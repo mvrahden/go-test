@@ -742,8 +742,11 @@ CompilePackagesStream:
                              from pkg3]    [run suites
                                             from pkg4]
 
-Each CompileResult immediately produces SuiteTargets that enter
-the execution semaphore. No "compile all, then run all" barrier.
+Each CompileResult immediately produces SuiteTargets that queue for
+an execution slot in the order the compile reported them; a slot goes to
+the target queued first. A group's go confirms cached binaries only as it
+exits, beside the ones it relinked last, and reports the relinked ones
+first. No "compile all, then run all" barrier.
 ```
 
 ### Per-Suite Fixture Readiness

@@ -2,9 +2,9 @@ Expect: ^FAIL .*conformance/fixtures .* / releases the fixture only once that pr
 Clause: when the last suite reading a shared fixture returns while a process it started still runs → releases the fixture only once that process is gone
 --- a/internal/gotestrunner/dispatch.go
 +++ b/internal/gotestrunner/dispatch.go
-@@ -110,6 +110,7 @@
+@@ -139,6 +139,7 @@
+ 			return
  		}
- 		defer release()
  	}
 +	r.done(&t)
  	r.clock.run(t.Group, func() {

@@ -8,17 +8,19 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strings"
 	"time"
 )
 
 // A run links its test binaries into a cache keyed by what decides the
 // link's output: the working directory (two checkouts of one module share
-// import paths), the build flags, the platform and the Go version. The -o
-// path is then stable across runs, and go skips the link when the binary's
-// build ID still matches. Each run copies the binary into its own work dir:
-// a concurrent run relinking the same key never replaces a file another run
-// is executing. The link runs under a per-binary lock so two runs cannot
-// write one output at once.
+// import paths), the build flags, those in GOFLAGS among them, the platform
+// and the Go version. Each entry is then stable across runs. A run places
+// its cached binaries into its own stage dir, by link or copy, under each
+// binary's lock, and builds there: go leaves a binary that is up to date
+// and replaces one that is not. Nothing writes a cache entry in place: a
+// rebuilt binary replaces its entry by a rename, so a run executing the old
+// file keeps it.
 
 func binaryCacheKey(cwd string, buildFlags []string) string {
 	flags := slices.Clone(buildFlags)
@@ -31,6 +33,32 @@ func binaryCacheKey(cwd string, buildFlags []string) string {
 	return hex.EncodeToString(h.Sum(nil))[:16]
 }
 
+// keyedEnv are the variables that change a test binary beside its build
+// flags: GOFLAGS carries build flags too.
+var keyedEnv = []string{"GOFLAGS", "GOEXPERIMENT", "CGO_ENABLED"}
+
+// traceFlags change what go prints, not the binary it links.
+var traceFlags = []string{"x", "v", "n", "work", "json", "p"}
+
+// envKeyFlags is what keyedEnv holds, as parts of a cache key; GOFLAGS
+// without its traceFlags.
+func envKeyFlags(getenv func(string) string) []string {
+	var out []string
+	for _, name := range keyedEnv {
+		v := getenv(name)
+		if name == "GOFLAGS" {
+			v = strings.Join(slices.DeleteFunc(strings.Fields(v), func(f string) bool {
+				flag, _, _ := strings.Cut(strings.TrimLeft(f, `-'"`), "=")
+				return slices.Contains(traceFlags, flag)
+			}), " ")
+		}
+		if v != "" {
+			out = append(out, "$"+name+"="+v)
+		}
+	}
+	return out
+}
+
 // binaryCacheDir returns the directory this run's binaries link into, or ""
 // when the cache is off (an empty root) or cannot be used.
 func binaryCacheDir(root string, buildFlags []string) string {
@@ -41,7 +69,7 @@ func binaryCacheDir(root string, buildFlags []string) string {
 	if err != nil {
 		return ""
 	}
-	dir := filepath.Join(root, "bin", binaryCacheKey(cwd, buildFlags))
+	dir := filepath.Join(root, "bin", binaryCacheKey(cwd, append(slices.Clone(buildFlags), envKeyFlags(os.Getenv)...)))
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return ""
 	}
@@ -86,6 +114,24 @@ func stillAt(f *os.File, path string) bool {
 // lockOpened runs once a lock file is open and before it is locked; tests
 // replace it to act while a run waits on a lock.
 var lockOpened = func(path string) {}
+
+// hardLink makes a hard link; tests replace it.
+var hardLink = os.Link
+
+// linkOrCopy makes dst name src's bytes as an executable, replacing dst:
+// a hard link, or a copy on Windows, where a linked binary in use can be
+// neither replaced nor evicted, and wherever the link is refused (another
+// filesystem, protected hard links, a link count at its limit).
+func linkOrCopy(src, dst string) (linked bool, err error) {
+	if runtime.GOOS == "windows" {
+		return false, copyFile(src, dst)
+	}
+	_ = os.Remove(dst)
+	if hardLink(src, dst) == nil {
+		return true, nil
+	}
+	return false, copyFile(src, dst)
+}
 
 // copyFile writes src's bytes to dst as an executable, replacing dst. No
 // process is forked while dst is open: a child forked then would hold the

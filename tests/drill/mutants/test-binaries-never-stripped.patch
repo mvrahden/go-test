@@ -1,0 +1,13 @@
+Clause: when a package is run with no link or profile flag → its test binary carries no debug information
+Expect: ^FAIL .*conformance/cli CLILinkFlags .* / its test binary carries no debug information \(
+--- a/internal/gotestrunner/compile.go
++++ b/internal/gotestrunner/compile.go
+@@ -276,7 +276,7 @@
+ 	if kept || hasLinkFlags(buildFlags) || hasLinkFlags(strings.Fields(goflags)) || hasProfileFlag(runFlags) {
+ 		return buildFlags
+ 	}
+-	return append(slices.Clone(buildFlags), stripLinkFlag)
++	return buildFlags
+ }
+
+ func hasLinkFlags(flags []string) bool {

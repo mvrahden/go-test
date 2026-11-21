@@ -1,0 +1,13 @@
+Clause: when the same suites are run with GOMAXPROCS=1 and no -p → they do not all run at once, so at least one fails waiting
+Expect: ^FAIL .*conformance/cli CLIProcs .* / they do not all run at once, so at least one fails waiting \(
+--- a/internal/gotestrunner/pipeline.go
++++ b/internal/gotestrunner/pipeline.go
+@@ -42,7 +42,7 @@
+ func computeDispatchConcurrency(runFlags *[]string, budget, totalSuites, procCap int, sanitized bool, gomaxprocs int) int {
+ 	userParallel := ExtractParallelValue(*runFlags)
+
+-	procs := gomaxprocs
++	procs := max(gomaxprocs, totalSuites)
+ 	if sanitized && budget == 0 && procCap == 0 {
+ 		// Halve both dimensions: the budget (total concurrent test methods)
+ 		// and the process cap. Halving the budget alone would not reduce the

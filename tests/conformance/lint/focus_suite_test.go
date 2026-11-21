@@ -16,8 +16,23 @@ import (
 type LinterFocusFixTestSuite struct{}
 
 func (s *LinterFocusFixTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second, SetupTimeout: 2 * time.Minute}
 }
+
+// BeforeAll vets a staged module once, so the methods, which lint and vet
+// one each, find gotest compiled and vetted rather than each building it
+// cold at once.
+func (s *LinterFocusFixTestSuite) BeforeAll(t *gotest.T) {
+	root, err := testkit.RepoRoot()
+	gotest.NoError(t, err)
+	mod := t.TempDir()
+	_, err = testkit.StagePackage(root, filepath.Join("..", "testdata", "lintfocustagged"), mod, "lintfocusmod")
+	gotest.NoError(t, err)
+	(&unfocusedFix{mod: mod}).vet(t)
+}
+
+// AfterAll has nothing to release: the staged module is a temp dir.
+func (s *LinterFocusFixTestSuite) AfterAll(t *gotest.T) {}
 
 // unfocusedFix is a staged copy of a testdata package after lint -fix ran
 // on it.

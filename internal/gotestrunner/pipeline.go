@@ -8,7 +8,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 	"slices"
 	"sort"
 	"strings"
@@ -37,13 +36,14 @@ func resolveSetupTimeout(d time.Duration) time.Duration {
 // computeDispatchConcurrency decides how many suite processes run at once.
 // The budget (total concurrent test methods, default 2×GOMAXPROCS) is split
 // between processes and each process's -parallel; a user -parallel keeps the
-// budget and divides it, so processes × methods never exceeds the budget;
-// procCap (go test's -p) bounds the process count outright.
-func computeDispatchConcurrency(runFlags *[]string, budget, totalSuites, procCap int, sanitized bool) int {
+// budget and divides it, so processes × methods never exceeds the budget.
+// procCap (go test's -p) sets the process count, above gomaxprocs too and
+// without the sanitizer halving: as go test, it runs that many binaries.
+func computeDispatchConcurrency(runFlags *[]string, budget, totalSuites, procCap int, sanitized bool, gomaxprocs int) int {
 	userParallel := ExtractParallelValue(*runFlags)
 
-	procs := runtime.GOMAXPROCS(0)
-	if sanitized && budget == 0 {
+	procs := gomaxprocs
+	if sanitized && budget == 0 && procCap == 0 {
 		// Halve both dimensions: the budget (total concurrent test methods)
 		// and the process cap. Halving the budget alone would not reduce the
 		// process count — ComputeConcurrency caps inter at procs first — and
@@ -52,11 +52,11 @@ func computeDispatchConcurrency(runFlags *[]string, budget, totalSuites, procCap
 		procs = max(1, procs/2)
 	}
 	if procCap > 0 {
-		procs = min(procs, procCap)
+		procs = procCap
 	}
 	if userParallel > 0 {
 		if budget <= 0 {
-			budget = 2 * runtime.GOMAXPROCS(0)
+			budget = 2 * procs
 		}
 		return max(1, min(totalSuites, procs, budget/userParallel))
 	}
@@ -124,6 +124,9 @@ type PipelineResult struct {
 	CapturedJSON []byte
 	// Groups is what each named group that ran took, by name.
 	Groups []GroupRun
+	// CompileSpan runs from the compile stage's start to its last outcome;
+	// zero when nothing was compiled.
+	CompileSpan time.Duration
 }
 
 // sharedFixturesPkg names the synthetic package a shared fixture failure is
@@ -350,20 +353,24 @@ type benchPrep struct {
 	proc            *SharedFixtureProcess
 	setupErr        error
 	setupTimedOut   bool
+	compileSpan     time.Duration
 }
 
-// prepareBenchRun compiles the suite packages and starts the given shared
-// fixtures concurrently, and waits for both: a bench run dispatches nothing
-// while a build or a setup could compete with a measurement. fixtures is the
-// run's residency plan (see planBenchFixtureWindows), not the full overlay
-// set: a fixture no scheduled target requires never starts.
-func prepareBenchRun(ctx context.Context, overlay *OverlayResult, fixtures []gotestgen.SharedFixtureInfo, buildFlags []string, setupTimeout time.Duration, compileParallel int) benchPrep {
+// prepareBenchRun compiles packages and starts the given shared fixtures
+// concurrently, and waits for both: a bench run dispatches nothing while a
+// build or a setup could compete with a measurement. fixtures is the run's
+// residency plan (see planBenchFixtureWindows), not the full overlay set: a
+// fixture no scheduled target requires never starts.
+func prepareBenchRun(ctx context.Context, overlay *OverlayResult, packages []string, fixtures []gotestgen.SharedFixtureInfo, buildFlags, runFlags []string, setupTimeout time.Duration, compileParallel int) benchPrep {
 	var p benchPrep
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		p.compiled, p.compileFailures = CompilePackages(ctx, overlay.SuitePackages, overlay.OverlayFlag, buildFlags, overlay.WorkDir, binaryCacheDir(overlay.BinaryCacheRoot, buildFlags), compileParallel)
+		link := stageFlags(buildFlags, runFlags, overlay.WorkDir)
+		ch, span := spanOf(CompilePackagesStream(ctx, packages, overlay.OverlayFlag, link, overlay.WorkDir, binaryCacheDir(overlay.BinaryCacheRoot, link), compileParallel), time.Now)
+		p.compiled, p.compileFailures = collectOutcomes(ch)
+		p.compileSpan = span()
 	}()
 
 	if len(fixtures) > 0 {
@@ -436,7 +443,9 @@ func runBench(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 	collector.StdlibTestsByPkg = plan.StdlibTests()
 	collector.bench = true
 	resolvedSetupTimeout := resolveSetupTimeout(cfg.SetupTimeout)
-	prep := prepareBenchRun(ctx, overlay, win.Fixtures, pf.BuildFlags, resolvedSetupTimeout, cfg.CompileParallel)
+	// A package no selected benchmark belongs to is not built.
+	benchBuild := buildSet(overlay.SuitePackages, dispatchedPackages(plan.benchRun(sel)))
+	prep := prepareBenchRun(ctx, overlay, benchBuild, win.Fixtures, pf.BuildFlags, pf.RunFlags, resolvedSetupTimeout, cfg.CompileParallel)
 	setupProc, setupErr := prep.proc, prep.setupErr
 
 	// finish tears the fixture process down — the one owner of its
@@ -456,6 +465,7 @@ func runBench(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 		applySetupFailure(collector, &result, setupErr)
 		applyTeardownFailure(collector, &result, teardownErr)
 		result.CapturedJSON = collector.CapturedJSON()
+		result.CompileSpan = prep.compileSpan
 		return result
 	}
 
@@ -493,19 +503,7 @@ func runBench(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 	collector.EmitSkippedSuites(plan.SkippedSuites())
 	bookBuildFailures(collector, overlay.BrokenPackages, prep.compileFailures)
 	bookNoSuites(collector, overlay, noSuite, order)
-	// A package that built but runs no benchmark passes, as under go test
-	// -bench.
-	benched := map[string]bool{}
-	for i := range targets {
-		benched[targets[i].Package] = true
-	}
-	nothingToRun := false
-	for i := range prep.compiled {
-		if pkg := prep.compiled[i].Package; !benched[pkg] {
-			collector.RecordNothingToRun(pkg)
-			nothingToRun = true
-		}
-	}
+	nothingToRun := bookUnbenched(collector, overlay.SuitePackages, benchBuild, prep.compiled, targets)
 
 	// "Nothing to run" is a clean outcome only when every matched package
 	// became runnable and none of them reports a verdict of its own. A
@@ -613,6 +611,30 @@ func runBench(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 	return finish(result, errors.Join(closeErrs...)), nil
 }
 
+// bookUnbenched books each suite package that runs no benchmark as passing,
+// as under go test -bench: one left unbuilt, or built with no target. It
+// reports whether there was any.
+func bookUnbenched(c *OutputCollector, suitePackages, built []string, compiled []CompileResult, targets []SuiteTarget) bool {
+	benched := map[string]bool{}
+	for i := range targets {
+		benched[targets[i].Package] = true
+	}
+	found := false
+	for i := range compiled {
+		if pkg := compiled[i].Package; !benched[pkg] {
+			c.RecordNothingToRun(pkg)
+			found = true
+		}
+	}
+	for _, pkg := range suitePackages {
+		if !slices.Contains(built, pkg) {
+			c.RecordNothingToRun(pkg)
+			found = true
+		}
+	}
+	return found
+}
+
 // neverRan is what a suite reports that was given up before it started,
 // naming the fixture by its type: key is its state key, import path and all.
 func neverRan(suite, key string) string {
@@ -647,9 +669,13 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 	r := newStreamRun(ctx, cfg, overlay, pf)
 	defer r.cancel()
 	defer r.releaseCancel()
-	held := r.intake(CompilePackagesStream(r.ctx, overlay.SuitePackages, overlay.OverlayFlag, r.pf.BuildFlags, overlay.WorkDir, binaryCacheDir(overlay.BinaryCacheRoot, r.pf.BuildFlags), cfg.CompileParallel))
+	link := stageFlags(r.pf.BuildFlags, r.pf.RunFlags, overlay.WorkDir)
+	compiled, span := spanOf(CompilePackagesStream(r.ctx, r.bookUnbuilt(), overlay.OverlayFlag, link, overlay.WorkDir, binaryCacheDir(overlay.BinaryCacheRoot, link), cfg.CompileParallel), time.Now)
+	held := r.intake(compiled)
 	r.runScopes(held)
-	return r.finish(), nil
+	result := r.finish()
+	result.CompileSpan = span()
+	return result, nil
 }
 
 // deferredTarget is a suite held back past the stream, with its slot in

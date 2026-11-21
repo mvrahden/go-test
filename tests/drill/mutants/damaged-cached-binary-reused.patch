@@ -1,13 +1,13 @@
 Expect: ^FAIL .*conformance/cli .* / the next run links it again, says so on stderr, and passes / truncated to half \(
 Clause: when a cached test binary is truncated, or zero-filled at its end, after a run linked it → the next run links it again, says so on stderr, and passes
---- a/internal/gotestrunner/compile.go
-+++ b/internal/gotestrunner/compile.go
-@@ -101,7 +101,7 @@
- 		return CompileResult{}, compileError(pkgPath, err, nil)
+--- a/internal/gotestrunner/compilestage.go
++++ b/internal/gotestrunner/compilestage.go
+@@ -195,7 +195,7 @@
+ 	if !recorded {
+ 		return
  	}
- 	record, recorded := readSum(outputPath)
--	if beforeErr == nil && before == after && (!recorded || record != after) {
-+	if beforeErr == nil && before == after && !recorded {
- 		_ = os.Remove(outputPath)
- 		if err := link(); err != nil {
- 			return CompileResult{}, err
+-	if sum, err := sumFile(b.Cached); err != nil || sum != record {
++	if _, err := sumFile(b.Cached); err != nil || record.Size < 0 {
+ 		b.damaged = err == nil
+ 		return
+ 	}

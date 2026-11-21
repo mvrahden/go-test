@@ -1,5 +1,5 @@
 Judge: ./internal/gotestrunner BinaryCacheLockCheckTestSuite/TestALockEvictedWhileWaitingIsNotTheCache
-Expect: ^FAIL .*internal/gotestrunner BinaryCacheLockCheck .* / links the run.s binary into its work dir and leaves none in the cache \(
+Expect: ^FAIL .*internal/gotestrunner BinaryCacheLockCheck .* / places nothing from the cache, so go links the run.s binary itself \(
 --- a/internal/gotestrunner/bincache_lock_unix.go
 +++ b/internal/gotestrunner/bincache_lock_unix.go
 @@ -20,11 +20,6 @@ func lockFile(path string) (func(), error) {

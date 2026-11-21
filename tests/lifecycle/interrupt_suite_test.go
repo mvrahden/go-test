@@ -28,7 +28,7 @@ type InterruptTestSuite struct {
 }
 
 func (s *InterruptTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second, SetupTimeout: time.Minute}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second, SetupTimeout: 3 * time.Minute}
 }
 
 func (s *InterruptTestSuite) BeforeAll(t *gotest.T) {
@@ -52,6 +52,12 @@ func (s *InterruptTestSuite) BeforeAll(t *gotest.T) {
 	build := exec.Command("go", "test", "-c", "-o", s.binary, "./testdata/interrupt/") //nolint:gosec // G204: fixed args
 	build.Dir = s.root
 	out, err = build.CombinedOutput()
+	gotest.NoError(t, err, string(out))
+	// gotest fuzz builds the package instrumented, the standard library
+	// included: built here once, a method does not compile it cold.
+	fuzzBuild := exec.Command("go", "test", "-c", "-fuzz=^FuzzFuzzingTestSuite_FuzzSpins$", "-o", os.DevNull, "./testdata/interrupt/") //nolint:gosec // G204: fixed args
+	fuzzBuild.Dir = s.root
+	out, err = fuzzBuild.CombinedOutput()
 	gotest.NoError(t, err, string(out))
 }
 
@@ -257,9 +263,10 @@ func (s *InterruptTestSuite) TestTheRunnerWaitsForTheRelease(t *gotest.T) {
 // fuzzingWorkers waits until a worker is fuzzing beside the coordinator: each
 // process logs "running" once it executes the target. The engine owns Ctrl-C
 // only from then on; a worker signalled before it answered the coordinator's
-// first ping is reported as having terminated without fuzzing.
+// first ping is reported as having terminated without fuzzing. The wait ends
+// inside the method's budget, so a worker that never fuzzes is named.
 func fuzzingWorkers(t *gotest.T, tree *proctree.Tree, cmd *exec.Cmd, log string) {
-	for deadline := time.Now().Add(30 * time.Second); countEvents(readEvents(log), "running") < 2; time.Sleep(20 * time.Millisecond) {
+	for deadline := time.Now().Add(15 * time.Second); countEvents(readEvents(log), "running") < 2; time.Sleep(20 * time.Millisecond) {
 		if time.Now().After(deadline) {
 			_ = tree.Kill()
 			_ = wait(tree, cmd)
