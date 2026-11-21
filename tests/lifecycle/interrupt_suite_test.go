@@ -263,9 +263,10 @@ func (s *InterruptTestSuite) TestTheRunnerWaitsForTheRelease(t *gotest.T) {
 // fuzzingWorkers waits until a worker is fuzzing beside the coordinator: each
 // process logs "running" once it executes the target. The engine owns Ctrl-C
 // only from then on; a worker signalled before it answered the coordinator's
-// first ping is reported as having terminated without fuzzing.
+// first ping is reported as having terminated without fuzzing. The wait ends
+// inside the method's budget, so a worker that never fuzzes is named.
 func fuzzingWorkers(t *gotest.T, tree *proctree.Tree, cmd *exec.Cmd, log string) {
-	for deadline := time.Now().Add(30 * time.Second); countEvents(readEvents(log), "running") < 2; time.Sleep(20 * time.Millisecond) {
+	for deadline := time.Now().Add(15 * time.Second); countEvents(readEvents(log), "running") < 2; time.Sleep(20 * time.Millisecond) {
 		if time.Now().After(deadline) {
 			_ = tree.Kill()
 			_ = wait(tree, cmd)
