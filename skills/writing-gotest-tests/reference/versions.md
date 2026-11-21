@@ -679,3 +679,30 @@ Rules and sections tagged **v1.38+** need v1.38.0 or newer. What v1.38 changes:
    `Fuzz<Suite>_<Method>` wrapper to replay them. `-c`, `-n`,
    `-overlay`, `-fuzz` and a profile flag over several suite processes
    are refused with exit 2.
+
+## v1.39
+
+What v1.39 changes:
+
+1. **Generated code needs the v1.39 runtime** — the harness calls
+   `gotestruntime.EachT`, `BenchB`, `FuzzF`, `FuzzTarget`, `SeedArity` and
+   `SeedArg`, and the shared fixture setup program is one call of
+   `gotestruntime.RunSharedFixtures`; none of them exists before v1.39, so
+   the module must resolve gotest v1.39.0 or newer. A `go get -tool` pin
+   resolves both from one version.
+
+2. **What only generated code used is gone from the user API** —
+   `pkg/gotest` drops `NewTFromTB`, `NewB`, `SeedArg`, `SeedArity`,
+   `FuzzTarget` and `FuzzEach`, and the package `pkg/gotestfuzz` is gone;
+   generated code calls the runtime's names instead. A
+   harness an older gotest left on disk no longer compiles: remove it with
+   `gotest clean ./...`, and run gotest as `go tool gotest`, so the CLI and
+   the runtime come from one version. A stdlib `FuzzXxx` wraps its
+   `*testing.F` with `gotest.NewF(f)`, without the three `nil`s; a benchmark
+   of your own hands its `*testing.B` to assertions as it is.
+
+3. **A vendored module imports nothing extra** — with the CLI declared by
+   `go get -tool`, `go mod vendor` copies `pkg/gotestruntime` itself:
+   delete the blank imports of `pkg/gotestruntime` and `pkg/gotestfuzz`
+   and vendor again. Without the tool directive the build failure of each
+   suite package names the `go get -tool` command, and `-mod=mod`.
