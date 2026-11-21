@@ -86,7 +86,7 @@ In the spec view the target sits under its suite as a property beside the exampl
 
 One caveat to state plainly: suite fuzz methods exist only through gotest's generated wrappers.
 Plain `go test` (and external fuzzing infrastructure like OSS-Fuzz, which needs on-disk `FuzzXxx` functions) never sees them, and promoted seeds replay only under gotest runs.
-If a target must also run under stock tooling, write it as a top-level `func FuzzXxx(*testing.F)` — `gotest.NewF(f, nil, nil, nil)` and `f.Fuzz` work there too, as plain library calls bound by reflection, though with native argument types only: fans exist solely in generated suite wrappers.
+If a target must also run under stock tooling, write it as a top-level `func FuzzXxx(*testing.F)` — `gotest.NewF(f)` and `f.Fuzz` work there too, as plain library calls bound by reflection, though with native argument types only: fans exist solely in generated suite wrappers.
 
 ## Running
 

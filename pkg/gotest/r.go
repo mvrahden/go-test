@@ -43,9 +43,10 @@ func (r *R) FailNow() {
 func (r *R) Failed() bool    { return r.failed }
 func (r *R) Message() string { return r.message }
 
-// Record runs fn with a fresh *R in a dedicated goroutine and returns
-// the recorder after fn completes. The goroutine is required because
-// FailNow calls runtime.Goexit.
+// Record is for testing an assertion helper: it runs fn with a fresh *R and
+// returns it, so the test can ask whether the helper failed and with what
+// message. fn runs in a dedicated goroutine because FailNow calls
+// runtime.Goexit.
 //
 // A panic inside fn is carried back to the calling goroutine and re-raised
 // there. Left unrecovered it would abort the process from a goroutine the

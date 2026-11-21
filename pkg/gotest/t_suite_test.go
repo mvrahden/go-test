@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
+	"github.com/mvrahden/go-test/pkg/gotestruntime"
 )
 
 // TTestSuite tests the T wrapper: context access and fallback to the
@@ -170,10 +171,10 @@ func (s *TTestSuite) TestNestedBehaviorContext(t *gotest.T) {
 	})
 }
 
-func (s *TTestSuite) TestNewTFromTB(t *gotest.T) {
+func (s *TTestSuite) TestBenchmarkHookT(t *gotest.T) {
 	t.It("routes helpers through the TB and nils T()", func(it *gotest.T) {
 		res := testing.Benchmark(func(b *testing.B) {
-			tb := gotest.NewTFromTB(b)
+			tb := gotestruntime.EachT(b)
 			gotest.Zero(it, tb.T())
 			gotest.NotZero(it, tb.Context())
 			gotest.Equal(it, "recovered", func() (r string) {
@@ -203,7 +204,7 @@ func (s *TTestSuite) TestName(t *gotest.T) {
 		w.It("is the benchmark's name", func(it *gotest.T) {
 			var got string
 			testing.Benchmark(func(b *testing.B) {
-				got = gotest.NewTFromTB(namedB{b}).Name()
+				got = gotestruntime.EachT(namedB{b}).Name()
 				for b.Loop() {
 				}
 			})

@@ -8,7 +8,7 @@ func Benchmark{{ $ts.Identifier }}(b *ƒtesting.B) {
     defer ƒgotestruntime.ReleaseOnPanic(b)
     ƒgotestruntime.SkipIfStopped(b)
     b.StopTimer()
-    ƒeachT := ƒgotest.NewTFromTB(b)
+    ƒeachT := ƒgotestruntime.EachT(b)
     defer ƒgotestruntime.AfterEach(func() {
       b.StopTimer()
       s.AfterEach(ƒeachT)
@@ -16,7 +16,7 @@ func Benchmark{{ $ts.Identifier }}(b *ƒtesting.B) {
     s.BeforeEach(ƒeachT)
     b.StartTimer()
     b.ResetTimer()
-    ƒgotestruntime.RunBody(b, func() { s.{{ $bm.Identifier }}({{ if $bm.UsesStdlibT }}b{{ else }}ƒgotest.NewB(b){{ end }}) })
+    ƒgotestruntime.RunBody(b, func() { s.{{ $bm.Identifier }}({{ if $bm.UsesStdlibT }}b{{ else }}ƒgotestruntime.BenchB(b){{ end }}) })
   })
 {{ end }}
 }

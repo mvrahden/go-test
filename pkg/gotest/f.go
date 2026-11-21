@@ -23,29 +23,23 @@ import (
 // (Errorf + FailNow), so the assertion library works against the fuzz
 // target itself, e.g. to fail setup outside of any single execution.
 //
-// It also carries the generated FuzzTarget of its wrapper and buffers f.Add
+// It also carries the generated target of its wrapper and buffers f.Add
 // seeds until the Fuzz call, which explodes them through that target.
 type F struct {
 	f          *testing.F
 	beforeEach func(*T)
 	afterEach  func(*T)
-	target     *FuzzTarget
+	target     *fuzzTarget
 	seeds      [][]any
 	seedAt     []string // the file:line of each seed's f.Add call
 	fuzzed     bool
 	echoAll    bool
 }
 
-// NewF wraps f, pairing it with optional beforeEach/afterEach lifecycle
-// hooks (either may be nil) and the generated target of its wrapper. A nil
-// target is the plain-library case: Fuzz then binds by reflection and only
-// engine-native argument types work.
-func NewF(f *testing.F, beforeEach, afterEach func(*T), target *FuzzTarget) *F {
-	return &F{
-		f: f, beforeEach: beforeEach, afterEach: afterEach, target: target,
-		echoAll: os.Getenv(protocol.EnvFuzzEchoInput) == "1",
-	}
-}
+// NewF wraps f for a fuzz target written as a top-level func
+// FuzzXxx(*testing.F). Its Fuzz binds the callback by reflection, with the
+// engine's native argument types only.
+func NewF(f *testing.F) *F { return newF(f, nil, nil, nil) }
 
 // F returns the underlying *testing.F; Context is its context.
 func (f *F) F() *testing.F            { return f.f }

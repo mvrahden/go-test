@@ -15,10 +15,6 @@ type B struct {
 	b *testing.B
 }
 
-// NewB wraps a *testing.B, for a helper written against *testing.B that
-// calls code taking a *B.
-func NewB(b *testing.B) *B { return &B{b: b} }
-
 // B returns the underlying *testing.B.
 func (b *B) B() *testing.B { return b.b }
 

@@ -20,11 +20,11 @@ gotest SHALL name the go get -tool command to run when a suite imports gotest in
 - **THEN** names the go get -tool command to run
 
 ### Requirement: A vendored module
-When a module's vendor directory lacks pkg/gotestruntime, which the generated harness imports and no file of a user module does, the build failure of each suite package SHALL name the blank import that makes go mod vendor copy it, and -mod=mod.
+When a module's vendor directory lacks pkg/gotestruntime, which only the generated harness imports, the build failure of each suite package SHALL name the go get -tool declaration that makes go mod vendor copy it, and -mod=mod.
 
 #### Scenario: A module vendored without the runtime
 - **WHEN** a suite runs in a module whose vendor directory lacks pkg/gotestruntime
-- **THEN** fails to build with exit 2, naming the blank import to add and -mod=mod
+- **THEN** fails to build with exit 2, naming the tool declaration to add and -mod=mod
 
 ### Requirement: A module that only requires gotest
 gotest SHALL run the suites of a module that requires gotest and declares no tool directive, with the go.mod and go.sum go mod tidy leaves it.

@@ -88,7 +88,7 @@ func newFuzzEmitter(pkg *packages.Package, imps *importSet) *fuzzEmitter {
 // pkgRef imports one of the fixed packages and returns its alias.
 func (e *fuzzEmitter) pkgRef(path string) string { return e.imps.std(path) }
 
-func (e *fuzzEmitter) fuzzPkg() string    { return e.pkgRef(fuzzRuntimeImport) }
+func (e *fuzzEmitter) fuzzPkg() string    { return e.pkgRef(runtimeImport) }
 func (e *fuzzEmitter) stringsPkg() string { return e.pkgRef("strings") }
 func (e *fuzzEmitter) strconvPkg() string { return e.pkgRef("strconv") }
 
@@ -257,8 +257,8 @@ func (e *fuzzEmitter) helperSource(t types.Type, typeRef, name string) (string, 
 	writeName := "ƒ_fuzzwrite_" + fuzzFanVersion + "_" + name
 
 	var read, write strings.Builder
-	fmt.Fprintf(&read, "\nfunc %s(ƒr *%s.Reader) %s {\n", readName, e.fuzzPkg(), typeRef)
-	fmt.Fprintf(&write, "\nfunc %s(ƒw *%s.Writer, ƒv %s) {\n", writeName, e.fuzzPkg(), typeRef)
+	fmt.Fprintf(&read, "\nfunc %s(ƒr *%s.FuzzReader) %s {\n", readName, e.fuzzPkg(), typeRef)
+	fmt.Fprintf(&write, "\nfunc %s(ƒw *%s.FuzzWriter, ƒv %s) {\n", writeName, e.fuzzPkg(), typeRef)
 
 	switch u := types.Unalias(t).Underlying().(type) {
 	case *types.Struct:

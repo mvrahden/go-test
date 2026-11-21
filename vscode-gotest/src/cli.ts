@@ -21,8 +21,8 @@ export { resolveGoBinary } from "./goBinary.js";
 const execFileAsync = promisify(execFile);
 const DEFAULT_MODULE_PATH = "github.com/mvrahden/go-test/cmd/gotest";
 // v1.39.0 is the release whose generated code calls the shared fixture
-// program in the runtime, so the CLI's runtime floor moved there and this
-// floor with it.
+// program and the benchmark and fuzz constructors in the runtime, so the
+// CLI's runtime floor moved there and this floor with it.
 // v1.38.0 is the release whose runner stops a suite on its control channel,
 // which its runtime requires, so the CLI's runtime floor moved there and this
 // floor with it. From v1.37.0 on spec reads --declared and --hide and lint

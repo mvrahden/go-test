@@ -46,7 +46,6 @@ func (s *DocTestSuite) TestPackageComments(t *gotest.T) {
 	for sub, row := range gotest.Each(t, []struct{ Desc, dir, opens string }{
 		{"gotest", ".", "Package gotest is what a gotest suite is written against"},
 		{"gotestruntime", "../gotestruntime", "Package gotestruntime is what the harness gotest generates calls"},
-		{"gotestfuzz", "../gotestfuzz", "Package gotestfuzz holds the byte codecs"},
 	}) {
 		gotest.Regexp(sub, "^"+regexp.QuoteMeta(row.opens), docOf(sub, row.dir).Doc)
 	}
@@ -69,7 +68,7 @@ func (s *DocTestSuite) TestTheNamesATestIsWrittenAgainst(t *gotest.T) {
 	}
 	for _, name := range []string{
 		"T", "NewT", "T.Context", "T.Errorf", "T.FailNow", "T.Skipf", "T.It", "T.When", "MatchSnapshot",
-		"B", "NewB", "B.B", "B.Name", "B.Loop", "B.ReportAllocs", "B.SetBytes", "B.ReportMetric", "B.Context", "B.Errorf", "B.FailNow", "B.Skipf",
+		"B", "B.B", "B.Name", "B.Loop", "B.ReportAllocs", "B.SetBytes", "B.ReportMetric", "B.Context", "B.Errorf", "B.FailNow", "B.Skipf",
 	} {
 		gotest.NotEmpty(t, strings.TrimSpace(documented[name]), "%s has no doc comment", name)
 	}

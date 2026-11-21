@@ -132,12 +132,13 @@ func compileError(pkgPath string, err error, diagnostics []byte) error {
 }
 
 // vendorAdvice names the fix for a vendor directory that lacks the runtime:
-// only the generated harness imports it, so go mod vendor never copied it.
+// only the generated harness imports it, and go mod vendor copies it only
+// for a module that declares the CLI as a tool.
 func vendorAdvice(diagnostics []byte) string {
 	pkg := about.Repo + "/pkg/gotestruntime"
 	for line := range bytes.SplitSeq(diagnostics, []byte("\n")) {
 		if bytes.Contains(line, []byte(pkg)) && bytes.Contains(line, []byte("-mod=vendor")) {
-			return fmt.Sprintf("gotest: vendor/ lacks %[1]s, which the generated harness imports and no file of this module does. Add a blank import of it to a test file (import _ %[1]q) and run go mod vendor, or run with -mod=mod.", pkg)
+			return fmt.Sprintf("gotest: vendor/ lacks %[1]s, which the generated harness imports. Declare the CLI as a tool (go get -tool %[2]s/cmd/gotest@<the version go.mod requires>) and run go mod vendor, or run with -mod=mod.", pkg, about.Repo)
 		}
 	}
 	return ""

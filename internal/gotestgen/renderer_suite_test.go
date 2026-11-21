@@ -1,6 +1,7 @@
 package gotestgen_test
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -604,13 +605,13 @@ func (s *RendererTestSuite) TestRenderer_BenchmarkWrapper(t *gotest.T) {
 	})
 
 	t.When("benchmark method takes *testing.B directly", func(w *gotest.T) {
-		w.It("dispatches with the raw *testing.B instead of gotest.NewB(b)", func(it *gotest.T) {
+		w.It("dispatches with the raw *testing.B instead of gotestruntime.BenchB(b)", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_Benchmark_StdlibB")
 			out, _ := renderTestPkg(it.T(), pkg, true)
 
 			gotest.Contains(it, out, "func BenchmarkStdlibBenchTestSuite(b *ƒtesting.B)")
 			gotest.Contains(it, out, "s.BenchmarkRaw(b)")
-			gotest.NotContains(it, out, "s.BenchmarkRaw(ƒgotest.NewB(b))")
+			gotest.NotContains(it, out, "s.BenchmarkRaw(ƒgotestruntime.BenchB(b))")
 		})
 	})
 
@@ -660,7 +661,7 @@ func (s *RendererTestSuite) TestRenderer_FuzzWrapper(t *gotest.T) {
 		out, _ := renderTestPkg(it.T(), pkg, true)
 
 		gotest.Contains(it, out, "func FuzzFuzzTestSuite_FuzzParse(f *ƒtesting.F)")
-		gotest.Contains(it, out, "ƒf := ƒgotest.NewF(f, s.BeforeEach, s.AfterEach, &ƒgotest.FuzzTarget{")
+		gotest.Contains(it, out, "ƒf := ƒgotestruntime.FuzzF(f, s.BeforeEach, s.AfterEach, &ƒgotestruntime.FuzzTarget{")
 		gotest.Contains(it, out, "s.FuzzParse(ƒf)")
 		gotest.NotContains(it, out, "X_FuzzOld")
 	})
@@ -672,7 +673,7 @@ func (s *RendererTestSuite) TestRenderer_FuzzWrapper(t *gotest.T) {
 		idx := strings.Index(out, "func FuzzFuzzTestSuite_FuzzParse")
 		gotest.GreaterOrEqual(it, idx, 0, "fuzz wrapper missing from output")
 		fuzzFn := out[idx:]
-		gotest.Regexp(it, `(?s)ƒgotestruntime\.OpenSuite\(f, ƒgotestruntime\.Suite\{\s+BeforeAll:\s+s\.BeforeAll,\s+AfterAll:\s+s\.AfterAll,\s+\}\)\s+ƒf := ƒgotest\.NewF\(`, fuzzFn,
+		gotest.Regexp(it, `(?s)ƒgotestruntime\.OpenSuite\(f, ƒgotestruntime\.Suite\{\s+BeforeAll:\s+s\.BeforeAll,\s+AfterAll:\s+s\.AfterAll,\s+\}\)\s+ƒf := ƒgotestruntime\.FuzzF\(`, fuzzFn,
 			"the suite opens before the fuzz target sees a seed")
 	})
 
@@ -715,14 +716,14 @@ func (s *RendererTestSuite) TestRenderer_FuzzWrapper(t *gotest.T) {
 	})
 
 	t.When("a fuzz target takes a struct", func(w *gotest.T) {
-		w.It("emits the fan source and hands each NewF its own target", func(it *gotest.T) {
+		w.It("emits the fan source and hands each FuzzF its own target", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestFuzzCodec_StructTarget")
 			out, _ := renderTestPkg(it.T(), pkg, true)
 
-			gotest.Contains(it, out, `"github.com/mvrahden/go-test/pkg/gotestfuzz"`)
+			gotest.Regexp(it, `ƒgotestruntime\.(FuzzLeaf\[|FuzzBytes\(|NewFuzzReader\()`, out)
 			gotest.Contains(it, out, "func ƒ_fuzzin_v1_Request(ƒ0 string, ƒ1 []byte, ƒ2 []byte, ƒ3 []byte, ƒ4 bool, ƒ5 string, ƒ6 []byte) Request {")
-			gotest.Contains(it, out, `ƒf := ƒgotest.NewF(f, s.BeforeEach, s.AfterEach, &ƒgotest.FuzzTarget{Signature: "func(*gotest.T, Request)", Register: ƒ_fuzzreg_v1_FuzzStructFuzzTestSuite_FuzzCreate, Explode: ƒ_fuzzexp_v1_FuzzStructFuzzTestSuite_FuzzCreate})`)
-			gotest.Contains(it, out, `ƒf := ƒgotest.NewF(f, s.BeforeEach, s.AfterEach, &ƒgotest.FuzzTarget{Signature: "func(*gotest.T, string)", Register: ƒ_fuzzreg_v1_FuzzStructFuzzTestSuite_FuzzNative, Explode: ƒ_fuzzexp_v1_FuzzStructFuzzTestSuite_FuzzNative})`)
+			gotest.Contains(it, out, `ƒf := ƒgotestruntime.FuzzF(f, s.BeforeEach, s.AfterEach, &ƒgotestruntime.FuzzTarget{Signature: "func(*gotest.T, Request)", Register: ƒ_fuzzreg_v1_FuzzStructFuzzTestSuite_FuzzCreate, Explode: ƒ_fuzzexp_v1_FuzzStructFuzzTestSuite_FuzzCreate})`)
+			gotest.Contains(it, out, `ƒf := ƒgotestruntime.FuzzF(f, s.BeforeEach, s.AfterEach, &ƒgotestruntime.FuzzTarget{Signature: "func(*gotest.T, string)", Register: ƒ_fuzzreg_v1_FuzzStructFuzzTestSuite_FuzzNative, Explode: ƒ_fuzzexp_v1_FuzzStructFuzzTestSuite_FuzzNative})`)
 			gotest.Contains(it, out, "s.FuzzCreate(ƒf)")
 			gotest.Contains(it, out, "s.FuzzNative(ƒf)")
 		})
@@ -737,11 +738,10 @@ func (s *RendererTestSuite) TestRenderer_FuzzWrapper(t *gotest.T) {
 	})
 
 	t.When("a fuzz target's struct pulls in a type from another package", func(w *gotest.T) {
-		w.It("imports that package in the generated header, alongside gotestfuzz", func(it *gotest.T) {
+		w.It("imports that package in the generated header", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestFuzzCodec_CrossPackage")
 			out, _ := renderTestPkg(it.T(), pkg, true)
 
-			gotest.Contains(it, out, `"github.com/mvrahden/go-test/pkg/gotestfuzz"`)
 			gotest.Contains(it, out, `"testpkg/TestFuzzCodec_CrossDep"`,
 				"without this import the generated file references crossdep.Setting and does not compile")
 			gotest.Contains(it, out, "crossdep.Setting")
@@ -749,14 +749,33 @@ func (s *RendererTestSuite) TestRenderer_FuzzWrapper(t *gotest.T) {
 	})
 
 	t.When("no fuzz target needs a fan", func(w *gotest.T) {
-		w.It("still binds the callback by type but imports no fuzz runtime", func(it *gotest.T) {
+		w.It("still binds the callback by type but calls no fuzz codec", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_FuzzMethod")
 			out, _ := renderTestPkg(it.T(), pkg, true)
 
-			gotest.Contains(it, out, `ƒf := ƒgotest.NewF(f, s.BeforeEach, s.AfterEach, &ƒgotest.FuzzTarget{Signature: "func(*gotest.T, string)"`)
+			gotest.Contains(it, out, `ƒf := ƒgotestruntime.FuzzF(f, s.BeforeEach, s.AfterEach, &ƒgotestruntime.FuzzTarget{Signature: "func(*gotest.T, string)"`)
 			gotest.Contains(it, out, "s.FuzzParse(ƒf)")
 			gotest.NotContains(it, out, "ƒ_fuzzin_")
-			gotest.NotContains(it, out, `"github.com/mvrahden/go-test/pkg/gotestfuzz"`)
+			gotest.Empty(it, regexp.MustCompile(`ƒgotestruntime\.(FuzzLeaf|FuzzBytes|NewFuzzReader|NewFuzzWriter)\b`).FindAllString(out, -1))
+		})
+	})
+}
+
+func (s *RendererTestSuite) TestRenderer_HarnessValuesFromRuntime(t *gotest.T) {
+	bench, _ := renderTestPkg(t.T(), gotestgen.ExportMustTestPkg(t.T(), "TestCollector_BenchmarkMethod"), true)
+	fuzz, _ := renderTestPkg(t.T(), gotestgen.ExportMustTestPkg(t.T(), "TestFuzzCodec_StructTarget"), true)
+	code := bench + fuzz
+	t.When("a suite with a benchmark and a struct-typed fuzz target is rendered", func(w *gotest.T) {
+		w.It("builds the benchmark's and the fuzz target's values through the runtime", func(it *gotest.T) {
+			gotest.Contains(it, code, "ƒeachT := ƒgotestruntime.EachT(b)")
+			gotest.Contains(it, code, "ƒgotestruntime.BenchB(b)")
+			gotest.Contains(it, code, "ƒf := ƒgotestruntime.FuzzF(f, s.BeforeEach, s.AfterEach, &ƒgotestruntime.FuzzTarget{")
+			gotest.Contains(it, code, "ƒeach ƒgotestruntime.FuzzEach) bool {")
+			gotest.Contains(it, code, "ƒgotestruntime.SeedArity(ƒseed, ")
+			gotest.Contains(it, code, "ƒgotestruntime.SeedArg[")
+		})
+		w.It("names no constructor of the user package", func(it *gotest.T) {
+			gotest.Empty(it, regexp.MustCompile(`ƒgotest\.(New[A-Z]\w*|FuzzTarget|FuzzEach|SeedArg|SeedArity)\b`).FindAllString(code, -1))
 		})
 	})
 }

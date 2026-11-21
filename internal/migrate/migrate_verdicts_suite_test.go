@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/migrate"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -17,8 +18,11 @@ type MigrateVerdictsTestSuite struct {
 }
 
 func (s *MigrateVerdictsTestSuite) SuiteConfig() gotest.SuiteConfig {
+	// MarkersAndTranslations compiles a module per row: about 30s on a
+	// developer machine, over 4m on a Windows runner.
 	cfg := gotest.IntegrationSuiteConfig()
 	cfg.Parallel = true
+	cfg.Timeout = 4 * time.Minute
 	return cfg
 }
 

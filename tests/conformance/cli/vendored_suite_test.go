@@ -11,7 +11,8 @@ import (
 )
 
 // CLIVendoredTestSuite: a vendored module that lacks the runtime the
-// harness imports is told how to bring it in.
+// harness imports, one that does not declare the CLI as a tool, is told how
+// to bring it in.
 type CLIVendoredTestSuite struct{}
 
 func (s *CLIVendoredTestSuite) SuiteConfig() gotest.SuiteConfig {
@@ -39,9 +40,9 @@ func (s *VendoredTestSuite) TestOne(t *gotest.T) { gotest.True(t, true) }
 	run, err := testkit.RunCLIWithEnv(t.Context(), dir, []string{"GOWORK=off", "GOFLAGS="}, ".")
 	gotest.NoError(t, err)
 	t.When("a suite runs in a module whose vendor directory lacks pkg/gotestruntime", func(w *gotest.T) {
-		w.It("fails to build with exit 2, naming the blank import to add and -mod=mod", func(it *gotest.T) {
+		w.It("fails to build with exit 2, naming the tool declaration to add and -mod=mod", func(it *gotest.T) {
 			gotest.Equal(it, 2, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
-			gotest.Contains(it, run.Stderr, `import _ "github.com/mvrahden/go-test/pkg/gotestruntime"`)
+			gotest.Contains(it, run.Stderr, "go get -tool github.com/mvrahden/go-test/cmd/gotest@")
 			gotest.Contains(it, run.Stderr, "or run with -mod=mod")
 		})
 	})

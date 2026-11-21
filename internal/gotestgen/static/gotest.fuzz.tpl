@@ -13,7 +13,7 @@ func Fuzz{{ $ts.Identifier }}_{{ $fz.Identifier }}(f *ƒtesting.F) {
   encoded exactly like a hand-written one. They are added before the user's
   method runs, so they precede the method's own f.Add seeds in replay order.
 */}}
-  ƒf := ƒgotest.NewF(f, s.BeforeEach, s.AfterEach, {{ with index $.FuzzTargets $funcName }}{{ . }}{{ else }}nil{{ end }})
+  ƒf := ƒgotestruntime.FuzzF(f, s.BeforeEach, s.AfterEach, {{ with index $.FuzzTargets $funcName }}{{ . }}{{ else }}nil{{ end }})
 {{- range index $.HarvestedSeeds $funcName }}
   ƒf.Add({{ . }})
 {{- end }}

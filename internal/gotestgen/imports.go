@@ -20,7 +20,6 @@ var fixedAliases = map[string]string{
 	"testing":                         "ƒtesting",
 	"time":                            "ƒtime",
 	about.Repo + "/pkg/gotest":        "ƒgotest",
-	about.Repo + "/pkg/gotestfuzz":    "ƒgotestfuzz",
 	about.Repo + "/pkg/gotestruntime": "ƒgotestruntime",
 }
 

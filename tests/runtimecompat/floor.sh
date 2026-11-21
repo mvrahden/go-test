@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Generated code must compile and run against gotestgen.MinRuntimeVersion:
 # this tree's CLI runs a corpus requiring the floor release, and the corpus
-# must reach every runtime symbol the templates call. A floor newer than the
+# must reach every runtime symbol the templates and the fuzz fan call. A floor newer than the
 # last release names the next one, which is this tree.
 set -euo pipefail
 root=$(cd "$(dirname "$0")/../.." && pwd)
@@ -61,7 +61,11 @@ fi
 
 (cd "$root" && go build -o "$work/render" ./tests/runtimecompat/render)
 "$work/render" ./... | grep -oE 'gotestruntime\.[A-Za-z_0-9]+' | sort -u >"$work/got"
-grep -rhoE 'gotestruntime\.[A-Za-z_0-9]+' "$root/internal/gotestgen/static" | sort -u >"$work/want"
+# The fuzz fan writes its runtime calls from Go (internal/gotestgen/fuzzfan.go).
+{
+  grep -rhoE 'gotestruntime\.[A-Za-z_0-9]+' "$root/internal/gotestgen/static"
+  printf 'gotestruntime.%s\n' FuzzEach FuzzTarget SeedArg SeedArity FuzzLeaf FuzzLeafBytes FuzzBytes NewFuzzReader NewFuzzWriter FuzzReader FuzzWriter
+} | sort -u >"$work/want"
 missing=$(comm -23 "$work/want" "$work/got")
 if [ -n "$missing" ]; then
   echo "FAIL  the corpus in tests/runtimecompat/testdata/corpus generates no call to:" >&2

@@ -87,7 +87,6 @@ gotest puts a generator and a runner in front of `go test`. That buys the lifecy
 - **Editors see suites through the extension only.** The [VS Code extension](#vs-code-extension) lists, runs and debugs suites. gopls and other editors show suite methods as plain methods. To debug elsewhere, write the generated code to disk first: `gotest generate ./...`, then `dlv test`, then `gotest clean ./...`.
 - **Go 1.26 or newer.** The Go version follows gotest's own `go.mod`, so upgrading gotest can raise your module's `go` line; Install shows how to keep it.
 - **The tool directive adds indirect requirements.** `go get -tool` records the CLI's dependencies in your `go.mod` as `// indirect`. Your test binaries link none of them: the runtime imports only the standard library.
-- **A vendored module needs one extra import**, shown under [Install](#install).
 - **Leaving means rewriting the entry points.** Assertions, `When`/`It` and `Each` are a library and keep working under plain `go test`. Suites need one hand-written `func Test*` each, and shared fixtures have no standard-library equivalent.
 
 ## Install
@@ -102,17 +101,6 @@ go tool gotest ./...
 `go get -tool` pins the CLI and the `pkg/gotest` runtime to the same release, and `go tool` rebuilds the CLI with your module's Go. Upgrading is the same command again. What each release changed is in [docs/CHANGELOG.md](docs/CHANGELOG.md). One caution for both: `@latest` raises your module's `go` line when the newest release needs a newer Go (`go get` prints `upgraded go …`). To keep your Go version, name the newest release whose go line fits instead; `go list -m -f '{{.GoVersion}}' github.com/mvrahden/go-test@<version>` prints a release's. In a module that already requires gotest, name that version in place of `@latest` to declare the tool without moving the pin. Avoid a global `go install` binary: it drifts from `go.mod` on both axes. A CLI built with an older Go than the module's go line, or pinned below the oldest runtime it generates for, refuses to run and names the version your module selects; one drifted the other way still runs, unless it predates v1.38 and the runtime does not: then each suite fails as it starts, naming both versions and the fix.
 
 The examples below write `gotest` for brevity; with the tool directive, read `go tool gotest`. The VS Code extension and the GitHub action run the same CLI your `go.mod` selects.
-
-**Vendored modules.** `go mod vendor` copies the packages your module imports. Nothing in your tree imports gotest's runtime: the generated code does, and it never reaches the disk. Import it blank in one test file of the module, then vendor again. Without it each suite package fails to build, and gotest names the import to add and the alternative, running with `-mod=mod` ([A vendored module](specs/cli/spec.md#requirement-a-vendored-module)):
-
-```go
-// gotestdeps_test.go, in any package of the module
-
-import (
-    _ "github.com/mvrahden/go-test/pkg/gotestfuzz"    // fuzz targets that take a struct
-    _ "github.com/mvrahden/go-test/pkg/gotestruntime" // every suite
-)
-```
 
 **Two runners.** `go tool gotest` runs suites and nothing else; `go test` runs plain `func Test*` functions and nothing else. Under plain `go test` a package of suites prints `ok … [no tests to run]` and exits 0, and `gotest` passes over the `func Test*` functions beside a suite with one note on stderr (`note: N stdlib test(s) in … not run`). A complete run is both commands, so every place that calls `go test ./...` today — CI, a Makefile, a pre-commit hook, an editor task — needs `go tool gotest ./...` beside it for as long as the module holds both kinds of test.
 

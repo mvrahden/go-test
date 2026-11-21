@@ -60,5 +60,5 @@ The linter flags unpaired `BeforeAll` as a likely resource leak.
 - **A behavior change starts in `specs/`.** State the requirement and its scenarios in `specs/<capability>/spec.md`, bind each scenario to a `When`/`It` in `tests/conformance`, and regenerate the catalog with `make catalog`. [`specs/README.md`](specs/README.md) has the format; `tests/conformance/README.md` has the binding rules.
 - **Guides link to `specs/` and never quote it.** `README.md`, this file, `ARCHITECTURE.md`, `docs/` and the skill explain and link a requirement; a suite fails on a restated clause and on a link that names no heading.
 - **Never commit generated files.** `gotest_psuite_test.go` and `gotest_pxsuite_test.go` are written by `gotest generate` and removed by `gotest clean ./...`.
-- **What a test binary links imports the standard library and this module only.** `pkg/gotest`, `pkg/gotestruntime` and `pkg/gotestfuzz` are linked into every user's test binary; `pkg/lint` is the analyzer and needs `golang.org/x/tools`.
+- **What a test binary links imports the standard library and this module only.** `pkg/gotest` and `pkg/gotestruntime` are linked into every user's test binary; `pkg/lint` is the analyzer and needs `golang.org/x/tools`.
 - **Run the CLI from the tree**, `go run ./cmd/gotest <args>`, never a `gotest` binary found on `PATH`.

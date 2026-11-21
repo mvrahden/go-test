@@ -79,5 +79,5 @@ better.
 
 Generated wrappers are named `Fuzz<Suite>_<Method>`; plain `go test -fuzz`
 cannot see them, so a target that must also run under stock tooling has to
-be a top-level `func FuzzX(*testing.F)` using `gotest.NewF(f, nil, nil, nil)`
+be a top-level `func FuzzX(*testing.F)` using `gotest.NewF(f)`
 with native argument types — and gotest itself will not run that one.
