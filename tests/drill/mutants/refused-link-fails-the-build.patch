@@ -1,0 +1,18 @@
+Judge: ./internal/gotestrunner BinaryLinkTestSuite/TestLinkOrCopy
+Expect: ^FAIL .*internal/gotestrunner BinaryLink .* / copies when the link is refused \(
+--- a/internal/gotestrunner/bincache.go
++++ b/internal/gotestrunner/bincache.go
+@@ -99,10 +99,10 @@
+ 		return false, copyFile(src, dst)
+ 	}
+ 	_ = os.Remove(dst)
+-	if hardLink(src, dst) == nil {
+-		return true, nil
++	if err := hardLink(src, dst); err != nil {
++		return false, err
+ 	}
+-	return false, copyFile(src, dst)
++	return true, nil
+ }
+
+ // copyFile writes src's bytes to dst as an executable, replacing dst. No

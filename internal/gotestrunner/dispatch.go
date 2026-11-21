@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -53,6 +54,7 @@ type streamRun struct {
 	pf        ParsedFlags
 	overlay   *OverlayResult
 	plan      *RunPlan
+	sel       selection
 	scopes    []suiteScope
 	collector *OutputCollector
 	baseEnv   []string
@@ -173,6 +175,7 @@ func newStreamRun(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 
 	r.plan = overlay.plan()
 	sel := selection{Run: pf.UserRunFilter, Skip: pf.UserSkipFilter, Groups: overlay.groups}
+	r.sel = sel
 	r.win = planFixtureWindows(r.plan, overlay.SharedFixtures, sel)
 	r.win.reportSkipped()
 	r.scopes = planSuiteScopes(r.plan, sel)
@@ -207,7 +210,7 @@ func newStreamRun(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 			totalSuites++
 		}
 	}
-	maxParallel := computeDispatchConcurrency(&r.pf.RunFlags, cfg.Parallel, totalSuites, pf.ProcessCap, SanitizerActive(pf.BuildFlags))
+	maxParallel := computeDispatchConcurrency(&r.pf.RunFlags, cfg.Parallel, totalSuites, pf.ProcessCap, SanitizerActive(pf.BuildFlags), runtime.GOMAXPROCS(0))
 	r.sem = make(chan struct{}, maxParallel)
 	r.buildFailed = len(overlay.BrokenPackages) > 0
 
@@ -233,6 +236,20 @@ func newStreamRun(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 // scopeQueue is what the stream held back for one group.
 type scopeQueue struct{ bulk, tail []deferredTarget }
 
+// bookUnbuilt books each suite package the run dispatches no suite of as
+// having nothing to run, and returns the packages to build.
+func (r *streamRun) bookUnbuilt() []string {
+	dispatched := dispatchedPackages(r.plan.testRun(r.sel))
+	for _, pkg := range r.overlay.SuitePackages {
+		if !dispatched[pkg] {
+			r.collector.RecordNothingToRun(pkg)
+			r.nothingToRun = true
+			r.free(r.ledger.DoneExcept(pkg, nil))
+		}
+	}
+	return buildSet(r.overlay.SuitePackages, dispatched)
+}
+
 // intake reads the compile stream: it books build failures, builds each
 // package's targets, starts the first scope's bulk and queues every other
 // suite. It returns once the stream ended and the suites it started are done.
@@ -247,6 +264,11 @@ func (r *streamRun) intake(compiled <-chan CompileOutcome) map[string]*scopeQueu
 			}
 			r.take(outcome, held)
 		case <-r.ctx.Done():
+			// The stage still ends: what it reports now is dropped.
+			go func() {
+				for range compiled {
+				}
+			}()
 			r.wg.Wait()
 			return held
 		}

@@ -485,6 +485,89 @@ A run's start SHALL evict from the test binary cache the binaries of a checkout 
 - **WHEN** a cached test binary has no record beside it
 - **THEN** the next run links it again without a word and records it
 
+### Requirement: Packages a run builds
+A run SHALL build a suite package only when it dispatches one of its suites. A package whose suites -run, -skip, a group flag or focus all leave out SHALL be reported as go test reports a package that ran no tests, without being built, so a build or vet failure in it is not that run's.
+
+#### Scenario: A package the filter leaves out
+- **WHEN** -run names a suite of one package and another package's suite fails vet
+- **THEN** exits 0 and reports the other package as having no tests to run
+
+#### Scenario: The same packages without the filter
+- **WHEN** the two packages are run without -run
+- **THEN** exits 2 and reports the vet finding under its package
+
+### Requirement: Suite processes at once
+A run SHALL start at most GOMAXPROCS suite processes at once, half of that under -race, -msan or -asan, and exactly the number -p gives when -p is given, whatever GOMAXPROCS is. The default --parallel budget SHALL be twice that number.
+
+#### Scenario: -p above GOMAXPROCS
+- **WHEN** three suites that each wait for the other two are run with -p 3 and GOMAXPROCS=1
+- **THEN** all three pass
+
+#### Scenario: No -p
+- **WHEN** the same suites are run with GOMAXPROCS=1 and no -p
+- **THEN** they do not all run at once, so at least one fails waiting
+
+### Requirement: Building several packages
+A run SHALL build its packages together and report each build failure under the package it belongs to, with the diagnostics go test prints for that package alone. A package that built SHALL run whether or not another failed, and SHALL start as soon as its binary is built or confirmed up to date where the platform lets gotest see that. Two packages whose import paths end in the same element SHALL both be built and run.
+
+#### Scenario: Two packages that fail vet beside one that passes
+- **WHEN** two packages each fail vet and a third passes
+- **THEN** exits 2, reports each finding under its own package and runs the third
+
+#### Scenario: Packages that share their last path element
+- **WHEN** two packages named util are run together
+- **THEN** both run and pass
+
+### Requirement: How test binaries are linked
+A run SHALL link its test binaries without the symbol table and debug information, as go test does, unless -ldflags is given as an argument or in GOFLAGS, a -cpuprofile, -memprofile, -blockprofile or -mutexprofile flag is given, or --debug keeps the binaries.
+
+#### Scenario: A plain run
+- **WHEN** a package is run with no link or profile flag
+- **THEN** its test binary carries no debug information
+
+#### Scenario: A run that writes a CPU profile
+- **WHEN** the package is run with -cpuprofile
+- **THEN** its test binary carries debug information
+
+#### Scenario: Link flags in GOFLAGS
+- **WHEN** GOFLAGS sets -ldflags=-X for a variable the test prints
+- **THEN** the test prints the value and the binary carries debug information
+
+### Requirement: A run never executes a stale binary
+A run SHALL execute a test binary built from the sources, build tags and link flags it was given, whatever an earlier run left in the cache.
+
+#### Scenario: A dependency changes and changes back
+- **WHEN** a dependency's source is changed, run, and restored
+- **THEN** each run prints the value its sources hold
+
+#### Scenario: A test file changes and changes back
+- **WHEN** a test file is changed, run, and restored
+- **THEN** each run prints the value its sources hold
+
+#### Scenario: Build tags as an argument and in GOFLAGS
+- **WHEN** a run is given a build tag by -tags, then by GOFLAGS, then none
+- **THEN** each run executes the binary built for its tags
+
+#### Scenario: Link flags as an argument and in GOFLAGS
+- **WHEN** a run is given -ldflags=-X as an argument, then in GOFLAGS, then none
+- **THEN** each run prints the value it was given
+
+#### Scenario: Vet after a run without it
+- **WHEN** a package with a vet finding is run with -vet=off and then without
+- **THEN** the second run reports the finding
+
+#### Scenario: Runs at once over one cache
+- **WHEN** three runs of one package start at once on an empty cache
+- **THEN** all pass and leave no temporary file in the cache
+
+#### Scenario: Runs at once with build tags in GOFLAGS
+- **WHEN** two runs of one package start together over one cache, one with a build tag in GOFLAGS
+- **THEN** each executes the binary built for its own tags
+
+#### Scenario: A filtered run before a full one
+- **WHEN** a run that -run narrows to one package is followed by an unfiltered run
+- **THEN** the second run builds and runs the other package
+
 ### Requirement: Clearing the test binary cache
 gotest clean --cache SHALL remove every cached binary no run is linking or copying, with its lock and record, and say how many.
 

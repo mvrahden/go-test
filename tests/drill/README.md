@@ -632,7 +632,23 @@ shards of one run do not add up to every mutant exactly once.
 | `overlay-also-written-to-the-cache` | a run also writes its overlay under the cache's `overlays` dir | runner: a run wrote under the cache's overlays dir |
 | `debug-run-drops-its-overlay` | a `--debug` run removes its work dir and overlay at its end like any run | cli conformance: the overlay a --debug run named is gone |
 | `old-overlay-entries-never-drain` | the sweep no longer evicts the `overlays` entries older CLIs left in the cache | runner: an aged overlay entry outlives the sweep |
-| `lock-taken-on-a-replaced-file` | a run that waited on a binary's lock uses the cache though an eviction replaced the lock file meanwhile | runner: the run links into the evicted cache entry |
+| `lock-taken-on-a-replaced-file` | a run that waited on a binary's lock uses the cache though an eviction replaced the lock file meanwhile | runner: the run places the binary it found under the replaced lock |
+| `untouched-binary-ready-after-a-failed-build` | a placed cached binary go did not replace counts as up to date after go exited non-zero | runner: the row "same file, newer, exit 1" reads confirmed |
+| `filtered-run-builds-every-package` | a run builds every suite package, including those its filter dispatches no suite of | cli conformance: a filtered run reports the vet finding of a package it does not run |
+| `dispatched-package-left-unbuilt` | a run builds no suite package, so even the packages it dispatches report no tests to run | cli conformance: an unfiltered run misses the vet finding |
+| `p-only-lowers-the-process-count` | `-p` above GOMAXPROCS still stops at GOMAXPROCS suite processes | cli conformance: three suites that wait for each other under `-p 3` and GOMAXPROCS=1 fail |
+| `suite-processes-ignore-gomaxprocs` | without `-p` a run starts a process per suite, whatever GOMAXPROCS is | cli conformance: the suites that wait for each other pass under GOMAXPROCS=1 |
+| `refused-link-fails-the-build` | a hard link the filesystem refuses fails the placement instead of falling back to a copy | runner: a refused link returns its error |
+| `build-failure-booked-under-every-package` | a failed package of a batched build is given the reports of other packages of its group | cli conformance: one vet finding is reported under the other package too |
+| `same-named-packages-share-a-stage-dir` | every compile group builds into one stage dir, so a later group's binary replaces an earlier one's of the same name | cli conformance: one of two `util` packages does not run its suite |
+| `strip-overrides-goflags-ldflags` | the strip flag is added though GOFLAGS carries `-ldflags`, which it then overrides | cli conformance: a GOFLAGS `-X` value is not printed and the binary has no DWARF |
+| `test-binaries-never-stripped` | test binaries keep their symbol table and DWARF on a plain run | cli conformance: a plain run's binary carries debug information |
+| `profiled-binary-stripped` | a run with a profile flag strips its binary all the same | cli conformance: a `-cpuprofile` run's binary has no DWARF |
+| `placed-binary-run-before-go-confirms-it` | a cached binary placed for go to confirm is handed out while go still runs, before go touched or replaced it | cli conformance: a run after a source change prints the old value |
+| `shared-touch-read-as-confirmation` | the cache key leaves out GOFLAGS and a newer mtime on the placed binary counts as go's confirmation, though another run's go touches the same entry | cli conformance: a run with a GOFLAGS build tag beside a plain one executes the untagged binary |
+| `goflags-dropped-from-the-build` | the go command that builds a run's binaries is started with `GOFLAGS` emptied | cli conformance: build tags and link flags given in GOFLAGS do not reach the binary |
+| `stage-builds-without-vet` | the compile stage passes `-vet=off` to every build | cli conformance: a run without `-vet=off` misses a vet finding |
+| `publish-leaves-its-temp-file` | a rebuilt binary is copied onto its cache entry and its temporary file is left beside it | cli conformance: runs at once leave a temporary file in the cache |
 | `live-checkout-evicted` | the sweep evicts every key that records a checkout, not only one whose checkout is gone | runner: a key whose checkout exists loses its binaries |
 | `cap-evicts-newest-first` | over its cap, the binary cache evicts the binaries used most recently first | runner: the newest binaries go and the oldest stay |
 | `eviction-ignores-a-held-lock` | the binary cache sweep evicts a binary whose lock a run holds | runner: the locked binary goes and the next one stays |

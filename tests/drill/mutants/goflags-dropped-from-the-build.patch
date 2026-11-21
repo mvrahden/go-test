@@ -1,0 +1,15 @@
+Clause: when a run is given a build tag by -tags, then by GOFLAGS, then none → each run executes the binary built for its tags
+Clause: when a run is given -ldflags=-X as an argument, then in GOFLAGS, then none → each run prints the value it was given
+Expect: ^FAIL .*conformance/cli CLIStaleBinary .* / each run executes the binary built for its tags \(
+Expect: ^FAIL .*conformance/cli CLIStaleBinary .* / each run prints the value it was given \(
+--- a/internal/gotestrunner/compilestage.go
++++ b/internal/gotestrunner/compilestage.go
+@@ -41,7 +41,7 @@
+ 	}
+ 	args := append([]string{"test", "-c", "-json", overlayFlag, "-o", stageDir + string(os.PathSeparator)}, buildFlags...)
+ 	args = append(args, group...)
+-	env := append(os.Environ(), "GOTMPDIR="+goTmp)
++	env := append(os.Environ(), "GOTMPDIR="+goTmp, "GOFLAGS=")
+ 	what := "test binary for " + group[0]
+ 	if len(group) > 1 {
+ 		what = fmt.Sprintf("test binaries for %d packages", len(group))

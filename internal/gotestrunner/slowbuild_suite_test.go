@@ -67,8 +67,8 @@ const missing = "github.com/mvrahden/go-test/internal/gotestrunner/testdata/miss
 func (s *SlowBuildThresholdTestSuite) TestATestBinaryBuildHonorsTheVariable(t *gotest.T) {
 	t.Setenv(protocol.EnvSlowBuildThreshold, "1ns")
 	out := stderrOf(t, func() {
-		_, err := gotestrunner.ExportCompilePackage(context.Background(), missing, "-overlay=", nil, t.TempDir(), "")
-		gotest.Error(t, err)
+		_, failures := gotestrunner.CompilePackages(context.Background(), []string{missing}, "-overlay=", nil, t.TempDir(), "", 0)
+		gotest.NotEmpty(t, failures)
 	})
 	gotest.Contains(t, out, "gotest: test binary for "+missing+" finished building after")
 }

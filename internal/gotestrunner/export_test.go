@@ -23,7 +23,6 @@ type ExportOverlayJSON = overlayJSON
 type ExportFixtureStateEntry = fixtureStateEntry
 
 var ExportCompileConcurrency = compileConcurrency
-var ExportCompilePackage = compilePackage
 var ExportBuildSuiteCmd = buildSuiteCmd
 var ExportTest2JSONPath = test2jsonPath
 var ExportResolveTest2JSON = resolveTest2JSON
@@ -794,4 +793,79 @@ func ExportBooked(c *OutputCollector, pkg string) int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.pkgs[pkg].completed
+}
+
+var ExportSpanOf = spanOf
+
+var ExportBuildSet = buildSet
+
+var ExportTestBinaryName = testBinaryName
+var ExportCompileGroups = compileGroups
+
+var ExportEventPackage = eventPackage
+
+// BuildLog is what one go test -c -json call said, by package.
+type BuildLog = buildLog
+
+var ExportNewBuildLog = newBuildLog
+
+func (l *buildLog) ExportFailed(pkg string) bool        { return l.failed(pkg) }
+func (l *buildLog) ExportDiagnostics(pkg string) []byte { return l.diagnostics(pkg) }
+func (l *buildLog) ExportShared() []byte                { return l.shared() }
+
+var ExportLinkOrCopy = linkOrCopy
+
+// StagedBinary is one package's slot in a group's stage dir.
+type StagedBinary = stagedBinary
+
+// ExportReadiness is what a slot holds.
+type ExportReadiness = readiness
+
+const (
+	ExportNotReady  = notReady
+	ExportConfirmed = confirmed
+	ExportRebuilt   = rebuilt
+)
+
+var (
+	ExportStageGroup  = stageGroup
+	ExportBinaryReady = binaryReady
+	ExportRenameSafe  = renameSafe
+	ExportPublish     = publish
+)
+
+// ExportPlaced reports whether a cached binary was placed in b's slot.
+func ExportPlaced(b *StagedBinary) bool { return b.placed != nil }
+
+// ExportSetGoTestC replaces the go command the compile stage runs until
+// restore.
+func ExportSetGoTestC(fn func(ctx context.Context, args, env []string, stdout, stderr io.Writer) error) (restore func()) {
+	prev := goTestC
+	goTestC = fn
+	return func() { goTestC = prev }
+}
+
+// ExportSetGoCacheDir makes dir the GOCACHE the compile stage reads until
+// restore.
+func ExportSetGoCacheDir(dir string) (restore func()) {
+	prev := goCacheDir
+	goCacheDir = func() string { return dir }
+	return func() { goCacheDir = prev }
+}
+
+var ExportLinkFlags = linkFlags
+
+var ExportEnvKeyFlags = envKeyFlags
+
+// ExportSetHardLink replaces the hard link a placement makes until restore.
+func ExportSetHardLink(fn func(oldname, newname string) error) (restore func()) {
+	prev := hardLink
+	hardLink = fn
+	return func() { hardLink = prev }
+}
+
+// ExportDispatchedPackages is the packages a test run of o dispatches
+// under -run, -skip and --skip-group.
+func ExportDispatchedPackages(o *OverlayResult, run, skip string, skipGroups []string) map[string]bool {
+	return dispatchedPackages(o.plan().testRun(selection{Run: run, Skip: skip, Groups: newGroupSelection(nil, skipGroups)}))
 }

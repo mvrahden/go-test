@@ -4074,6 +4074,98 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "exits 2, reports each finding under its own package and runs the third",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "batch_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 39,
+                      "name": "exits_2,_reports_each_finding_under_its_own_package_and_runs_the_third",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when two packages each fail vet and a third passes",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "batch_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 38,
+                  "name": "two_packages_each_fail_vet_and_a_third_passes",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "both run and pass",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "batch_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 56,
+                      "name": "both_run_and_pass",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when two packages named util are run together",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "batch_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 55,
+                  "name": "two_packages_named_util_are_run_together",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "BuildingSeveralPackages",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "batch_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 34,
+              "name": "TestBuildingSeveralPackages",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLIBatch",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "batch_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 14,
+          "name": "TestCLIBatchTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "a run removes its binaries",
                       "duration": 0,
                       "excluded": false,
@@ -4400,6 +4492,98 @@
           "kind": "suite",
           "line": 11,
           "name": "TestCLIBuildRulesTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "exits 0 and reports the other package as having no tests to run",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "buildset_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 26,
+                      "name": "exits_0_and_reports_the_other_package_as_having_no_tests_to_run",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when -run names a suite of one package and another package's suite fails vet",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "buildset_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 25,
+                  "name": "-run_names_a_suite_of_one_package_and_another_package's_suite_fails_vet",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "exits 2 and reports the vet finding under its package",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "buildset_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 33,
+                      "name": "exits_2_and_reports_the_vet_finding_under_its_package",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the two packages are run without -run",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "buildset_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 32,
+                  "name": "the_two_packages_are_run_without_-run",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "WhatAFilteredRunBuilds",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "buildset_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 19,
+              "name": "TestWhatAFilteredRunBuilds",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLIBuildSet",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "buildset_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 13,
+          "name": "TestCLIBuildSetTestSuite",
           "output": [],
           "status": "none"
         },
@@ -6875,6 +7059,129 @@
                 {
                   "children": [
                     {
+                      "children": [],
+                      "display": "its test binary carries no debug information",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "linkflags_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 54,
+                      "name": "its_test_binary_carries_no_debug_information",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a package is run with no link or profile flag",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "linkflags_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 53,
+                  "name": "a_package_is_run_with_no_link_or_profile_flag",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "its test binary carries debug information",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "linkflags_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 59,
+                      "name": "its_test_binary_carries_debug_information",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the package is run with -cpuprofile",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "linkflags_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 58,
+                  "name": "the_package_is_run_with_-cpuprofile",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the test prints the value and the binary carries debug information",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "linkflags_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 67,
+                      "name": "the_test_prints_the_value_and_the_binary_carries_debug_information",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when GOFLAGS sets -ldflags=-X for a variable the test prints",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "linkflags_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 66,
+                  "name": "GOFLAGS_sets_-ldflags=-X_for_a_variable_the_test_prints",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "HowTestBinariesAreLinked",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "linkflags_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 35,
+              "name": "TestHowTestBinariesAreLinked",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLILinkFlags",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "linkflags_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 17,
+          "name": "TestCLILinkFlagsTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
                       "children": [
                         {
                           "children": [],
@@ -8327,6 +8634,98 @@
                 {
                   "children": [
                     {
+                      "children": [],
+                      "display": "all three pass",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "procs_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 28,
+                      "name": "all_three_pass",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when three suites that each wait for the other two are run with -p 3 and GOMAXPROCS=1",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "procs_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 27,
+                  "name": "three_suites_that_each_wait_for_the_other_two_are_run_with_-p_3_and_GOMAXPROCS=1",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "they do not all run at once, so at least one fails waiting",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "procs_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 34,
+                      "name": "they_do_not_all_run_at_once,_so_at_least_one_fails_waiting",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the same suites are run with GOMAXPROCS=1 and no -p",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "procs_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 33,
+                  "name": "the_same_suites_are_run_with_GOMAXPROCS=1_and_no_-p",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "SuiteProcessesAtOnce",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "procs_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 20,
+              "name": "TestSuiteProcessesAtOnce",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLIProcs",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "procs_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 12,
+          "name": "TestCLIProcsTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
                       "children": [
                         {
                           "children": [],
@@ -9559,6 +9958,389 @@
           "kind": "suite",
           "line": 13,
           "name": "TestCLIScaffoldPathsTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "each run prints the value its sources hold",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "stalebinary_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 70,
+                      "name": "each_run_prints_the_value_its_sources_hold",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a dependency's source is changed, run, and restored",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "stalebinary_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 69,
+                  "name": "a_dependency's_source_is_changed,_run,_and_restored",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ADependencyChanges",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "stalebinary_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 62,
+              "name": "TestADependencyChanges",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "each run prints the value its sources hold",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "stalebinary_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 88,
+                      "name": "each_run_prints_the_value_its_sources_hold",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a test file is changed, run, and restored",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "stalebinary_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 87,
+                  "name": "a_test_file_is_changed,_run,_and_restored",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ATestFileChanges",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "stalebinary_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 80,
+              "name": "TestATestFileChanges",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "each run executes the binary built for its tags",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "stalebinary_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 106,
+                      "name": "each_run_executes_the_binary_built_for_its_tags",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a run is given a build tag by -tags, then by GOFLAGS, then none",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "stalebinary_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 105,
+                  "name": "a_run_is_given_a_build_tag_by_-tags,_then_by_GOFLAGS,_then_none",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "BuildTags",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "stalebinary_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 98,
+              "name": "TestBuildTags",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "each run prints the value it was given",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "stalebinary_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 125,
+                      "name": "each_run_prints_the_value_it_was_given",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a run is given -ldflags=-X as an argument, then in GOFLAGS, then none",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "stalebinary_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 124,
+                  "name": "a_run_is_given_-ldflags=-X_as_an_argument,_then_in_GOFLAGS,_then_none",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "LinkFlags",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "stalebinary_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 117,
+              "name": "TestLinkFlags",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the second run reports the finding",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "stalebinary_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 141,
+                      "name": "the_second_run_reports_the_finding",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a package with a vet finding is run with -vet=off and then without",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "stalebinary_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 140,
+                  "name": "a_package_with_a_vet_finding_is_run_with_-vet=off_and_then_without",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "VetAfterARunWithoutIt",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "stalebinary_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 136,
+              "name": "TestVetAfterARunWithoutIt",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "all pass and leave no temporary file in the cache",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "stalebinary_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 165,
+                      "name": "all_pass_and_leave_no_temporary_file_in_the_cache",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when three runs of one package start at once on an empty cache",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "stalebinary_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 164,
+                  "name": "three_runs_of_one_package_start_at_once_on_an_empty_cache",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "RunsAtOnce",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "stalebinary_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 149,
+              "name": "TestRunsAtOnce",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "each executes the binary built for its own tags",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "stalebinary_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 203,
+                      "name": "each_executes_the_binary_built_for_its_own_tags",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when two runs of one package start together over one cache, one with a build tag in GOFLAGS",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "stalebinary_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 202,
+                  "name": "two_runs_of_one_package_start_together_over_one_cache,_one_with_a_build_tag_in_GOFLAGS",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "RunsAtOnceWithGOFLAGSTags",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "stalebinary_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 175,
+              "name": "TestRunsAtOnceWithGOFLAGSTags",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the second run builds and runs the other package",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "stalebinary_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 217,
+                      "name": "the_second_run_builds_and_runs_the_other_package",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a run that -run narrows to one package is followed by an unfiltered run",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "stalebinary_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 216,
+                  "name": "a_run_that_-run_narrows_to_one_package_is_followed_by_an_unfiltered_run",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AFilteredRunBeforeAFullOne",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "stalebinary_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 210,
+              "name": "TestAFilteredRunBeforeAFullOne",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLIStaleBinary",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "stalebinary_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 18,
+          "name": "TestCLIStaleBinaryTestSuite",
           "output": [],
           "status": "none"
         },
@@ -32457,13 +33239,13 @@
     }
   ],
   "stats": {
-    "behaviors": 944,
+    "behaviors": 961,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 135,
+    "suites": 140,
     "tests": 0
   }
 }
