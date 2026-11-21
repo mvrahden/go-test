@@ -12844,6 +12844,113 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "the build cache holds no more files than before",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "loadcost_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 64,
+                      "name": "the_build_cache_holds_no_more_files_than_before",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a test file of a discovered package is changed and the package is discovered again",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "loadcost_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 63,
+                  "name": "a_test_file_of_a_discovered_package_is_changed_and_the_package_is_discovered_again",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ATestFileChanges",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "loadcost_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 61,
+              "name": "TestATestFileChanges",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the build cache holds no more files than before",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "loadcost_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 73,
+                      "name": "the_build_cache_holds_no_more_files_than_before",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a test file of a linted package is changed and the package is linted again",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "loadcost_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 72,
+                  "name": "a_test_file_of_a_linted_package_is_changed_and_the_package_is_linted_again",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "LintAfterATestFileChanges",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "loadcost_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 70,
+              "name": "TestLintAfterATestFileChanges",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "DiscoveryLoadCost",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "loadcost_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 15,
+          "name": "TestDiscoveryLoadCostTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "a suite declared alone, binding a fixture through a named pointer field, runs",
                       "duration": 0,
                       "excluded": false,
@@ -33300,13 +33407,13 @@
     }
   ],
   "stats": {
-    "behaviors": 962,
+    "behaviors": 964,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 141,
+    "suites": 142,
     "tests": 0
   }
 }

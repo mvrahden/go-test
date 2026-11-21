@@ -188,15 +188,16 @@ func (s *LintFixTestSuite) TestFix(t *gotest.T) {
 }
 
 func (s *LintFixTestSuite) TestLoads(t *gotest.T) {
-	// The shim logs every package load: go/packages runs one go list -json
-	// per load, in lint and in the child driver alike.
+	// The shim logs every go invocation. Each package load lists its graph
+	// once without export data (-export=false), in lint and in the child
+	// driver alike; lint's export-data listing beside it is not a load.
 	loads := func(t *gotest.T, log string) int {
 		data, err := os.ReadFile(log)
 		if errors.Is(err, os.ErrNotExist) {
 			return 0
 		}
 		gotest.NoError(t, err)
-		return strings.Count(string(data), "list -e -json=")
+		return strings.Count(string(data), "-export=false")
 	}
 
 	t.When("no finding has a fix", func(w *gotest.T) {
@@ -642,7 +643,7 @@ func (s *LintFixTestSuite) TestWrites(t *gotest.T) {
 		dir, file := s.stageProbe(w, lintFixProbe)
 		// The shim edits the file at the second load, of the fixed sources.
 		count := filepath.Join(w.TempDir(), "loads")
-		path := goShim(w, `case "$*" in *-json=*) echo >> '`+count+`'; if [ "$(wc -l < '`+count+`')" -eq 2 ]; then echo '// edited' >> '`+file+`'; fi;; esac`)
+		path := goShim(w, `case "$*" in *-export=false*) echo >> '`+count+`'; if [ "$(wc -l < '`+count+`')" -eq 2 ]; then echo '// edited' >> '`+file+`'; fi;; esac`)
 		stdout, stderr, code := s.runLintIn(w, dir, []string{path}, "lint", "-fix", "./...")
 
 		w.It("exits 1, says nothing was written and keeps the edit", func(it *gotest.T) {
@@ -726,7 +727,7 @@ func (s *LintFixTestSuite) TestInterrupt(t *gotest.T) {
 		// signal lands mid-fix.
 		tmp := w.TempDir()
 		count, marker := filepath.Join(tmp, "loads"), filepath.Join(tmp, "driver")
-		path := goShim(w, `case "$*" in *-json=*) echo >> '`+count+`'; if [ "$(wc -l < '`+count+`')" -eq 2 ]; then : > '`+marker+`'; sleep 5; fi;; esac`)
+		path := goShim(w, `case "$*" in *-export=false*) echo >> '`+count+`'; if [ "$(wc -l < '`+count+`')" -eq 2 ]; then : > '`+marker+`'; sleep 5; fi;; esac`)
 		dir, file := s.stageProbe(w, lintFixProbe)
 		tmpdir := w.TempDir()
 
@@ -762,7 +763,7 @@ func (s *LintFixTestSuite) TestInterrupt(t *gotest.T) {
 	t.When("lint is stopped twice while it fixes", func(w *gotest.T) {
 		tmp := w.TempDir()
 		count, marker := filepath.Join(tmp, "loads"), filepath.Join(tmp, "driver")
-		path := goShim(w, `case "$*" in *-json=*) echo >> '`+count+`'; if [ "$(wc -l < '`+count+`')" -eq 2 ]; then : > '`+marker+`'; sleep 5; fi;; esac`)
+		path := goShim(w, `case "$*" in *-export=false*) echo >> '`+count+`'; if [ "$(wc -l < '`+count+`')" -eq 2 ]; then : > '`+marker+`'; sleep 5; fi;; esac`)
 		dir, file := s.stageProbe(w, lintFixProbe)
 		tmpdir := w.TempDir()
 
@@ -841,14 +842,14 @@ func (s *LintFixTestSuite) TestLoadFailure(t *gotest.T) {
 	t.When("the load of the fixed sources fails", func(w *gotest.T) {
 		// The shim fails the second load, of the fixed sources.
 		count := filepath.Join(w.TempDir(), "loads")
-		path := goShim(w, `case "$*" in *-json=*) echo >> '`+count+`'; if [ "$(wc -l < '`+count+`')" -eq 2 ]; then exit 1; fi;; esac`)
+		path := goShim(w, `case "$*" in *-export=false*) echo >> '`+count+`'; if [ "$(wc -l < '`+count+`')" -eq 2 ]; then exit 1; fi;; esac`)
 		dir, file := s.stageProbe(w, lintFixProbe)
 		stdout, stderr, code := s.runLintIn(w, dir, []string{path}, "lint", "-fix", "./...")
 
 		w.It("exits 1 and says why", func(it *gotest.T) {
 			gotest.Equal(it, 1, code, stderr)
-			// go/packages turns a failed go list into an empty load.
-			gotest.Equal(it, "FAIL: after applying fixes: \"./...\" matched no packages\n", stderr)
+			// A listing without export data reports go list's failure.
+			gotest.Regexp(it, `^FAIL: after applying fixes: load packages: .*exit status 1`, stderr)
 			gotest.Empty(it, stdout)
 		})
 		w.It("touches no file", func(it *gotest.T) {
