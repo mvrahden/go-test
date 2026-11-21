@@ -48,6 +48,7 @@ func (s *WatchCLITestSuite) TestWatchOverAnAbsolutePath(t *gotest.T) {
 			seen <- sc.Text()
 		}
 		close(seen)
+		gotest.NoError(t, sc.Err())
 	})
 	var start, end string
 	deadline := time.After(2 * time.Minute)
