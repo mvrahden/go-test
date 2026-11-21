@@ -763,7 +763,9 @@ func (s *LintFixTestSuite) TestInterrupt(t *gotest.T) {
 	t.When("lint is stopped twice while it fixes", func(w *gotest.T) {
 		tmp := w.TempDir()
 		count, marker := filepath.Join(tmp, "loads"), filepath.Join(tmp, "driver")
-		path := goShim(w, `case "$*" in *-export=false*) echo >> '`+count+`'; if [ "$(wc -l < '`+count+`')" -eq 2 ]; then : > '`+marker+`'; sleep 5; fi;; esac`)
+		// The held load ignores the interrupt go/packages sends its process
+		// group: a go command slow to stop.
+		path := goShim(w, `case "$*" in *-export=false*) echo >> '`+count+`'; if [ "$(wc -l < '`+count+`')" -eq 2 ]; then trap '' INT; : > '`+marker+`'; sleep 5; fi;; esac`)
 		dir, file := s.stageProbe(w, lintFixProbe)
 		tmpdir := w.TempDir()
 
