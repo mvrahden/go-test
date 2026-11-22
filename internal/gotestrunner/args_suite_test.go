@@ -318,6 +318,17 @@ func (s *ArgsTestSuite) TestCoverProfile(t *gotest.T) {
 			})
 		})
 
+		w.When("a profile cannot be read to its end", func(w2 *gotest.T) {
+			w2.It("fails the merge, naming the profile", func(it *gotest.T) {
+				dir := it.TempDir()
+				// A directory opens, and its first read fails.
+				unreadable := filepath.Join(dir, "profile.out")
+				gotest.NoError(it, os.Mkdir(unreadable, 0o750))
+				err := gotestrunner.MergeCoverProfiles([]string{unreadable}, filepath.Join(dir, "merged.out"))
+				gotest.ErrorContains(it, err, "read coverage profile "+unreadable)
+			})
+		})
+
 		w.When("one profile is missing", func(w2 *gotest.T) {
 			w2.It("skips the missing file", func(it *gotest.T) {
 				dir := it.TempDir()

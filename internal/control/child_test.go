@@ -181,6 +181,9 @@ func drain() int {
 		report("busy.eof", eof)
 		report("busy.took", took.Nanoseconds())
 	}
+	if in.Err() != nil {
+		return 2
+	}
 	return 0
 }
 

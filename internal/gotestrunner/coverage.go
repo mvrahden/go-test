@@ -47,6 +47,9 @@ func MergeCoverProfiles(profiles []string, output string) error {
 			}
 		}
 		f.Close()
+		if err := scanner.Err(); err != nil {
+			return fmt.Errorf("read coverage profile %s: %w", path, err)
+		}
 	}
 
 	if mode == "" {

@@ -84,6 +84,7 @@ type child struct {
 	stdin   io.WriteCloser
 	stderr  *os.File
 	lines   chan string
+	readErr error // why reading the child's output stopped, nil at EOF
 	seen    map[string]string
 	waited  bool
 }
@@ -158,6 +159,7 @@ func (cs *children) start(t *gotest.T, s spec) *child {
 		for sc.Scan() {
 			c.lines <- sc.Text()
 		}
+		c.readErr = sc.Err()
 		close(c.lines)
 	}()
 	return c
@@ -189,7 +191,9 @@ func (c *child) value(t *gotest.T, key string) string {
 	for {
 		select {
 		case line, ok := <-c.lines:
-			gotest.True(t, ok, "the %s child ended without reporting %s%s", c.mode, key, c.diagnosis())
+			if !ok { //nolint:fail-guard // the message reads readErr, which only a closed channel makes safe
+				gotest.Fail(t, "the %s child ended without reporting %s%s%s", c.mode, key, c.ended(), c.diagnosis())
+			}
 			k, v, _ := strings.Cut(line, "=")
 			c.seen[k] = v
 			if k == key {
@@ -256,6 +260,14 @@ func (c *child) diagnosis() string {
 		return ""
 	}
 	return "\nstderr:\n" + string(data)
+}
+
+// ended says why the child's output ended; call it only once lines closed.
+func (c *child) ended() string {
+	if c.readErr == nil {
+		return ""
+	}
+	return " (reading its output: " + c.readErr.Error() + ")"
 }
 
 // environWithout is env without key.

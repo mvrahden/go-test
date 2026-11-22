@@ -57,6 +57,7 @@ func lateBudgetReports(t *gotest.T, timeout time.Duration) (done, ack string) {
 		TeardownBudget string `json:"teardownBudget"`
 	}
 	lines := make(chan protocolLine)
+	var readErr error // set before lines closes
 	go func() {
 		defer close(lines)
 		sc := bufio.NewScanner(stdout)
@@ -66,6 +67,7 @@ func lateBudgetReports(t *gotest.T, timeout time.Duration) (done, ack string) {
 				lines <- line
 			}
 		}
+		readErr = sc.Err()
 	}()
 	// The budget of the first line keyed key, or "" when none came in time.
 	await := func(key string) string {
@@ -96,6 +98,7 @@ func lateBudgetReports(t *gotest.T, timeout time.Duration) (done, ack string) {
 	_ = stdin.Close()
 	for range lines {
 	}
+	gotest.NoError(t, readErr, "reading the fixture process's protocol")
 	_ = cmd.Wait()
 	return done, ack
 }
