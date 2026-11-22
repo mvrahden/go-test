@@ -1,6 +1,7 @@
 package gotestrunner_test
 
 import (
+	"cmp"
 	"fmt"
 	"slices"
 	"strings"
@@ -22,6 +23,7 @@ const tracePkgs = "github.com/mvrahden/go-test/tests/conformance/testdata"
 type DispatchTraceTestSuite struct{}
 
 type traceCtx struct {
+	slots   int // the run's suite processes; 0 is 8
 	mu      sync.Mutex
 	events  []gotestrunner.DispatchEvent
 	restore func()
@@ -59,7 +61,7 @@ func (c *traceCtx) run(t *gotest.T, pkg string, goTestArgs ...string) (string, i
 	gotest.NoError(t, err)
 	c.cleanup = cleanup
 	result, err := gotestrunner.RunPipeline(t.Context(), gotestrunner.PipelineConfig{
-		GoTestArgs: goTestArgs, OutputMode: gotestrunner.RunCaptureJSON, Parallel: 8,
+		GoTestArgs: goTestArgs, OutputMode: gotestrunner.RunCaptureJSON, Parallel: cmp.Or(c.slots, 8),
 		PackageOrder: pkgs.Order,
 	}, overlay)
 	gotest.NoError(t, err)
@@ -75,6 +77,25 @@ func (s *DispatchTraceTestSuite) TestADefaultRun(t *gotest.T, c *traceCtx) {
 	gotest.NotContains(t, trace, "VIOLATION")
 	gotest.Equal(t, "intake "+tracePkgs+"/passing\nup-front []\nscope \"\"\n  bulk "+tracePkgs+"/passing.TestPassingTestSuite [] ran\n", trace)
 	gotest.MatchSnapshot(t, trace)
+}
+
+func (s *DispatchTraceTestSuite) TestOneSlotStartsSuitesInTheOrderTheyQueued(t *gotest.T, c *traceCtx) {
+	c.slots = 1
+	_, exit := c.run(t, "../../tests/conformance/testdata/slotorder/")
+	gotest.Equal(t, 0, exit)
+	c.mu.Lock()
+	var started []string
+	for _, e := range c.events {
+		if e.Kind == "suite-start" {
+			started = append(started, e.Suite)
+		}
+	}
+	c.mu.Unlock()
+	want := make([]string, 24)
+	for i := range want {
+		want[i] = fmt.Sprintf("TestOrder%02dTestSuite", i+1)
+	}
+	gotest.Equal(t, want, started)
 }
 
 func (s *DispatchTraceTestSuite) TestAGroupedRun(t *gotest.T, c *traceCtx) {

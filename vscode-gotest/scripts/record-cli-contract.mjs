@@ -256,9 +256,12 @@ function mask(stdout) {
     });
 }
 
+// They build, so a slow runner's build notice must not reach their stderr.
 const live = {};
 for (const [name, args] of Object.entries(LIVE)) {
-  const result = await run(bin, args, "");
+  const result = await run(bin, args, "", {
+    env: { ...process.env, GOTEST_SLOW_BUILD_THRESHOLD: "1h" },
+  });
   live[name] = {
     args,
     exitCode: result.exitCode,
