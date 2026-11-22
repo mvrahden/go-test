@@ -12,7 +12,7 @@ import (
 type CLINoTestsTestSuite struct{}
 
 func (s *CLINoTestsTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second}
+	return gotest.SuiteConfig{Parallel: true, Timeout: time.Minute} // six CLI runs in one method
 }
 
 func (s *CLINoTestsTestSuite) TestSuitesThatLegitimatelyRunNothing(t *gotest.T) {
