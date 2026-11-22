@@ -34,7 +34,7 @@ runs:
         version=$(sed -n "s/^$key=//p" "$GITHUB_WORKSPACE/.github/gate.env")
         test -n "$version" || { echo "::error::.github/gate.env has no $key"; exit 1; }
         echo "go-version=$version" >> "$GITHUB_OUTPUT"
-    - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+    - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7
       with:
         go-version: ${{ steps.gate.outputs.go-version }}
         cache: false
