@@ -6,7 +6,9 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
+	"time"
 )
 
 var markMu sync.Mutex
@@ -21,6 +23,17 @@ func Mark(event string) {
 	}
 	defer f.Close()
 	_, _ = f.WriteString(event + "\n")
+}
+
+// Await waits until event is marked, or for limit, and says whether it was.
+func Await(event string, limit time.Duration) bool {
+	for end := time.Now().Add(limit); time.Now().Before(end); time.Sleep(50 * time.Millisecond) {
+		data, _ := os.ReadFile(filepath.Join(os.Getenv("GOTEST_CANARY_DIR"), "markers"))
+		if strings.Contains(string(data), event+"\n") {
+			return true
+		}
+	}
+	return false
 }
 
 type ASharedFixture struct {
