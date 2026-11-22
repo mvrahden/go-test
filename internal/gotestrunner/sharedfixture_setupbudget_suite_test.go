@@ -236,7 +236,7 @@ func (s *SharedFixtureSetupBudgetTestSuite) TestANegativeTimeoutWaitsWithoutADea
 			ended = true
 		case <-time.After(time.Hour):
 			cancel() // ends the wait, so the bubble can end
-			<-result
+			err = <-result
 		}
 		cancel()
 	})

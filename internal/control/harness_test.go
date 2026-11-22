@@ -239,8 +239,11 @@ func (c *child) send(t *gotest.T, line string) {
 
 // wait waits for the child to exit and returns its exit code.
 func (c *child) wait(t *gotest.T) int {
-	done := make(chan error, 1)
-	go func() { done <- c.cmd.Wait() }()
+	done := make(chan struct{})
+	go func() {
+		_ = c.cmd.Wait() // the exit code is read from ProcessState below
+		close(done)
+	}()
 	select {
 	case <-done:
 	case <-time.After(within):

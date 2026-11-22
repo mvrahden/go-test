@@ -4,7 +4,7 @@ SKILL.md and the other references describe the newest release. Find the
 installed version first (SKILL.md's version check), then read what differs
 on it below. After an upgrade, the entries newer than the old pin are the
 upgrade notes: each names the behavior it replaced.
-What a release changed inside the runner is in the repository's `docs/CHANGELOG.md`, not here.
+What a release changed inside the runner is in its GitHub release, not here.
 
 ## v1.25.x
 

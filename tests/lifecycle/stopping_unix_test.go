@@ -112,7 +112,7 @@ func (s *StoppingTestSuite) TestAForceWithNoStopForcesOne(t *gotest.T) {
 	case err = <-exited:
 	case <-time.After(20 * time.Second):
 		_ = tree.Kill()
-		<-exited
+		err = <-exited
 		tree.Release()
 		c.close()
 		gotest.Fail(t, "a force with no stop under way left the process running") //nolint:fail-guard // the tree is killed before the test fails

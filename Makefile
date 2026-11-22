@@ -2,7 +2,7 @@
 
 # Must ship x/tools >= v0.46.0, the first that reads Go 1.27 export data.
 # Move it with the Go version the workflows test.
-GOLANGCI_VERSION := v2.14.0
+GOLANGCI_VERSION := v2.15.0
 ACTIONLINT_VERSION := v1.7.12
 
 SPECS_DIR ?= specs
