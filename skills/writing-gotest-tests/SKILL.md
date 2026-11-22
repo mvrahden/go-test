@@ -35,7 +35,7 @@ without go-test yet, `go.work`, vendoring). A `FAIL:` refusal about a
 drifted binary is never a fault in the tests: switch to `go tool gotest`;
 never upgrade just to silence it.
 
-This skill describes **v1.39**, the newest release; a rule tagged with a
+This skill describes **v1.40**, the newest release; a rule tagged with a
 later version waits for that release. On a release you could not upgrade from,
 read `reference/versions.md` before writing anything: it lists what each
 older release lacks or does differently, including rules below that fail
