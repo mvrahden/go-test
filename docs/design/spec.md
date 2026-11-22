@@ -130,16 +130,16 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 ### Flags
 
 | Flag | Effect |
-|------|--------|
-| `--debug` | Keep generated files after run |
-| `--ci` | CI mode: fail on `F_` prefixes, snapshot read-only |
-| `--no-cache` | Bypass the test binary cache (generation is not cached) |
+|---|---|
+| `--debug` | Keep the run's overlay and work dir for inspection; a later run removes them after 7 days |
+| `--ci` | CI mode: fail on `F_` prefixes, snapshot read-only; on by itself where `CI` is set, opt out with `GOTEST_CI=0` |
+| `--no-cache` | Bypass the test binary cache and link afresh (generation is not cached) |
 | `--spec` | Render the spec view instead of the default output (default and watch modes) |
 | `--update-snapshots` | Regenerate snapshot files |
 | `--format=<fmt>` | Output format for `spec`/`summary` (terminal, md/markdown, json) |
 | `--output=<path>` | Write formatted output to file |
 | `--no-color` | Strip ANSI codes from terminal output |
-| `--min=<pct>` | Fail if coverage below threshold (enables `-coverprofile`) |
+| `--min=<pct>` | Fail if coverage is below threshold (enables `-coverprofile`) |
 | `--setup-timeout=<dur>` | Flat budget for shared fixture setup (default: the fixtures' declared budgets, 30s until the first reports; 0 disables) |
 | `--timeout=<dur>` | Global pipeline deadline (default: 15m; 0 disables); refused by `fuzz`, whose deadline follows `--for` |
 | `--debounce=<dur>` | Debounce interval for watch mode (default 200ms) |
@@ -148,31 +148,35 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `--group=<name>` | Run only the suites of this `ExclusiveGroup` (repeatable; default runs, `spec`, `summary`); a name no suite declares exits 2 before any build |
 | `--skip-group=<name>` | Leave the suites of this `ExclusiveGroup` out (repeatable) |
 | `--input=<path>` | Replay a saved `go test -json` stream in `spec`/`summary` (`-` reads stdin); exit 2 when it holds no test events, a package or failed build has no verdict, or a package failed to build |
-| `--events-file=<path>` | With `-json`, or in `summary`, also write the run's `go test -json` event stream to the file as `-json` prints it (a suite's events when its process ends), making its directories and replacing a file there; `summary --input` reads it back. A text run refuses it (exit 2) |
-| `--control=stdin` | Read `stop` and `force` lines on standard input, a first and a second interrupt, counted with the signals; the input's end is a stop when none is under way. Taken by every command that stops on an interrupt (runs, `spec`, `summary`, `watch`, `bench`, `fuzz` and its `triage` and `promote`, `prepare`); any other value, or beside `--input=-`, exits 2. Without it standard input is never read ([Stopping gotest through its standard input](../../specs/lifecycle/spec.md#requirement-stopping-gotest-through-its-standard-input)) |
+| `--events-file=<path>` | With `-json`, or in `summary`, also write the run's `go test -json` event stream to the file as `-json` prints it (a suite's events when its process ends), making its directories and replacing a file there; `summary --input` reads it back; a text run refuses it, and an unwritable path exits 2 before anything is built |
+| `--control=stdin` | Read `stop` and `force` lines on standard input, a first and a second interrupt, counted with the signals, the input's end a stop when none is under way; taken by every command that stops on an interrupt, and without it standard input is never read |
 | `--github` | Emit GitHub annotations and step summary (auto-enabled in GitHub Actions) |
-| `--coverage=<path>` | Coverage profile path for `summary` subcommand |
+| `--coverage=<path>` | Coverage profile path for the `summary` subcommand |
 | `--badge=<path>` | Write a self-contained coverage badge SVG (`summary`); adds `-coverprofile` when neither the caller nor `--min` did |
-| `--render-only` | With `--input`, exit 0 on a failing or incomplete stream: the code reports whether rendering succeeded, not whether the tests passed (requires `--input`) |
-| `--stamp` | With `--input`, write the stream back with each test event placed as `gotest -json` places it, instead of rendering it (`spec`; [Stamping a saved stream](../../specs/cli/spec.md#requirement-stamping-a-saved-stream)) |
+| `--render-only` | With `--input`, exit 0 on a failing or incomplete stream: the code reports whether rendering succeeded, not whether the tests passed |
+| `--stamp` | With `--input`, write the stream back with each test event placed as `gotest -json` places it, instead of rendering it (`spec`) |
 | `--static` | Render the specification from source without running the suites (`spec`); nodes carry no verdict, and methods whose behaviors depend on runtime values are reported as incomplete on stderr |
-| `--declared` | Lay the run's verdicts, or with `--input` a saved stream's, over the specification the packages' source declares (`spec`; [The declared specification under a run's verdicts](../../specs/spec/spec.md#requirement-the-declared-specification-under-a-runs-verdicts)) |
-| `--hide=<statuses>` | Leave out of the `spec` rendering the rows whose status is one of `pass`, `fail`, `skip`, `none`, without changing what is counted ([Hiding rows by status](../../specs/spec/spec.md#requirement-hiding-rows-by-status)) |
-| `--match=<text>` | Keep of the `spec` rendering the behaviors whose label holds the text, and their groups; counts are those of what is kept ([Searching and picking rows](../../specs/spec/spec.md#requirement-searching-and-picking-rows)) |
-| `--only=<import path>[:<i>.<j>…]` | Keep of the `spec` rendering one package, or the node at that position among the shown children, with what is under it; counts are those of what is kept ([Searching and picking rows](../../specs/spec/spec.md#requirement-searching-and-picking-rows)) |
+| `--declared` | Lay the run's verdicts, or with `--input` a saved stream's, over the specification the packages' source declares (`spec`) |
+| `--hide=<statuses>` | Leave out of the `spec` rendering the rows whose status is one of `pass`, `fail`, `skip`, `none`, without changing what is counted |
+| `--match=<text>` | Keep of the `spec` rendering the behaviors whose label holds the text, and their groups; counts are those of what is kept |
+| `--only=<import path>[:<i>.<j>…]` | Keep of the `spec` rendering one package, or the node at that position among the shown children, with what is under it; counts are those of what is kept |
 | `--bench` | Benchmark mode for `watch`: re-run benchmarks on change with ns/op deltas |
 | `--save=<path>` | Save a benchmark run as a JSON baseline (`bench`; a bare `--save=` uses `bench.baseline` from `.gotest.yml`, and saving to the configured baseline promotes the run without comparing it) |
-| `--against=<path>` | Compare a benchmark run against a saved baseline and print the delta table (`bench`; defaults to `bench.baseline`). A baseline whose `goos`, `goarch`, `goVersion`, `cpu` or `gomaxprocs` differs warns on stderr and reports `envMismatch`; the comparison still runs and the exit code is unchanged. What the comparison does with benchmarks on one side alone, with few samples and with one file for both flags is pinned below |
-| `--gate=<pct>` | Fail (exit 1) if the worst significant benchmark regression exceeds the threshold (`bench`); needs `-count=4` or more, the samples a significance test takes (pinned below) |
-| `--json` | Emit one versioned JSON report to stdout — results, deltas, gate verdict, environment mismatch, failures — instead of human output (`bench`; for tooling) |
-| `--for=<dur>` | Approximate wall-clock fuzz budget for the session, split jobs-aware across targets (`fuzz`; default 1m or half of a shorter `--timeout`; `0` removes the budget; per-target share floors at 10s) |
-| `--target=<name>` | Fuzz exactly one generated wrapper by name; unmatched names error with the available list (`fuzz`) |
+| `--against=<path>` | Compare a benchmark run against a saved baseline and print the delta table (`bench`; defaults to `bench.baseline`); a baseline from another machine or Go version warns and still compares |
+| `--gate=<pct>` | Fail (exit 1) if the worst significant benchmark regression exceeds the threshold (`bench`); needs `-count=4` or more |
+| `--json` | Emit one versioned JSON report to stdout instead of human output (`bench`; for tooling) |
+| `--for=<dur>` | Approximate wall-clock fuzz budget for the session, split across targets (`fuzz`; default 1m or half of a shorter `--timeout`; `0` removes the budget) |
+| `--target=<name>` | Fuzz exactly one generated wrapper by name; an unmatched name lists the available ones (`fuzz`) |
 | `--jobs=<n>` | Max concurrent fuzz targets (`fuzz`; default: max(1, GOMAXPROCS/2)) |
 | `--no-harvest` | Disable table-test seed harvesting for this run |
 | `--fuzz` | Generate fuzz round-trip skeletons (`scaffold`) |
 | `--dry-run` | Print the unified diff of every edit instead of writing it (`migrate`) |
-| `--dir` | Skills directory to install into, default `.agents/skills` (`skill install`) |
+| `--dir=<skills-dir>` | Skills directory to install into, default `.agents/skills` (`skill install`) |
 | `--cache` | Remove every cached test binary no run is using (`clean`) |
+
+The requirements behind some of these flags: `--control` [Stopping gotest through its standard input](../../specs/lifecycle/spec.md#requirement-stopping-gotest-through-its-standard-input), `--stamp` [Stamping a saved stream](../../specs/cli/spec.md#requirement-stamping-a-saved-stream), `--declared` [The declared specification under a run's verdicts](../../specs/spec/spec.md#requirement-the-declared-specification-under-a-runs-verdicts), `--hide` [Hiding rows by status](../../specs/spec/spec.md#requirement-hiding-rows-by-status), `--match` and `--only` [Searching and picking rows](../../specs/spec/spec.md#requirement-searching-and-picking-rows).
+A `--control` value other than `stdin`, or one beside `--input=-`, exits 2. The commands that take `--control` are the runs, `spec`, `summary`, `watch`, `bench`, `fuzz` with its `triage` and `promote`, and `prepare`.
+`--against`: a baseline whose `goos`, `goarch`, `goVersion`, `cpu` or `gomaxprocs` differs warns on stderr and reports `envMismatch`; the comparison still runs and the exit code is unchanged. What the comparison does with benchmarks on one side alone, with few samples and with one file for both flags is pinned below, as is the sample count `--gate`'s significance test takes. `--json`'s report carries results, deltas, the gate verdict, the environment mismatch and failures. `--for` floors each target's share at 10s.
 
 ### Disambiguation
 
@@ -1584,11 +1588,12 @@ The `--ci` flag fails the run when any `F_` (focus) prefix is committed, prevent
 User-facing:
 
 | Variable | Effect |
-|----------|--------|
-| `GOTEST_UPDATE_SNAPSHOTS=1` | Regenerate snapshot baselines (what `--update-snapshots` sets; the only mechanism under plain `go test`) |
-| `GOTEST_CI` | `1`/`true` forces CI mode; any value suppresses auto-detection from `CI`; unset → auto-detect |
+|---|---|
+| `GOTEST_CI` | CI mode on for any value but `0`, `f`, `F`, `false`, `FALSE` and `False`, which turn it off; unset, the standard `CI` variable turns it on |
 | `GOTEST_CACHE_DIR` | Cache location for test binaries (default `os.UserCacheDir()/gotest`; a run evicts the binaries of a gone checkout, those unused for 7 days, then the least recently used above 5 GiB) |
 | `GOTEST_SLOW_BUILD_THRESHOLD` | How long a build runs, as a Go duration, before the CLI says it is still building (default `15s`; unparsable or not positive → the default) |
+| `GOTEST_UPDATE_SNAPSHOTS` | Regenerate snapshot baselines, off for the same values as `GOTEST_CI` (what `--update-snapshots` sets; the only mechanism under plain `go test`) |
+| `GOTEST_TIMEOUT_SCALE` | Multiply every suite and fixture budget, declared or default, deadline and verdict alike, for a machine slower than the one the budgets were written on (`2` doubles them); the processes the tests start do not inherit it |
 
 Internal protocol between the CLI and test/subprocess boundaries (may change without notice): `GOTEST_SHARED_STATE_FILE` (shared-fixture state file for the test process), `GOTEST_CONTROL` (the suite process's control channel: the stop, the forced stop and the teardown budget travel on it as lines).
 

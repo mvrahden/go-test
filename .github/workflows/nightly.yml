@@ -93,7 +93,7 @@ jobs:
 
   platform:
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 25
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
@@ -128,7 +128,7 @@ jobs:
         with:
           packages: ${{ steps.shard.outputs.packages }}
           race: true
-          flags: "--parallel=${{ matrix.parallel || env.GATE_PARALLEL }} --timeout=${{ env.GATE_TIMEOUT }}"
+          flags: "--parallel=${{ matrix.parallel || env.GATE_PARALLEL }} --timeout=${{ env.GATE_PLATFORM_TIMEOUT }}"
           events-file: ${{ runner.temp }}/test-events.json
       - name: Upload the test event stream
         if: ${{ always() && steps.test.outputs.events-file != '' }}

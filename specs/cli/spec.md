@@ -635,3 +635,10 @@ A suite process an expired --timeout stopped SHALL fail its package on the text,
 - **WHEN** --timeout expires while a method waits for its context to end, and the method then returns
 - **THEN** fails the package and the run with exit 1, on the text and -json pipelines
 - **AND** names the suite in the run's FAIL line, on stderr and in the stream
+
+### Requirement: Every run executes its tests
+A run SHALL execute every suite it selects, whether or not anything changed since the last run, and SHALL mark no package as cached.
+
+#### Scenario: Nothing changed between two runs
+- **WHEN** a package is run twice with nothing changed in between
+- **THEN** the second run executes its tests again and marks nothing cached
