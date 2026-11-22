@@ -1,5 +1,6 @@
+Expect: ^FAIL .*internal/gotestrunner DispatchTrace / OneSlotStartsSuitesInTheOrderTheyQueued \(
+Judge: ./internal/gotestrunner DispatchTraceTestSuite/TestOneSlotStartsSuitesInTheOrderTheyQueued
 Clause: when four packages ran once, the last of them is edited, and they run again with -p 1 → the edited package's suite runs first
-Expect: ^FAIL .*conformance/cli CLIRebuiltFirst .* / the edited package's suite runs first \(
 --- a/internal/gotestrunner/dispatch.go
 +++ b/internal/gotestrunner/dispatch.go
 @@ -336,9 +336,6 @@
