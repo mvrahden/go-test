@@ -706,3 +706,31 @@ What v1.39 changes:
    delete the blank imports of `pkg/gotestruntime` and `pkg/gotestfuzz`
    and vendor again. Without the tool directive the build failure of each
    suite package names the `go get -tool` command, and `-mod=mod`.
+
+## v1.40
+
+What v1.40 changes:
+
+1. **A filtered run builds only what it runs** — a package none of whose
+   suites the run selects (by `-run`, `-skip`, a group flag or focus) is
+   not built and shows as having no tests to run, so a build or vet
+   failure there goes unreported. Below v1.40 every suite package was built.
+   Run the whole tree before trusting a narrowed green.
+
+2. **`-p N` means N suite processes** — exactly that many run at once,
+   above `GOMAXPROCS` too and without the halving under `-race`, and the
+   default `--parallel` budget becomes `2 × N`. Below v1.40 `-p` only
+   lowered the count, so suites that wait for each other could not all run
+   on a small machine.
+
+3. **Stripped binaries** — test binaries lose their symbols and debug
+   information, as under `go test`; `-ldflags`, a profile flag or
+   `--debug` keeps both. Below v1.40 they kept them.
+
+4. **The `--debug` phases line** — a `--debug` test run ends with
+   `DEBUG: phases: discover=… generate=… compile=… run=… report=… total=…`
+   on stderr; compile overlaps run and is counted inside it.
+
+5. **No result cache, now stated** — every run executes every suite it
+   selects and never prints `(cached)`, as before; to rerun only what a
+   change touches, use `gotest watch`.

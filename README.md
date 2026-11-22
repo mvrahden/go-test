@@ -578,7 +578,7 @@ Left unchecked, that product grows quadratically with CPU count and saturates th
 `gotest` manages this automatically with a linear concurrency budget.
 
 By default the budget is `2 × GOMAXPROCS`.
-The runner caps suite processes at `GOMAXPROCS` (one per core) and distributes the remaining budget as `-test.parallel` to each subprocess.
+The runner starts `GOMAXPROCS` suite processes at once (one per core) and distributes the remaining budget as `-test.parallel` to each subprocess; `-p N` sets the number, above `GOMAXPROCS` too, for suites that wait rather than compute ([Suite processes at once](specs/cli/spec.md#requirement-suite-processes-at-once)).
 On a 4-core machine with 10 suites this means 4 concurrent processes, each running 2 test methods at a time — 8 total, not 32.
 
 Override with `--parallel`:
@@ -595,10 +595,10 @@ gotest ./... -parallel 8            # explicit per-suite, no budget management
 | `--parallel N` | `min(S, GOMAXPROCS, N)` | `N / inter` | `N` |
 | `-parallel M` | `min(S, GOMAXPROCS, 2 × GOMAXPROCS / M)` | `M` | `≤ 2 × GOMAXPROCS` |
 | `--parallel N -parallel M` | `min(S, GOMAXPROCS, N/M)` | `M` | `~N` |
-| `-p P` | at most `P` | as above | as above |
+| `-p P` | `min(S, P)` | `budget / inter` | `2 × P` |
 
-Where *S* is the number of suites and *inter* is the computed process count.
-`-p P` keeps the meaning it has for go test, the number of programs run at once: it caps the suite processes and the compile parallelism alike. `-exec <cmd>` runs every suite binary under the command, as go test does.
+Where *S* is the number of suites and *inter* is the computed process count; beside `--parallel` or `-parallel`, `P` takes the place of `GOMAXPROCS` in the rows above.
+`-p P` keeps the meaning it has for go test, the number of programs run at once: it sets the suite processes, without the halving under a sanitizer, and caps the compile parallelism. `-exec <cmd>` runs every suite binary under the command, as go test does.
 Under `-race`/`-msan`/`-asan` the default budget halves (as does compile concurrency) — instrumentation at least doubles the CPU cost per instruction stream, and keeping the uninstrumented defaults would oversubscribe the machine. An explicit `--parallel`/`--compile-parallel` always wins over this heuristic.
 
 ## Testing Toolkit
@@ -1123,7 +1123,9 @@ gotest help                    # show help
 
 The `go test` flags keep their meaning: `-race`, `-cover`, `-count`, `-run`, `-skip`, `-list`, `-json`, `-short`, `-timeout`, `-v`, `-p`, `-exec` and the build flags. A few would break what gotest does and are refused with the reason, exit 2 ([Go test flags gotest implements](specs/cli/spec.md#requirement-go-test-flags-gotest-implements)): `-o`, `-c` and `-n`, since gotest builds the binaries itself; `-overlay`, since gotest builds through an overlay of its own; `-fuzz`, which `gotest fuzz` replaces; and `-cpuprofile`, `-memprofile`, `-blockprofile`, `-mutexprofile` and `-trace` on a run that starts more than one suite process, which would each write the one file. Every word after `-args` goes to the test binary as written.
 `-run` reaches each suite process as a pattern for that suite alone ([A -run pattern in each suite process](specs/cli/spec.md#requirement-a--run-pattern-in-each-suite-process)). `-run '^TestMySuite$'` names the suite's test function only, so its fuzz seeds do not replay; name the fuzz wrapper as well, or drop the anchors, to replay them.
-A filtered run builds only the packages it runs, so a build or vet failure in a package the filter leaves out is not reported by that run; `go test` builds every matched package.
+A filtered run builds only the packages it runs, so a build or vet failure in a package the filter leaves out is not reported by that run; `go test` builds every matched package ([Packages a run builds](specs/cli/spec.md#requirement-packages-a-run-builds)).
+Test binaries are stripped of their symbol table and debug information, as `go test` strips them; `-ldflags` (an argument or in `GOFLAGS`), a profile flag such as `-cpuprofile`, or `--debug` keeps both in ([How test binaries are linked](specs/cli/spec.md#requirement-how-test-binaries-are-linked)).
+`--debug` also ends a run with one line on stderr of the time each phase took, `DEBUG: phases: discover=… generate=… compile=… run=… report=… total=…`; compiling overlaps running, so `compile` is a part of `run`, not a phase after it ([Where a run's time went](specs/cli/spec.md#requirement-where-a-runs-time-went)).
 
 A run exits `0` when everything passed, `1` on a failed test (one that panics or calls `os.Exit` included — `os.Exit(0)` too, as under `go test`), a shared fixture that failed to set up or tear down, or an expired `--timeout` (a suite it stopped fails its package even when its methods passed: [A suite cut short by --timeout](specs/cli/spec.md#requirement-a-suite-cut-short-by---timeout)), `2` on a usage, generation or build error, on a text run in which a suite reports that it ran no tests ([A suite that ran no tests](specs/cli/spec.md#requirement-a-suite-that-ran-no-tests)), on a green run that writes an event stream (`-json`, `spec`, `summary`) in which a declared test never ran (a plain text run takes no census, and `-run`, `-skip` and `-list` stand it down), and when the patterns match no package, and `130` when it was interrupted. `lint` and `fuzz` state their own codes in `gotest help lint` and `gotest help fuzz`.
 
