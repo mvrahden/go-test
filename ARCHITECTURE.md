@@ -1426,7 +1426,7 @@ Arrows read "imports". Third-party modules are named where a package needs one.
 | `internal/migrate` | testify/suite conversion | `internal/{about,filewrite,gotestast,protocol,refactor,unidiff}`; third-party: `x/tools` |
 | `internal/refactor` | Source edits: focus toggles, seed splices | `internal/{gotestast,protocol}`; third-party: `x/tools` |
 | `internal/scaffold` | Suite skeletons from a type | `internal/{gotestgen,goversion}`; third-party: `x/tools` |
-| `internal/config` | `.gotest.yml` | third-party: `yaml/v3` |
+| `internal/config` | `.gotest.yml` | third-party: `yaml/v4` |
 | `internal/genstub` | Stands a package clause in for generated files while packages load | `internal/{about,pkgpattern}` |
 | `internal/goversion` | Refuses a CLI built by an older Go than the module's | `internal/about`; third-party: `x/tools` |
 | `internal/filewrite` | Rewrites a set of files all or none | third-party: `x/sys` |

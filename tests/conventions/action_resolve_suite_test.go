@@ -7,7 +7,7 @@ import (
 	"runtime"
 	"time"
 
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
