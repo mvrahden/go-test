@@ -76,7 +76,7 @@ func (s *DependencyAllowlistTestSuite) TestWhatTheModuleRequires(t *gotest.T) {
 		}
 	}
 	gotest.ElementsMatch(t, []string{
-		"github.com/fsnotify/fsnotify", "go.yaml.in/yaml/v3", "golang.org/x/mod", "golang.org/x/sys", "golang.org/x/tools",
+		"github.com/fsnotify/fsnotify", "go.yaml.in/yaml/v4", "golang.org/x/mod", "golang.org/x/sys", "golang.org/x/tools",
 	}, direct, "go.mod requires another set of modules: each one reaches every user's go.mod through the tool directive")
 	gotest.ElementsMatch(t, []string{"golang.org/x/sync"}, indirect, "go.mod's indirect requirements changed: edit the list in this file on purpose")
 }

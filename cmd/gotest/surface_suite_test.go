@@ -8,7 +8,7 @@ import (
 
 	. "github.com/mvrahden/go-test/cmd/gotest"
 
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 
 	"github.com/mvrahden/go-test/internal/lint"
 	"github.com/mvrahden/go-test/pkg/gotest"
