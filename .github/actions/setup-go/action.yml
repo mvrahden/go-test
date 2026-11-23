@@ -39,31 +39,31 @@ runs:
         go-version: ${{ steps.gate.outputs.go-version }}
         cache: false
     - name: Name the Go cache
-      id: cache
       shell: bash
       env:
         KEY: ${{ inputs.cache-key }}
         SUM: ${{ hashFiles('**/go.sum') }}
       run: |
-        prefix="go-${RUNNER_OS}-$(go env GOVERSION)"
+        if [ "$RUNNER_OS" = Windows ]; then
+          echo "GO_CACHE_KEY=" >> "$GITHUB_ENV"
+          exit 0
+        fi
         {
-          echo "GO_CACHE_KEY=${prefix}-${KEY}-${SUM}-${GITHUB_SHA}"
+          echo "GO_CACHE_KEY=go-${RUNNER_OS}-$(go env GOVERSION)-${KEY}-${SUM}-$(date -u +%G-W%V)"
           echo "GO_CACHE_PATHS<<GO_CACHE_PATHS_END"
           echo "$(go env GOCACHE)"
           echo "!$(go env GOCACHE)/fuzz"
           echo "$(go env GOMODCACHE)"
           echo "GO_CACHE_PATHS_END"
         } >> "$GITHUB_ENV"
-        {
-          echo "restore-keys<<RESTORE_KEYS_END"
-          echo "${prefix}-${KEY}-${SUM}-"
-          echo "${prefix}-${KEY}-"
-          echo "${prefix}-"
-          echo "RESTORE_KEYS_END"
-        } >> "$GITHUB_OUTPUT"
     - name: Restore the Go cache
+      id: restore
+      if: env.GO_CACHE_KEY != ''
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
       with:
         path: ${{ env.GO_CACHE_PATHS }}
         key: ${{ env.GO_CACHE_KEY }}
-        restore-keys: ${{ steps.cache.outputs.restore-keys }}
+    - name: Note the cache hit
+      if: steps.restore.outputs.cache-hit == 'true'
+      shell: bash
+      run: echo "GO_CACHE_HIT=true" >> "$GITHUB_ENV"
