@@ -96,7 +96,7 @@ describe("buildRunRows", () => {
         dir: "/w",
         runs: [
           entry({
-            manifest: { args: [], changed: { Ran: 1, Unchanged: 3 } },
+            manifest: { args: [], changed: { ran: 1, unchanged: 3 } },
             imported: true,
             eventsFile: "/dl/ci-run.json",
           }),
@@ -122,7 +122,7 @@ describe("the run's words", () => {
     expect(
       narrowedText({
         args: [],
-        changed: { Ran: 5, Unchanged: 0, NoRecord: true },
+        changed: { ran: 5, unchanged: 0, noRecord: true },
       }),
     ).toBe("--changed found no record and ran all 5");
   });

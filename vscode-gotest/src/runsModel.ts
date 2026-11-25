@@ -18,7 +18,7 @@ export interface RunsManifest {
   agent?: string;
   build?: string[];
   // A --changed run: how many packages it ran and left out.
-  changed?: { Ran: number; Unchanged: number; NoRecord?: boolean };
+  changed?: { ran: number; unchanged: number; noRecord?: boolean };
 }
 
 export interface RunsEntry {
@@ -106,9 +106,9 @@ export function whenText(at: Date, now: Date): string {
 export function narrowedText(m: RunsManifest): string | undefined {
   const c = m.changed;
   if (!c) return undefined;
-  if (c.NoRecord) return `--changed found no record and ran all ${c.Ran}`;
+  if (c.noRecord) return `--changed found no record and ran all ${c.ran}`;
   const pkgs = (n: number) => `${n} package${n === 1 ? "" : "s"}`;
-  return `--changed: ran ${pkgs(c.Ran)}, left out ${c.Unchanged} unchanged`;
+  return `--changed: ran ${pkgs(c.ran)}, left out ${c.unchanged} unchanged`;
 }
 
 // judgesText is what a record says of the tree now, as the CLI counts it.

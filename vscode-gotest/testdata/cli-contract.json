@@ -3779,6 +3779,7 @@
             "change": "removed",
             "kind": "it",
             "package": "auditmod/shop",
+            "module": "auditmod",
             "base": {
               "path": [
                 "Cart",
@@ -3791,12 +3792,14 @@
             },
             "behaviors": 1,
             "test": "TestCartTestSuite/TestCopies/first_copy",
-            "run": "^TestCartTestSuite$/^TestCopies$/^first_copy$"
+            "run": "^TestCartTestSuite$/^TestCopies$/^first_copy$",
+            "order": 0
           },
           {
             "change": "removed",
             "kind": "it",
             "package": "auditmod/shop",
+            "module": "auditmod",
             "base": {
               "path": [
                 "Cart",
@@ -3809,12 +3812,14 @@
             },
             "behaviors": 1,
             "test": "TestCartTestSuite/TestCopies/second_copy",
-            "run": "^TestCartTestSuite$/^TestCopies$/^second_copy$"
+            "run": "^TestCartTestSuite$/^TestCopies$/^second_copy$",
+            "order": 1
           },
           {
             "change": "removed",
             "kind": "test",
             "package": "auditmod/shop",
+            "module": "auditmod",
             "base": {
               "path": [
                 "Cart",
@@ -3826,12 +3831,14 @@
             },
             "behaviors": 1,
             "test": "TestCartTestSuite/TestRemove",
-            "run": "^TestCartTestSuite$/^TestRemove$"
+            "run": "^TestCartTestSuite$/^TestRemove$",
+            "order": 2
           },
           {
             "change": "added",
             "kind": "it",
             "package": "auditmod/shop",
+            "module": "auditmod",
             "head": {
               "path": [
                 "Cart",
@@ -3844,12 +3851,14 @@
             },
             "behaviors": 1,
             "test": "TestCartTestSuite/TestCopies/the_only_copy",
-            "run": "^TestCartTestSuite$/^TestCopies$/^the_only_copy$"
+            "run": "^TestCartTestSuite$/^TestCopies$/^the_only_copy$",
+            "order": 4
           },
           {
             "change": "added",
             "kind": "when",
             "package": "auditmod/shop",
+            "module": "auditmod",
             "head": {
               "path": [
                 "Stock",
@@ -3862,12 +3871,14 @@
             },
             "behaviors": 1,
             "test": "TestStockTestSuite/TestCount/the_stock_is_empty",
-            "run": "^TestStockTestSuite$/^TestCount$/^the_stock_is_empty$"
+            "run": "^TestStockTestSuite$/^TestCount$/^the_stock_is_empty$",
+            "order": 5
           },
           {
             "change": "added",
             "kind": "when",
             "package": "auditmod/shop",
+            "module": "auditmod",
             "head": {
               "path": [
                 "Stock",
@@ -3880,12 +3891,14 @@
             },
             "behaviors": 1,
             "test": "TestStockTestSuite/TestCount/the_stock_is_refilled",
-            "run": "^TestStockTestSuite$/^TestCount$/^the_stock_is_refilled$"
+            "run": "^TestStockTestSuite$/^TestCount$/^the_stock_is_refilled$",
+            "order": 6
           },
           {
             "change": "reworded",
             "kind": "it",
             "package": "auditmod/shop",
+            "module": "auditmod",
             "base": {
               "path": [
                 "Cart",
@@ -3909,12 +3922,14 @@
               "endLine": 26
             },
             "test": "TestCartTestSuite/TestAdd/both_numbers_are_positive/ignores_the_order",
-            "run": "^TestCartTestSuite$/^TestAdd$/^both_numbers_are_positive$/^ignores_the_order$"
+            "run": "^TestCartTestSuite$/^TestAdd$/^both_numbers_are_positive$/^ignores_the_order$",
+            "order": 7
           },
           {
             "change": "moved",
             "kind": "it",
             "package": "auditmod/shop",
+            "module": "auditmod",
             "base": {
               "path": [
                 "Stock",
@@ -3938,12 +3953,14 @@
               "endLine": 28
             },
             "test": "TestStockTestSuite/TestCount/the_stock_is_refilled/counts_every_item",
-            "run": "^TestStockTestSuite$/^TestCount$/^the_stock_is_refilled$/^counts_every_item$"
+            "run": "^TestStockTestSuite$/^TestCount$/^the_stock_is_refilled$/^counts_every_item$",
+            "order": 8
           },
           {
             "change": "changed",
             "kind": "it",
             "package": "auditmod/shop",
+            "module": "auditmod",
             "base": {
               "path": [
                 "Cart",
@@ -3967,12 +3984,14 @@
               "endLine": 31
             },
             "test": "TestCartTestSuite/TestAdd/one_number_is_negative/returns_the_difference",
-            "run": "^TestCartTestSuite$/^TestAdd$/^one_number_is_negative$/^returns_the_difference$"
+            "run": "^TestCartTestSuite$/^TestAdd$/^one_number_is_negative$/^returns_the_difference$",
+            "order": 9
           },
           {
             "change": "changed",
             "kind": "test",
             "package": "auditmod/shop",
+            "module": "auditmod",
             "base": {
               "path": [
                 "Cart",
@@ -3992,7 +4011,8 @@
               "endLine": 46
             },
             "test": "TestCartTestSuite/TestRounds",
-            "run": "^TestCartTestSuite$/^TestRounds$"
+            "run": "^TestCartTestSuite$/^TestRounds$",
+            "order": 3
           }
         ],
         "streams": [],
@@ -4181,7 +4201,8 @@
               "endLine": 37
             },
             "test": "TestCartTestSuite/X_TestEmpty",
-            "run": "^TestCartTestSuite$/^X_TestEmpty$"
+            "run": "^TestCartTestSuite$/^X_TestEmpty$",
+            "evidence": "67c8c0775cc5d97d"
           },
           {
             "id": "57e621919d575dbd",
@@ -4208,7 +4229,8 @@
               "endLine": 41
             },
             "test": "TestCartTestSuite/F_TestTotal",
-            "run": "^TestCartTestSuite$/^F_TestTotal$"
+            "run": "^TestCartTestSuite$/^F_TestTotal$",
+            "evidence": "d79811a1397f6a0b"
           },
           {
             "id": "2ba056a1d67380e6",
@@ -4235,7 +4257,8 @@
               "endLine": 11
             },
             "test": "TestStockTestSuite",
-            "run": "^TestStockTestSuite$"
+            "run": "^TestStockTestSuite$",
+            "evidence": "e89d04dcd8bfe22f"
           },
           {
             "id": "3d981c23a696f9f1",
@@ -4262,7 +4285,8 @@
               "endLine": 9
             },
             "test": "TestCartTestSuite",
-            "run": "^TestCartTestSuite$"
+            "run": "^TestCartTestSuite$",
+            "evidence": "02d704b52132bcb2"
           },
           {
             "id": "26933db0db337d8a",
@@ -4289,7 +4313,8 @@
               "endLine": 11
             },
             "test": "TestStockTestSuite",
-            "run": "^TestStockTestSuite$"
+            "run": "^TestStockTestSuite$",
+            "evidence": "e89d04dcd8bfe22f"
           },
           {
             "id": "eb62796c3106bf46",
@@ -4406,7 +4431,8 @@
             "runtime": {
               "base": 4,
               "head": 1
-            }
+            },
+            "evidence": "4134c35afad51aac"
           },
           {
             "id": "076f3e54056fe14d",
@@ -4433,7 +4459,8 @@
               "endLine": 46
             },
             "test": "TestCartTestSuite/TestRounds",
-            "run": "^TestCartTestSuite$/^TestRounds$"
+            "run": "^TestCartTestSuite$/^TestRounds$",
+            "evidence": "4134c35afad51aac"
           },
           {
             "id": "8e429eee2ea6943f",
@@ -4460,7 +4487,8 @@
               "endLine": 31
             },
             "test": "TestCartTestSuite/TestAdd/one_number_is_negative/returns_the_difference",
-            "run": "^TestCartTestSuite$/^TestAdd$/^one_number_is_negative$/^returns_the_difference$"
+            "run": "^TestCartTestSuite$/^TestAdd$/^one_number_is_negative$/^returns_the_difference$",
+            "evidence": "c281736a4cbb6993"
           },
           {
             "id": "b2d6f3a8e28bedb5",
@@ -4487,7 +4515,8 @@
               "endLine": 46
             },
             "test": "TestCartTestSuite/TestRounds",
-            "run": "^TestCartTestSuite$/^TestRounds$"
+            "run": "^TestCartTestSuite$/^TestRounds$",
+            "evidence": "4134c35afad51aac"
           }
         ],
         "behaviors": [
@@ -4495,6 +4524,7 @@
             "change": "removed",
             "kind": "it",
             "package": "auditmod/shop",
+            "module": "auditmod",
             "base": {
               "path": [
                 "Cart",
@@ -4507,12 +4537,14 @@
             },
             "behaviors": 1,
             "test": "TestCartTestSuite/TestCopies/first_copy",
-            "run": "^TestCartTestSuite$/^TestCopies$/^first_copy$"
+            "run": "^TestCartTestSuite$/^TestCopies$/^first_copy$",
+            "order": 0
           },
           {
             "change": "removed",
             "kind": "it",
             "package": "auditmod/shop",
+            "module": "auditmod",
             "base": {
               "path": [
                 "Cart",
@@ -4525,12 +4557,14 @@
             },
             "behaviors": 1,
             "test": "TestCartTestSuite/TestCopies/second_copy",
-            "run": "^TestCartTestSuite$/^TestCopies$/^second_copy$"
+            "run": "^TestCartTestSuite$/^TestCopies$/^second_copy$",
+            "order": 1
           },
           {
             "change": "removed",
             "kind": "test",
             "package": "auditmod/shop",
+            "module": "auditmod",
             "base": {
               "path": [
                 "Cart",
@@ -4542,12 +4576,14 @@
             },
             "behaviors": 1,
             "test": "TestCartTestSuite/TestRemove",
-            "run": "^TestCartTestSuite$/^TestRemove$"
+            "run": "^TestCartTestSuite$/^TestRemove$",
+            "order": 2
           },
           {
             "change": "added",
             "kind": "it",
             "package": "auditmod/shop",
+            "module": "auditmod",
             "head": {
               "path": [
                 "Cart",
@@ -4560,12 +4596,15 @@
             },
             "behaviors": 1,
             "test": "TestCartTestSuite/TestCopies/the_only_copy",
-            "run": "^TestCartTestSuite$/^TestCopies$/^the_only_copy$"
+            "run": "^TestCartTestSuite$/^TestCopies$/^the_only_copy$",
+            "evidence": "bfcbd449f3db5e15",
+            "order": 5
           },
           {
             "change": "added",
             "kind": "when",
             "package": "auditmod/shop",
+            "module": "auditmod",
             "head": {
               "path": [
                 "Stock",
@@ -4578,12 +4617,15 @@
             },
             "behaviors": 1,
             "test": "TestStockTestSuite/TestCount/the_stock_is_empty",
-            "run": "^TestStockTestSuite$/^TestCount$/^the_stock_is_empty$"
+            "run": "^TestStockTestSuite$/^TestCount$/^the_stock_is_empty$",
+            "evidence": "cf56d1ec4fac85d1",
+            "order": 6
           },
           {
             "change": "added",
             "kind": "when",
             "package": "auditmod/shop",
+            "module": "auditmod",
             "head": {
               "path": [
                 "Stock",
@@ -4596,12 +4638,15 @@
             },
             "behaviors": 1,
             "test": "TestStockTestSuite/TestCount/the_stock_is_refilled",
-            "run": "^TestStockTestSuite$/^TestCount$/^the_stock_is_refilled$"
+            "run": "^TestStockTestSuite$/^TestCount$/^the_stock_is_refilled$",
+            "evidence": "e0252059794e38b9",
+            "order": 7
           },
           {
             "change": "reworded",
             "kind": "it",
             "package": "auditmod/shop",
+            "module": "auditmod",
             "base": {
               "path": [
                 "Cart",
@@ -4625,12 +4670,15 @@
               "endLine": 26
             },
             "test": "TestCartTestSuite/TestAdd/both_numbers_are_positive/ignores_the_order",
-            "run": "^TestCartTestSuite$/^TestAdd$/^both_numbers_are_positive$/^ignores_the_order$"
+            "run": "^TestCartTestSuite$/^TestAdd$/^both_numbers_are_positive$/^ignores_the_order$",
+            "evidence": "12835e70679cebce",
+            "order": 8
           },
           {
             "change": "moved",
             "kind": "it",
             "package": "auditmod/shop",
+            "module": "auditmod",
             "base": {
               "path": [
                 "Stock",
@@ -4654,12 +4702,15 @@
               "endLine": 28
             },
             "test": "TestStockTestSuite/TestCount/the_stock_is_refilled/counts_every_item",
-            "run": "^TestStockTestSuite$/^TestCount$/^the_stock_is_refilled$/^counts_every_item$"
+            "run": "^TestStockTestSuite$/^TestCount$/^the_stock_is_refilled$/^counts_every_item$",
+            "evidence": "7b76f972790ec811",
+            "order": 9
           },
           {
             "change": "changed",
             "kind": "it",
             "package": "auditmod/shop",
+            "module": "auditmod",
             "base": {
               "path": [
                 "Cart",
@@ -4683,12 +4734,15 @@
               "endLine": 31
             },
             "test": "TestCartTestSuite/TestAdd/one_number_is_negative/returns_the_difference",
-            "run": "^TestCartTestSuite$/^TestAdd$/^one_number_is_negative$/^returns_the_difference$"
+            "run": "^TestCartTestSuite$/^TestAdd$/^one_number_is_negative$/^returns_the_difference$",
+            "evidence": "c281736a4cbb6993",
+            "order": 4
           },
           {
             "change": "changed",
             "kind": "test",
             "package": "auditmod/shop",
+            "module": "auditmod",
             "base": {
               "path": [
                 "Cart",
@@ -4708,7 +4762,9 @@
               "endLine": 46
             },
             "test": "TestCartTestSuite/TestRounds",
-            "run": "^TestCartTestSuite$/^TestRounds$"
+            "run": "^TestCartTestSuite$/^TestRounds$",
+            "evidence": "4134c35afad51aac",
+            "order": 3
           }
         ],
         "streams": [
@@ -4795,12 +4851,19 @@
           {
             "id": "bfcbd449f3db5e15",
             "package": "auditmod/shop",
+            "module": "auditmod",
             "path": [
               "Cart",
               "Copies",
               "the only copy"
             ],
+            "location": {
+              "file": "shop/cart_suite_test.go",
+              "line": 49,
+              "endLine": 51
+            },
             "verdict": "pass",
+            "mark": "vacuous",
             "kind": "it",
             "why": [
               "added"
@@ -4835,12 +4898,19 @@
           {
             "id": "cf56d1ec4fac85d1",
             "package": "auditmod/shop",
+            "module": "auditmod",
             "path": [
               "Stock",
               "Count",
               "when the stock is empty"
             ],
+            "location": {
+              "file": "shop/stock_suite_test.go",
+              "line": 30,
+              "endLine": 34
+            },
             "verdict": "not run",
+            "mark": "not run",
             "kind": "when",
             "why": [
               "added"
@@ -4880,12 +4950,19 @@
           {
             "id": "e0252059794e38b9",
             "package": "auditmod/shop",
+            "module": "auditmod",
             "path": [
               "Stock",
               "Count",
               "when the stock is refilled"
             ],
+            "location": {
+              "file": "shop/stock_suite_test.go",
+              "line": 25,
+              "endLine": 29
+            },
             "verdict": "pass",
+            "mark": "pass",
             "kind": "when",
             "why": [
               "added"
@@ -4926,13 +5003,20 @@
           {
             "id": "12835e70679cebce",
             "package": "auditmod/shop",
+            "module": "auditmod",
             "path": [
               "Cart",
               "Add",
               "when both numbers are positive",
               "ignores the order"
             ],
+            "location": {
+              "file": "shop/cart_suite_test.go",
+              "line": 21,
+              "endLine": 26
+            },
             "verdict": "pass",
+            "mark": "pass 1",
             "kind": "it",
             "why": [
               "reworded"
@@ -4966,13 +5050,20 @@
           {
             "id": "7b76f972790ec811",
             "package": "auditmod/shop",
+            "module": "auditmod",
             "path": [
               "Stock",
               "Count",
               "when the stock is refilled",
               "counts every item"
             ],
+            "location": {
+              "file": "shop/stock_suite_test.go",
+              "line": 26,
+              "endLine": 28
+            },
             "verdict": "pass",
+            "mark": "pass 1",
             "kind": "it",
             "why": [
               "moved"
@@ -5006,13 +5097,20 @@
           {
             "id": "c281736a4cbb6993",
             "package": "auditmod/shop",
+            "module": "auditmod",
             "path": [
               "Cart",
               "Add",
               "when one number is negative",
               "returns the difference"
             ],
+            "location": {
+              "file": "shop/cart_suite_test.go",
+              "line": 29,
+              "endLine": 31
+            },
             "verdict": "fail",
+            "mark": "FAIL",
             "kind": "it",
             "why": [
               "changed"
@@ -5046,11 +5144,18 @@
           {
             "id": "4134c35afad51aac",
             "package": "auditmod/shop",
+            "module": "auditmod",
             "path": [
               "Cart",
               "Rounds"
             ],
+            "location": {
+              "file": "shop/cart_suite_test.go",
+              "line": 43,
+              "endLine": 46
+            },
             "verdict": "pass",
+            "mark": "pass 1",
             "kind": "test",
             "why": [
               "changed",
@@ -5087,11 +5192,18 @@
           {
             "id": "67c8c0775cc5d97d",
             "package": "auditmod/shop",
+            "module": "auditmod",
             "path": [
               "Cart",
               "Empty"
             ],
+            "location": {
+              "file": "shop/cart_suite_test.go",
+              "line": 35,
+              "endLine": 37
+            },
             "verdict": "skip",
+            "mark": "skip",
             "kind": "test",
             "why": [
               "excluded"
@@ -5125,11 +5237,18 @@
           {
             "id": "d79811a1397f6a0b",
             "package": "auditmod/shop",
+            "module": "auditmod",
             "path": [
               "Cart",
               "Total"
             ],
+            "location": {
+              "file": "shop/cart_suite_test.go",
+              "line": 39,
+              "endLine": 41
+            },
             "verdict": "pass",
+            "mark": "pass 1",
             "kind": "test",
             "why": [
               "focus"
@@ -5163,10 +5282,17 @@
           {
             "id": "e89d04dcd8bfe22f",
             "package": "auditmod/shop",
+            "module": "auditmod",
             "path": [
               "Stock"
             ],
+            "location": {
+              "file": "shop/stock_suite_test.go",
+              "line": 11,
+              "endLine": 11
+            },
             "verdict": "pass",
+            "mark": "partly run",
             "kind": "suite",
             "why": [
               "guard",
@@ -5208,10 +5334,17 @@
           {
             "id": "02d704b52132bcb2",
             "package": "auditmod/shop",
+            "module": "auditmod",
             "path": [
               "Cart"
             ],
+            "location": {
+              "file": "shop/cart_suite_test.go",
+              "line": 9,
+              "endLine": 9
+            },
             "verdict": "fail",
+            "mark": "FAIL",
             "kind": "suite",
             "why": [
               "budget"
@@ -5600,8 +5733,8 @@
                 "./..."
               ],
               "changed": {
-                "Ran": 1,
-                "Unchanged": 1
+                "ran": 1,
+                "unchanged": 1
               }
             },
             "result": {
