@@ -113,11 +113,14 @@ func (s *CLIAgentOutputTestSuite) TestAPassingTextRun(t *gotest.T) {
 func (s *CLIAgentOutputTestSuite) TestARunGivenCountZero(t *gotest.T) {
 	t.When("a text or a -json run is given -count=0", func(w *gotest.T) {
 		w.It("passes, noting that the census was skipped", func(it *gotest.T) {
-			for sub, args := range gotest.Each(it, [][]string{
-				{"-count=0", "../testdata/passing/"},
-				{"-json", "-count=0", "../testdata/passing/"},
+			for sub, r := range gotest.Each(it, []struct {
+				Desc string
+				args []string
+			}{
+				{Desc: "a text run", args: []string{"-count=0", "../testdata/passing/"}},
+				{Desc: "a -json run", args: []string{"-json", "-count=0", "../testdata/passing/"}},
 			}) {
-				run, err := testkit.RunCLIWithEnv(sub.Context(), ".", inCache(sub.TempDir()), args...)
+				run, err := testkit.RunCLIWithEnv(sub.Context(), ".", inCache(sub.TempDir()), r.args...)
 				gotest.NoError(sub, err)
 				gotest.Equal(sub, 0, run.Exit, "stderr: %s", run.Stderr)
 				gotest.Contains(sub, run.Stderr, "note: census skipped under -count=0\n")
