@@ -24,13 +24,14 @@ func WithModule(path string) RenderOption {
 }
 
 // countsPhrase is "5 passed, 1 failed": the non-zero verdicts in the order
-// passed, failed, skipped, not run; "" when all are zero.
+// passed, failed, skipped, not run, then the vacuous passes; "" when all are
+// zero.
 func countsPhrase(s Stats) string { //nolint:gocritic // hugeParam: stable API
 	var parts []string
 	for _, b := range []struct {
 		n    int
 		word string
-	}{{s.Passed, "passed"}, {s.Failed, "failed"}, {s.Skipped, "skipped"}, {s.NotRun, "not run"}} {
+	}{{s.Passed, "passed"}, {s.Failed, "failed"}, {s.Skipped, "skipped"}, {s.NotRun, "not run"}, {s.Vacuous, "vacuous"}} {
 		if b.n > 0 {
 			parts = append(parts, fmt.Sprintf("%d %s", b.n, b.word))
 		}
@@ -73,7 +74,7 @@ func (c *renderConfig) packageName(pkg *Package) (name string, other bool) {
 
 // attentionRow is a failure or a row not run, with its display path.
 type attentionRow struct {
-	Status Status // StatusFail, or StatusNone for a row not run
+	Status Status // StatusFail, StatusNone for a row not run, StatusPass for a vacuous one
 	Path   []string
 	Output []string // a failure's own lines, filtered
 }
@@ -111,6 +112,8 @@ func attentionOf(n *Node, path []string, rows []attentionRow, cfg *renderConfig)
 		return append(rows, attentionRow{Status: StatusNone, Path: path})
 	case len(n.Children) == 0 && n.Status == StatusFail:
 		rows = append(rows, attentionRow{Status: StatusFail, Path: path, Output: filterOutput(n.Output)})
+	case n.Vacuous():
+		rows = append(rows, attentionRow{Status: StatusPass, Path: path})
 	case ownFailure(n) && !cfg.hidden[StatusFail]:
 		rows = append(rows, attentionRow{Status: StatusFail, Path: path, Output: diagnostic(n.Output)})
 	}
@@ -216,6 +219,21 @@ func hiddenPhrase(hidden map[Status]bool) string {
 		return "hiding " + words[0] + " rows"
 	}
 	return "hiding " + strings.Join(words[:len(words)-1], ", ") + " and " + words[len(words)-1] + " rows"
+}
+
+// vacuousMark follows a leaf that passed without an assertion.
+const vacuousMark = "VACUOUS: passed without an assertion"
+
+// assertionMark is what a leaf's row says about its assertions: that it is
+// vacuous, or the means it declared; "" otherwise.
+func assertionMark(n *Node) string {
+	switch {
+	case n.Vacuous():
+		return vacuousMark
+	case n.AssertsBy != "" && len(n.Children) == 0:
+		return "ASSERTS BY: " + n.AssertsBy
+	}
+	return ""
 }
 
 // skipReason is the reason a skipped node's skip gave, as BuildTree read it.

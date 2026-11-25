@@ -234,9 +234,25 @@ func renderAttention(w io.Writer, rows []attentionRow, c *colors, cfg *renderCon
 	fmt.Fprintf(w, "%sNeeds attention%s\n", c.bold, c.reset)
 	for _, r := range rows {
 		icon, clr := statusIcon(r.Status, c)
-		writeRow(w, &rowLine{lead: clr + icon + c.reset + " ", leadWidth: 2, text: strings.Join(r.Path, " › ")}, c, cfg)
+		var tail []tailPart
+		if r.Status == StatusPass {
+			tail = []tailPart{{" — " + vacuousMark, c.yellow}}
+		}
+		writeRow(w, &rowLine{lead: clr + icon + c.reset + " ", leadWidth: 2, text: strings.Join(r.Path, " › "), tail: tail}, c, cfg)
 		renderErrorOutput(w, r.Output, 1, c)
 	}
+}
+
+// assertionTail is what a leaf's row says about its assertions, if any.
+func assertionTail(n *Node, c *colors) []tailPart {
+	am := assertionMark(n)
+	switch {
+	case am == "":
+		return nil
+	case n.Vacuous():
+		return []tailPart{{" — " + am, c.yellow}}
+	}
+	return []tailPart{{" — " + am, c.dim}}
 }
 
 // tailPart is text that follows a row's label, with its color.
@@ -373,6 +389,7 @@ func renderNode(w io.Writer, n *Node, depth int, c *colors, cfg *renderConfig) {
 			}
 			tail = append(tail, tailPart{skipped, ""})
 		}
+		tail = append(tail, assertionTail(n, c)...)
 		lead, lw := mark(n.Status)
 		writeRow(w, &rowLine{indent: indent, lead: lead, leadWidth: lw, text: n.Display, tail: append(tail, duration()...)}, c, cfg)
 
@@ -577,6 +594,12 @@ func renderSummary(w io.Writer, stats Stats, c colors) { //nolint:gocritic // hu
 	}
 	if stats.NotRun > 0 {
 		parts = append(parts, fmt.Sprintf("%s%d not run%s", c.dim, stats.NotRun, c.reset))
+	}
+	if stats.Vacuous > 0 {
+		parts = append(parts, fmt.Sprintf("%s%d vacuous%s", c.yellow, stats.Vacuous, c.reset))
+	}
+	if stats.AssertsBy > 0 {
+		parts = append(parts, fmt.Sprintf("%s%d asserting by other means%s", c.dim, stats.AssertsBy, c.reset))
 	}
 	if stats.FailedPackages > 0 {
 		parts = append(parts, fmt.Sprintf("%s%s%s", c.red, countNoun(stats.FailedPackages, "failed package", "failed packages"), c.reset))

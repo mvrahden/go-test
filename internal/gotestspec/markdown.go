@@ -49,7 +49,11 @@ func RenderMarkdown(w io.Writer, packages []*Package, opts ...RenderOption) {
 				for i, p := range r.Path {
 					path[i] = EscapeLabel(p)
 				}
-				list = append(list, "- "+verdictWord(r.Status)+" "+strings.Join(path, " › "))
+				word := verdictWord(r.Status)
+				if r.Status == StatusPass {
+					word = "**VACUOUS**"
+				}
+				list = append(list, "- "+word+" "+strings.Join(path, " › "))
 				list = append(list, fenced(r.Output, "  ")...)
 			}
 			doc.block(list...)
@@ -279,6 +283,9 @@ func markdownItem(list []string, n *Node, depth int, cfg *renderConfig) []string
 	if word != "" && leaf {
 		if reason := skipReason(n); reason != "" {
 			line += " — " + EscapeLabel(reason)
+		}
+		if am := assertionMark(n); am != "" {
+			line += " — " + EscapeLabel(am)
 		}
 	}
 	if !bare && showsDuration(n) {

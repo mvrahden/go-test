@@ -201,6 +201,13 @@ type Node struct {
 	// SkipReason is the message a skip gave (see readSkipReasons); empty
 	// when it gave none or the stream cannot say.
 	SkipReason string
+	// Assertions is how many assertions the test made, as the runtime
+	// reported it on a leaf; nil when it did not (an older runtime, a
+	// skipped or interior test, a benchmark or a fuzz target).
+	Assertions *int
+	// AssertsBy is the reason the test declared for asserting by other
+	// means than gotest's assertions; empty when it declared none.
+	AssertsBy string
 	// Reported is the own level go test reported when it is not Name: a
 	// twin's TestCreate#01, whose #01 is testing's, not the developer's.
 	Reported    string
@@ -245,6 +252,13 @@ type Stats struct {
 	// NotRun counts the behaviors and fuzz targets without a verdict: declared
 	// and not reported, or started and never ended.
 	NotRun int
+	// Vacuous counts the leaves that passed without an assertion and
+	// declared no other means (see Node.Vacuous).
+	Vacuous int
+	// AssertsBy counts the leaves that declared they assert by other means.
+	AssertsBy int
+	// Excluded counts the leaves the X_ prefix excludes, or one above them.
+	Excluded int
 }
 
 func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
@@ -329,6 +343,8 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 			node.Status = statusFrom(ev.Action)
 			node.Duration = elapsed(ev.Elapsed)
 			node.End = ev.Time
+		case ActionAttr:
+			readAttr(node, ev.Key, ev.Value)
 		}
 	}
 
@@ -559,6 +575,9 @@ func lastSkipMessage(output []string, calls map[string]bool) string {
 	for i := len(lines) - 1; i >= 0; i-- {
 		file, line, msg := parseFileLine(lines[i])
 		if file == "" {
+			if i == len(lines)-1 && strings.TrimSpace(lines[i]) == protocol.ExcludedLine {
+				return protocol.ExcludedLine // the runner's, for a suite it never started
+			}
 			continue // a message's continuation line
 		}
 		first, _, _ := strings.Cut(msg, "\n")
@@ -863,6 +882,12 @@ func PkgFailedOnItsOwn(pkg *Package) bool {
 }
 
 func collectStats(n *Node, s *Stats, inStdlib bool) {
+	collectStatsUnder(n, s, inStdlib, false)
+}
+
+// collectStatsUnder is collectStats below an excluded node when excluded.
+func collectStatsUnder(n *Node, s *Stats, inStdlib, excluded bool) {
+	excluded = excluded || n.Excluded
 	if n.Kind == KindBenchmark && len(n.Children) == 0 {
 		s.Benchmarks++
 		return
@@ -894,9 +919,24 @@ func collectStats(n *Node, s *Stats, inStdlib bool) {
 			s.Behaviors++
 		}
 		countVerdict(n, s)
+		countAssertions(n, s, excluded)
 	}
 	for _, c := range n.Children {
-		collectStats(c, s, inStdlib)
+		collectStatsUnder(c, s, inStdlib, excluded)
+	}
+}
+
+// countAssertions counts a leaf as vacuous, as asserting by other means and
+// as excluded.
+func countAssertions(n *Node, s *Stats, excluded bool) {
+	if n.Vacuous() {
+		s.Vacuous++
+	}
+	if n.AssertsBy != "" {
+		s.AssertsBy++
+	}
+	if excluded {
+		s.Excluded++
 	}
 }
 
@@ -913,6 +953,28 @@ func countVerdict(n *Node, s *Stats) {
 	case n.Status == StatusSkip:
 		s.Skipped++
 	}
+}
+
+// readAttr reads the attributes the runtime reports on a leaf; others are
+// left alone.
+func readAttr(n *Node, key, value string) {
+	switch key {
+	case protocol.AttrAssertions:
+		if v, err := strconv.Atoi(value); err == nil && v >= 0 {
+			n.Assertions = &v
+		}
+	case protocol.AttrAssertsBy:
+		n.AssertsBy = value
+	}
+}
+
+// Vacuous reports a leaf that passed having made no assertion, with no
+// other means declared. A count the runtime did not report is unknown,
+// never zero, so such a leaf is not vacuous.
+func (n *Node) Vacuous() bool {
+	return n.Status == StatusPass && len(n.Children) == 0 && !n.NotRun &&
+		n.Kind != KindBenchmark && n.Kind != KindFuzz &&
+		n.Assertions != nil && *n.Assertions == 0 && n.AssertsBy == ""
 }
 
 // noVerdict reports a leaf the stream gave no verdict: it counts as not run
