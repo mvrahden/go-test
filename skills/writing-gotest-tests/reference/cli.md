@@ -141,7 +141,9 @@ invocation runs tests — there is NO `test` subcommand:
   instead (stale unless it ran the head's commit, clean;
   `--base-evidence=<stream>` adds the base's run-time assertion counts),
   and with `--base`, or `--diff=<file>` and `--coverage=<profile>`, the
-  changed production lines no test executed are listed;
+  changed production lines no test executed are listed (under `--run` a
+  binary a test starts counts when built with `go build -cover`, which
+  writes to the `GOCOVERDIR` the run sets);
   `--fail-on=proof` fails on a failing, not run, vacuous or stale
   behavior or an unproven line. `-v` lists the rows text groups.
 - `go tool gotest summary --input=<events file> --format=intoto-test-result`
