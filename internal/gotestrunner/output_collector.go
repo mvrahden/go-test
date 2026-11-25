@@ -59,8 +59,8 @@ type OutputCollector struct {
 	// manifest opens the JSON stream and makes the run close it; nil for a
 	// stream that is neither opened nor closed.
 	manifest *protocol.Manifest
-	// censusAside is why the census does not judge this test run, "" when
-	// it does: --failed or -count=0.
+	// censusAside is why the census does not judge this test run beyond
+	// its patterns and groups, "" when it does (see censusAside).
 	censusAside string
 	// ran are the suites and fuzz wrappers whose binary reported a result
 	// in a text run, which keeps no stream for the census to read.
