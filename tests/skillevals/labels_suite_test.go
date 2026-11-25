@@ -100,6 +100,10 @@ var witnesses = []witness{
 	{file: "reference/api.md", quote: "except on an `Each` row's `T`", label: "v1.42+", path: "pkg/gotest/utils.go", literal: "row.soft = true"},
 	{file: "reference/assertions.md", quote: "An `Each` row's `t` is the exception", label: "v1.42+", path: "pkg/gotest/utils.go", literal: "row.soft = true"},
 	{file: "reference/assertions.md", quote: "a failing row goes on and so do the rows after it", label: "v1.42+", path: "pkg/gotest/utils.go", literal: "row.soft = true"},
+	{file: "SKILL.md", quote: "only what failed, then one closing line", label: "v1.42+", path: "internal/gotestrunner/agentoutput.go", literal: "func NewAgentOutput"},
+	{file: "reference/cli.md", quote: "A text run ends with one closing line", label: "v1.42+", path: "internal/gotestrunner/agentoutput.go", literal: "func (c Closing) String() string"},
+	{file: "reference/cli.md", quote: "fails a text run with exit 2", label: "v1.42+", path: "internal/gotestrunner/census.go", literal: "func reportsResult"},
+	{file: "reference/cli.md", quote: "there is no record or nothing to rerun", label: "v1.42+", path: "cmd/gotest/flags.go", literal: "--failed"},
 }
 
 var (

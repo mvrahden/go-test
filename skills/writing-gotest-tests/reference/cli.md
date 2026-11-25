@@ -28,6 +28,18 @@ invocation runs tests — there is NO `test` subcommand:
   Outside CI mode a focused run notes on stderr that `F_` narrows it
   (v1.38+), and a text run fails with exit 2 when a suite's binary ran no
   tests (v1.38+).
+  A text run ends with one closing line (v1.42+): `gotest:`, `PASS`,
+  `FAIL` or `EMPTY` (exit 0, nothing passed), `exit <code>`, the counts,
+  on stderr after go test's text. `--agent` (on by itself under
+  `AI_AGENT` or `CLAUDECODE=1`; `--agent=false` or `GOTEST_AGENT=0` turns
+  it off) prints only what failed and puts the line last on stdout, with
+  the tests counted and the `rerun:` command. A suite binary that ran
+  none of its tests, under a `TestMain` that never calls `m.Run` or an
+  `-exec` that never starts it, fails a text run with exit 2 (v1.42+), as
+  `-json` did. Every run records what it failed in the cache;
+  `--failed` reruns only that, by method, of the packages given or the
+  record's, with `-json`, `spec` and `summary` too, and exits 2 when
+  there is no record or nothing to rerun (v1.42+).
 - `go tool gotest spec ./...` — run + render the behavioral spec view.
   `--format terminal|md|json` (terminal is the default), `--output <file>`; `--input <file|->` re-renders a
   captured `go test -json` stream WITHOUT running (v1.29+: it still reads
