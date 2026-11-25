@@ -1,5 +1,5 @@
-Expect: ^FAIL .*conformance/spec SpecDeclared / ALiveRunUnderItsDeclaredSpecification / when a run of a package is rendered with --declared / shows the rows of a table after its failing row as not run \(
-Clause: when a run of a package is rendered with --declared → shows the rows of a table after its failing row as not run
+Expect: ^FAIL .*conformance/spec SpecDeclared / ALiveRunUnderItsDeclaredSpecification / when a run of a package is rendered with --declared / shows the rows of a table after a row that stopped the method as not run \(
+Clause: when a run of a package is rendered with --declared → shows the rows of a table after a row that stopped the method as not run
 --- a/cmd/gotest/spec.go
 +++ b/cmd/gotest/spec.go
 @@ -180,7 +180,7 @@

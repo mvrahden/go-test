@@ -1,5 +1,5 @@
-// Package specnotrun leaves rows of a table unrun behind a failing one and
-// parks a method; see the spec conformance suite.
+// Package specnotrun leaves rows of a table unrun behind one that stops the
+// method and parks a method; see the spec conformance suite.
 package specnotrun
 
 import "github.com/mvrahden/go-test/pkg/gotest"
@@ -12,6 +12,9 @@ func (s *NotRunTestSuite) TestRowsAfterAFailure(t *gotest.T) {
 		ok   bool
 	}{{Desc: "first", ok: true}, {Desc: "second", ok: false}, {Desc: "third", ok: true}}) {
 		gotest.True(it, r.ok, "the %s row fails", r.Desc)
+		if !r.ok {
+			it.FailNow()
+		}
 	}
 }
 
