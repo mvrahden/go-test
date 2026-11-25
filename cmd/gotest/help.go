@@ -48,6 +48,8 @@ func showHelp(topic string) {
 		printRefactorHelp()
 	case "skill":
 		printSkillHelp()
+	case "hook":
+		printHookHelp()
 	case "generate":
 		printGenerateHelp()
 	case "prepare":
@@ -83,6 +85,7 @@ Subcommands:
   migrate     Convert testify/suite tests to go-test format
   refactor    Source code refactoring tools
   skill       Install the agent skill matching this version
+  hook        Answer a coding agent's hook event (post-edit, pre-shell, stop)
   generate    Run code generation only (no test execution)
   prepare     Start shared fixtures for debug (blocks until SIGTERM)
   clean       Remove orphaned generated files

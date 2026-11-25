@@ -122,6 +122,7 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `lint` | Run gotest-specific linter checks |
 | `refactor` | Toggle focus prefixes: `refactor toggle-focus <file> <Suite[.Method]>` |
 | `skill` | Install the agent skill shipped with this version: `skill install [--dir=<skills-dir>]` |
+| `hook` | Answer a coding agent's hook event read on stdin: `hook post-edit\|pre-shell\|stop` |
 | `discover` | Discover test suites and output JSON metadata |
 | `prepare` | Start shared fixtures for debug (blocks until SIGTERM) |
 | `version` | Print version information |

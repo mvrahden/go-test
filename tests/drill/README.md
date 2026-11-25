@@ -1022,6 +1022,12 @@ shards of one run do not add up to every mutant exactly once.
 | `spec-stdlib-twin-read-as-runs` | a stdlib test both test packages declare is not marked a twin, so its two halves read as two runs | spec conformance: a replayed stdlib twin shows its external half marked, once and under -count=2 |
 | `test-variants-built-for-export-data` | the package loader asks for types in its listing with tests, so go list builds every test variant and test main | pkgload: the load with tests asks for types |
 | `run-books-a-cached-result` | a suite that ran before is booked passed without running again | cli conformance: a package run twice runs its tests again and marks nothing cached |
+| `hook-unknown-event-exits-0` | `gotest hook` answers an event it does not know with exit 0 | cli conformance: an unknown hook event exits 1 and names the events |
+| `hook-stop-writes-a-note` | the stop hook event writes a note | cli conformance: the stop event exits 0 and writes nothing |
+| `hook-lint-findings-dropped` | `gotest hook post-edit` drops the findings lint reports | cli conformance: an edited test file with a finding gets it as additional context |
+| `hook-lints-any-go-file` | `gotest hook post-edit` lints the package of any edited `.go` file, not only of a test file | cli conformance: an edited file that is not a test gets no answer |
+| `hook-note-keeps-go-test` | the `pre-shell` note gives the command line with `go test` left in it | cli conformance: the note's command line runs gotest in place of go test |
+| `hook-note-for-stdlib-tests` | a test file without a suite counts as declaring one | cli conformance: go test over a package with only stdlib tests gets no note |
 
 ## Adding a mutant
 

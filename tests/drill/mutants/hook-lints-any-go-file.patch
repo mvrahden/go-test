@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / exits 0 and writes nothing / a file that is not a test \(
+Clause: when an agent edits a clean test file, a file that is not a test, or a test file in a module without gotest → exits 0 and writes nothing
+--- a/cmd/gotest/hook.go
++++ b/cmd/gotest/hook.go
+@@ -109,7 +109,7 @@
+ // cannot finish in time or when the file is none of gotest's business.
+ func postEditNote(in hookInput) string {
+ 	file := in.ToolInput.FilePath
+-	if !strings.HasSuffix(file, "_test.go") || isGeneratedHarness(file) {
++	if !strings.HasSuffix(file, ".go") || isGeneratedHarness(file) {
+ 		return ""
+ 	}
+ 	if !filepath.IsAbs(file) {

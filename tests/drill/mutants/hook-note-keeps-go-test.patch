@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / exits 0 with a note giving the command line with gotest in place of go test, and no permission decision / every package \(
+Clause: when an agent is about to run go test, after an environment assignment or a cd, over packages that declare gotest suites → exits 0 with a note giving the command line with gotest in place of go test, and no permission decision
+--- a/cmd/gotest/hook.go
++++ b/cmd/gotest/hook.go
+@@ -256,7 +256,7 @@
+ 			if mod == nil || !mod.usesGotest() || !runsSuites(mod, dir, words[2:]) {
+ 				return ""
+ 			}
+-			rewritten := line[:words[0].start] + mod.command(dir) + line[words[1].end:]
++			rewritten := line
+ 			return fmt.Sprintf("This module's tests are gotest suites, and go test does not run them: without the harness gotest generates, a suite package runs none of its suites and can still report ok. Run them with:\n%s", rewritten)
+ 		}
+ 	}

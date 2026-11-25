@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / exits 0 and writes nothing / a package with only stdlib tests \(
+Clause: when an agent is about to run go test over packages with only stdlib tests, or a command other than go test → exits 0 and writes nothing
+--- a/cmd/gotest/hook.go
++++ b/cmd/gotest/hook.go
+@@ -397,7 +397,7 @@
+ 			return nil
+ 		}
+ 		data, err := os.ReadFile(path) //nolint:gosec // G304: a test file of the agent's module
+-		if err == nil && bytes.Contains(data, suiteImport) && suiteType.Match(data) {
++		if err == nil && (bytes.Contains(data, suiteImport) || !suiteType.Match(data)) {
+ 			found = true
+ 			return filepath.SkipAll
+ 		}

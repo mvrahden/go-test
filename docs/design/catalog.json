@@ -4074,6 +4074,435 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "exits 1 and names the events it takes on stderr",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "agenthook_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 56,
+                      "name": "exits_1_and_names_the_events_it_takes_on_stderr",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when gotest hook runs an event it does not know",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "agenthook_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 53,
+                  "name": "gotest_hook_runs_an_event_it_does_not_know",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "exits 0 and writes nothing",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "agenthook_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 66,
+                      "name": "exits_0_and_writes_nothing",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when gotest hook runs the stop event",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "agenthook_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 63,
+                  "name": "gotest_hook_runs_the_stop_event",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "Events",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "agenthook_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 52,
+              "name": "TestEvents",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "exits 0 with the finding as additional context and no permission decision",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "agenthook_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 79,
+                      "name": "exits_0_with_the_finding_as_additional_context_and_no_permission_decision",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when an agent edits a test file whose package has a lint finding, in a module that requires gotest",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "agenthook_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 75,
+                  "name": "an_agent_edits_a_test_file_whose_package_has_a_lint_finding,_in_a_module_that_requires_gotest",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "a clean test file",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "agenthook_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 97,
+                          "name": "a_clean_test_file",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "a file that is not a test",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "agenthook_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 98,
+                          "name": "a_file_that_is_not_a_test",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "a test file in a module without gotest",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "agenthook_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 99,
+                          "name": "a_test_file_in_a_module_without_gotest",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "exits 0 and writes nothing",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "agenthook_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 91,
+                      "name": "exits_0_and_writes_nothing",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when an agent edits a clean test file, a file that is not a test, or a test file in a module without gotest",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "agenthook_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 90,
+                  "name": "an_agent_edits_a_clean_test_file,_a_file_that_is_not_a_test,_or_a_test_file_in_a_module_without_gotest",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AfterAnEdit",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "agenthook_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 74,
+              "name": "TestAfterAnEdit",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "every package",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "agenthook_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 122,
+                          "name": "every_package",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "an environment assignment and flags",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "agenthook_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 123,
+                          "name": "an_environment_assignment_and_flags",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "a cd before it",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "agenthook_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 124,
+                          "name": "a_cd_before_it",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "a module that declares the tool",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "agenthook_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 125,
+                          "name": "a_module_that_declares_the_tool",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "exits 0 with a note giving the command line with gotest in place of go test, and no permission decision",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "agenthook_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 115,
+                      "name": "exits_0_with_a_note_giving_the_command_line_with_gotest_in_place_of_go_test,_and_no_permission_decision",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when an agent is about to run go test, after an environment assignment or a cd, over packages that declare gotest suites",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "agenthook_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 114,
+                  "name": "an_agent_is_about_to_run_go_test,_after_an_environment_assignment_or_a_cd,_over_packages_that_declare_gotest_suites",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "a package with only stdlib tests",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "agenthook_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 153,
+                          "name": "a_package_with_only_stdlib_tests",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "a standard-library package",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "agenthook_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 154,
+                          "name": "a_standard-library_package",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "a test binary built, not run",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "agenthook_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 155,
+                          "name": "a_test_binary_built,_not_run",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "a module without gotest",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "agenthook_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 156,
+                          "name": "a_module_without_gotest",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "a command other than go test",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "agenthook_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 157,
+                          "name": "a_command_other_than_go_test",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "exits 0 and writes nothing",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "agenthook_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 147,
+                      "name": "exits_0_and_writes_nothing",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when an agent is about to run go test over packages with only stdlib tests, or a command other than go test",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "agenthook_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 146,
+                  "name": "an_agent_is_about_to_run_go_test_over_packages_with_only_stdlib_tests,_or_a_command_other_than_go_test",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "BeforeAShellCommand",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "agenthook_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 113,
+              "name": "TestBeforeAShellCommand",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLIAgentHook",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "agenthook_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 17,
+          "name": "TestCLIAgentHookTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "exits 2, reports each finding under its own package and runs the third",
                       "duration": 0,
                       "excluded": false,
@@ -34295,13 +34724,13 @@
     }
   ],
   "stats": {
-    "behaviors": 989,
+    "behaviors": 1004,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 146,
+    "suites": 147,
     "tests": 0
   }
 }

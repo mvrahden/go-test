@@ -39,6 +39,10 @@ func main() {
 		}
 		showHelp(topic)
 		return
+	case "hook":
+		// An agent's hook: it needs no config, and must answer even where
+		// .gotest.yml does not parse.
+		os.Exit(runHook(remaining, os.Stdin, os.Stdout, os.Stderr))
 	}
 
 	if subcmd == "" {
