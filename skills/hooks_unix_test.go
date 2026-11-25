@@ -126,6 +126,18 @@ func (s *PluginHooksTestSuite) TestTheWrapperFindsGotest(t *gotest.T) {
 			gotest.Empty(it, run.stderr)
 		})
 	})
+	t.When("the event is the end of the agent's turn", func(w *gotest.T) {
+		calls := filepath.Join(w.TempDir(), "calls")
+		run := runWrapper(w, "stop", `{"hook_event_name":"Stop"}`, map[string]string{
+			"gotest": "#!/bin/sh\necho \"$*\" >> " + calls + "\n",
+		})
+		w.It("starts no gotest", func(it *gotest.T) {
+			gotest.NoError(it, run.err)
+			gotest.Empty(it, run.stdout)
+			_, err := os.Stat(calls)
+			gotest.ErrorIs(it, err, os.ErrNotExist)
+		})
+	})
 	t.When("the event is a shell command that is not go test", func(w *gotest.T) {
 		calls := filepath.Join(w.TempDir(), "calls")
 		run := runWrapper(w, "pre-shell", `{"tool_input":{"command":"ls -la"}}`, map[string]string{

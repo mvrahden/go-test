@@ -11,6 +11,7 @@ input=$(cat)
 case $event in
 post-edit) case $input in *_test.go*) ;; *) exit 0 ;; esac ;;
 pre-shell) case $input in *go*test*) ;; *) exit 0 ;; esac ;;
+stop) exit 0 ;; # gotest hook stop answers nothing yet
 esac
 
 # answer runs the hook with the CLI given as arguments, once it knows the
