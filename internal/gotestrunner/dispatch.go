@@ -71,7 +71,10 @@ type streamRun struct {
 	streamedGroup string                     // the group whose bulk streams with the compile
 	noSuite       []string
 	coverDir      string
-	coverTargets  []SuiteTarget
+	// countsDir holds the files a text run's processes write their leaves'
+	// assertion counts to; "" for a run that reads them from its stream.
+	countsDir    string
+	coverTargets []SuiteTarget
 	// anyTargets: a package built and dispatched a suite; nothingToRun: a
 	// package built but none of its suites run.
 	anyTargets, nothingToRun, buildFailed bool
@@ -166,6 +169,9 @@ func newStreamRun(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 	if pf.UserCoverProfile != "" {
 		r.coverDir = filepath.Join(overlay.WorkDir, "cover")
 		_ = os.MkdirAll(r.coverDir, 0o755)
+	}
+	if cfg.OutputMode == RunBatchText && os.MkdirAll(filepath.Join(overlay.WorkDir, "counts"), 0o755) == nil {
+		r.countsDir = filepath.Join(overlay.WorkDir, "counts")
 	}
 
 	setupTimeout := resolveSetupTimeout(cfg.SetupTimeout)
@@ -309,6 +315,9 @@ func (r *streamRun) take(outcome CompileOutcome, held map[string]*scopeQueue) { 
 			targets[j].CoverProfile = filepath.Join(r.coverDir, fmt.Sprintf("%d.out", baseIdx+j))
 		}
 		r.coverTargets = append(r.coverTargets, targets...)
+	}
+	for j := range targets {
+		targets[j].CountsDir = r.countsDir
 	}
 
 	r.collector.Register(cr.Package, len(targets))

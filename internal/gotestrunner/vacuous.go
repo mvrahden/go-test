@@ -125,37 +125,48 @@ func (x *assertionIndex) verdict(key assertionKey, action string) {
 	}
 }
 
-// observeText reads a text run's verbose output of pkg, where testing
-// prints each attribute and each verdict on a line of its own; without -v
-// it prints neither, and nothing is read.
-func (x *assertionIndex) observeText(pkg string, out []byte) {
-	if !bytes.Contains(out, attrLineMark) {
-		return
+// observeCounts reads the protocol.LeafCount lines a text run's process of
+// pkg wrote, one per leaf that ended; a line cut short by the process's end
+// is no count. A leaf that panicked reported before testing failed it, so a
+// failure its stdout names and no line marks is the leaf's last run.
+func (x *assertionIndex) observeCounts(pkg string, data, stdout []byte) {
+	var leaves []protocol.LeafCount
+	unmarked := textFailedNames(stdout)
+	for line := range bytes.Lines(data) {
+		var lc protocol.LeafCount
+		if !bytes.HasSuffix(line, []byte("\n")) || json.Unmarshal(line, &lc) != nil || lc.Test == "" {
+			continue
+		}
+		x.counted = true
+		if lc.Failed {
+			unmarked[lc.Test]--
+		}
+		leaves = append(leaves, lc)
 	}
-	for line := range bytes.Lines(out) {
-		line = bytes.TrimRight(bytes.TrimLeft(line, " "), "\r\n")
-		if name, ok := bytes.CutPrefix(line, runLineMark); ok {
-			x.started(assertionKey{pkg, string(bytes.TrimSpace(name)), 1})
-			continue
+	for i := len(leaves) - 1; i >= 0; i-- {
+		if lc := &leaves[i]; !lc.Failed && unmarked[lc.Test] > 0 {
+			lc.Failed = true
+			unmarked[lc.Test]--
 		}
-		if rest, ok := bytes.CutPrefix(line, attrLineMark); ok {
-			if name, kv, ok := bytes.Cut(rest, []byte(" ")); ok {
-				k, v, _ := bytes.Cut(kv, []byte(" "))
-				x.attr(assertionKey{pkg, string(name), 1}, string(k), string(v))
-			}
-			continue
-		}
-		for action, mark := range textVerdicts {
-			if rest, ok := bytes.CutPrefix(line, mark); ok {
-				if name, _, ok := bytes.Cut(rest, []byte(" (")); ok {
-					x.verdict(assertionKey{pkg, string(name), 1}, action)
-				}
-			}
+	}
+	for _, lc := range leaves {
+		if lc.Assertions == 0 && !lc.AssertsBy && !lc.Failed {
+			x.vacuous = append(x.vacuous, CensusCase{Pkg: pkg, Path: lc.Test})
 		}
 	}
 }
 
-var textVerdicts = map[string][]byte{"pass": []byte("--- PASS: "), "fail": []byte("--- FAIL: "), "skip": []byte("--- SKIP: ")}
+// textFailedNames counts the --- FAIL lines of a text run's stdout by test.
+func textFailedNames(stdout []byte) map[string]int {
+	names := map[string]int{}
+	for line := range bytes.Lines(stdout) {
+		rest, ok := bytes.CutPrefix(bytes.TrimLeft(line, " \t"), []byte("--- FAIL: "))
+		if at := bytes.LastIndex(rest, []byte(" (")); ok && at > 0 {
+			names[string(rest[:at])]++
+		}
+	}
+	return names
+}
 
 func containsAny(line []byte, markers [][]byte) bool {
 	for _, m := range markers {
@@ -168,15 +179,17 @@ func containsAny(line []byte, markers [][]byte) bool {
 
 // judgeVacuous names the tests that passed without an assertion: under CI
 // they fail a run that is otherwise green, with exit 1, as the focus guard
-// does; outside CI a note says so and the code stands. It books the count
-// into the run's result when the stream holds any count. A text run is
-// judged only under -v, which prints the counts.
+// does, and are what --failed reruns; outside CI a note says so and the code
+// stands. It books the count into the run's result when any test reported
+// one.
 func (c *OutputCollector) judgeVacuous(ci bool, code int) int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	vacuous := c.assertions.vacuous
 	if c.assertions.counted {
-		c.starts.vacuity(len(vacuous))
+		n := len(vacuous)
+		c.vacuous = &n
+		c.starts.vacuity(n)
 	}
 	if len(vacuous) == 0 {
 		return code
@@ -189,6 +202,7 @@ func (c *OutputCollector) judgeVacuous(ci bool, code int) int {
 	for _, v := range vacuous {
 		fmt.Fprintf(c.stderr, "  %s %s\n", v.Pkg, v.Path)
 	}
+	c.vacuousFailed = vacuous
 	return max(code, 1)
 }
 
@@ -210,7 +224,4 @@ func dropCountLines(out []byte) []byte {
 	return kept
 }
 
-var (
-	attrLineMark = []byte("=== ATTR  ")
-	runLineMark  = []byte("=== RUN   ")
-)
+var attrLineMark = []byte("=== ATTR  ")

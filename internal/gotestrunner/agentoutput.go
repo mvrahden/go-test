@@ -19,7 +19,10 @@ type Closing struct {
 	Tests *protocol.Tally
 	// NotRun counts the declared units the census found without a verdict;
 	// nil when it did not judge the run.
-	NotRun   *int
+	NotRun *int
+	// Vacuous counts the tests that passed without an assertion; nil when
+	// none reported a count.
+	Vacuous  *int
 	Packages protocol.Tally
 	// Rerun is the command that reruns the run's failures; "" for none.
 	Rerun string
@@ -33,7 +36,7 @@ type count struct {
 
 // String is the closing line, without its newline:
 //
-//	gotest: FAIL exit 1 | tests: 2 passed, 2 failed, 0 skipped, 0 not run | packages: 1 passed, 1 failed, 0 skipped | rerun: gotest --failed
+//	gotest: FAIL exit 1 | tests: 2 passed, 2 failed, 0 skipped, 0 not run, 1 vacuous | packages: 1 passed, 1 failed, 0 skipped | rerun: gotest --failed
 //
 // PASS is exit 0 with something passed, EMPTY exit 0 with nothing passed,
 // FAIL any other exit code. A segment's counts are a list, so one more can
@@ -57,6 +60,9 @@ func (c Closing) String() string { //nolint:gocritic // hugeParam: once per run
 	}
 	if c.NotRun != nil && (c.Tests != nil || *c.NotRun > 0) {
 		tests = append(tests, count{*c.NotRun, "not run"})
+	}
+	if c.Vacuous != nil && *c.Vacuous > 0 {
+		tests = append(tests, count{*c.Vacuous, "vacuous"})
 	}
 	if len(tests) > 0 {
 		segments = append(segments, "tests: "+joinCounts(tests))
@@ -84,7 +90,7 @@ func ClosingOf(res *protocol.RunResult, code int, countTests bool) Closing {
 	if res == nil {
 		return c
 	}
-	c.NotRun, c.Packages = res.NotRun, res.Packages
+	c.NotRun, c.Vacuous, c.Packages = res.NotRun, res.Vacuous, res.Packages
 	if countTests {
 		tests := res.Tests
 		if res.NotRun != nil {

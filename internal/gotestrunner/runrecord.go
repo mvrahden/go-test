@@ -82,9 +82,9 @@ func (c *OutputCollector) judged() (*protocol.RunResult, []protocol.FailedUnit) 
 			return nil, nil
 		}
 		res, failed := c.starts.run.snapshot(c.runLevel)
-		return &res, narrowFailures(failed)
+		return &res, narrowFailures(append(failed, c.vacuousUnits()...))
 	}
-	res := protocol.RunResult{NotRun: c.notRun}
+	res := protocol.RunResult{NotRun: c.notRun, Vacuous: c.vacuous}
 	var failed []protocol.FailedUnit
 	missed := map[string]bool{}
 	for _, m := range c.missing {
@@ -111,7 +111,17 @@ func (c *OutputCollector) judged() (*protocol.RunResult, []protocol.FailedUnit) 
 	for _, m := range c.missing {
 		failed = append(failed, failedUnit(m.Pkg, m.Path))
 	}
-	return &res, narrowFailures(failed)
+	return &res, narrowFailures(append(failed, c.vacuousUnits()...))
+}
+
+// vacuousUnits are the units of the passes without an assertion that failed
+// the run under --ci.
+func (c *OutputCollector) vacuousUnits() []protocol.FailedUnit {
+	var out []protocol.FailedUnit
+	for _, v := range c.vacuousFailed {
+		out = append(out, failedUnit(v.Pkg, v.Path))
+	}
+	return out
 }
 
 // RerunSelection is the per-package -run that reruns failed, as

@@ -346,7 +346,8 @@ func RunPipeline(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult
 }
 
 func buildBaseEnv(cfg PipelineConfig) []string { //nolint:gocritic // hugeParam: stable API
-	env := os.Environ()
+	// A file an outer run asked for is not this run's; askCounts names its own.
+	env := slices.DeleteFunc(os.Environ(), func(kv string) bool { return strings.HasPrefix(kv, protocol.EnvAssertionsFile+"=") })
 	if cfg.UpdateSnapshots {
 		env = append(env, protocol.EnvUpdateSnapshots+"=1")
 	}

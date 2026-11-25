@@ -71,6 +71,10 @@ type OutputCollector struct {
 	// their count, nil when the census did not judge the run.
 	missing []CensusCase
 	notRun  *int
+	// vacuous counts the tests that passed without an assertion, nil when
+	// none reported a count; vacuousFailed are those --ci failed the run on.
+	vacuous       *int
+	vacuousFailed []CensusCase
 }
 
 type pkgState struct {
@@ -236,7 +240,7 @@ func (c *OutputCollector) recordResultLocked(pkg string, idx int, r SuiteResult)
 
 	switch c.mode {
 	case RunBatchText:
-		c.assertions.observeText(pkg, r.Stdout)
+		c.assertions.observeCounts(pkg, r.Counts, r.Stdout)
 		c.flushReadyText()
 	case RunStreamJSON, RunCaptureJSON:
 		w := c.jsonWriter()
