@@ -120,6 +120,12 @@ invocation runs tests — there is NO `test` subcommand:
   rewrites this skill as shipped with the pinned version (default
   `.agents/skills`; Claude Code reads `.claude/skills`). Rerun after
   upgrading the pin.
+- `go tool gotest audit --base=<ref>` (**v1.42+**) — compares the suites
+  the working tree declares with those of the commit, read from source, and
+  lists the weakenings, then the behaviors added, removed, reworded, moved
+  and changed; `--record` writes a tree's record, `--base-record` and
+  `--head-record` compare two, `--fail-on=<classes>` exits 1 on a listed
+  class, `--format=json|md` for tools and pull requests.
 - `go tool gotest summary ./...` — run and print a failure-first summary
   for CI; `--input <file|->` renders a saved stream, `--coverage=<path>`
   names the coverage profile, `--badge=<path>` writes a coverage badge SVG.

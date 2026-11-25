@@ -1117,6 +1117,7 @@ gotest summary ./...           # failure-focused summary for CI
 gotest watch ./... -v          # watch mode with auto-rerun
 gotest scaffold ./pkg/user.Svc # generate suite skeleton from type
 gotest lint ./...              # static analysis for test suites
+gotest audit --base=origin/main  # what a change did to the suites, and what got weaker
 gotest refactor toggle-focus user_test.go UserTestSuite  # toggle an F_ prefix on a suite (or Suite.Method)
 gotest skill install           # install the agent skill matching this version
 gotest hook pre-shell          # answer a coding agent's hook event on stdin (the plugin wires it)
