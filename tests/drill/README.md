@@ -602,6 +602,20 @@ shards of one run do not add up to every mutant exactly once.
 | `run-close-claims-a-census` | the run's close counts units not run when the census did not judge | CLI conformance: the closing event of a -run narrowed run carries NotRun |
 | `saved-run-drops-the-exit-code` | a saved stream's run is read without the exit code its close carries | CLI conformance: summary --input names no exit code where the live summary named 1 |
 | `stream-without-a-manifest-names-a-run` | a document of a stream with no manifest names an empty run | CLI conformance: spec of go test's own stream holds a run |
+| `agent-output-prints-passing-packages` | agent output writes what a package that passed printed | CLI conformance: an agent's run of a failing and a passing package names the passing one on stdout |
+| `agent-closing-line-drops-the-rerun` | agent output's closing line never names the rerun command | CLI conformance: the closing line of an agent's failing run ends at the package counts |
+| `agent-output-unannounced` | agent output says nothing on stderr when it comes on | CLI conformance: an agent's run under `CLAUDECODE=1` opens stderr with no word of agent output |
+| `agent-off-switch-ignored` | `--agent=false` and `GOTEST_AGENT=0` are read as unset | CLI conformance: a run under `CLAUDECODE=1` given either prints no ok line |
+| `agent-asked-for-ignored` | `--agent` and `GOTEST_AGENT=1` turn agent output on only where an agent is detected | CLI conformance: a run with no agent variable given either prints go test's text |
+| `closing-line-on-stdout-in-a-text-run` | a plain text run prints its closing line on stdout | CLI conformance: a passing text run's stdout holds more than go test's ok line |
+| `text-run-counts-no-package-passed` | a text run counts no package that passed | CLI conformance: a passing text run's closing line reads EMPTY with 0 packages passed |
+| `text-run-takes-no-census` | a text run takes no census | CLI conformance: the text runs under a `TestMain` that never calls `m.Run` and under `-exec true` pass |
+| `text-census-counts-nothing-not-run` | a text run's census finds units without a verdict but counts none | CLI conformance: the closing line of those runs names no test not run |
+| `census-judges-a-zero-count` | the census judges a run given `-count=0` | CLI conformance: the `-json` run given `-count=0` exits 2 and neither run notes the census skipped |
+| `record-names-no-failure` | a run's record lists no failed unit | CLI conformance: the record of a failing run names no method |
+| `record-written-into-the-module` | a run's record is written under the working directory instead of the cache | CLI conformance: the cache holds no record and the module holds a new file |
+| `failed-reruns-whole-packages` | `--failed` reruns every suite of a package that failed | CLI conformance: the text, `-json` and spec reruns run the passing method too |
+| `failed-runs-packages-that-passed` | `--failed` over packages none of which failed runs them | CLI conformance: `--failed` given the passing package exits 0 with nothing to run |
 | `second-signal-taken-for-the-first` | the window for a repeat of the first signal never closes, so a second Ctrl-C is taken for the first delivered again | lifecycle conformance: the direct run's second SIGINT does not abandon the teardown |
 | `stop-line-ignored` | the CLI reads a `stop` line on its standard input and does nothing with it | lifecycle conformance: the run sent a `stop` line holds until it is killed, never exiting 130 or booking the stop |
 | `force-line-taken-for-a-repeat` | a `force` line within the window of a repeat is taken for the first stop delivered again | lifecycle conformance: the run forced right after its stop waits out the five-second grace without saying it was interrupted again |

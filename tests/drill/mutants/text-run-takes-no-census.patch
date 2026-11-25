@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLIAgentOutput .* / fails with exit 2, naming on stderr the suite's declared test as never ran / a TestMain that never calls m.Run \(
+Clause: when a text run's suite binary exits 0 having run nothing, under a TestMain that never calls m.Run or under -exec true → fails with exit 2, naming on stderr the suite's declared test as never ran
+--- a/internal/gotestrunner/census.go
++++ b/internal/gotestrunner/census.go
+@@ -417,7 +417,7 @@ func missingUnits(declared, executed []CensusCase) []CensusCase {
+ // which keeps no stream, judges each suite by its binary's result line.
+ func (c *OutputCollector) takeCensus(cfg PipelineConfig, declared DeclaredUnits, code int, dispatchErr error) int { //nolint:gocritic // hugeParam: stable API
+ 	text := c.mode == RunBatchText
+-	if code != 0 || dispatchErr != nil || text && cfg.Bench {
++	if code != 0 || dispatchErr != nil || text {
+ 		return code
+ 	}
+ 	c.mu.Lock()

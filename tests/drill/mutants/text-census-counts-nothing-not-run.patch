@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/cli CLIAgentOutput .* / the closing line counts 1 test not run / -exec true \(
+Clause: when a text run's suite binary exits 0 having run nothing, under a TestMain that never calls m.Run or under -exec true → the closing line counts 1 test not run
+--- a/internal/gotestrunner/census.go
++++ b/internal/gotestrunner/census.go
+@@ -474,7 +474,6 @@ func (c *OutputCollector) takeCensus(cfg PipelineConfig, declared DeclaredUnits,
+ 		booked = append(booked, c.verdicts.suiteFailures(missing)...)
+ 		code = 2
+ 	}
+-	c.notRun = &notRun
+ 	if text {
+ 		return code
+ 	}

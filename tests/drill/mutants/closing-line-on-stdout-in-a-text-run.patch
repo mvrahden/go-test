@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLIAgentOutput .* / prints on stdout go test's text alone \(
+Clause: when a text run of a passing package ends → prints on stdout go test's text alone
+--- a/cmd/gotest/cli.go
++++ b/cmd/gotest/cli.go
+@@ -248,7 +248,7 @@ func runText(inv Invocation, own OwnFlags, goTestArgs []string, jsonMode bool, a
+ 	gotestrunner.EndRun(code)
+ 	if !jsonMode && agent == nil && result != nil {
+ 		// stdout stays go test's text; the verdict closes stderr.
+-		fmt.Fprintln(os.Stderr, gotestrunner.ClosingOf(result.Judged, code, false))
++		fmt.Fprintln(os.Stdout, gotestrunner.ClosingOf(result.Judged, code, false))
+ 	}
+ 	if phases != "" {
+ 		fmt.Fprintln(os.Stderr, phases)

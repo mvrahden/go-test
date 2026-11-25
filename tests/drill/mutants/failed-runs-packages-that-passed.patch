@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLIAgentOutput .* / runs nothing and exits 2, saying why on stderr / a package that did not fail \(
+Clause: when --failed is given without a record, after a run that failed nothing, or with a package that did not fail → runs nothing and exits 2, saying why on stderr
+--- a/cmd/gotest/agentmode.go
++++ b/cmd/gotest/agentmode.go
+@@ -108,7 +108,7 @@ func loadReportPackages(cfg ExecConfig, goTestArgs []string) (gotestgen.RunPacka
+ // refuseUnfailed reports, on stderr, a --failed run none of whose packages
+ // failed in the last run: it would run nothing and pass.
+ func refuseUnfailed(only map[string]string, pkgs []string) bool {
+-	if only == nil || slices.ContainsFunc(pkgs, func(p string) bool { _, ok := only[p]; return ok }) {
++	if only == nil || len(pkgs) > 0 {
+ 		return false
+ 	}
+ 	fmt.Fprintln(os.Stderr, "FAIL: --failed: none of the packages given failed in the last run, so there is nothing to rerun")

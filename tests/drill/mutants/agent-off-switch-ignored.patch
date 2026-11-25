@@ -1,0 +1,17 @@
+Expect: ^FAIL .*conformance/cli CLIAgentOutput .* / prints go test's text, the passing package's ok line included, and no word of agent output / --agent=false \(
+Clause: when a text run under CLAUDECODE=1 is given --agent=false, or GOTEST_AGENT=0 → prints go test's text, the passing package's ok line included, and no word of agent output
+--- a/cmd/gotest/agentmode.go
++++ b/cmd/gotest/agentmode.go
+@@ -20,10 +20,10 @@ import (
+ // what turned it on: --agent, else GOTEST_AGENT, else the variable an agent
+ // set. --agent=false and GOTEST_AGENT=0 turn it off whatever is detected.
+ func agentOutput(own OwnFlags, getenv func(string) string) (on bool, why string) {
+-	if own.Given("--agent") {
++	if own.Given("--agent") && own.Bool("--agent") {
+ 		return own.Bool("--agent"), "--agent"
+ 	}
+-	if v := getenv(protocol.EnvAgentOutput); v != "" {
++	if v := getenv(protocol.EnvAgentOutput); v != "" && protocol.SwitchOn(v) {
+ 		return protocol.SwitchOn(v), protocol.EnvAgentOutput + "=" + v
+ 	}
+ 	why = agentenv.Cause(getenv)

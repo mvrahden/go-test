@@ -1,0 +1,17 @@
+Expect: ^FAIL .*conformance/cli CLIAgentOutput .* / runs only the failed method and exits 1 \(
+Clause: when --failed follows a run in which one method of a suite failed and one passed, beside a passing package → runs only the failed method and exits 1
+Expect: ^FAIL .*conformance/cli CLIAgentOutput .* / -json --failed streams the failed method's verdict and no other method's \(
+Clause: when --failed follows a run in which one method of a suite failed and one passed, beside a passing package → -json --failed streams the failed method's verdict and no other method's
+Expect: ^FAIL .*conformance/cli CLIAgentOutput .* / spec --failed renders the failed method and no other \(
+Clause: when --failed follows a run in which one method of a suite failed and one passed, beside a passing package → spec --failed renders the failed method and no other
+--- a/internal/gotestrunner/runrecord.go
++++ b/internal/gotestrunner/runrecord.go
+@@ -132,7 +132,7 @@ func RerunSelection(failed []protocol.FailedUnit) map[string]string {
+ 	}
+ 	only := map[string]string{}
+ 	for pkg, a := range alts {
+-		only[pkg] = strings.Join(a, "|")
++		only[pkg] = strings.Join(a[:0], "|")
+ 	}
+ 	for pkg := range whole {
+ 		only[pkg] = ""
