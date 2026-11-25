@@ -1121,6 +1121,8 @@ Inputs, outputs, the event stream, the fuzz and bench steps and the coverage bad
 ```bash
 gotest ./... -v -race          # generate overlays and run tests (default)
 gotest --failed               # rerun only what the last run here failed
+gotest --changed ./...        # run only the packages whose sources changed
+gotest runs                    # list the runs made here, and what is still current
 gotest bench ./...             # run BenchmarkX suite methods, serially
 gotest fuzz ./... --for=5m     # run FuzzX suite methods, budgeted
 gotest spec ./...              # behavioral specification view
@@ -1237,6 +1239,7 @@ Under an agent a run prints for it. Where `AI_AGENT` is set, or `CLAUDECODE=1`, 
 Outside agent output the same line closes stderr, after go test's text on stdout.
 A suite binary that ran none of its tests, as under a `TestMain` that never calls `m.Run`, fails a text run as it fails `-json` ([The census in a text run](specs/cli/spec.md#requirement-the-census-in-a-text-run)).
 Every run leaves a record of what it failed in the gotest cache, and `gotest --failed` reruns only that, by method, a pass without an assertion that failed a `--ci` run included, in a text or `-json` run, `spec` or `summary` ([Rerunning what failed](specs/cli/spec.md#requirement-rerunning-what-failed)).
+Each package's verdict carries an input hash of the source it judged ([A package's input hash](specs/cli/spec.md#requirement-a-packages-input-hash)), so `gotest --changed` runs only the packages whose hash moved since the last run, or that failed in it, and says on its closing line how many it left out ([Running what changed](specs/cli/spec.md#requirement-running-what-changed)); a hash cannot see the environment or files read outside `testdata`, so a final check runs everything ([What an input hash cannot see](specs/cli/spec.md#requirement-what-an-input-hash-cannot-see)). `gotest runs` lists the runs kept for the directory with how many of their packages are still current ([Listing the runs](specs/cli/spec.md#requirement-listing-the-runs)), and `spec --input=<file> --check-fresh` marks the stale packages of a saved stream ([Checking a stream against the tree](specs/cli/spec.md#requirement-checking-a-stream-against-the-tree)).
 
 Two commands give an agent the specification without the source. `gotest spec --static ./...` prints what a package promises before anything runs, and `gotest discover ./...` emits the same tree as JSON with a `behaviorsComplete` flag per method, so an agent never presents a partial list as the whole specification.
 

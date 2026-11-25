@@ -110,6 +110,8 @@ var witnesses = []witness{
 	{file: "reference/cli.md", quote: "A text run ends with one closing line", label: "v1.42+", path: "internal/gotestrunner/agentoutput.go", literal: "func (c Closing) String() string"},
 	{file: "reference/cli.md", quote: "fails a text run with exit 2", label: "v1.42+", path: "internal/gotestrunner/census.go", literal: "func reportsResult"},
 	{file: "reference/cli.md", quote: "there is no record or nothing to rerun", label: "v1.42+", path: "cmd/gotest/flags.go", literal: "--failed"},
+	{file: "SKILL.md", quote: "go tool gotest --changed ./...", label: "v1.42+", path: "cmd/gotest/flags.go", literal: "--changed"},
+	{file: "reference/cli.md", quote: "`--changed` (v1.42+)", label: "v1.42+", path: "cmd/gotest/changed.go", literal: "func planRun"},
 	{file: "reference/cli.md", quote: "The plain text run is censused too", label: "v1.42+", path: "internal/gotestrunner/census.go", literal: "func reportsResult"},
 	{file: "reference/reporting.md", quote: "text run (v1.42+", label: "v1.42+", path: "internal/gotestrunner/census.go", literal: "func reportsResult"},
 	{file: "SKILL.md", quote: "asserts, or says how it checks (v1.42+)", label: "v1.42+", path: "pkg/gotest/census.go", literal: "func (t *T) AssertsBy(reason string)"},
