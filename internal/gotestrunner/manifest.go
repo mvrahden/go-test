@@ -2,6 +2,7 @@ package gotestrunner
 
 import (
 	"encoding/json"
+	"slices"
 	"sync"
 	"time"
 
@@ -18,6 +19,8 @@ type runTally struct {
 	tests    protocol.Tally
 	notRun   *int
 	closed   bool
+	// failed are the units of every fail, once each, in stream order.
+	failed []protocol.FailedUnit
 }
 
 // count books one event of the stream; the run's own package is not counted.
@@ -32,6 +35,11 @@ func (r *runTally) count(pkg, test, action string) {
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if action == "fail" {
+		if u := failedUnit(pkg, test); !slices.Contains(r.failed, u) {
+			r.failed = append(r.failed, u)
+		}
+	}
 	if test != "" {
 		r.tests.Add(action)
 		return
@@ -78,10 +86,8 @@ func (s *startWriter) end(code int) {
 		return
 	}
 	r.closed = true
-	result := protocol.RunResult{ExitCode: code, Tests: r.tests, NotRun: r.notRun}
-	for _, pkg := range r.order {
-		result.Packages.Add(r.packages[pkg])
-	}
+	result := r.resultLocked()
+	result.ExitCode = code
 	opened := r.opened
 	r.mu.Unlock()
 	action := "pass"
@@ -92,6 +98,24 @@ func (s *startWriter) end(code int) {
 	elapsed := now.Sub(opened).Seconds()
 	data, _ := json.Marshal(runEvent{Time: now, Action: action, Package: protocol.RunPackage, Elapsed: &elapsed, RunLevel: true, Result: &result})
 	s.writeLine(append(data, '\n'))
+}
+
+// resultLocked is what the stream has held so far, its exit code aside.
+func (r *runTally) resultLocked() protocol.RunResult {
+	result := protocol.RunResult{Tests: r.tests, NotRun: r.notRun}
+	for _, pkg := range r.order {
+		result.Packages.Add(r.packages[pkg])
+	}
+	return result
+}
+
+// snapshot is what the stream has held so far and the units it failed,
+// the packages the run booked for itself left out.
+func (r *runTally) snapshot(runLevel map[string]bool) (protocol.RunResult, []protocol.FailedUnit) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	failed := slices.DeleteFunc(slices.Clone(r.failed), func(u protocol.FailedUnit) bool { return runLevel[u.Package] })
+	return r.resultLocked(), failed
 }
 
 // judged records what the census found: n declared units without a verdict.

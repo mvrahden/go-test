@@ -57,15 +57,11 @@ func hasSelectionFlag(goTestArgs, flags []string) bool {
 // run no test: a selection flag or -count=0, in gotest's spelling or in the
 // binary's own after -args.
 func mayRunNothing(goTestArgs, runFlags []string) bool {
-	if hasSelectionFlag(goTestArgs, testSelectionFlags) || extractFlag(runFlags, "-count") == "0" {
+	if hasSelectionFlag(goTestArgs, testSelectionFlags) || countsZero(goTestArgs, runFlags) {
 		return true
 	}
 	at := slices.Index(goTestArgs, "-args")
-	if at < 0 {
-		return false
-	}
-	binary := goTestArgs[at+1:]
-	return hasSelectionFlag(binary, []string{"-test.bench"}) || extractFlag(binary, "-test.count") == "0"
+	return at >= 0 && hasSelectionFlag(goTestArgs[at+1:], []string{"-test.bench"})
 }
 
 // NoteBenchmarksNotRun says how many declared benchmarks a test run leaves
@@ -416,10 +412,12 @@ func missingUnits(declared, executed []CensusCase) []CensusCase {
 }
 
 // takeCensus holds a green run that ran to completion to the units its
-// packages declare. A unit without a verdict makes the run exit 2 and is
-// booked into the JSON stream as a failed test, so every renderer names it.
+// packages declare. A unit without a verdict makes the run exit 2. The JSON
+// stream books it as a failed test, so every renderer names it; a text run,
+// which keeps no stream, judges each suite by its binary's result line.
 func (c *OutputCollector) takeCensus(cfg PipelineConfig, declared DeclaredUnits, code int, dispatchErr error) int { //nolint:gocritic // hugeParam: stable API
-	if c.mode == RunBatchText || code != 0 || dispatchErr != nil {
+	text := c.mode == RunBatchText
+	if code != 0 || dispatchErr != nil || text && cfg.Bench {
 		return code
 	}
 	c.mu.Lock()
@@ -429,9 +427,17 @@ func (c *OutputCollector) takeCensus(cfg PipelineConfig, declared DeclaredUnits,
 		kind               string
 		declared, executed []CensusCase
 	}
+	executedTests, executedFuzz := c.verdicts.executedTests(), c.verdicts.executedFuzz()
+	if text {
+		executedTests, executedFuzz = c.ran, c.ran
+	}
+	if cfg.Only != nil {
+		// A rerun is held to what it reran.
+		declared = DeclaredUnits{Tests: rerunUnits(declared.Tests, cfg.Only), Fuzz: rerunUnits(declared.Fuzz, cfg.Only)}
+	}
 	groups := []group{
-		{"test", declared.Tests, c.verdicts.executedTests()},
-		{"fuzz target", declared.Fuzz, c.verdicts.executedFuzz()},
+		{"test", declared.Tests, executedTests},
+		{"fuzz target", declared.Fuzz, executedFuzz},
 	}
 	flags := testSelectionFlags
 	if cfg.Bench {
@@ -444,6 +450,10 @@ func (c *OutputCollector) takeCensus(cfg PipelineConfig, declared DeclaredUnits,
 	}
 	if len(cfg.Groups)+len(cfg.SkipGroups) > 0 {
 		fmt.Fprintln(c.stderr, "note: census skipped under --group/--skip-group")
+		return code
+	}
+	if c.censusAside != "" {
+		fmt.Fprintf(c.stderr, "note: census skipped under %s\n", c.censusAside)
 		return code
 	}
 
@@ -459,14 +469,92 @@ func (c *OutputCollector) takeCensus(cfg PipelineConfig, declared DeclaredUnits,
 		for _, m := range missing {
 			fmt.Fprintf(c.stderr, "  %s %s\n", m.Pkg, m.Path)
 		}
+		c.missing = append(c.missing, missing...)
 		booked = append(booked, bookMissing(g.kind, missing)...)
 		booked = append(booked, c.verdicts.suiteFailures(missing)...)
 		code = 2
+	}
+	c.notRun = &notRun
+	if text {
+		return code
 	}
 	booked = append(booked, c.verdicts.packageFailures(booked)...)
 	writeBooked(c.jsonTarget(), booked)
 	c.starts.judged(notRun)
 	return code
+}
+
+// censusAside is why the census does not judge a test run beyond its
+// patterns and groups, "" when it does: -count=0, gotest's or the
+// binary's, runs nothing, and nor does a binary asked for its usage.
+func censusAside(cfg PipelineConfig, runFlags []string) string { //nolint:gocritic // hugeParam: once per run
+	switch {
+	case countsZero(cfg.GoTestArgs, runFlags):
+		return "-count=0"
+	case asksUsage(cfg.GoTestArgs):
+		return "-args -h"
+	}
+	return ""
+}
+
+// asksUsage reports whether the binary's own words after -args ask it for
+// its usage, which it prints instead of running a test.
+func asksUsage(goTestArgs []string) bool {
+	at := slices.Index(goTestArgs, "-args")
+	return at >= 0 && slices.ContainsFunc(goTestArgs[at+1:], func(w string) bool {
+		return slices.Contains([]string{"-h", "-help", "--h", "--help", "-test.h", "-test.help"}, w)
+	})
+}
+
+// rerunUnits are the units of declared that only, as RerunSelection writes
+// it, selects: every unit of a package it names whole, else those whose
+// levels one of its alternatives matches.
+func rerunUnits(declared []CensusCase, only map[string]string) []CensusCase {
+	var out []CensusCase
+	for _, d := range declared {
+		filter, ok := only[d.Pkg]
+		if ok && (filter == "" || slices.ContainsFunc(strings.Split(filter, "|"), func(alt string) bool { return matchesLevels(alt, d.Path) })) {
+			out = append(out, d)
+		}
+	}
+	return out
+}
+
+// matchesLevels reports whether each level of alt matches the same level of
+// path; path may go deeper than alt.
+func matchesLevels(alt, path string) bool {
+	levels, names := strings.Split(alt, "/"), strings.Split(path, "/")
+	if len(levels) > len(names) {
+		return false
+	}
+	for i, level := range levels {
+		if ok, err := regexp.MatchString(level, names[i]); err != nil || !ok {
+			return false
+		}
+	}
+	return true
+}
+
+// countsZero reports whether -count=0 is given, in gotest's spelling or in
+// the binary's own after -args.
+func countsZero(goTestArgs, runFlags []string) bool {
+	if extractFlag(runFlags, "-count") == "0" {
+		return true
+	}
+	at := slices.Index(goTestArgs, "-args")
+	return at >= 0 && extractFlag(goTestArgs[at+1:], "-test.count") == "0"
+}
+
+// reportsResult reports whether a text run's suite binary printed its final
+// result line: a binary whose tests never ran, under a TestMain that never
+// calls m.Run or an -exec that never starts it, prints none.
+func reportsResult(stdout []byte) bool {
+	for line := range bytes.SplitSeq(stdout, []byte("\n")) {
+		if line := string(bytes.TrimRight(line, "\r")); line == "PASS" || line == "FAIL" {
+			return true
+		}
+	}
+	return false
 }
 
 // bookMissing books each missing unit as a test that ran and failed with the

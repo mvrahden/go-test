@@ -92,6 +92,11 @@ type PipelineConfig struct {
 	// Manifest opens a -json stream, which EndRun then closes; nil for a
 	// stream that is neither.
 	Manifest *protocol.Manifest
+	// Only narrows the run as --failed does: each package's own -run, ""
+	// for all its suites; a package it lacks runs nothing. Nil for none.
+	Only map[string]string
+	// Stdout is where a JSON stream goes; nil for os.Stdout.
+	Stdout io.Writer
 }
 
 // flushOrder is the order a text run prints its verdicts in: the matched
@@ -130,6 +135,11 @@ type PipelineResult struct {
 	// CompileSpan runs from the compile stage's start to its last outcome;
 	// zero when nothing was compiled.
 	CompileSpan time.Duration
+	// Judged is what the run judged, its exit code aside; nil for a run that
+	// judged nothing, such as -list. A text run counts no tests.
+	Judged *protocol.RunResult
+	// Failed are the units the run failed, for --failed.
+	Failed []protocol.FailedUnit
 }
 
 // sharedFixturesPkg names the synthetic package a shared fixture failure is
@@ -327,7 +337,7 @@ func RunPipeline(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult
 		return runBench(ctx, cfg, overlay, pf)
 	}
 	if name := sharedProfileFlag(pf.RunFlags); name != "" {
-		sel := selection{Run: pf.UserRunFilter, Skip: pf.UserSkipFilter, Groups: overlay.groups}
+		sel := selection{Run: pf.UserRunFilter, Skip: pf.UserSkipFilter, Groups: overlay.groups, Only: cfg.Only}
 		if n := plannedSuiteCount(planSuiteScopes(overlay.plan(), sel)); n > 1 {
 			return PipelineResult{}, fmt.Errorf("%s writes one file, and this run starts %d suite processes that would each write it: select one suite of one package with -run '^Test<Suite>$'", name, n)
 		}
