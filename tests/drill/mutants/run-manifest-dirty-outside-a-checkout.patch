@@ -1,0 +1,17 @@
+Expect: ^FAIL .*conformance/cli CLIRunManifest .* / names no commit and no dirty flag, and exits 0 \(
+Clause: when a -json run is made outside a checkout → names no commit and no dirty flag, and exits 0
+--- a/cmd/gotest/provenance.go
++++ b/cmd/gotest/provenance.go
+@@ -47,10 +47,8 @@
+ 	wg.Go(func() { p = readProvenance(cwd) })
+ 	wg.Go(func() { m.GoVersion = goVersion(cwd) })
+ 	wg.Wait()
+-	if p.Commit != "" {
+-		dirty := p.Dirty
+-		m.Commit, m.Dirty = p.Commit, &dirty
+-	}
++	dirty := p.Dirty
++	m.Commit, m.Dirty = p.Commit, &dirty
+ 	return m
+ }
+ 

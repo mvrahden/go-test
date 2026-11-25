@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/cli CLIRunManifest .* / holds no run \(
+Clause: when spec --format=json renders a stream go test wrote → holds no run
+--- a/internal/gotestspec/run.go
++++ b/internal/gotestspec/run.go
+@@ -36,9 +36,6 @@
+ 			r.ExitCode = &code
+ 		}
+ 	}
+-	if !ok {
+-		return RunInfo{}, false
+-	}
+ 	return r, true
+ }
+ 

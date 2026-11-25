@@ -585,7 +585,17 @@ shards of one run do not add up to every mutant exactly once.
 | `third-signal-waits-out-the-bound` | a further signal while the second one waits for the suites is ignored | runner unit suite: the wait runs to its bound |
 | `stopped-suite-leaves-its-processes` | a suite stopped by its stop line leaves the rest of its process group running, and its release leaves it too | lifecycle conformance: a process the test started outlives the run, never interrupted |
 | `stop-kills-the-suite` | the runner stops a suite that took its channel by killing its tree instead of sending the stop line | lifecycle conformance: AfterAll never runs before the fixture's release |
-| `stopped-run-reads-as-a-pass` | an interrupted run books no stop into the stream | lifecycle and CLI conformance: the stopped run's stream has no failed package, and neither a forced stop's stream nor the events file ends with the run booked as interrupted |
+| `stopped-run-reads-as-a-pass` | an interrupted run books no stop into the stream | lifecycle and CLI conformance: the stopped run's stream has no failed package, and neither a forced stop's stream nor the events file ends with the run booked as interrupted before its close |
+| `run-manifest-args-of-the-command` | the run's manifest drops its first argument | CLI conformance: the opening event's arguments are not the run's |
+| `run-manifest-names-no-commit` | the run's manifest leaves out the commit of a checkout on a branch | CLI conformance: the opening event and the spec and summary JSON documents name no commit |
+| `run-manifest-dirty-outside-a-checkout` | the run's manifest gives a run outside a checkout a dirty flag | CLI conformance: the opening event outside a checkout carries Dirty |
+| `agent-variable-ignored` | the agent is never read from `AI_AGENT` | CLI conformance: a run under `AI_AGENT=my-agent` names claude-code |
+| `agent-named-without-a-variable` | the agent is named whenever `CLAUDECODE` is not `0`, set or not | CLI conformance: a run with no agent variable names claude-code |
+| `run-tally-counts-every-test-passed` | the run's close counts every test verdict as a pass | CLI conformance: the closing event of a failing run counts no failed test |
+| `run-close-forgets-the-census` | the census's judgement never reaches the run's close | CLI conformance: a passing run's closing event carries no count of units not run |
+| `run-close-claims-a-census` | the run's close counts units not run when the census did not judge | CLI conformance: the closing event of a -run narrowed run carries NotRun |
+| `saved-run-drops-the-exit-code` | a saved stream's run is read without the exit code its close carries | CLI conformance: summary --input names no exit code where the live summary named 1 |
+| `stream-without-a-manifest-names-a-run` | a document of a stream with no manifest names an empty run | CLI conformance: spec of go test's own stream holds a run |
 | `second-signal-taken-for-the-first` | the window for a repeat of the first signal never closes, so a second Ctrl-C is taken for the first delivered again | lifecycle conformance: the direct run's second SIGINT does not abandon the teardown |
 | `stop-line-ignored` | the CLI reads a `stop` line on its standard input and does nothing with it | lifecycle conformance: the run sent a `stop` line holds until it is killed, never exiting 130 or booking the stop |
 | `force-line-taken-for-a-repeat` | a `force` line within the window of a repeat is taken for the first stop delivered again | lifecycle conformance: the run forced right after its stop waits out the five-second grace without saying it was interrupted again |

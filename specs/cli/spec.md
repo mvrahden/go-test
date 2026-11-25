@@ -285,7 +285,7 @@ The scaffold subcommand SHALL write only code that compiles. It SHALL refuse wit
 - **THEN** writes a file go vet passes
 
 ### Requirement: The go test -json stream
-The go test -json stream SHALL hold JSON lines only, inside GitHub Actions too. Every event of a package the run books for itself rather than for an import path (`shared fixtures`, `interrupted`, `global --timeout`, `go build`) SHALL carry `"RunLevel":true`, its start line included, and no event of another package SHALL carry it; spec's JSON document SHALL mark such a package `"runLevel":true`. A consumer that decodes the events with encoding/json into go test's own event type ignores the field.
+The go test -json stream SHALL hold JSON lines only, inside GitHub Actions too. Every event of a package the run books for itself rather than for an import path (`gotest run`, `shared fixtures`, `interrupted`, `global --timeout`, `go build`) SHALL carry `"RunLevel":true`, its start line included, and no event of another package SHALL carry it; spec's JSON document SHALL mark such a package `"runLevel":true`. A consumer decoding the events into go test's own event type ignores the field.
 
 #### Scenario: Asking for the stream
 - **WHEN** the go test -json stream is asked for
@@ -622,11 +622,52 @@ A run given --events-file SHALL write to that file byte for byte the go test -js
 - **WHEN** a -json run with --events-file is stopped while a suite holds
 - **THEN** keeps the events of the suites that ended before the stop, each line whole
 - **AND** writes the stopped suite's events too, as -json prints them
-- **AND** ends with the run booked as interrupted
+- **AND** ends with the run booked as interrupted, then closed with exit code 130
 
 #### Scenario: A killed run
 - **WHEN** a -json run with --events-file is killed while a suite holds
 - **THEN** keeps the events of the suites that ended before the kill, each line whole
+
+### Requirement: What a run says it was
+A -json run, and the run spec or summary renders, SHALL open its go test -json stream with a start event of the package `gotest run`, marked RunLevel, whose `Manifest` holds `Version` (the CLI's), `GoVersion` (the go command's), `Args`, `Commit` and `Dirty` (the checkout's commit and whether it has uncommitted changes) and `Agent`: `AI_AGENT` when set, else `claude-code` under `CLAUDECODE=1`. A fact the run cannot learn SHALL be left out and SHALL NOT fail the run.
+
+#### Scenario: A run in a checkout
+- **WHEN** a -json run is made in a checkout
+- **THEN** opens the stream with a RunLevel start of gotest run naming the CLI's version, the go command's version and the run's arguments
+- **AND** names the checkout's commit and whether it has uncommitted changes
+
+#### Scenario: A run outside a checkout
+- **WHEN** a -json run is made outside a checkout
+- **THEN** names no commit and no dirty flag, and exits 0
+
+#### Scenario: A run under an agent
+- **WHEN** a -json run is made under an agent
+- **THEN** names the agent AI_AGENT names, and claude-code under CLAUDECODE=1 alone
+- **AND** names no agent without either
+
+### Requirement: What a run says it judged
+The stream's last event SHALL be the verdict of `gotest run`, `pass` for exit code 0 and `fail` for any other, whose `Result` holds `ExitCode`; `Packages`, the other packages by their last verdict; `Tests`, every test verdict, subtests included; and `NotRun`, the declared units the census found without a verdict, only when the census judged the run. A stopped run SHALL close its stream so too.
+
+#### Scenario: The end of a run
+- **WHEN** a -json run of a failing and a passing package ends
+- **THEN** closes the stream with a fail of gotest run carrying exit code 1, one package passed and one failed, two tests passed and two failed
+- **AND** a passing run closes it with a pass carrying exit code 0 and 0 units not run
+
+#### Scenario: A run the census does not judge
+- **WHEN** a -json run is narrowed with -run
+- **THEN** closes the stream with no count of units not run
+
+### Requirement: The run a document renders
+spec and summary --format=json SHALL name the run they render in `run`, right after `version`: its `version`, `goVersion`, `args`, `commit`, `dirty`, `agent` and `exitCode`, as the run's events hold them, the exit code left out for a stream the run did not close. A document of a stream without the run's start SHALL hold no `run`.
+
+#### Scenario: A live run's document
+- **WHEN** spec --format=json renders a live run of a failing package
+- **THEN** its run names the commit, the go command's version and exit code 1, after version
+- **AND** summary --format=json of the run's saved stream names the same run
+
+#### Scenario: A document of go test's own stream
+- **WHEN** spec --format=json renders a stream go test wrote
+- **THEN** holds no run
 
 ### Requirement: A suite cut short by --timeout
 A suite process an expired --timeout stopped SHALL fail its package on the text, -json and spec pipelines, whatever its tests reported: a method that returned when its context ended did not finish. The FAIL line of the run SHALL name the suite when no method was still running. An interrupt SHALL keep the tests' own verdicts, as the lifecycle spec states. A method running when the stop came SHALL be booked failed in the stream with the line that names the deadline.

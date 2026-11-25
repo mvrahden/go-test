@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/cli CLIRunManifest .* / a passing run closes it with a pass carrying exit code 0 and 0 units not run \(
+Clause: when a -json run of a failing and a passing package ends → a passing run closes it with a pass carrying exit code 0 and 0 units not run
+--- a/internal/gotestrunner/census.go
++++ b/internal/gotestrunner/census.go
+@@ -465,7 +465,6 @@
+ 	}
+ 	booked = append(booked, c.verdicts.packageFailures(booked)...)
+ 	writeBooked(c.jsonTarget(), booked)
+-	c.starts.judged(notRun)
+ 	return code
+ }
+ 

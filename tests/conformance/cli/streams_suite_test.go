@@ -88,7 +88,8 @@ func (s *CLIStreamsTestSuite) TestRunLevelPackagesAreMarked(t *gotest.T) {
 			gotest.NotEmpty(it, actions)
 			gotest.Equal(it, "start", actions[0])
 			gotest.Equal(it, "fail", actions[len(actions)-1])
-			gotest.Equal(it, map[string]int{"shared fixtures": len(actions)}, marked)
+			// The run's own start and verdict are marked too.
+			gotest.Equal(it, map[string]int{"gotest run": 2, "shared fixtures": len(actions)}, marked)
 			gotest.NotEmpty(it, unmarked)
 			gotest.Zero(it, unmarked["shared fixtures"])
 		})
