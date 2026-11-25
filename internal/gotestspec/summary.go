@@ -402,7 +402,6 @@ func RenderMarkdownBenchSummary(w io.Writer, packages []*Package, opts ...Render
 	} else {
 		fmt.Fprintf(w, "### %d of %d benchmarks failed (%s)\n", len(failures), stats.Benchmarks, dur)
 		renderMarkdownFailures(w, failures)
-	renderMarkdownVacuous(w, collectVacuous(packages))
 	}
 
 	for _, pkg := range packages {
