@@ -65,11 +65,21 @@ type wrapperRun struct {
 	err            error
 }
 
-// runWrapper runs the wrapper with only the tools it needs on PATH, plus
-// the files of extra, each an executable script named by its key.
+// runWrapper runs the wrapper in a fresh directory with only the tools it
+// needs on PATH, plus the files of extra, each an executable script named by
+// its key.
 func runWrapper(t *gotest.T, event, input string, extra map[string]string) wrapperRun {
+	return runWrapperIn(t, t.TempDir(), false, event, input, extra)
+}
+
+// runWrapperIn is runWrapper in dir, with git on PATH when withGit is set.
+func runWrapperIn(t *gotest.T, dir string, withGit bool, event, input string, extra map[string]string) wrapperRun {
 	bin := t.TempDir()
-	for _, tool := range []string{"cat", "grep", "dirname"} {
+	tools := []string{"cat", "grep", "dirname"}
+	if withGit {
+		tools = append(tools, "git")
+	}
+	for _, tool := range tools {
 		path, err := exec.LookPath(tool)
 		gotest.NoError(t, err)
 		gotest.NoError(t, os.Symlink(path, filepath.Join(bin, tool)))
@@ -82,8 +92,9 @@ func runWrapper(t *gotest.T, event, input string, extra map[string]string) wrapp
 	script, err := filepath.Abs(filepath.Join("hooks", "gotest-hook.sh"))
 	gotest.NoError(t, err)
 	cmd := exec.CommandContext(t.Context(), sh, script, event) //nolint:gosec // G204: the plugin's own wrapper
-	cmd.Dir = t.TempDir()
-	cmd.Env = []string{"PATH=" + bin, "HOME=" + cmd.Dir}
+	cmd.Dir = dir
+	// No checkout above dir counts, and no user's git configuration.
+	cmd.Env = []string{"PATH=" + bin, "HOME=" + dir, "GIT_CEILING_DIRECTORIES=" + filepath.Dir(dir), "GIT_CONFIG_NOSYSTEM=1"}
 	cmd.Stdin = bytes.NewBufferString(input)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
@@ -126,18 +137,6 @@ func (s *PluginHooksTestSuite) TestTheWrapperFindsGotest(t *gotest.T) {
 			gotest.Empty(it, run.stderr)
 		})
 	})
-	t.When("the event is the end of the agent's turn", func(w *gotest.T) {
-		calls := filepath.Join(w.TempDir(), "calls")
-		run := runWrapper(w, "stop", `{"hook_event_name":"Stop"}`, map[string]string{
-			"gotest": "#!/bin/sh\necho \"$*\" >> " + calls + "\n",
-		})
-		w.It("starts no gotest", func(it *gotest.T) {
-			gotest.NoError(it, run.err)
-			gotest.Empty(it, run.stdout)
-			_, err := os.Stat(calls)
-			gotest.ErrorIs(it, err, os.ErrNotExist)
-		})
-	})
 	t.When("the event is a shell command that is not go test", func(w *gotest.T) {
 		calls := filepath.Join(w.TempDir(), "calls")
 		run := runWrapper(w, "pre-shell", `{"tool_input":{"command":"ls -la"}}`, map[string]string{
@@ -148,6 +147,105 @@ func (s *PluginHooksTestSuite) TestTheWrapperFindsGotest(t *gotest.T) {
 			gotest.Empty(it, run.stdout)
 			_, err := os.Stat(calls)
 			gotest.ErrorIs(it, err, os.ErrNotExist)
+		})
+	})
+}
+
+// knowingGotest is a gotest that knows the hook command and logs each
+// event it is handed.
+func knowingGotest(calls string) string {
+	return "#!/bin/sh\nif [ \"$1\" = help ]; then echo 'gotest hook — answer'; exit 0; fi\necho \"$*\" >> " + calls + "\n"
+}
+
+// checkout is a git checkout with one committed Go file and README.
+func checkout(t *gotest.T) string {
+	dir := t.TempDir()
+	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "a.go"), []byte("package a\n"), 0o600))
+	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "README"), []byte("a\n"), 0o600))
+	for _, args := range [][]string{
+		{"init", "-q"}, {"add", "-A"},
+		{"-c", "user.name=gotest", "-c", "user.email=gotest@example.com", "commit", "-q", "-m", "base"},
+	} {
+		cmd := exec.CommandContext(t.Context(), "git", args...)
+		cmd.Dir = dir
+		cmd.Env = append(os.Environ(), "GIT_CEILING_DIRECTORIES="+filepath.Dir(dir), "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1")
+		out, err := cmd.CombinedOutput()
+		gotest.NoError(t, err, "git %v: %s", args, out)
+	}
+	return dir
+}
+
+// PluginHookStopTestSuite: the wrapper starts gotest at the end of a turn
+// only in a checkout with a changed or untracked Go file.
+type PluginHookStopTestSuite struct{}
+
+func (s *PluginHookStopTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second}
+}
+
+func (s *PluginHookStopTestSuite) SuiteGuard() string {
+	if _, err := exec.LookPath("git"); err != nil {
+		return "git not found"
+	}
+	return ""
+}
+
+func (s *PluginHookStopTestSuite) TestTheEndOfATurn(t *gotest.T) {
+	const stopEvent = `{"hook_event_name":"Stop"}`
+	t.When("the turn ends in a checkout with a changed or untracked Go file", func(w *gotest.T) {
+		w.It("hands gotest the stop event", func(it *gotest.T) {
+			for sub, row := range gotest.Each(it, []struct {
+				Desc   string
+				change func(dir string) error
+			}{
+				{Desc: "a changed file", change: func(dir string) error {
+					return os.WriteFile(filepath.Join(dir, "a.go"), []byte("package a\n\nvar x = 1\n"), 0o600)
+				}},
+				{Desc: "a test file in a new directory", change: func(dir string) error {
+					if err := os.MkdirAll(filepath.Join(dir, "b"), 0o750); err != nil {
+						return err
+					}
+					return os.WriteFile(filepath.Join(dir, "b", "b_test.go"), []byte("package b\n"), 0o600)
+				}},
+			}) {
+				dir := checkout(sub)
+				gotest.NoError(sub, row.change(dir))
+				calls := filepath.Join(sub.TempDir(), "calls")
+				run := runWrapperIn(sub, dir, true, "stop", stopEvent, map[string]string{"gotest": knowingGotest(calls)})
+				gotest.NoError(sub, run.err)
+				got, err := os.ReadFile(calls) //nolint:gosec // G304: the stub's own log
+				gotest.NoError(sub, err)
+				gotest.Equal(sub, "hook stop\n", string(got))
+			}
+		})
+	})
+	t.When("the turn ends outside a checkout, without git, or with no Go file changed", func(w *gotest.T) {
+		w.It("starts no gotest", func(it *gotest.T) {
+			for sub, row := range gotest.Each(it, []struct {
+				Desc    string
+				dir     func(*gotest.T) string
+				withGit bool
+			}{
+				{Desc: "outside a checkout", dir: func(t *gotest.T) string { return t.TempDir() }, withGit: true},
+				{Desc: "without git", dir: func(t *gotest.T) string {
+					dir := checkout(t)
+					gotest.NoError(t, os.WriteFile(filepath.Join(dir, "a.go"), []byte("package a\n\nvar x = 1\n"), 0o600))
+					return dir
+				}},
+				{Desc: "only a file that is not Go changed", dir: func(t *gotest.T) string {
+					dir := checkout(t)
+					gotest.NoError(t, os.WriteFile(filepath.Join(dir, "README"), []byte("b\n"), 0o600))
+					gotest.NoError(t, os.WriteFile(filepath.Join(dir, "notes.txt"), []byte("go\n"), 0o600))
+					return dir
+				}, withGit: true},
+			}) {
+				calls := filepath.Join(sub.TempDir(), "calls")
+				run := runWrapperIn(sub, row.dir(sub), row.withGit, "stop", stopEvent, map[string]string{"gotest": knowingGotest(calls)})
+				gotest.NoError(sub, run.err)
+				gotest.Empty(sub, run.stdout)
+				_, err := os.Stat(calls)
+				gotest.ErrorIs(sub, err, os.ErrNotExist)
+			}
 		})
 	})
 }
