@@ -69,7 +69,8 @@ Test results persist across sessions, so you see pass/fail state immediately aft
 The tree itself is restored from disk on startup, so suites are browsable straight away instead of waiting for the Go toolchain to finish discovery.
 A run the CLI failed is never green: when it exits non-zero and no test or package carries a failing verdict, the packages (for a fuzz or bench run, the selected targets) are marked errored with what the CLI said and its exit code.
 A test that started and got no verdict because its process died — a test timeout, a panic on a goroutine — is marked errored with what it printed, and its package's message names it. The Spec View shows such a test as NOT RUN until the CLI reports it otherwise.
-When a Go file of a package changes, the verdicts shown for that package are marked outdated (VS Code dims them) until it runs again. Packages that import the changed one are not marked: the extension does not know the import graph.
+When a Go file of a package changes, the verdicts shown for that package are marked outdated (VS Code dims them) until it runs again. Packages that import the changed one are not marked here: the extension does not know the import graph. The Spec View asks the CLI instead, which does (see *Stale verdicts* below).
+The **Run Changed** profile (and **Go Test: Run Changed Packages**) runs `gotest --changed` in a folder: only the packages whose inputs changed since the last run record, and those that failed or never ran. Its run is named *changed packages only*, its output says how many packages it ran and how many it left out, and a package it left out keeps the verdict it had; it is not a full run.
 
 ### CodeLens
 
@@ -111,7 +112,9 @@ Open it with **Go Test: Show Spec View**.
 - **The specification under the runs** — the CLI lays a folder's runs over what the folder's source declares (`gotest spec --declared`), so a behavior no run reported is listed as *not run*, and every package and module row carries the CLI's counts
 - **Before the first run** — a folder nothing ran in shows what its source declares, every row *not run* and each package marked *declared, not run yet*
 - **What the CLI says of a row** — a skip's reason, a row whose behaviors are known only at run time (*INCOMPLETE*), a leaf that passed without an assertion (*VACUOUS*), one that asserts by other means (*ASSERTS BY*) and how many assertions a leaf made when the run counted them; the trailer counts the vacuous, the other-means and the excluded leaves
-- **Which run it shows** — a line under the toolbar names the run's commit, whether the tree had uncommitted changes, the agent that ran it and its exit code; each named `ExclusiveGroup` is listed with its suites and wall time
+- **Which run it shows** — a line under the toolbar names the run's commit, whether the tree had uncommitted changes, the agent that ran it and its exit code, and for a `--changed` run how many packages it ran and left out; each named `ExclusiveGroup` is listed with its suites and wall time
+- **Stale verdicts** — after a render, and once a burst of edits to Go files, `go.mod`/`go.work` or testdata settles, the panel asks the folder's CLI which of the shown packages' verdicts still belong to the tree (`gotest spec --check-fresh`, which compares each package's input hash with the run's, importers included). A stale package is dimmed under *stale: inputs changed since the run*, and a line under the toolbar counts them; a package whose run stamped no hash is *unknown*, said only in its tooltip. One check per folder per burst, a newer one stopping the one it supersedes; a CLI without run records (before v1.42.0) marks nothing
+- **Run changed** — the toolbar's **Run changed** runs `--changed` in the active folder, as the Run Changed profile does
 - **A branch's own verdict** — a suite whose hooks failed is red, and what it printed (a failed `AfterAll`, a panic booked on the suite) is shown on it
 - **Go-to-source** — click any suite, method, fuzz target, When or It the source declares to navigate to the line the CLI names; `file:line` in failure output opens that line
 - **Run, Debug, Rerun failed** — hover a row to run or debug it; a behavior the Test Explorer does not list runs as its method
@@ -120,7 +123,7 @@ Open it with **Go Test: Show Spec View**.
 - **Persistence** — the panel survives editor reload and restores what it kept
 - **A render that failed** — when a render fails the panel keeps the last picture and says so at its top, with the reason and a Retry button; the next successful render removes the notice
 - **Live updates** — refreshes from test runs, coverage runs and watch mode, rendered when the panel is visible; with `gotest.specView.autoRefresh` off, runs are kept and shown on **Refresh**
-- **Scopes** — **Spec** and **Change** switch at the panel's top; the panel reopens in the scope it was left in
+- **Scopes** — **Spec**, **Change** and **Runs** switch at the panel's top; the panel reopens in the scope it was left in
 - **Saved runs** — **Go Test: Open Events File…** opens a `--events-file` stream (or any `go test -json` capture) as a source of its own beside the workspace's runs, and replays it into the Test Explorer as a run named `Imported: <file>`; packages the workspace does not hold are listed once
 
 ### Change scope
@@ -130,7 +133,8 @@ The panel's **Change** scope (or **Go Test: Show Change View**) is the audit of 
 - **The base** — by default the merge-base of `HEAD` with the remote default branch (`origin/HEAD`, else a remote's `main` or `master`). **Base:** picks another: the merge-base again, a branch or tag, or any ref typed in; the choice is kept per folder. The extension passes the ref; the CLI records the base tree itself. A folder outside git says so, and one with no default branch asks for a base
 - **Head and counts** — the branch, the head commit and whether it has uncommitted changes, the base's ref and commit, and the document's counts: with evidence also failing, not run, vacuous and stale, with coverage the unproven lines and the files without coverage data
 - **Evidence** — the runs that judged the change, each current or stale with the CLI's reason, its commit, exit code and agent. Every weakening and behavior carries its verdict as the CLI's text marks it (`pass 1`, `FAIL`, `vacuous`, `partly run`, `not run`, `no evidence`, `skip`, `*` for a stale run); hovering a mark names the run it came from and what the other runs said
-- **Audit with a run** — runs `gotest audit --base=<ref> --run --format=json`: the CLI runs the packages of the changed behaviors, with coverage of the changed production packages, and takes that run as current evidence. It runs until it ends or **Cancel** stops it, the run's fixtures torn down as a stop of any run is; **Refresh** stays the fast audit from source alone. The Spec scope's runs are not handed to the audit: they are kept per test, not as one run's stream
+- **Audit with a run** — runs `gotest audit --base=<ref> --run --format=json`: the CLI runs the packages of the changed behaviors, with coverage of the changed production packages, and takes that run as current evidence. It runs until it ends or **Cancel** stops it, the run's fixtures torn down as a stop of any run is; **Refresh** stays the fast audit from source alone
+- **Evidence from runs** — runs chosen in the Runs scope (**Use as evidence**) are passed to every audit as `--evidence=<events file>`, and show as chips under the toolbar; × drops one, and one whose file is gone is marked and not passed. Whether such a run is current the CLI decides, by input hash
 - **Needs a decision** — every weakening the audit lists, in its order (removed, excluded, focused, guarded, budget, suppression, snapshot, assertions, asserts-by), then the evidence rows the document says need a decision, grouped by their mark. Each row opens the diff of its file against the base (**Open diff**): the base's lines on the left, the head's on the right, a removed one on the base's side; runs its test by the package and `-run` pattern the document names (**Run**), never one the head no longer has; and can be **Accept**ed. A group with more than five rows is folded behind its count
 - **Accept** — a note for yourself, kept per finding id: in the workspace's state, never sent anywhere, and forgotten when the head commit changes. Accepted rows move to the bottom; the band's head counts open and accepted
 - **Changed behaviors** — added, removed, reworded, moved and changed, by package and suite, each with its mark and **Run**; a row opens where the behavior is declared, a removed one in the base's copy of its file
@@ -138,6 +142,25 @@ The panel's **Change** scope (or **Go Test: Show Change View**) is the audit of 
 - **Information, not compared, notes** — the document's other lists, when it has them
 - **Refresh** — on the button, and after a run in the folder while the scope is on show. One audit of a folder runs at a time, a busy notice shows while it does, and closing the panel stops it. An audit that exits non-zero with a document (a package it could not read) still renders, with its exit code; one without a document shows what the CLI wrote on stderr
 - **An older CLI** — before it audits, the scope asks the folder's CLI what it can do (`gotest version --json`): it audits when the CLI lists `audit` and writes an audit schema the extension reads, a pre-release build included. A CLI that predates `--json` gets the version it named and the `go get` that upgrades to v1.42.0, with **Upgrade** when `go.mod` pins the CLI; one that writes a newer schema asks for a newer extension
+
+### Runs scope
+
+The panel's **Runs** scope lists the folder's run records, newest first, as `gotest runs --format=json` prints them. Every gotest run leaves one, from a terminal, an agent or this editor alike; the editor's own runs save their stream with `--events-file` under the extension's storage (the newest 50, none older than 30 days, as the CLI keeps its records), so they can be opened and used as evidence too.
+
+- **Each run** — its time, PASS or FAIL with the exit code, the agent it ran under (or none), its commit and whether the tree was dirty, the command, the tests' counts, *narrowed* for a `--changed` run with how many packages it ran and left out, *imported* for one imported from a file, and what it says of the tree now: *judges this tree: n current / n stale / n unknown*, as the CLI hashes the packages now
+- **Open in Spec** — renders the run's events file in the Spec scope, as a source of its own
+- **Use as evidence** — toggles the run as evidence for the Change scope's audits; the choice is kept per folder in the workspace's state
+- **Import run…** — picks an events file (a CI run you downloaded) and keeps its run among the folder's records (`gotest runs --import`)
+- **Run changed** — runs `--changed` in the folder
+- **An older CLI** — one without `runs` (before v1.42.0) gets the `go get` that upgrades it, with **Upgrade** when `go.mod` pins the CLI
+
+### Sessions
+
+A **gotest Sessions** view in the Testing sidebar lists the CLI sessions running now, per folder: test and coverage runs, `--changed` runs, watchers, bench and fuzz sessions from the Test Explorer, audits and the `prepare` behind a debug session, each with what it runs and when it started. **Stop** on a row stops that session alone, the way its own cancel does: a run gets its stop and its fixtures' teardown, then force after `gotest.forceKillTimeout`. The view is hidden while nothing runs.
+
+### Language model tool
+
+The extension contributes the `gotest_audit` tool (`#gotestAudit` in chat) to agents in the editor. It returns the active folder's audit as `gotest audit --format=md` writes it, so an agent reads the document the Change scope shows, through the same one audit per folder. Its input: `base`, a ref to audit against (the folder's chosen base when left out), and `run`, which runs the tests of the changed behaviors as evidence and asks you to confirm first. A CLI without `audit` gets a plain explanation of the release it needs. The tool needs VS Code's language model tools API; an editor without it goes without the tool.
 
 ### Lint
 
@@ -243,6 +266,7 @@ The palette offers these. Commands that act on one test, benchmark or fuzz targe
 | Go Test: Show Focused Tests | List all focused tests and navigate to them |
 | Go Test: Show Spec View | Open the BDD spec output panel |
 | Go Test: Show Change View | Open the panel's Change scope: the audit of the working tree against its base |
+| Go Test: Run Changed Packages | Run `--changed` in the active folder: only the packages whose inputs changed since the last run record |
 | Go Test: Open Events File… | Open a saved `go test -json` stream in the Spec View and the Test Explorer |
 | Go Test: Fix lint findings in package | Apply every suggested lint fix in a package and show what is left |
 | Go Test: Lint Workspace | Run `gotest lint` on every workspace folder |
