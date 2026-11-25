@@ -69,6 +69,7 @@ func (s *CanaryTestSuite) TestSpecMarkdownLabelsStayOnTheirLine(t *gotest.T) {
 // A label is text: no tag of it reaches the reader as HTML and no backtick
 // of it opens a code span.
 func (s *CanaryTestSuite) TestSpecMarkdownLabelsAreNotHTML(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	for _, static := range []bool{false, true} {
 		md := s.specMarkdown(t, static)
 		for _, raw := range []string{"<b>", "</b>", "<i>", "</i>", "and `code`"} {
@@ -82,6 +83,7 @@ func (s *CanaryTestSuite) TestSpecMarkdownLabelsAreNotHTML(t *gotest.T) {
 // go test reports one subtest for an It whose label holds a slash, so the
 // live spec shows one It under its When.
 func (s *CanaryTestSuite) TestSpecMarkdownASlashIsNoLevel(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	md := s.specMarkdown(t, false)
 	if !strings.Contains(md, "\n  - when a path is read\n    - PASS reads a/b paths\n") {
 		t.Errorf("specmarkdown: an It with a slash is split into levels:\n%s", md)
@@ -90,6 +92,7 @@ func (s *CanaryTestSuite) TestSpecMarkdownASlashIsNoLevel(t *gotest.T) {
 
 // The spec read from source marks what X_ excludes, as the terminal spec does.
 func (s *CanaryTestSuite) TestSpecMarkdownMarksExclusions(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	md := s.specMarkdown(t, true)
 	for _, want := range []string{"#### Parked — EXCLUDED\n", "- **Parked** — EXCLUDED\n", "- never runs — EXCLUDED\n"} {
 		if !strings.Contains(md, want) {

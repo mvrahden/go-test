@@ -22,6 +22,7 @@ func (s *FormatTestSuite) SuiteConfig() gotest.SuiteConfig {
 func (s *FormatTestSuite) BeforeEach(t *gotest.T) *ring0Ctx { return &ring0Ctx{} }
 
 func mustEqualString(t *gotest.T, what, got, want string) {
+	t.AssertsBy(rawCheck)
 	if got != want {
 		fatalf(t, "%s = %q; want %q", what, got, want)
 	}
@@ -47,6 +48,7 @@ func (s *FormatTestSuite) Test_FormatValue_NonNilPointerInt(t *gotest.T, _ *ring
 }
 
 func (s *FormatTestSuite) Test_FormatValue_PlainValues(t *gotest.T, _ *ring0Ctx) {
+	t.AssertsBy(rawCheck)
 	for sub, tc := range gotest.Each(t, []struct {
 		Desc string
 		v    any

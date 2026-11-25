@@ -58,6 +58,7 @@ func sharedEnded(markers []string) bool {
 // stdin: the fixture's AfterAll runs, the process exits on its own, and no
 // signal reaches it.
 func (s *CanaryDagTestSuite) TestAStopReachesTheSharedFixtureAsALine(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	r := s.sharedStopRun(t, "sharedstop", "HoldTestSuite")
 	interruptRun(t, "sharedstop", r)
 	code, markers := r.end(20 * time.Second)
@@ -83,6 +84,7 @@ func (s *CanaryDagTestSuite) TestAStopReachesTheSharedFixtureAsALine(t *gotest.T
 // A second stop while the shared fixture's AfterAll waits on its context
 // ends that context: the AfterAll returns at once, and nothing is killed.
 func (s *CanaryDagTestSuite) TestASecondStopEndsTheSharedReleasesContext(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	r := s.sharedStopRun(t, "sharedforce", "HoldTestSuite", "SHAREDSTOP_RELEASE=wait")
 	first := interruptRun(t, "sharedforce", r)
 	if !r.await(30*time.Second, "AfterAll begins") {
@@ -112,6 +114,7 @@ func (s *CanaryDagTestSuite) TestASecondStopEndsTheSharedReleasesContext(t *gote
 // runs, so before any stop did, stops it too: its AfterAll runs with its
 // context ended.
 func (s *CanaryDagTestSuite) TestASecondStopFirstStopsTheSharedFixture(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	r := s.sharedStopRun(t, "forcefirst", "IgnoreTestSuite", "SHAREDSTOP_RELEASE=wait")
 	first := interruptRun(t, "forcefirst", r)
 	time.Sleep(time.Until(first.Add(time.Second)))

@@ -11,6 +11,10 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
+// rawCheck is what a raw check declares on its test: it asserts without
+// gotest's assertions, which a broken kernel could not pass.
+const rawCheck = "a raw check of ring 0"
+
 // fatalf records a failure and halts the test through testing.T alone.
 func fatalf(t *gotest.T, format string, args ...any) {
 	t.Errorf(format, args...)
@@ -19,6 +23,7 @@ func fatalf(t *gotest.T, format string, args ...any) {
 
 // mustEq reports a mismatch for a comparable value.
 func mustEq[V comparable](t *gotest.T, what string, got, want V) {
+	t.AssertsBy(rawCheck)
 	if got != want {
 		t.Errorf("%s = %v, want %v", what, got, want)
 	}
@@ -27,6 +32,7 @@ func mustEq[V comparable](t *gotest.T, what string, got, want V) {
 // mustLen halts unless the slice has exactly n elements: what follows would
 // index out of range otherwise.
 func mustLen[E any](t *gotest.T, what string, got []E, n int) {
+	t.AssertsBy(rawCheck)
 	if len(got) != n {
 		fatalf(t, "%s: expected %d, got %d", what, n, len(got))
 	}
@@ -34,6 +40,7 @@ func mustLen[E any](t *gotest.T, what string, got []E, n int) {
 
 // mustContain reports when s lacks sub.
 func mustContain(t *gotest.T, s, sub, why string) {
+	t.AssertsBy(rawCheck)
 	if !strings.Contains(s, sub) {
 		t.Errorf("%s: expected %q in:\n%s", why, sub, s)
 	}
@@ -41,6 +48,7 @@ func mustContain(t *gotest.T, s, sub, why string) {
 
 // mustNotContain reports when s has sub.
 func mustNotContain(t *gotest.T, s, sub, why string) {
+	t.AssertsBy(rawCheck)
 	if strings.Contains(s, sub) {
 		t.Errorf("%s: unexpected %q in:\n%s", why, sub, s)
 	}

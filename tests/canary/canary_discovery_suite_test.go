@@ -205,6 +205,7 @@ func (s *CanaryDiscoveryTestSuite) TestGeneratedFilesStayValid(t *gotest.T) {
 // package or test package variant skips the unfocused suites of every other,
 // and a suite skipped that way starts none of its fixtures.
 func (s *CanaryDiscoveryTestSuite) TestFocusIsRunWide(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	verdicts := func(stdout []byte) map[string]string {
 		out := map[string]string{}
 		for _, ev := range testkit.ParseEvents(stdout) {

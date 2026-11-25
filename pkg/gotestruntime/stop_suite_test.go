@@ -25,6 +25,8 @@ func (s *StopTestSuite) TestAStopSkipsTheMethodsNotStarted(t *gotest.T) {
 	var ran []string
 	method := func(name string, body func()) gotestruntime.Method {
 		return gotestruntime.Method{Name: name, Run: func(tt *gotest.T, run func(func())) {
+			tt.AssertsBy(underTest)
+
 			run(func() {
 				ran = append(ran, name)
 				body()
@@ -103,6 +105,8 @@ func (s *StopTestSuite) TestAStopLeavesASlowAfterEachItsTurn(t *gotest.T) {
 		gotestruntime.RunMethods(tt, cfg, budget, gotestruntime.Methods{Cases: []gotestruntime.Method{{
 			Name: "TestHolds",
 			Run: func(ttt *gotest.T, run func(func())) {
+				ttt.AssertsBy(underTest)
+
 				defer func() {
 					time.Sleep(3 * grace)
 					mark("AfterEach")
@@ -199,6 +203,8 @@ func (s *StopTestSuite) TestAStopLeavesAfterEachsContextAlone(t *gotest.T) {
 			gotestruntime.RunMethods(tt, cfg, gotest.SuiteConfig{Timeout: budget}, gotestruntime.Methods{Cases: []gotestruntime.Method{{
 				Name: "TestStops",
 				Run: func(ttt *gotest.T, run func(func())) {
+					ttt.AssertsBy(underTest)
+
 					defer gotestruntime.AfterEach(func() { afterErr = gotestruntime.AfterEachT(ttt).Context().Err() })
 					run(func() {
 						runstate.Stop()
@@ -264,6 +270,8 @@ func (s *StopTestSuite) TestABodyStartingAfterTheStopGetsTheGraceFromItsStart(t 
 		gotestruntime.RunMethods(tt, cfg, cfg, gotestruntime.Methods{Cases: []gotestruntime.Method{{
 			Name: "TestLate",
 			Run: func(ttt *gotest.T, run func(func())) {
+				ttt.AssertsBy(underTest)
+
 				close(started)
 				time.Sleep(3 * grace) // a BeforeEach the stop lands in
 				run(func() {

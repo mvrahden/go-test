@@ -147,9 +147,13 @@ func runLinkChild(t *testing.T) {
 		})
 		gotestruntime.RunMethods(tt, cfg, budget, gotestruntime.Methods{Cases: []gotestruntime.Method{
 			{Name: "TestHolds", Run: func(ttt *gotest.T, run func(func())) {
+				ttt.AssertsBy(underTest)
+
 				run(func() { holdAs(ttt, mode, dir, mark) })
 			}},
 			{Name: "TestSecond", Run: func(ttt *gotest.T, run func(func())) {
+				ttt.AssertsBy(underTest)
+
 				run(func() { mark("TestSecond ran") })
 			}},
 		}})

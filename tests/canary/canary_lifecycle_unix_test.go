@@ -40,6 +40,7 @@ func signalSuite(t *gotest.T, markersPath string) {
 // run leaves it to end with its tests' own status: every verdict reaches the
 // stream and the process lives to its own end.
 func (s *CanaryLifecycleTestSuite) TestASignalAfterTheStopSettledTheRun(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	// The runner stops the suite by its stop line; the signal comes after.
 	r := s.startRun(t, t.TempDir(), []string{"STOPPING_LINGER=1"}, "-json", "./testdata/stopping/")
 	if !r.await(90*time.Second, "running") {
@@ -71,6 +72,7 @@ func (s *CanaryLifecycleTestSuite) TestASignalAfterTheStopSettledTheRun(t *gotes
 // as a signal: the process ends with its tests' own status, the run's stderr
 // names no signal, and the -json stream carries a verdict for every test.
 func (s *CanaryLifecycleTestSuite) TestAStopReachesTheSuiteAsALine(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	took, code, out, markers := s.interrupted(t, "stopping", nil)
 	if code == -2 || took > 10*time.Second {
 		t.Errorf("stopline: the run did not end within 10s of the stop (it took %s):\n%s", took, out)
@@ -95,6 +97,7 @@ func (s *CanaryLifecycleTestSuite) TestAStopReachesTheSuiteAsALine(t *gotest.T) 
 // read when their first suite opens: every suite skips with the reason run
 // stopping and no fixture is set up.
 func (s *CanaryLifecycleTestSuite) TestAStopDuringTestMainSkipsEverySuite(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	r := s.startRun(t, t.TempDir(), nil, "-json", "./testdata/stopatopen/")
 	for deadline := time.Now().Add(90 * time.Second); ; time.Sleep(20 * time.Millisecond) {
 		got, _ := testkit.ReadMarkers(r.markers)
@@ -150,6 +153,7 @@ func countMarker(markers []string, want string) int {
 // stop as one from outside the runner and the run fails. A second SIGTERM
 // during that stop forces nothing.
 func (s *CanaryLifecycleTestSuite) TestASignalFromOutsideIsAStop(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	r := s.startRun(t, t.TempDir(), nil, "-json", "./testdata/stopping/")
 	if !r.await(90*time.Second, "running", "pid=") {
 		_, _ = r.end(0)
@@ -180,6 +184,7 @@ func (s *CanaryLifecycleTestSuite) TestASignalFromOutsideIsAStop(t *gotest.T) {
 // starts inherits none of it, a descriptor named as the channel that is a
 // regular file is left open, and no reader of it outlives the last suite.
 func (s *CanaryLifecycleTestSuite) TestTheChannelStaysWithTheSuite(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	r := s.startRun(t, t.TempDir(), nil, "-json", "./testdata/channel/")
 	code, markers := r.end(90 * time.Second)
 	if code != 0 {

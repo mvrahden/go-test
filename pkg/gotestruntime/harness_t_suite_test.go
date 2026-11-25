@@ -230,7 +230,9 @@ func (s *HarnessTTestSuite) TestRunMethods(t *gotest.T) {
 						{Name: "Root", Before: hook("root before"), After: hook("root after")},
 						{Name: "Child", Before: hook("child before"), After: hook("child after")},
 					},
-					Cases: []gotestruntime.Method{{Name: "TestOne", Run: func(_ *gotest.T, run func(func())) {
+					Cases: []gotestruntime.Method{{Name: "TestOne", Run: func(mt *gotest.T, run func(func())) {
+						mt.AssertsBy(underTest)
+
 						calls = append(calls, "suite before")
 						run(func() { calls = append(calls, "method") })
 						calls = append(calls, "suite after")
@@ -252,8 +254,14 @@ func (s *HarnessTTestSuite) TestRunMethods(t *gotest.T) {
 			var order []string
 			note := func(s string) { mu.Lock(); order = append(order, s); mu.Unlock() }
 			cases := []gotestruntime.Method{
-				{Name: "TestFirst", Run: func(_ *gotest.T, run func(func())) { run(func() { note("first") }) }},
-				{Name: "TestSecond", Run: func(_ *gotest.T, run func(func())) { run(func() { note("second") }) }},
+				{Name: "TestFirst", Run: func(mt *gotest.T, run func(func())) {
+					mt.AssertsBy(underTest)
+					run(func() { note("first") })
+				}},
+				{Name: "TestSecond", Run: func(mt *gotest.T, run func(func())) {
+					mt.AssertsBy(underTest)
+					run(func() { note("second") })
+				}},
 			}
 			it.T().Run("inner", func(tt *testing.T) { //nolint:t-escape // RunMethods takes the raw testing.T
 				gotestruntime.RunMethods(tt, gotest.DefaultSuiteConfig(), gotest.SuiteConfig{}, gotestruntime.Methods{Parallel: true, Cases: cases})

@@ -109,12 +109,14 @@ func (s *canary) relayCtrlC(t *gotest.T, wrapper string) {
 // it with descriptor 3 closed, at the channel's end, and under one that
 // holds the channel silent, 3s after its start.
 func (s *CanaryRelayTestSuite) TestASuiteWithoutItsChannelGetsACtrlC(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	s.relayCtrlC(t, "close3.sh")
 	s.relayCtrlC(t, "hold3.sh")
 }
 
 // A suite whose stop line cannot be written gets the same Ctrl-C.
 func (s *CanaryRelayTestSuite) TestAStopLineThatCannotBeWrittenIsACtrlC(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	s.relayCtrlC(t, "hello3.sh")
 }
 
@@ -142,6 +144,7 @@ func converterUnder(pid int) int {
 // everything the suite wrote: every verdict is in the stream, and a note
 // on stderr names the suite and how the converter ended.
 func (s *CanaryRelayTestSuite) TestAKilledConverterIsReplaced(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	r := s.relayHeld(t, "converter", "WaitTestSuite", nil)
 	converter := converterUnder(r.cmd.Process.Pid)
 	if converter == 0 {
@@ -174,6 +177,7 @@ func (s *CanaryRelayTestSuite) TestAKilledConverterIsReplaced(t *gotest.T) {
 // A signal from outside the runner stops the suite and fails its package,
 // saying so.
 func (s *CanaryRelayTestSuite) TestASignalFromOutsideFailsThePackage(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	r := s.relayHeld(t, "outside", "HoldTestSuite", nil)
 	markers, _ := testkit.ReadMarkers(r.markers)
 	pid := 0
@@ -206,6 +210,7 @@ func (s *CanaryRelayTestSuite) TestASignalFromOutsideFailsThePackage(t *gotest.T
 // A suite an -exec wrapper started in the background runs to its end after
 // the wrapper exited: its channel stays open until its tree is released.
 func (s *CanaryRelayTestSuite) TestASuiteOutlivingItsWrapperRunsOn(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	wrappers := t.TempDir()
 	relayWrappers(t, wrappers)
 	r := s.startRun(t, t.TempDir(), nil, "-json", "-exec", filepath.Join(wrappers, "fork.sh"), "-run=^TestPauseTestSuite$", "./testdata/relay/")

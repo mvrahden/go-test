@@ -100,7 +100,10 @@ func (s *LifetimesTestSuite) TestAFixtureAfterEachContextEndsAtTheTimeout(t *got
 				bounded, left = ok, time.Until(deadline)
 				return nil
 			}}},
-			Cases: []gotestruntime.Method{{Name: "TestOne", Run: func(_ *gotest.T, run func(func())) { run(func() {}) }}},
+			Cases: []gotestruntime.Method{{Name: "TestOne", Run: func(mt *gotest.T, run func(func())) {
+				mt.AssertsBy(underTest)
+				run(func() {})
+			}}},
 		})
 	})
 	if !bounded || left <= 0 || left > 5*time.Second {
@@ -120,7 +123,9 @@ func (s *LifetimesTestSuite) TestAFixtureAfterEachContextOutlivesTheDefaultDeadl
 				err = ctx.Err()
 				return err
 			}}},
-			Cases: []gotestruntime.Method{{Name: "TestSlow", Run: func(_ *gotest.T, run func(func())) {
+			Cases: []gotestruntime.Method{{Name: "TestSlow", Run: func(mt *gotest.T, run func(func())) {
+				mt.AssertsBy(underTest)
+
 				run(func() { time.Sleep(150 * time.Millisecond) })
 			}}},
 		})
@@ -142,6 +147,7 @@ const overrunChildEnv = "GOTEST_LIFETIMES_OVERRUN_CHILD"
 // A method whose Timeout passed before its fixture's BeforeEach started runs
 // neither hook, and is not counted.
 func (s *LifetimesTestSuite) TestAFixtureAfterEachContextHasEndedOnceItsBeforeEachSawTheTimeout(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	if os.Getenv(overrunChildEnv) != "" {
 		ran, live := 0, 0
 		for range 1000 {
@@ -155,7 +161,10 @@ func (s *LifetimesTestSuite) TestAFixtureAfterEachContextHasEndedOnceItsBeforeEa
 						Before: func(ctx context.Context) error { <-ctx.Done(); return nil },
 						After:  func(ctx context.Context) error { after, err = true, ctx.Err(); return nil },
 					}},
-					Cases: []gotestruntime.Method{{Name: "TestOne", Run: func(_ *gotest.T, run func(func())) { run(func() {}) }}},
+					Cases: []gotestruntime.Method{{Name: "TestOne", Run: func(mt *gotest.T, run func(func())) {
+						mt.AssertsBy(underTest)
+						run(func() {})
+					}}},
 				})
 			})
 			if after {

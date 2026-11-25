@@ -311,6 +311,7 @@ func (s *TreeTestSuite) TestBuildTree_PackageLevelOutput(t *gotest.T, _ *treeCtx
 }
 
 func mustInDelta(t *gotest.T, what string, want, got, delta float64) {
+	t.AssertsBy(rawCheck)
 	if diff := got - want; diff > delta || diff < -delta {
 		t.Errorf("%s = %v, want %v (within %v)", what, got, want, delta)
 	}
