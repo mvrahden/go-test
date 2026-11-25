@@ -209,16 +209,6 @@ func recordPathIn(root, dir string) string {
 	return filepath.Join(root, "runs", hex.EncodeToString(sum[:])[:16], "last.json")
 }
 
-// WriteRunRecord replaces the record of rec.Dir by a rename, so a reader
-// never sees half of one.
-func WriteRunRecord(rec protocol.RunRecord) error { //nolint:gocritic // hugeParam: once per run
-	root, err := cacheRoot()
-	if err != nil {
-		return err
-	}
-	return writeRecordIn(root, rec)
-}
-
 func writeRecordIn(root string, rec protocol.RunRecord) error { //nolint:gocritic // hugeParam: once per run
 	path := recordPathIn(root, rec.Dir)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
