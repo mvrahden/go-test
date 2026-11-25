@@ -1133,6 +1133,7 @@ gotest scaffold ./pkg/user.Svc # generate suite skeleton from type
 gotest lint ./...              # static analysis for test suites
 gotest audit --base=origin/main  # what a change did to the suites, and what got weaker
 gotest audit --base=origin/main --run  # and what a run of what changed proved
+gotest audit --base=origin/main --mutate  # and whether a test notices each changed line made wrong
 gotest scenarios --verify      # OpenSpec scenarios bound to When/It by text, judged by a run
 gotest refactor toggle-focus user_test.go UserTestSuite  # toggle an F_ prefix on a suite (or Suite.Method)
 gotest skill install           # install the agent skill matching this version
@@ -1140,12 +1141,14 @@ gotest hook pre-shell          # answer a coding agent's hook event on stdin (th
 gotest migrate ./...           # convert testify/suite to go-test
 gotest generate ./...          # run code generation only (no tests)
 gotest clean ./...             # remove orphaned generated files
-gotest clean --cache           # empty the test binary cache and the audit's base trees
+gotest clean --cache           # empty the test binary cache, the audit's base trees and mutants
 gotest discover ./...          # suite metadata as JSON (editor/AI surface)
 gotest prepare ./tests/e2e     # start shared fixtures for debugging
 gotest version                 # print version
 gotest help                    # show help
 ```
+
+`gotest audit --mutate` asks, of each changed line a test executed, whether a test would notice it made wrong: it compiles the line's mutants into one build, runs the suites that executed the line once per mutant through the runner, and lists, grouped per file, the lines whose mutant survived, within `--mutate-budget` (three minutes) ([Mutants of the changed lines](specs/audit/spec.md#requirement-mutants-of-the-changed-lines), [A mutant's verdict](specs/audit/spec.md#requirement-a-mutants-verdict)). A survivor no test can tell apart, such as one of a heuristic's equally valid answers, takes `//gotest:mutate-ignore <reason>` on its line or above its function; the audit lists each one added as a suppression ([Keeping a line from mutation](specs/audit/spec.md#requirement-keeping-a-line-from-mutation)).
 
 The `go test` flags keep their meaning: `-race`, `-cover`, `-count`, `-run`, `-skip`, `-list`, `-json`, `-short`, `-timeout`, `-v`, `-p`, `-exec` and the build flags. A few would break what gotest does and are refused with the reason, exit 2 ([Go test flags gotest implements](specs/cli/spec.md#requirement-go-test-flags-gotest-implements)): `-o`, `-c` and `-n`, since gotest builds the binaries itself; `-overlay`, since gotest builds through an overlay of its own; `-fuzz`, which `gotest fuzz` replaces; and `-cpuprofile`, `-memprofile`, `-blockprofile`, `-mutexprofile` and `-trace` on a run that starts more than one suite process, which would each write the one file. Every word after `-args` goes to the test binary as written.
 `-run` reaches each suite process as a pattern for that suite alone ([A -run pattern in each suite process](specs/cli/spec.md#requirement-a--run-pattern-in-each-suite-process)). `-run '^TestMySuite$'` names the suite's test function only, so its fuzz seeds do not replay; name the fuzz wrapper as well, or drop the anchors, to replay them.
