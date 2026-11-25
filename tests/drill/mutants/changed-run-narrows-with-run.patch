@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/cli CLIChanged .* / closes the stream with 0 units not run \(
+Clause: when a --changed run leaves packages out as unchanged → closes the stream with 0 units not run
+--- a/cmd/gotest/changed.go
++++ b/cmd/gotest/changed.go
+@@ -87,6 +87,7 @@
+ 		return plan, true
+ 	}
+ 	plan.merge = true
++	cfg.GoTestArgs = append(cfg.GoTestArgs, "-run=.")
+ 	dir, err := os.Getwd()
+ 	if err != nil {
+ 		fmt.Fprintf(os.Stderr, "FAIL: --changed: %s\n", err)

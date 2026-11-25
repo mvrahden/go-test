@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/cli CLIInputHash .* / spec --format=json of the stream gives each package its inputHash \(
+Clause: when a -json run is made with -tags → spec --format=json of the stream gives each package its inputHash
+--- a/internal/gotestspec/json.go
++++ b/internal/gotestspec/json.go
+@@ -166,7 +166,6 @@
+ 			RunLevel:  pkg.RunLevel,
+ 			Status:    statusString(pkg.Status),
+ 			Duration:  PackageDuration(pkg).Seconds(),
+-			InputHash: pkg.InputHash,
+ 			Freshness: string(pkg.Freshness),
+ 			Nodes:     cfg.convertNodes(pkg.Nodes),
+ 			Output:    output,

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLIInputHash .* / refuses with exit 2, naming --input \(
+Clause: when spec or summary is given --check-fresh without --input → refuses with exit 2, naming --input
+--- a/cmd/gotest/freshness.go
++++ b/cmd/gotest/freshness.go
+@@ -56,8 +56,6 @@
+ 		return false
+ 	case own.Bool("--render-only"):
+ 		fmt.Fprintln(os.Stderr, "FAIL: --render-only requires --input")
+-	case own.Bool("--check-fresh"):
+-		fmt.Fprintln(os.Stderr, "FAIL: --check-fresh judges a saved stream against the working tree and requires --input")
+ 	default:
+ 		return false
+ 	}

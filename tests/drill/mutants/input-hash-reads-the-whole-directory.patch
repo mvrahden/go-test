@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLIInputHash .* / spec --check-fresh of the run's stream marks the package current \(
+Clause: when a file the package's test reads outside its testdata trees changes after a run → spec --check-fresh of the run's stream marks the package current
+--- a/internal/inputhash/inputhash.go
++++ b/internal/inputhash/inputhash.go
+@@ -193,7 +193,7 @@
+ 	}
+ 	var out []string
+ 	for {
+-		td := filepath.Join(dir, "testdata")
++		td := dir
+ 		if fi, err := os.Stat(td); err == nil && fi.IsDir() {
+ 			out = append(out, td)
+ 		}

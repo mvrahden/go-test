@@ -58,6 +58,8 @@ func showHelp(topic string) {
 		printGenerateHelp()
 	case "prepare":
 		printPrepareHelp()
+	case "runs":
+		printRunsHelp()
 	case "clean":
 		printCleanHelp()
 	case "config":
@@ -88,6 +90,7 @@ Subcommands:
   lint        Run gotest-specific linter checks
   audit       Compare a change's test estate with its base, from source
   scenarios   Bind OpenSpec scenarios to the suites by text, and judge them
+  runs        List this directory's recorded runs and what of them is still current
   migrate     Convert testify/suite tests to go-test format
   refactor    Source code refactoring tools
   skill       Install the agent skill matching this version
@@ -122,6 +125,7 @@ Flags (gotest — use --double-dash):
                           as stdout's last line; on under AI_AGENT or CLAUDECODE=1,
                           off with --agent=false or GOTEST_AGENT=0
   --failed                Rerun only what failed in the last run in this directory
+  --changed               Run only the packages changed or failed since the last run
   --no-harvest            Disable fuzz seed harvesting for this run
   --control=stdin         Read stop and force lines on stdin: stop is a first
                           Ctrl-C, force a second; the input's end is a stop
@@ -215,6 +219,7 @@ Flags:
                           as stdout's last line; on under AI_AGENT or CLAUDECODE=1,
                           off with --agent=false or GOTEST_AGENT=0
   --failed                Rerun only what failed in the last run in this directory
+  --changed               Run only the packages changed or failed since the last run
   --control=stdin         Read stop and force lines on stdin: stop is a first
                           Ctrl-C, force a second; the input's end is a stop
 
@@ -229,8 +234,9 @@ unset, --ci is enabled automatically. Set GOTEST_CI=0 to opt out.
 
 A text run ends with one verdict line: its exit code and counts, on stderr
 after go test's text, or under agent output as stdout's last line with the
-command that reruns the failures. Every run records what failed, in the
-cache, for --failed. A suite binary that ran none of its tests, as under a
+command that reruns the failures. Every run records what failed and each
+package's input hash, in the cache, for --failed and --changed; a --changed
+run's closing line says how many packages it left out. A suite binary that ran none of its tests, as under a
 TestMain that never calls m.Run, fails the run with exit 2.
 
 Every package a pattern matches ends in a verdict. A run whose patterns
@@ -295,6 +301,7 @@ Flags:
   --render-only           With --input, exit 0 on a failing or incomplete
                           stream: report whether rendering succeeded, not the
                           test verdict
+  --check-fresh           With --input, mark the packages changed since the run stale
   --stamp                 With --input, write the stream back with each test
                           event placed as gotest -json places it, instead of
                           rendering it: for a stream of an older gotest or of
@@ -342,6 +349,7 @@ Flags:
   --group=<name>          Run only the suites of this ExclusiveGroup (repeatable)
   --skip-group=<name>     Leave the suites of this ExclusiveGroup out (repeatable)
   --failed                Rerun only what failed in the last run in this directory
+  --changed               Run only the packages changed or failed since the last run
   --control=stdin         Read stop and force lines on stdin: stop is a first
                           Ctrl-C, force a second; the input's end is a stop
                           (not with --input=-)
@@ -399,6 +407,7 @@ Flags:
   --render-only           With --input, exit 0 on a failing or incomplete
                           stream: report whether rendering succeeded, not the
                           test verdict
+  --check-fresh           With --input, mark the packages changed since the run stale
   --no-color              Disable ANSI color codes
   --github                GitHub CI mode: emit annotations and step summary
                           (auto-detected via $GITHUB_ACTIONS)
@@ -420,6 +429,7 @@ Flags:
   --group=<name>          Run only the suites of this ExclusiveGroup (repeatable)
   --skip-group=<name>     Leave the suites of this ExclusiveGroup out (repeatable)
   --failed                Rerun only what failed in the last run in this directory
+  --changed               Run only the packages changed or failed since the last run
   --control=stdin         Read stop and force lines on stdin: stop is a first
                           Ctrl-C, force a second; the input's end is a stop
                           (not with --input=-)
@@ -1074,6 +1084,30 @@ Examples:
 `)
 }
 
+func printRunsHelp() {
+	fmt.Print(`gotest runs — list the recorded runs of this directory
+
+Usage:
+  gotest runs [--format=text|json]
+  gotest runs --import=<events file>
+
+Lists the runs made in the working directory, newest first, from the
+records each run keeps in the gotest cache: when, its exit code, its
+commit, agent and arguments, and how many of its packages are current
+(their input hash is the working tree's now), stale or unknown (no hash).
+The newest 50 records are kept, none longer than 30 days.
+
+Flags:
+  --format=text|json      One line per run (default), or one JSON document
+  --import=<file>         Keep the run a saved -json stream holds, a CI run's
+                          --events-file say, among this directory's records
+
+Examples:
+  gotest runs                                List the runs, newest first
+  gotest runs --import=ci-events.json        Keep a CI run beside local ones
+`)
+}
+
 func printCleanHelp() {
 	fmt.Print(`gotest clean — remove orphaned generated files
 
@@ -1090,7 +1124,8 @@ package only, as generate does; before v1.33 it walked the directory
 tree. Above several modules, or for a module pulled in by a replace
 directive, use a go.work that lists them, or run clean inside each.
 
-gotest clean --cache removes every cached test binary no run is using.
+gotest clean --cache removes every cached test binary no run is using,
+and the run records no run is writing.
 Otherwise the cache keeps itself: each run's start evicts the binaries of
 a checkout that no longer exists, those unused for 7 days, then the least
 recently used above 5 GiB. Set GOTEST_CACHE_DIR to control the cache

@@ -7757,6 +7757,388 @@
                 {
                   "children": [
                     {
+                      "children": [],
+                      "display": "runs those two packages and the one that failed, and not the one unchanged",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "changed_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 81,
+                      "name": "runs_those_two_packages_and_the_one_that_failed,_and_not_the_one_unchanged",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "-json and spec --changed hold no verdict of the unchanged package",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "changed_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 85,
+                      "name": "-json_and_spec_--changed_hold_no_verdict_of_the_unchanged_package",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when --changed follows a run, after a file two of its packages read changed",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "changed_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 80,
+                  "name": "--changed_follows_a_run,_after_a_file_two_of_its_packages_read_changed",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ARunAfterAChange",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "changed_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 72,
+              "name": "TestARunAfterAChange",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "runs again the packages the narrowed run ran, and none it left out",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "changed_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 101,
+                      "name": "runs_again_the_packages_the_narrowed_run_ran,_and_none_it_left_out",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when --changed follows a --changed run that -run narrowed",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "changed_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 100,
+                  "name": "--changed_follows_a_--changed_run_that_-run_narrowed",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AfterANarrowedRun",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "changed_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 93,
+              "name": "TestAfterANarrowedRun",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "runs every package and says on stderr that no run is recorded",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "changed_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 113,
+                      "name": "runs_every_package_and_says_on_stderr_that_no_run_is_recorded",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when --changed is given in a working directory without a record",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "changed_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 112,
+                  "name": "--changed_is_given_in_a_working_directory_without_a_record",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "WithoutARecord",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "changed_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 108,
+              "name": "TestWithoutARecord",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "reruns only that method",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "changed_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 127,
+                      "name": "reruns_only_that_method",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when --changed --failed follows a run in which one method of an unchanged package failed",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "changed_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 126,
+                  "name": "--changed_--failed_follows_a_run_in_which_one_method_of_an_unchanged_package_failed",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "BesideFailed",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "changed_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 121,
+              "name": "TestBesideFailed",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "ends stderr with a closing line counting the packages it ran and those unchanged",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "changed_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 150,
+                      "name": "ends_stderr_with_a_closing_line_counting_the_packages_it_ran_and_those_unchanged",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "opens its -json stream with a manifest whose Changed holds both counts",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "changed_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 154,
+                      "name": "opens_its_-json_stream_with_a_manifest_whose_Changed_holds_both_counts",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "closes the stream with 0 units not run",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "changed_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 159,
+                      "name": "closes_the_stream_with_0_units_not_run",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a --changed run leaves packages out as unchanged",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "changed_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 149,
+                  "name": "a_--changed_run_leaves_packages_out_as_unchanged",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ARunThatLeftPackagesOut",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "changed_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 134,
+              "name": "TestARunThatLeftPackagesOut",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "its record lists the package with its verdict, its InputHash and its time, marked narrowed",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "changed_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 173,
+                      "name": "its_record_lists_the_package_with_its_verdict,_its_InputHash_and_its_time,_marked_narrowed",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a -run narrowed run of a package ends",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "changed_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 172,
+                  "name": "a_-run_narrowed_run_of_a_package_ends",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ThePackagesOfANarrowedRun",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "changed_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 167,
+              "name": "TestThePackagesOfANarrowedRun",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the record keeps their verdicts and hashes beside those of the packages it ran",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "changed_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 193,
+                      "name": "the_record_keeps_their_verdicts_and_hashes_beside_those_of_the_packages_it_ran",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a --changed run leaves out packages the record before it held",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "changed_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 192,
+                  "name": "a_--changed_run_leaves_out_packages_the_record_before_it_held",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "TheRecordAfterAChangedRun",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "changed_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 184,
+              "name": "TestTheRecordAfterAChangedRun",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLIChanged",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "changed_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 15,
+          "name": "TestCLIChangedTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
                       "children": [
                         {
                           "children": [],
@@ -10212,6 +10594,403 @@
           "kind": "suite",
           "line": 11,
           "name": "TestCLIHelpTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "stamps each package's verdict event with an InputHash and no test event with one",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "freshness_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 126,
+                      "name": "stamps_each_package's_verdict_event_with_an_InputHash_and_no_test_event_with_one",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "spec --format=json of the stream gives each package its inputHash",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "freshness_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 133,
+                      "name": "spec_--format=json_of_the_stream_gives_each_package_its_inputHash",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a -json run is made with -tags",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "freshness_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 125,
+                  "name": "a_-json_run_is_made_with_-tags",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "APackagesInputHash",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "freshness_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 116,
+              "name": "TestAPackagesInputHash",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "spec --check-fresh of the run's stream marks that package stale",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "freshness_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 162,
+                      "name": "spec_--check-fresh_of_the_run's_stream_marks_that_package_stale",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "marks current a package that reads none of them",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "freshness_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 168,
+                      "name": "marks_current_a_package_that_reads_none_of_them",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a file of a package's dependency in its module, a file it embeds or a file of its testdata changes after a run",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "freshness_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 161,
+                  "name": "a_file_of_a_package's_dependency_in_its_module,_a_file_it_embeds_or_a_file_of_its_testdata_changes_after_a_run",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "EditingWhatAPackageReads",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "freshness_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 144,
+              "name": "TestEditingWhatAPackageReads",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "its two verdicts carry two hashes",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "freshness_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 184,
+                      "name": "its_two_verdicts_carry_two_hashes",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when one package is run with and without -tags",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "freshness_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 183,
+                  "name": "one_package_is_run_with_and_without_-tags",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "OtherBuildFlags",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "freshness_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 176,
+              "name": "TestOtherBuildFlags",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "spec --check-fresh of the run's stream marks the package current",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "freshness_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 203,
+                      "name": "spec_--check-fresh_of_the_run's_stream_marks_the_package_current",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "the run's manifest names its -tags in Build",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "freshness_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 206,
+                      "name": "the_run's_manifest_names_its_-tags_in_Build",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a file the package's test reads outside its testdata trees changes after a run",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "freshness_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 202,
+                  "name": "a_file_the_package's_test_reads_outside_its_testdata_trees_changes_after_a_run",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AFileTheHashDoesNotCover",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "freshness_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 192,
+              "name": "TestAFileTheHashDoesNotCover",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "its JSON marks the changed package stale and the others current, counting 1 stale",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "freshness_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 233,
+                      "name": "its_JSON_marks_the_changed_package_stale_and_the_others_current,_counting_1_stale",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "marks the package of go test's stream unknown",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "freshness_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 237,
+                      "name": "marks_the_package_of_go_test's_stream_unknown",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "the terminal and Markdown spec and the summary mark the stale package, and exit as without --check-fresh",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "freshness_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 241,
+                      "name": "the_terminal_and_Markdown_spec_and_the_summary_mark_the_stale_package,_and_exit_as_without_--check-fresh",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when spec --check-fresh reads a run's stream after one of its packages changed, and go test's own stream",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "freshness_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 232,
+                  "name": "spec_--check-fresh_reads_a_run's_stream_after_one_of_its_packages_changed,_and_go_test's_own_stream",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AStreamCheckedAgainstTheTree",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "freshness_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 213,
+              "name": "TestAStreamCheckedAgainstTheTree",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "spec",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "freshness_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 256,
+                          "name": "spec",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "summary",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "freshness_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 256,
+                          "name": "summary",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "refuses with exit 2, naming --input",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "freshness_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 255,
+                      "name": "refuses_with_exit_2,_naming_--input",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when spec or summary is given --check-fresh without --input",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "freshness_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 254,
+                  "name": "spec_or_summary_is_given_--check-fresh_without_--input",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ALiveRunAskedToCheck",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "freshness_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 253,
+              "name": "TestALiveRunAskedToCheck",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLIInputHash",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "freshness_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 17,
+          "name": "TestCLIInputHashTestSuite",
           "output": [],
           "status": "none"
         },
@@ -13120,6 +13899,326 @@
           "kind": "suite",
           "line": 17,
           "name": "TestCLIRunManifestTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the history holds a record of each, the third naming its events file",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "runs_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 60,
+                      "name": "the_history_holds_a_record_of_each,_the_third_naming_its_events_file",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "gotest clean --cache removes them",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "runs_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 68,
+                      "name": "gotest_clean_--cache_removes_them",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when three runs are made in one working directory, one with --events-file",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "runs_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 59,
+                  "name": "three_runs_are_made_in_one_working_directory,_one_with_--events-file",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ThreeRuns",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "runs_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 44,
+              "name": "TestThreeRuns",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the first history holds the newest 50",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "runs_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 106,
+                      "name": "the_first_history_holds_the_newest_50",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "the second no longer holds the old one",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "runs_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 111,
+                      "name": "the_second_no_longer_holds_the_old_one",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a run is recorded beside 50 kept records, and in another directory beside one kept over 30 days",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "runs_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 105,
+                  "name": "a_run_is_recorded_beside_50_kept_records,_and_in_another_directory_beside_one_kept_over_30_days",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AFullHistory",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "runs_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 91,
+              "name": "TestAFullHistory",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "prints one document opening with version that lists both newest first, with manifest, result and failed units",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "runs_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 155,
+                      "name": "prints_one_document_opening_with_version_that_lists_both_newest_first,_with_manifest,_result_and_failed_units",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "counts the changed package of the first stale and every other package current",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "runs_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 165,
+                      "name": "counts_the_changed_package_of_the_first_stale_and_every_other_package_current",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "the text format prints one line for each, newest first",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "runs_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 169,
+                      "name": "the_text_format_prints_one_line_for_each,_newest_first",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when gotest runs --format=json follows two runs, a package of the first changed since",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "runs_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 154,
+                  "name": "gotest_runs_--format=json_follows_two_runs,_a_package_of_the_first_changed_since",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "TwoRunsListed",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "runs_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 146,
+              "name": "TestTwoRunsListed",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "says no run is recorded and exits 0",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "runs_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 184,
+                      "name": "says_no_run_is_recorded_and_exits_0",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when gotest runs is given in a working directory without a record",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "runs_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 183,
+                  "name": "gotest_runs_is_given_in_a_working_directory_without_a_record",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "NothingRecorded",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "runs_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 179,
+              "name": "TestNothingRecorded",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lists it among the records as imported, with its packages and the file's path",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "runs_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 202,
+                      "name": "lists_it_among_the_records_as_imported,_with_its_packages_and_the_file's_path",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "refuses with exit 2 a file that holds no package verdict",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "runs_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 209,
+                      "name": "refuses_with_exit_2_a_file_that_holds_no_package_verdict",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when gotest runs --import names a saved stream of a run",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "runs_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 201,
+                  "name": "gotest_runs_--import_names_a_saved_stream_of_a_run",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ImportingAStream",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "runs_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 192,
+              "name": "TestImportingAStream",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLIRunRecords",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "runs_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 17,
+          "name": "TestCLIRunRecordsTestSuite",
           "output": [],
           "status": "none"
         },
@@ -39708,13 +40807,13 @@
     }
   ],
   "stats": {
-    "behaviors": 1153,
+    "behaviors": 1185,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 163,
+    "suites": 166,
     "tests": 0
   }
 }

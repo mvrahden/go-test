@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLIRunRecords .* / the first history holds the newest 50 \(
+Clause: when a run is recorded beside 50 kept records, and in another directory beside one kept over 30 days → the first history holds the newest 50
+--- a/internal/gotestrunner/runhistory.go
++++ b/internal/gotestrunner/runhistory.go
+@@ -169,7 +169,7 @@
+ 	names := historyNames(dir)
+ 	for i, name := range names {
+ 		at, ok := recordTime(name)
+-		if i < len(names)-HistoryCount || ok && now.Sub(at) > HistoryAge {
++		if i < len(names)-HistoryCount-1 || ok && now.Sub(at) > HistoryAge {
+ 			_ = os.Remove(filepath.Join(dir, name))
+ 		}
+ 	}

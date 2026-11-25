@@ -43,8 +43,7 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	github := own.Bool("--github") || os.Getenv("GITHUB_ACTIONS") == "true"
 	renderOnly := own.Bool("--render-only")
 
-	if renderOnly && input == "" {
-		fmt.Fprintf(os.Stderr, "FAIL: --render-only requires --input\n")
+	if refuseWithoutInput(own, input) {
 		return 2
 	}
 
@@ -52,7 +51,7 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		if refuseInputFlags(own) {
 			return 2
 		}
-		return runSummaryFromInput(input, format, output, coverageProfile, noColor, github, renderOnly, badgePath)
+		return runSummaryFromInput(input, format, output, coverageProfile, noColor, github, renderOnly, own.Bool("--check-fresh"), badgePath)
 	}
 
 	eventsFile, err := openEventsFile(own)
@@ -60,9 +59,7 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
-	if eventsFile != nil {
-		defer eventsFile.Close()
-	}
+	defer closeEvents(eventsFile)
 
 	minCoverage, err := parseMinFlag(own)
 	if err != nil {
@@ -90,14 +87,17 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	if !ok {
 		return 2
 	}
-	loaded, broken, noTestFiles := pkgs.Loaded, pkgs.Broken, pkgs.NoTestFiles
-
-	if code, err := focusGate(loaded, cfg.CI); err != nil {
+	if code, err := focusGate(pkgs.Loaded, cfg.CI); err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	} else if code != 0 {
 		return code
 	}
+	plan, ok := planReport(&cfg, &pkgs)
+	if !ok {
+		return 2
+	}
+	loaded, broken, noTestFiles := pkgs.Loaded, pkgs.Broken, pkgs.NoTestFiles
 
 	overlay, cleanup, err := gotestrunner.GenerateOverlay(loaded, broken, cfg.Debug, cfg.NoCache, cfg.HarvestSeeds)
 	if err != nil {
@@ -115,8 +115,7 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		defer timeoutCancel()
 	}
 
-	pipelineStart := time.Now()
-	manifest := runManifest()
+	pipelineStart, manifest := time.Now(), cfg.Manifest
 	result, err := gotestrunner.RunPipeline(ctx, gotestrunner.PipelineConfig{
 		GoTestArgs:      cfg.GoTestArgs,
 		SetupTimeout:    cfg.SetupTimeout,
@@ -133,6 +132,7 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		SkipGroups:      cfg.SkipGroups,
 		Manifest:        manifest,
 		Only:            cfg.Only,
+		Inputs:          plan.inputs.stamp(),
 	}, overlay)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
@@ -140,7 +140,7 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 
 	code, coverageFailure := coverageVerdict(coverProfile, minCoverage, result.ExitCode)
-	recordRun(&result, code, manifest)
+	saveRun(&result, code, manifest, recordOptions{plan: plan, eventsFile: own.Value("--events-file"), narrowed: narrowedBy(&cfg, plan)})
 	events, err := gotestspec.ParseEvents(bytes.NewReader(result.CapturedJSON))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: parsing test events: %s\n", err)
@@ -185,7 +185,7 @@ func refuseInputFlags(own OwnFlags) bool { //nolint:gocritic // hugeParam: OwnFl
 	return false
 }
 
-func runSummaryFromInput(input, format, output, coverageProfile string, noColor, github, renderOnly bool, badgePath string) int {
+func runSummaryFromInput(input, format, output, coverageProfile string, noColor, github, renderOnly, checkFresh bool, badgePath string) int {
 	var r io.Reader
 	if input == "-" {
 		r = os.Stdin
@@ -206,6 +206,12 @@ func runSummaryFromInput(input, format, output, coverageProfile string, noColor,
 	}
 
 	tree := gotestspec.BuildTree(events, gotestspec.WithDeclarations(declarationsForStream(events, nil)))
+	if checkFresh {
+		if err := markFreshness(context.Background(), tree, events); err != nil {
+			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+			return 2
+		}
+	}
 
 	if err := writeSummaryOutput(tree, format, output, coverageProfile, noColor, github, 0, badgePath, nil, nil, runOptions(events, nil)); err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)

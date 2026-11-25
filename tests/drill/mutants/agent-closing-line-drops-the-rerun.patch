@@ -2,9 +2,9 @@ Expect: ^FAIL .*conformance/cli CLIAgentOutput .* / ends stdout with the closing
 Clause: when a text run of a failing and a passing package is made under CLAUDECODE=1 → ends stdout with the closing line naming FAIL, exit 1, the tests counted and the command that reruns the failures
 --- a/internal/gotestrunner/agentoutput.go
 +++ b/internal/gotestrunner/agentoutput.go
-@@ -171,7 +171,7 @@ func (a *AgentOutput) line(line []byte) {
- 		if ev.Result != nil {
+@@ -193,7 +193,7 @@
  			closing := ClosingOf(ev.Result, ev.Result.ExitCode, true)
+ 			closing.Changed = a.changed
  			if ev.Result.ExitCode != 0 {
 -				closing.Rerun = a.rerun
 +				closing.Rerun = ""

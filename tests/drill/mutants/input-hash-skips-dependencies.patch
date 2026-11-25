@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/cli CLIInputHash .* / spec --check-fresh of the run's stream marks that package stale \(
+Clause: when a file of a package's dependency in its module, a file it embeds or a file of its testdata changes after a run → spec --check-fresh of the run's stream marks that package stale
+--- a/internal/inputhash/inputhash.go
++++ b/internal/inputhash/inputhash.go
+@@ -91,9 +91,6 @@
+ 		for _, l := range h.own(p) {
+ 			lines[l] = true
+ 		}
+-		for _, dep := range p.Imports {
+-			walk(dep)
+-		}
+ 	}
+ 	for _, p := range roots {
+ 		walk(p)

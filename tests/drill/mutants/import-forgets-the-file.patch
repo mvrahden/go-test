@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLIRunRecords .* / lists it among the records as imported, with its packages and the file's path \(
+Clause: when gotest runs --import names a saved stream of a run → lists it among the records as imported, with its packages and the file's path
+--- a/cmd/gotest/runs.go
++++ b/cmd/gotest/runs.go
+@@ -76,7 +76,7 @@
+ 		fmt.Fprintf(os.Stderr, "FAIL: --import: %s: %s\n", file, err)
+ 		return 2
+ 	}
+-	rec.Dir, rec.EventsFile = dir, absPath(file)
++	rec.Dir = dir
+ 	if err := gotestrunner.ImportRun(rec, time.Now()); err != nil {
+ 		fmt.Fprintf(os.Stderr, "FAIL: --import: %s\n", err)
+ 		return 2

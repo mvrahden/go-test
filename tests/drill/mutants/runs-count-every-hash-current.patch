@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLIRunRecords .* / counts the changed package of the first stale and every other package current \(
+Clause: when gotest runs --format=json follows two runs, a package of the first changed since → counts the changed package of the first stale and every other package current
+--- a/cmd/gotest/runs.go
++++ b/cmd/gotest/runs.go
+@@ -172,7 +172,7 @@
+ 		switch {
+ 		case p.InputHash == "":
+ 			e.Packages.Unknown++
+-		case ok && h == p.InputHash:
++		case ok || h == p.InputHash:
+ 			e.Packages.Current++
+ 		default:
+ 			e.Packages.Stale++

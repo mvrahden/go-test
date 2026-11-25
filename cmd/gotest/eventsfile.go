@@ -34,3 +34,10 @@ func eventsWriter(f *os.File) io.Writer {
 	}
 	return f
 }
+
+// closeEvents closes the events file, when there is one.
+func closeEvents(f *os.File) {
+	if f != nil {
+		_ = f.Close()
+	}
+}

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLIRunRecords .* / gotest clean --cache removes them \(
+Clause: when three runs are made in one working directory, one with --events-file → gotest clean --cache removes them
+--- a/cmd/gotest/clean.go
++++ b/cmd/gotest/clean.go
+@@ -103,7 +103,7 @@
+ 	if held > 0 {
+ 		fmt.Fprintf(os.Stderr, "note: %d audit base tree%s left in place: a running audit is using %s\n", held, plural(held), itThem(held))
+ 	}
+-	checkouts, writing, runsDir, err := gotestrunner.ClearRuns()
++	checkouts, writing, runsDir, err := 0, 0, "", error(nil)
+ 	if err != nil {
+ 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+ 		return 2

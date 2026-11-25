@@ -1241,7 +1241,8 @@
         {
           "Action": "skip",
           "Elapsed": 0,
-          "Package": "github.com/mvrahden/go-test/cmd/gotest/testdata/unrun/notestfiles"
+          "Package": "github.com/mvrahden/go-test/cmd/gotest/testdata/unrun/notestfiles",
+          "InputHash": "<hash>"
         },
         {
           "Action": "start",
@@ -1255,7 +1256,8 @@
         {
           "Action": "skip",
           "Elapsed": 0,
-          "Package": "github.com/mvrahden/go-test/cmd/gotest/testdata/unrun/nosuites"
+          "Package": "github.com/mvrahden/go-test/cmd/gotest/testdata/unrun/nosuites",
+          "InputHash": "<hash>"
         },
         {
           "Action": "output",
@@ -1265,7 +1267,8 @@
         {
           "Action": "pass",
           "Elapsed": 0,
-          "Package": "github.com/mvrahden/go-test/cmd/gotest/testdata/unrun/excluded"
+          "Package": "github.com/mvrahden/go-test/cmd/gotest/testdata/unrun/excluded",
+          "InputHash": "<hash>"
         },
         {
           "Action": "start",
@@ -1391,7 +1394,8 @@
         {
           "Action": "pass",
           "Elapsed": 0,
-          "Package": "github.com/mvrahden/go-test/cmd/gotest/testdata/census/plain"
+          "Package": "github.com/mvrahden/go-test/cmd/gotest/testdata/census/plain",
+          "InputHash": "<hash>"
         },
         {
           "Action": "pass",
@@ -1469,7 +1473,8 @@
         {
           "Action": "fail",
           "Elapsed": 0,
-          "Package": "gotest.runlevel/down"
+          "Package": "gotest.runlevel/down",
+          "InputHash": "<hash>"
         },
         {
           "Action": "start",

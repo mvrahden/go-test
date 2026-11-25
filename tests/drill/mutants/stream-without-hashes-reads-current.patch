@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLIInputHash .* / marks the package of go test's stream unknown \(
+Clause: when spec --check-fresh reads a run's stream after one of its packages changed, and go test's own stream → marks the package of go test's stream unknown
+--- a/internal/gotestspec/tree.go
++++ b/internal/gotestspec/tree.go
+@@ -266,8 +266,6 @@
+ 	for _, pkg := range packages {
+ 		switch {
+ 		case pkg.RunLevel:
+-		case pkg.InputHash == "":
+-			pkg.Freshness = FreshUnknown
+ 		case current[pkg.Path] == pkg.InputHash:
+ 			pkg.Freshness = FreshCurrent
+ 		default:

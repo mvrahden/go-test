@@ -1,13 +1,13 @@
 Expect: ^FAIL .*conformance/cli CLIAgentOutput .* / its record names the failing method and exit code 1 \(
 Clause: when a text run of a failing package ends → its record names the failing method and exit code 1
---- a/cmd/gotest/agentmode.go
-+++ b/cmd/gotest/agentmode.go
-@@ -127,7 +127,7 @@ func recordRun(result *gotestrunner.PipelineResult, code int, manifest *protocol
+--- a/cmd/gotest/changed.go
++++ b/cmd/gotest/changed.go
+@@ -199,7 +199,7 @@
  	}
  	res := *result.Judged
  	res.ExitCode = code
--	if err := gotestrunner.WriteRunRecord(protocol.RunRecord{Dir: dir, Manifest: *manifest, Result: res, Failed: result.Failed}); err != nil {
-+	if err := gotestrunner.WriteRunRecord(protocol.RunRecord{Dir: dir, Manifest: *manifest, Result: res}); err != nil {
- 		fmt.Fprintf(os.Stderr, "gotest: the run is not recorded for --failed: %s\n", err)
- 	}
- 	return result.Failed
+-	rec := protocol.RunRecord{Dir: dir, Manifest: *manifest, Result: res, Failed: result.Failed, Packages: slices.Clone(result.Packages), EventsFile: absPath(opts.eventsFile), Started: processStart.UTC()}
++	rec := protocol.RunRecord{Dir: dir, Manifest: *manifest, Result: res, Packages: slices.Clone(result.Packages), EventsFile: absPath(opts.eventsFile), Started: processStart.UTC()}
+ 	for i := range rec.Packages {
+ 		if opts.narrowed != nil && opts.narrowed(rec.Packages[i].Package) {
+ 			rec.Packages[i].Narrowed = true

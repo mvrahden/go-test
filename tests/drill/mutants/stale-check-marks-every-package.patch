@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLIInputHash .* / marks current a package that reads none of them \(
+Clause: when a file of a package's dependency in its module, a file it embeds or a file of its testdata changes after a run → marks current a package that reads none of them
+--- a/internal/gotestspec/tree.go
++++ b/internal/gotestspec/tree.go
+@@ -268,7 +268,7 @@
+ 		case pkg.RunLevel:
+ 		case pkg.InputHash == "":
+ 			pkg.Freshness = FreshUnknown
+-		case current[pkg.Path] == pkg.InputHash:
++		case current[pkg.Path] == pkg.Path:
+ 			pkg.Freshness = FreshCurrent
+ 		default:
+ 			pkg.Freshness = FreshStale
