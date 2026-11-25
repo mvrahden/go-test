@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditEvidence / RowsAToolLinks / when a tool reads the audit document with evidence as JSON / finds on each finding and behavior about an evidence row's behavior that row's id, and none on the others \(
+Clause: when a tool reads the audit document with evidence as JSON → finds on each finding and behavior about an evidence row's behavior that row's id, and none on the others
+--- a/internal/gotestaudit/render.go
++++ b/internal/gotestaudit/render.go
+@@ -200,7 +200,7 @@
+ 	for i := range d.Findings {
+ 		f := &d.Findings[i]
+ 		f.Evidence = ""
+-		if e := ev[pathKey(f.Package, f.headPath)]; e != nil && f.headPath != nil {
++		if e := ev[pathKey(f.Package, f.headPath)]; e != nil && f.headPath == nil {
+ 			f.Evidence = e.ID
+ 		}
+ 	}

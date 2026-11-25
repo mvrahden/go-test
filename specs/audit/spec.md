@@ -194,6 +194,16 @@ In the JSON document each finding and evidence row SHALL carry an `id` made from
 - **AND** finds each module's directory relative to the audited one and each side's branch
 - **AND** finds on each evidence row whether it needs a decision, the stream it was judged by and that stream's commit
 
+### Requirement: Rows a tool links
+In the JSON document a finding and a behavior SHALL name, as `evidence`, the id of the evidence row about its behavior where there is one; a behavior and an evidence row SHALL carry its `module`; an evidence row SHALL carry, as `location`, where the head declares its behavior, and, as `mark`, the mark the text format writes on its rows; a behavior SHALL carry, as `order`, its place in the text format's list, the findings being in the text format's order.
+
+#### Scenario: A tool linking the rows
+- **WHEN** a tool reads the audit document with evidence as JSON
+- **THEN** finds on each finding and behavior about an evidence row's behavior that row's id, and none on the others
+- **AND** finds on each behavior and evidence row its module, and on each evidence row the head's file and lines of its behavior
+- **AND** finds on each evidence row the mark the text format writes on its rows
+- **AND** finds on each behavior its place in the text format's list of behaviors
+
 ### Requirement: A tree that does not compile
 A record SHALL list a package that does not compile with its errors and no suites, and exit 2; the audit SHALL compare none of that package's behaviors, name it as not compared and exit 2 unless the policy failed.
 

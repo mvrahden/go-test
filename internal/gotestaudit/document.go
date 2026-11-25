@@ -23,9 +23,12 @@ type Document struct {
 	// the head was recorded in.
 	ModuleDirs []ModuleDir `json:"moduleDirs"`
 	Summary    Summary     `json:"summary"`
-	// Findings come in the order of Classes, the weakenings first.
-	Findings  []Finding `json:"findings"`
-	Behaviors []Change  `json:"behaviors"`
+	// Findings come in the order of Classes, the weakenings first: the
+	// order the text format lists them in.
+	Findings []Finding `json:"findings"`
+	// Behaviors come by change; each one's Order is its place in the text
+	// format's list.
+	Behaviors []Change `json:"behaviors"`
 	// Streams are the runs given as evidence, in the order given; an
 	// Evidence names one by its index.
 	Streams []Stream `json:"streams"`
@@ -93,12 +96,17 @@ type Change struct {
 	Change  string `json:"change"`
 	Kind    string `json:"kind"`
 	Package string `json:"package"`
+	Module  string `json:"module,omitempty"`
 	Base    *Place `json:"base,omitempty"`
 	Head    *Place `json:"head,omitempty"`
 	// Behaviors counts the leaves of an added or removed one, itself when it
 	// is a leaf.
 	Behaviors int `json:"behaviors,omitempty"`
 	Selector
+	// Evidence is the id of the evidence row about it; empty for none.
+	Evidence string `json:"evidence,omitempty"`
+	// Order is its place in the text format's list of behaviors, from 0.
+	Order int `json:"order"`
 }
 
 // Selector names the test go test runs for a behavior: its full name and
@@ -202,6 +210,9 @@ type Finding struct {
 	// Runtime is the assertion count each side's run reported, beside the
 	// static floor in Base and Head; on an assertions finding only.
 	Runtime *Runtime `json:"runtime,omitempty"`
+	// Evidence is the id of the evidence row about its behavior; empty for
+	// none.
+	Evidence string `json:"evidence,omitempty"`
 
 	// The labels of the behavior on each side, nil where it has none.
 	basePath, headPath []string
@@ -265,9 +276,15 @@ type Evidence struct {
 	// ID is made from the behavior's package and labels.
 	ID      string   `json:"id"`
 	Package string   `json:"package"`
+	Module  string   `json:"module,omitempty"`
 	Path    []string `json:"path"`
-	Verdict string   `json:"verdict"`
-	Kind    string   `json:"kind"`
+	// Location is where the head declares the behavior.
+	Location *Location `json:"location,omitempty"`
+	Verdict  string    `json:"verdict"`
+	// Mark is the row's mark in the text format: its verdict, a passing
+	// leaf's assertions, * for a stale stream.
+	Mark string `json:"mark"`
+	Kind string `json:"kind"`
 	// Why are its change and the classes of the findings about it.
 	Why []string `json:"why"`
 	// Assertions is the count the run reported: a leaf's own, or the sum

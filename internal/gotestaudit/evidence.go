@@ -28,12 +28,14 @@ type rnode struct {
 	kind     string
 	excluded bool
 	kids     []*rnode
+	loc      Location
 }
 
 // target is a behavior of a record: its levels from the suite down.
 type target struct {
 	chain          []*rnode
 	external, twin bool
+	mod            string
 }
 
 // recordIndex finds a record's suites and behaviors by package and labels.
@@ -67,26 +69,26 @@ func indexRecord(r *Record) *recordIndex {
 				}
 				idx.twins[p.Path][gotestspec.DeclKey("Test"+s.Name)] = gotestspec.Declaration{Twin: true}
 			}
-			root := &rnode{name: "Test" + s.Name, kind: KindSuite, excluded: s.Excluded}
-			idx.add(p.Path, []string{s.Display}, []*rnode{root}, s.External, twin)
-			root.kids = idx.behaviors(p.Path, []string{s.Display}, []*rnode{root}, s.Methods, s.External, twin)
+			root := &rnode{name: "Test" + s.Name, kind: KindSuite, excluded: s.Excluded, loc: s.Location}
+			idx.add(p, []string{s.Display}, []*rnode{root}, s.External, twin)
+			root.kids = idx.behaviors(p, []string{s.Display}, []*rnode{root}, s.Methods, s.External, twin)
 		}
 	}
 	return idx
 }
 
-func (idx *recordIndex) add(pkg string, path []string, chain []*rnode, external, twin bool) {
-	k := pathKey(pkg, path)
+func (idx *recordIndex) add(pkg *Package, path []string, chain []*rnode, external, twin bool) {
+	k := pathKey(pkg.Path, path)
 	if idx.targets[k] == nil {
-		idx.targets[k] = &target{chain: slices.Clone(chain), external: external, twin: twin}
+		idx.targets[k] = &target{chain: slices.Clone(chain), external: external, twin: twin, mod: pkg.Module}
 	}
 }
 
-func (idx *recordIndex) behaviors(pkg string, path []string, chain []*rnode, bs []Behavior, external, twin bool) []*rnode {
+func (idx *recordIndex) behaviors(pkg *Package, path []string, chain []*rnode, bs []Behavior, external, twin bool) []*rnode {
 	out := make([]*rnode, 0, len(bs))
 	for i := range bs {
 		b := &bs[i]
-		n := &rnode{name: b.Name, kind: b.Kind, excluded: b.Excluded}
+		n := &rnode{name: b.Name, kind: b.Kind, excluded: b.Excluded, loc: b.Location}
 		p := append(slices.Clip(path), b.Display)
 		c := append(slices.Clip(chain), n)
 		idx.add(pkg, p, c, external, twin)
@@ -528,6 +530,8 @@ func evidenceFor(s *evidenceSubject, idx *recordIndex, trees []streamTree, at []
 		e.Kind = t.chain[len(t.chain)-1].kind
 	}
 	e.Selector = t.selector()
+	loc := t.chain[len(t.chain)-1].loc
+	e.Module, e.Location = t.mod, &loc
 	js := make([]judgment, len(trees))
 	for i := range trees {
 		js[i] = trees[i].judge(s.pkg, t)
@@ -617,7 +621,7 @@ func (d *Document) countEvidence() {
 	setClass(s, ClassNotRun, s.NotRun)
 	setClass(s, ClassVacuous, s.Vacuous)
 	setClass(s, ClassStale, s.Stale)
-	d.normalize()
+	d.link()
 }
 
 func setClass(s *Summary, class string, n int) {

@@ -1205,6 +1205,10 @@ shards of one run do not add up to every mutant exactly once.
 | `import-takes-an-empty-stream` | `--import` keeps a stream without a package verdict | cli conformance: the empty file is imported with exit 0 |
 | `audit-judges-hashed-streams-by-commit` | the audit judges a stream with input hashes by the tree's commit | audit conformance: the unchanged package's evidence is stale on the dirty tree |
 | `audit-trusts-every-hashed-package` | the audit takes every package a stream hashed as current | audit conformance: the changed package's evidence reads current |
+| `audit-findings-unlinked` | a finding names no evidence row | audit conformance: the links It finds a finding without its row's id |
+| `audit-evidence-location-dropped` | an evidence row's location keeps its file, not its lines | audit conformance: the location It finds no lines |
+| `audit-mark-without-stale-star` | the `*` goes on the marks of current streams | audit conformance: the mark It finds a stale mark without it |
+| `audit-order-by-document` | a behavior's order is its place in the document | audit conformance: the order It finds the changes in the document's order |
 
 ## Adding a mutant
 

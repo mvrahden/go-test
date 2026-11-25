@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditEvidence / RowsAToolLinks / when a tool reads the audit document with evidence as JSON / finds on each evidence row the mark the text format writes on its rows \(
+Clause: when a tool reads the audit document with evidence as JSON → finds on each evidence row the mark the text format writes on its rows
+--- a/internal/gotestaudit/render.go
++++ b/internal/gotestaudit/render.go
+@@ -184,7 +184,7 @@
+ 	case e.Verdict == VerdictPass && e.Assertions != nil && e.Leaves == nil:
+ 		m = fmt.Sprintf("pass %d", *e.Assertions)
+ 	}
+-	if e.Stream != nil && !e.Current {
++	if e.Stream != nil && e.Current {
+ 		m += "*"
+ 	}
+ 	return m

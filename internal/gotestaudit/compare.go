@@ -176,9 +176,9 @@ func (c *collector) pairs(roots []*node) {
 func (c *collector) pair(b, h *node) {
 	switch {
 	case b.how != "":
-		c.doc.Behaviors = append(c.doc.Behaviors, Change{Change: b.how, Kind: h.kind, Package: h.pkg, Base: place(b), Head: place(h), Selector: selector(b, h)})
+		c.doc.Behaviors = append(c.doc.Behaviors, Change{Change: b.how, Kind: h.kind, Package: h.pkg, Module: h.mod, Base: place(b), Head: place(h), Selector: selector(b, h)})
 	case h.kind != KindSuite && (b.hash != h.hash || h.whole && b.tree != h.tree):
-		c.doc.Behaviors = append(c.doc.Behaviors, Change{Change: ChangeChanged, Kind: h.kind, Package: h.pkg, Base: place(b), Head: place(h), Selector: selector(b, h)})
+		c.doc.Behaviors = append(c.doc.Behaviors, Change{Change: ChangeChanged, Kind: h.kind, Package: h.pkg, Module: h.mod, Base: place(b), Head: place(h), Selector: selector(b, h)})
 		c.find(ClassChanged, h.pkg, subject(h), b.hash, h.hash, h.loc)
 		c.at(b, h)
 	}
@@ -241,7 +241,7 @@ func (c *collector) unmatched(roots []*node, change string) {
 				continue
 			}
 			if n.match == nil && (n.parent == nil || n.parent.match != nil) {
-				ch := Change{Change: change, Kind: n.kind, Package: n.pkg, Behaviors: n.leaves(), Selector: selector(nil, n)}
+				ch := Change{Change: change, Kind: n.kind, Package: n.pkg, Module: n.mod, Behaviors: n.leaves(), Selector: selector(nil, n)}
 				if change == ChangeRemoved {
 					ch.Base = place(n)
 					c.find(ClassRemoved, n.pkg, subject(n), n.kind, "", n.loc)
@@ -405,8 +405,8 @@ func (d *Document) finish() {
 			d.Summary.Informational++
 		}
 	}
-	for _, ch := range d.Behaviors {
-		switch ch.Change {
+	for i := range d.Behaviors {
+		switch d.Behaviors[i].Change {
 		case ChangeAdded:
 			d.Summary.Added++
 		case ChangeRemoved:
@@ -419,7 +419,7 @@ func (d *Document) finish() {
 			d.Summary.Changed++
 		}
 	}
-	d.normalize()
+	d.link()
 }
 
 func changePath(c *Change) string {

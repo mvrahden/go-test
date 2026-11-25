@@ -34,7 +34,8 @@ func recordOf(suites ...gotestaudit.Suite) *gotestaudit.Record {
 
 func changes(doc *gotestaudit.Document) []string {
 	var out []string
-	for _, c := range doc.Behaviors {
+	for i := range doc.Behaviors {
+		c := &doc.Behaviors[i]
 		p := c.Head
 		if p == nil {
 			p = c.Base
