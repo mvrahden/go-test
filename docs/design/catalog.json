@@ -3299,6 +3299,221 @@
           "name": "TestSnapshotKeysTestSuite",
           "output": [],
           "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "each failure names its assertion and the line it failed at",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "soft_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 25,
+                      "name": "each_failure_names_its_assertion_and_the_line_it_failed_at",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "the method goes on past them and fails",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "soft_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 30,
+                      "name": "the_method_goes_on_past_them_and_fails",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when soft assertions fail in a method",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "soft_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 24,
+                  "name": "soft_assertions_fail_in_a_method",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "an assertion that fails in its body ends the It there",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "soft_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 36,
+                      "name": "an_assertion_that_fails_in_its_body_ends_the_It_there",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when an It runs on a soft T",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "soft_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 35,
+                  "name": "an_It_runs_on_a_soft_T",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "BeforeEach goes on, the method runs and fails",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "soft_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 43,
+                      "name": "BeforeEach_goes_on,_the_method_runs_and_fails",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a soft assertion fails in BeforeEach",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "soft_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 42,
+                  "name": "a_soft_assertion_fails_in_BeforeEach",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the test goes on past it and fails",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "soft_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 51,
+                      "name": "the_test_goes_on_past_it_and_fails",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when Eventually is given a soft T and no poll passes",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "soft_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 50,
+                  "name": "Eventually_is_given_a_soft_T_and_no_poll_passes",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "SoftAssertions",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "soft_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 21,
+              "name": "TestSoftAssertions",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the soft failure names the helper's line and the caller's, and the test goes on",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "soft_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 68,
+                      "name": "the_soft_failure_names_the_helper's_line_and_the_caller's,_and_the_test_goes_on",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a soft assertion fails in a helper of a module whose path has no dot, built with -trimpath",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "soft_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 67,
+                  "name": "a_soft_assertion_fails_in_a_helper_of_a_module_whose_path_has_no_dot,_built_with_-trimpath",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "SoftHelperUnderTrimpath",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "soft_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 59,
+              "name": "TestSoftHelperUnderTrimpath",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "SoftAssertions",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "soft_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 13,
+          "name": "TestSoftAssertionsTestSuite",
+          "output": [],
+          "status": "none"
         }
       ],
       "output": [],
@@ -22052,7 +22267,7 @@
                   "children": [
                     {
                       "children": [],
-                      "display": "fails that row and the method, and the rows after it never run",
+                      "display": "fails that row and the method, and the rows after it still run",
                       "duration": 0,
                       "excluded": false,
                       "external": false,
@@ -22060,7 +22275,7 @@
                       "focused": false,
                       "kind": "block",
                       "line": 21,
-                      "name": "fails_that_row_and_the_method,_and_the_rows_after_it_never_run",
+                      "name": "fails_that_row_and_the_method,_and_the_rows_after_it_still_run",
                       "output": [],
                       "status": "none",
                       "vocab": "it"
@@ -22083,6 +22298,37 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "fails that row and the method there, and the rows after it never run",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "eachrows_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 33,
+                      "name": "fails_that_row_and_the_method_there,_and_the_rows_after_it_never_run",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a row of an Each table calls FailNow",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "eachrows_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 32,
+                  "name": "a_row_of_an_Each_table_calls_FailNow",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "skips that row and the method from there, and the rows after it never run",
                       "duration": 0,
                       "excluded": false,
@@ -22090,7 +22336,7 @@
                       "file": "eachrows_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 31,
+                      "line": 43,
                       "name": "skips_that_row_and_the_method_from_there,_and_the_rows_after_it_never_run",
                       "output": [],
                       "status": "none",
@@ -22104,7 +22350,7 @@
                   "file": "eachrows_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 30,
+                  "line": 42,
                   "name": "one_row_of_an_Each_table_skips",
                   "output": [],
                   "status": "none",
@@ -22121,7 +22367,7 @@
                       "file": "eachrows_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 41,
+                      "line": 53,
                       "name": "the_method_skips_or_fails_there,_with_no_failure_of_its_own",
                       "output": [],
                       "status": "none",
@@ -22135,7 +22381,7 @@
                   "file": "eachrows_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 40,
+                  "line": 52,
                   "name": "a_row_of_an_Each_table_skips_or_fatally_fails_the_method's_own_T",
                   "output": [],
                   "status": "none",
@@ -22152,7 +22398,7 @@
                       "file": "eachrows_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 50,
+                      "line": 62,
                       "name": "stops_at_the_break_and_the_method_goes_on",
                       "output": [],
                       "status": "none",
@@ -22166,7 +22412,7 @@
                   "file": "eachrows_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 49,
+                  "line": 61,
                   "name": "the_loop_over_an_Each_table_breaks",
                   "output": [],
                   "status": "none",
@@ -29578,6 +29824,190 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "lint reports each as a poll-scope finding that names t",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "soft_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 24,
+                      "name": "lint_reports_each_as_a_poll-scope_finding_that_names_t",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a polling callback asserts on the test's t.Soft(), hands it to a helper and calls Errorf on it",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "soft_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 23,
+                  "name": "a_polling_callback_asserts_on_the_test's_t.Soft(),_hands_it_to_a_helper_and_calls_Errorf_on_it",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "assertion-redundant leaves the pair unreported",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "soft_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 33,
+                      "name": "assertion-redundant_leaves_the_pair_unreported",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "assertion-redundant reports the pair when both are soft",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "soft_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 36,
+                      "name": "assertion-redundant_reports_the_pair_when_both_are_soft",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a fatal assertion is followed by a stronger soft one on the same operand",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "soft_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 32,
+                  "name": "a_fatal_assertion_is_followed_by_a_stronger_soft_one_on_the_same_operand",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "fail-guard leaves it unreported, an or-chained one too",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "soft_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 42,
+                      "name": "fail-guard_leaves_it_unreported,_an_or-chained_one_too",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a failure guard calls Fail on t.Soft()",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "soft_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 41,
+                  "name": "a_failure_guard_calls_Fail_on_t.Soft()",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "True(t.Soft(), a == b) becomes Equal(t.Soft(), a, b)",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "soft_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 60,
+                      "name": "True(t.Soft(),_a_==_b)_becomes_Equal(t.Soft(),_a,_b)",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a guard calling FailNow on t.Soft() becomes an assertion on t",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "soft_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 63,
+                      "name": "a_guard_calling_FailNow_on_t.Soft()_becomes_an_assertion_on_t",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when lint -fix rewrites assertions and guards on t.Soft()",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "soft_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 50,
+                  "name": "lint_-fix_rewrites_assertions_and_guards_on_t.Soft()",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "SoftAssertions",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "soft_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 22,
+              "name": "TestSoftAssertions",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "LinterSoft",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "soft_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 14,
+          "name": "TestLinterSoftTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "lint reports the comment under nolint-reason at the comment and still honours its suppression",
                       "duration": 0,
                       "excluded": false,
@@ -31439,7 +31869,7 @@
                   "children": [
                     {
                       "children": [],
-                      "display": "the summary counts the assertions that now stop the test and the stdlib tests left, and lists the id that changed",
+                      "display": "the summary counts the stdlib tests left and lists the id that changed",
                       "duration": 0,
                       "excluded": false,
                       "external": false,
@@ -31447,7 +31877,7 @@
                       "focused": false,
                       "kind": "block",
                       "line": 631,
-                      "name": "the_summary_counts_the_assertions_that_now_stop_the_test_and_the_stdlib_tests_left,_and_lists_the_id_that_changed",
+                      "name": "the_summary_counts_the_stdlib_tests_left_and_lists_the_id_that_changed",
                       "output": [],
                       "status": "none",
                       "vocab": "it"
@@ -31461,14 +31891,14 @@
                       "file": "verdicts_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 663,
+                      "line": 662,
                       "name": "a_migration_with_none_of_these_prints_no_such_section",
                       "output": [],
                       "status": "none",
                       "vocab": "it"
                     }
                   ],
-                  "display": "when migrate converts a suite with soft assertions, under a runner of another name, beside a plain testify test",
+                  "display": "when migrate converts a suite under a runner of another name, beside a plain testify test",
                   "duration": 0,
                   "excluded": false,
                   "external": false,
@@ -31476,7 +31906,7 @@
                   "focused": false,
                   "kind": "block",
                   "line": 630,
-                  "name": "migrate_converts_a_suite_with_soft_assertions,_under_a_runner_of_another_name,_beside_a_plain_testify_test",
+                  "name": "migrate_converts_a_suite_under_a_runner_of_another_name,_beside_a_plain_testify_test",
                   "output": [],
                   "status": "none",
                   "vocab": "when"
@@ -31491,6 +31921,67 @@
               "kind": "method",
               "line": 629,
               "name": "TestWhatMigrateDidNotKeep",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "migrate writes the first three on t.Soft() and the others on t",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "verdicts_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 720,
+                      "name": "migrate_writes_the_first_three_on_t.Soft()_and_the_others_on_t",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "the migrated test goes on past a failing soft assertion and fails",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "verdicts_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 731,
+                      "name": "the_migrated_test_goes_on_past_a_failing_soft_assertion_and_fails",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a suite calls s.X, s.Assert().X and assert.X beside s.Require().X and FailNow",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "verdicts_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 713,
+                  "name": "a_suite_calls_s.X,_s.Assert().X_and_assert.X_beside_s.Require().X_and_FailNow",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AssertionsThatGoOnAfterFailing",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "verdicts_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 712,
+              "name": "TestAssertionsThatGoOnAfterFailing",
               "output": [],
               "status": "none"
             }
@@ -31875,7 +32366,7 @@
                   "children": [
                     {
                       "children": [],
-                      "display": "shows the rows of a table after its failing row as not run",
+                      "display": "shows the rows of a table after a row that stopped the method as not run",
                       "duration": 0,
                       "excluded": false,
                       "external": false,
@@ -31883,7 +32374,7 @@
                       "focused": false,
                       "kind": "block",
                       "line": 277,
-                      "name": "shows_the_rows_of_a_table_after_its_failing_row_as_not_run",
+                      "name": "shows_the_rows_of_a_table_after_a_row_that_stopped_the_method_as_not_run",
                       "output": [],
                       "status": "none",
                       "vocab": "it"
@@ -34724,13 +35215,13 @@
     }
   ],
   "stats": {
-    "behaviors": 1004,
+    "behaviors": 1019,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 147,
+    "suites": 149,
     "tests": 0
   }
 }
