@@ -242,3 +242,5 @@ the skill arm; n=1. Superseded by this protocol — rerun everything under
 §2 before ship.
 
 **Round 2:** T− and T−2 under the protocol; fixtures in `trigger-fixtures/`, procedure and results in `ROUND-2.md`.
+
+**Round 3:** T+ and the eleven content tasks the fixtures carry today, under a 72-run cap; procedure, results and the tasks left blocked or cut in `ROUND-3.md`.
