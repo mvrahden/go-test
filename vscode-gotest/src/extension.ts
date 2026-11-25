@@ -1,4 +1,6 @@
 import * as vscode from "vscode";
+import * as path from "node:path";
+import { setEventsDir } from "./eventsFiles.js";
 import {
   DiscoveryCache,
   DiscoveryService,
@@ -99,6 +101,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const registryDir =
     context.storageUri?.fsPath ?? context.globalStorageUri.fsPath;
   const runRegistry = new RunRegistry(registryDir);
+  setEventsDir(path.join(registryDir, "events"));
   // Installed before anything can spawn, so no child escapes the table that
   // makes it reapable after a crash.
   const processRegistry = new ProcessRegistry(registryDir);
@@ -354,6 +357,7 @@ export function activate(context: vscode.ExtensionContext): void {
         // The reaper's escalation timer, and the hook that would otherwise keep
         // recording into a registry nobody is reading any more.
         setChildObserver(undefined);
+        setEventsDir(undefined);
         setStoreErrorLogger(undefined);
         processRegistry.dispose();
       },

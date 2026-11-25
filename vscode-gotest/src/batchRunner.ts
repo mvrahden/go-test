@@ -23,6 +23,7 @@ import {
   markFailedRun,
 } from "./runnerUtils.js";
 import { coverOf, type RunPiece } from "./specStore.js";
+import { nextEventsFile, pruneEventsFiles } from "./eventsFiles.js";
 import {
   runGoToolCoverFunc,
   splitCoverByPackage,
@@ -121,6 +122,9 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
     }
 
     const gotestArgs: string[] = [];
+    // The stream on disk too, so the run's record names a file to open.
+    const eventsFile = nextEventsFile();
+    if (eventsFile) gotestArgs.push(`--events-file=${eventsFile}`);
     const goTestArgs: string[] = ["-json", "-count=1", ...cliPkgArgs];
     if (coverFile) {
       goTestArgs.push("-covermode=atomic", `-coverprofile=${coverFile}`);
@@ -358,6 +362,7 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
     }
     return { stdout: "", piece: runPiece("", config) };
   } finally {
+    pruneEventsFiles();
     if (coverFile) {
       rm(path.dirname(coverFile), { recursive: true, force: true }).catch(
         () => {},
