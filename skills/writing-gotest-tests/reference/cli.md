@@ -125,7 +125,15 @@ invocation runs tests — there is NO `test` subcommand:
   lists the weakenings, then the behaviors added, removed, reworded, moved
   and changed; `--record` writes a tree's record, `--base-record` and
   `--head-record` compare two, `--fail-on=<classes>` exits 1 on a listed
-  class, `--format=json|md` for tools and pull requests.
+  class, `--format=json|md` for tools and pull requests. `--run` runs the
+  packages of the changed behaviors and marks each with its verdict and
+  run-time assertions, `--evidence=<stream>` reads a saved `-json` stream
+  instead (stale unless it ran the head's commit, clean;
+  `--base-evidence=<stream>` adds the base's run-time assertion counts),
+  and with `--base`, or `--diff=<file>` and `--coverage=<profile>`, the
+  changed production lines no test executed are listed;
+  `--fail-on=proof` fails on a failing, not run, vacuous or stale
+  behavior or an unproven line. `-v` lists the rows text groups.
 - `go tool gotest summary ./...` — run and print a failure-first summary
   for CI; `--input <file|->` renders a saved stream, `--coverage=<path>`
   names the coverage profile, `--badge=<path>` writes a coverage badge SVG.

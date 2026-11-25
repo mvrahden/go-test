@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditEvidence / WhatAToolReads / when a tool reads the audit document as JSON / finds on a finding each side's location, and the module of one without a package \(
+Clause: when a tool reads the audit document as JSON → finds on a finding each side's location, and the module of one without a package
+--- a/internal/gotestaudit/compare.go
++++ b/internal/gotestaudit/compare.go
+@@ -136,7 +136,7 @@
+ 	if b != nil {
+ 		f.basePath, f.Module = b.path, b.mod
+ 		l := b.loc
+-		f.BaseLocation = &l
++		_ = l
+ 		f.Selector = selectorOf(b.names, !b.bench)
+ 	}
+ 	if h != nil {

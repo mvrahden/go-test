@@ -2,12 +2,12 @@ Expect: ^FAIL .*conformance/audit AuditGitBase / ABaseFromGit / when audit --bas
 Clause: when audit --base names a commit of the checkout → leaves the checkout's status, index and worktree list as they were
 --- a/cmd/gotest/auditbase.go
 +++ b/cmd/gotest/auditbase.go
-@@ -52,7 +52,7 @@
- 	}
- 	defer os.RemoveAll(dir)
- 	tree := filepath.Join(dir, "tree")
--	if err := exportCommit(ctx, top, commit, tree); err != nil {
-+	if _, err := gitOutput(top, "worktree", "add", "--detach", tree, commit); err != nil {
- 		return nil, fmt.Errorf("exporting %s: %w", ref, err)
- 	}
- 	keepWorkspace(top, tree)
+@@ -170,7 +170,7 @@
+ 			return err
+ 		}
+ 		_ = os.Remove(filepath.Join(dir, exportedCopies))
+-		if err := exportCommit(ctx, g.top, g.commit, tree); err != nil {
++		if _, err := gitOutput(g.top, "worktree", "add", "--detach", tree, g.commit); err != nil {
+ 			return err
+ 		}
+ 		if err := os.WriteFile(marker, []byte(g.commit+"\n"), 0o600); err != nil {

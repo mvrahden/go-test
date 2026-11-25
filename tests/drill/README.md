@@ -1107,6 +1107,33 @@ shards of one run do not add up to every mutant exactly once.
 | `audit-unknown-ref-names-no-flags` | a ref the checkout lacks is refused without naming the record flags | audit conformance: the unknown-ref It finds the flags unnamed |
 | `audit-broken-package-unrecorded` | a package that does not compile is left out of the record | audit conformance: the broken-tree It finds no package |
 | `audit-broken-package-compared` | a package the head cannot read is compared, every behavior removed | audit conformance: the broken-tree It finds behaviors listed |
+| `audit-evidence-assertions-dropped` | a leaf's evidence leaves out the assertions its run reported | audit conformance: the evidence It finds no count on a passing leaf |
+| `audit-evidence-unreported-passes` | a behavior the stream does not report reads as passed | audit conformance: the not-run It finds the empty-stock When passed |
+| `audit-evidence-exit-code-dropped` | a stream's exit code is left out of its entry | audit conformance: the stream It finds no exit code |
+| `audit-dirty-stream-current` | a stream of a tree with uncommitted changes is current | audit conformance: the stale It finds the uncommitted stream current |
+| `audit-first-stream-wins` | the first stream given judges a behavior, stale or not | audit conformance: the two-streams It finds the stale pass |
+| `audit-runtime-base-is-the-head` | an assertions finding carries the head's run-time count for the base's | audit conformance: the run-time It finds 1 → 1 |
+| `audit-own-run-stale` | `--run`'s stream is read as a saved one, stale on an uncommitted head | audit conformance: the run It finds the stream stale |
+| `audit-own-run-uncovered` | `--run`'s profile is not read for the unproven lines | audit conformance: the run's unproven It finds no profile read |
+| `audit-unproven-every-block-ran` | a block that never ran counts as run | audit conformance: the unproven It finds no unexecuted line |
+| `audit-unproven-unspanned-counted` | a changed line no block spans counts as executable | audit conformance: the unspanned It counts 11 changed lines |
+| `audit-unproven-uncovered-dropped` | a file of a package no profile covers is left out | audit conformance: the no-coverage It finds no ledger entry |
+| `audit-git-untracked-ignored` | the changed lines leave out the files git does not track | audit conformance: the git-lines It finds no ledger entry |
+| `audit-failing-uncounted` | `--fail-on=failing` finds no failing behavior | audit conformance: the policy It sees exit 0 |
+| `audit-all-takes-proof` | `all` takes the proof classes too | audit conformance: the all It finds failing among the classes |
+| `audit-proof-without-evidence-taken` | a proof class without a stream is taken | audit conformance: the refusal It sees exit 0 |
+| `audit-text-marks-dropped` | the text rows carry no verdict | audit conformance: the text It finds no FAIL mark |
+| `audit-text-rows-unordered` | a weakened behavior is not put first | audit conformance: the order It finds the weakened change after the failing one |
+| `audit-text-rows-unfolded` | seven rows alike are not folded | audit conformance: the folding It finds seven rows |
+| `audit-markdown-unproven-untabled` | the Markdown leaves the unproven lines out | audit conformance: the Markdown It finds no unproven table |
+| `audit-base-exported-every-time` | the export's marker never matches, so every audit exports again | audit conformance: the export It finds a new file |
+| `audit-clean-leaves-base-trees` | `clean --cache` removes only an empty base tree | audit conformance: the clean It finds the tree left |
+| `audit-ids-from-lines` | a finding's id is made from its lines too | audit conformance: the id It finds other ids once the lines moved |
+| `audit-base-location-dropped` | a behavior's finding has no base location | audit conformance: the locations It finds no base file of a removed test |
+| `audit-run-pattern-unanchored` | the -run pattern is not anchored, so it selects siblings sharing a prefix | audit conformance: the selector It finds an unanchored pattern |
+| `audit-head-branch-dropped` | the head's provenance names no branch | audit conformance: the branch It finds none on the head |
+| `audit-needs-decision-only-on-failure` | only a failing row needs a decision | audit conformance: the decision It finds the vacuous row undecided |
+| `audit-base-records-a-missing-directory` | a directory the commit lacks is recorded as a package that cannot be read | audit conformance: the missing-directory It sees exit 2 |
 
 ## Adding a mutant
 

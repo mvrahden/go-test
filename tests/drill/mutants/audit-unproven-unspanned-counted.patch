@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditEvidence / UnprovenLines / when audit is given a coverage profile and a diff that changes production lines / counts no changed line that no block of the profile spans \(
+Clause: when audit is given a coverage profile and a diff that changes production lines → counts no changed line that no block of the profile spans
+--- a/internal/gotestaudit/unproven.go
++++ b/internal/gotestaudit/unproven.go
+@@ -155,7 +155,7 @@
+ 		u.Coverage = true
+ 		var unexecuted []int
+ 		for _, l := range f.Lines {
+-			executable, ran := false, false
++			executable, ran := true, false
+ 			for _, b := range byFile[f.key()] {
+ 				if b.Stmts > 0 && b.StartLine <= l && l <= b.EndLine {
+ 					executable = true

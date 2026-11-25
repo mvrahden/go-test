@@ -155,7 +155,7 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `--events-file=<path>` | With `-json`, or in `summary`, also write the run's `go test -json` event stream to the file as `-json` prints it (a suite's events when its process ends), making its directories and replacing a file there; `summary --input` reads it back; a text run refuses it, and an unwritable path exits 2 before anything is built |
 | `--control=stdin` | Read `stop` and `force` lines on standard input, a first and a second interrupt, counted with the signals, the input's end a stop when none is under way; taken by every command that stops on an interrupt, and without it standard input is never read |
 | `--github` | Emit GitHub annotations and step summary (auto-enabled in GitHub Actions) |
-| `--coverage=<path>` | Coverage profile path for the `summary` subcommand |
+| `--coverage=<path>` | Coverage profile path for the `summary` subcommand; for `audit`, the profile the unproven lines are read from ([Unproven lines](../../specs/audit/spec.md#requirement-unproven-lines)) |
 | `--badge=<path>` | Write a self-contained coverage badge SVG (`summary`); adds `-coverprofile` when neither the caller nor `--min` did |
 | `--render-only` | With `--input`, exit 0 on a failing or incomplete stream: the code reports whether rendering succeeded, not whether the tests passed |
 | `--stamp` | With `--input`, write the stream back with each test event placed as `gotest -json` places it, instead of rendering it (`spec`) |
@@ -176,12 +176,16 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `--fuzz` | Generate fuzz round-trip skeletons (`scaffold`) |
 | `--dry-run` | Print the unified diff of every edit instead of writing it (`migrate`) |
 | `--dir=<skills-dir>` | Skills directory to install into, default `.agents/skills` (`skill install`) |
-| `--cache` | Remove every cached test binary no run is using (`clean`) |
+| `--cache` | Remove every cached test binary no run is using, and every base tree no audit is using (`clean`) |
 | `--record` | Write the record of the tree as JSON instead of comparing (`audit`) ([The tree record](../../specs/audit/spec.md#requirement-the-tree-record)) |
 | `--base=<ref>` | Record the commit the ref names, exported by git outside the checkout, as the base (`audit`) ([A base from git](../../specs/audit/spec.md#requirement-a-base-from-git)) |
 | `--base-record=<file>` | The base of the comparison, a record `--record` wrote (`audit`) |
 | `--head-record=<file>` | The head of the comparison, a record `--record` wrote; default the working tree (`audit`) |
-| `--fail-on=<classes>` | Exit 1 when the audit lists a finding of one of the comma-separated classes, `all` for every weakening (`audit`) ([The policy exit](../../specs/audit/spec.md#requirement-the-policy-exit)) |
+| `--fail-on=<classes>` | Exit 1 when the audit lists a finding of one of the comma-separated classes, `all` for every weakening, `proof` for every proof class (`audit`) ([The policy exit](../../specs/audit/spec.md#requirement-the-policy-exit), [Proof in the policy](../../specs/audit/spec.md#requirement-proof-in-the-policy)) |
+| `--evidence=<stream>` | A saved `-json` stream of a run of the head, repeatable: each changed behavior's verdict, current or stale (`audit`) ([Evidence from runs](../../specs/audit/spec.md#requirement-evidence-from-runs)) |
+| `--base-evidence=<stream>` | A saved `-json` stream of a run of the base, repeatable, for the run-time assertions of an assertions finding (`audit`) ([Assertions at run time](../../specs/audit/spec.md#requirement-assertions-at-run-time)) |
+| `--run` | Run the packages of the changed behaviors, with coverage of the changed production packages, and take the run as current evidence (`audit`) ([The audit's own run](../../specs/audit/spec.md#requirement-the-audits-own-run)) |
+| `--diff=<file\|->` | The changed lines the unproven ones are read from, as a unified diff, where `--base` does not give them (`audit`) |
 
 The requirements behind some of these flags: `--control` [Stopping gotest through its standard input](../../specs/lifecycle/spec.md#requirement-stopping-gotest-through-its-standard-input), `--stamp` [Stamping a saved stream](../../specs/cli/spec.md#requirement-stamping-a-saved-stream), `--declared` [The declared specification under a run's verdicts](../../specs/spec/spec.md#requirement-the-declared-specification-under-a-runs-verdicts), `--hide` [Hiding rows by status](../../specs/spec/spec.md#requirement-hiding-rows-by-status), `--match` and `--only` [Searching and picking rows](../../specs/spec/spec.md#requirement-searching-and-picking-rows).
 A `--control` value other than `stdin`, or one beside `--input=-`, exits 2. The commands that take `--control` are the runs, `spec`, `summary`, `watch`, `bench`, `fuzz` with its `triage` and `promote`, and `prepare`.

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditEvidence / CurrentAndStaleEvidence / when audit is given streams of another commit, of a tree with uncommitted changes and without a manifest / marks each stale, naming another commit, uncommitted changes and no manifest \(
+Clause: when audit is given streams of another commit, of a tree with uncommitted changes and without a manifest → marks each stale, naming another commit, uncommitted changes and no manifest
+--- a/internal/gotestaudit/evidence.go
++++ b/internal/gotestaudit/evidence.go
+@@ -152,7 +152,7 @@
+ 		return false, "the " + name + " names no commit"
+ 	case !sameCommit(run.Commit, side.Commit):
+ 		return false, fmt.Sprintf("another commit: the stream ran %s, the %s is %s", run.Commit, name, side.Commit)
+-	case run.Dirty == nil || *run.Dirty:
++	case run.Dirty == nil:
+ 		return false, "the stream's tree had uncommitted changes"
+ 	case side.Dirty == nil || *side.Dirty:
+ 		return false, "the " + name + " has uncommitted changes"

@@ -1,0 +1,7 @@
+mode: set
+auditmod/shop/shop.go:5.26,5.40 1 1
+auditmod/shop/shop.go:9.2,9.11 1 1
+auditmod/shop/shop.go:10.3,11.1 1 0
+auditmod/shop/shop.go:12.2,12.15 1 1
+auditmod/shop/shop.go:13.3,14.1 1 1
+auditmod/shop/shop.go:15.2,15.10 1 0

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditEvidence / EvidenceInTheRenderings / when audit renders evidence in the text format / lists the removed, weakened and failing behaviors before the others \(
+Clause: when audit renders evidence in the text format → lists the removed, weakened and failing behaviors before the others
+--- a/internal/gotestaudit/render.go
++++ b/internal/gotestaudit/render.go
+@@ -202,7 +202,7 @@
+ 		e := ev[k]
+ 		switch {
+ 		case weakened[k]:
+-			return 1
++			return 6
+ 		case e == nil:
+ 			return 6
+ 		case e.Verdict == VerdictFail:

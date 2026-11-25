@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditEvidence / EvidenceInTheRenderings / when audit renders evidence with --format=md / writes the evidence as a column of the behaviors table and the unproven lines as a table \(
+Clause: when audit renders evidence with --format=md → writes the evidence as a column of the behaviors table and the unproven lines as a table
+--- a/internal/gotestaudit/render.go
++++ b/internal/gotestaudit/render.go
+@@ -568,7 +568,7 @@
+ 			fmt.Fprintf(w, "| %s | %s | %s | %s |\n", c.Change, mdCell(shortPackage(d, c.Package)), mdCell(mdBehavior(c)), mdCell(mdWhere(c)))
+ 		}
+ 	}
+-	if d.Coverage != nil {
++	if d.Coverage == nil {
+ 		fmt.Fprintf(w, "\n#### Unproven lines\n\n%s\n", gotestspec.EscapeLabel(unprovenCounts(&d.Summary)))
+ 		if len(d.Unproven) > 0 {
+ 			fmt.Fprint(w, "\n| File | Package | Not executed |\n|---|---|---|\n")

@@ -73,7 +73,9 @@ trees' suites from source and lists every weakening before the behaviors
 added, removed, reworded, moved and changed: a test removed, an `X_` or
 `F_` added, a guard, a raised budget or `NoDeadline`, a new suppression, a
 rewritten snapshot, fewer assertions, a new `AssertsBy`. Each one is what
-the change meant, said in your report, or a mistake to undo.
+the change meant, said in your report, or a mistake to undo. Add `--run` to
+run what changed: each behavior then shows its verdict, and the changed
+production lines no test executed are listed.
 
 ## The write loop
 

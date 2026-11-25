@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditEvidence / EvidenceFromRuns / when audit is given a stream of the head's run / states for each added, reworded, moved and changed behavior and each finding's behavior its verdict, its run-time assertions, whether it passed vacuous and its AssertsBy \(
+Clause: when audit is given a stream of the head's run → states for each added, reworded, moved and changed behavior and each finding's behavior its verdict, its run-time assertions, whether it passed vacuous and its AssertsBy
+--- a/internal/gotestaudit/evidence.go
++++ b/internal/gotestaudit/evidence.go
+@@ -268,7 +268,7 @@
+ func found(n *gotestspec.Node, r *rnode) judgment {
+ 	j := judgment{verdict: verdictOf(n.Status), skipReason: n.SkipReason}
+ 	if len(r.kids) == 0 && len(n.Children) == 0 {
+-		j.assertions, j.vacuous, j.assertsBy = n.Assertions, n.Vacuous(), n.AssertsBy
++		j.vacuous, j.assertsBy = n.Vacuous(), n.AssertsBy
+ 		return j
+ 	}
+ 	j.leaves = &Leaves{}

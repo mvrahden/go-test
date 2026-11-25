@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditEvidence / WhatAToolReads / when a tool reads the audit document as JSON / finds on each evidence row whether it needs a decision, the stream it was judged by and that stream's commit \(
+Clause: when a tool reads the audit document as JSON → finds on each evidence row whether it needs a decision, the stream it was judged by and that stream's commit
+--- a/internal/gotestaudit/evidence.go
++++ b/internal/gotestaudit/evidence.go
+@@ -494,7 +494,7 @@
+ 	if st.Run != nil {
+ 		e.Commit = st.Run.Commit
+ 	}
+-	e.NeedsDecision = e.Verdict == VerdictFail || e.Vacuous || e.notProven() || !e.Current
++	e.NeedsDecision = e.Verdict == VerdictFail
+ 	for i := range js {
+ 		if i != pick && js[i].verdict != VerdictNone {
+ 			e.Others = append(e.Others, OtherVerdict{Stream: at[i], Verdict: js[i].verdict, Current: trees[i].stream.Current})

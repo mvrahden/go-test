@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditEvidence / UnprovenLines / when audit is given a coverage profile and a diff that changes production lines / lists per file the changed executable lines no test executed as ranges, and counts them in the summary \(
+Clause: when audit is given a coverage profile and a diff that changes production lines → lists per file the changed executable lines no test executed as ranges, and counts them in the summary
+--- a/internal/gotestaudit/unproven.go
++++ b/internal/gotestaudit/unproven.go
+@@ -159,7 +159,7 @@
+ 			for _, b := range byFile[f.key()] {
+ 				if b.Stmts > 0 && b.StartLine <= l && l <= b.EndLine {
+ 					executable = true
+-					ran = ran || b.Count > 0
++					ran = ran || b.Count >= 0
+ 				}
+ 			}
+ 			if !executable {
