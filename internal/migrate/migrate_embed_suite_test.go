@@ -442,8 +442,9 @@ func runBinary(t *gotest.T, binary, dir string, args ...string) (stdout, stderr 
 	cmd := exec.CommandContext(t.Context(), binary, args...) //nolint:gosec // G204: the CLI under test
 	cmd.Dir = dir
 	// The migrated tests are what migrate wrote, not this repository's, so
-	// the host's CI mode does not judge them.
-	cmd.Env = append(os.Environ(), "GOWORK=off", "GOFLAGS=", "PWD="+dir, "GOTEST_CI=0")
+	// the host's CI mode does not judge them; an agent running this suite
+	// does not turn their output into its own.
+	cmd.Env = append(os.Environ(), "GOWORK=off", "GOFLAGS=", "PWD="+dir, "GOTEST_CI=0", "GOTEST_AGENT=0")
 	var out, errb bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errb
 	_ = cmd.Run()
