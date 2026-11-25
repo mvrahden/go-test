@@ -139,5 +139,5 @@ compile gate. Two corollaries:
 - Do not ADD stdlib tests to a gotest-exclusive project to satisfy the
   three-step shape — the shape follows the tests, not the other way round.
 - If stdlib tests later become intentional (marked
-  `//nolint:stdlib-test`), reintroduce the `go test ./...` step in the
+  `//nolint:stdlib-test // <reason>`), reintroduce the `go test ./...` step in the
   same change.
