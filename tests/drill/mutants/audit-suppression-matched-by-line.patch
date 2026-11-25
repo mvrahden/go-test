@@ -2,12 +2,12 @@ Expect: ^FAIL .*conformance/audit AuditCompare / WhatGotWeaker / when a suppress
 Clause: when a suppression moves to another line with its rules and reason → lists no suppression finding for it
 --- a/internal/gotestaudit/compare.go
 +++ b/internal/gotestaudit/compare.go
-@@ -235,7 +235,7 @@
+@@ -292,7 +292,7 @@
  		return
  	}
  	rules := func(s *Suppression) string { return s.Module + "\x00" + s.File + "\x00" + strings.Join(s.Rules, ",") }
 -	key := func(s *Suppression) string { return rules(s) + "\x00" + s.Reason }
 +	key := func(s *Suppression) string { return rules(s) + "\x00" + s.Reason + fmt.Sprint(s.Line) }
+ 	baseList, headList := withMutateIgnores(base), withMutateIgnores(head)
  	have := map[string]int{}
- 	for i := range base.Suppressions {
- 		have[key(&base.Suppressions[i])]++
+ 	for i := range baseList {

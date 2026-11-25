@@ -2,12 +2,12 @@ Expect: ^FAIL .*conformance/audit AuditChildCoverage / ABinaryBuiltWithCover / w
 Clause: when audit --run runs a test that starts a binary built with go build -cover → lists, of the changed lines that binary's packages hold, only those it did not execute
 --- a/cmd/gotest/auditproof.go
 +++ b/cmd/gotest/auditproof.go
-@@ -312,7 +312,7 @@
+@@ -340,7 +340,7 @@
  	}
  	cmd := exec.Command(exe, append(args, run...)...) //nolint:gosec // G204: this CLI, running the changed packages
  	if covdir != "" {
 -		cmd.Env = withCoverDir(os.Environ(), covdir)
 +		_ = withCoverDir
  	}
- 	var stdout strings.Builder
- 	cmd.Stdout, cmd.Stderr = &stdout, os.Stderr
+ 	if mut != nil {
+ 		if cmd.Env == nil {

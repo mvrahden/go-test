@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/audit AuditMutate / MutantsInTheDocument / when a tool reads the document of audit --mutate as JSON / finds a mutation section whose lines carry an id, module, file, line, verdict, order, counts, the suites that ran them and their mutants \(
+Clause: when a tool reads the document of audit --mutate as JSON → finds a mutation section whose lines carry an id, module, file, line, verdict, order, counts, the suites that ran them and their mutants
+--- a/internal/gotestaudit/mutation.go
++++ b/internal/gotestaudit/mutation.go
+@@ -185,9 +185,7 @@
+ 			idx = len(m.Lines)
+ 			at[k] = idx
+ 			group := r.File
+-			if r.Func != "" {
+-				group += " " + r.Func
+-			}
++
+ 			m.Lines = append(m.Lines, MutatedLine{Module: r.Module, File: r.File, Package: r.Package, Line: r.Line, Func: r.Func, Group: group,
+ 				ID: stableID("mutated line", r.Module, r.File, r.Func, r.LineText), Suites: slices.Clone(r.Suites), Reason: r.Reason})
+ 		}

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditMutate / SurvivorsInThePolicy / when --fail-on names survived without --mutate / audit refuses it with exit 2, naming --mutate \(
+Clause: when --fail-on names survived without --mutate → audit refuses it with exit 2, naming --mutate
+--- a/cmd/gotest/audit.go
++++ b/cmd/gotest/audit.go
+@@ -216,7 +216,7 @@
+ 		return errors.New("--parallel bounds the run --run or --mutate makes; give it with one")
+ 	}
+ 	for _, c := range a.failOnNamed {
+-		if strings.TrimSpace(c) == gotestaudit.ClassSurvived && !a.mutate {
++		if strings.TrimSpace(c) == gotestaudit.ClassSurvived && !a.mutate && !a.run {
+ 			return errors.New("--fail-on=survived judges mutants: give --mutate, with --base or --diff")
+ 		}
+ 	}

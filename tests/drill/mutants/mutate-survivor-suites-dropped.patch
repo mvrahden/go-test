@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditMutate / AMutantsVerdict / when audit --mutate runs the mutants of a change one of whose lines no test checks at its boundary / marks the boundary mutant survived, naming the suites that ran its line \(
+Clause: when audit --mutate runs the mutants of a change one of whose lines no test checks at its boundary → marks the boundary mutant survived, naming the suites that ran its line
+--- a/cmd/gotest/auditmutate_run.go
++++ b/cmd/gotest/auditmutate_run.go
+@@ -202,7 +202,7 @@
+ 			for _, s := range b.suites {
+ 				if s.executed.Ran(mu) {
+ 					covering[mu.ID] = append(covering[mu.ID], s)
+-					r.Suites = append(r.Suites, s.label())
++					r.Suites = append(r.Suites[:0], s.name)
+ 				}
+ 			}
+ 			if len(covering[mu.ID]) == 0 {

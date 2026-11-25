@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/audit AuditMutate / AMutantsVerdict / when audit --mutate runs the mutants of a change one of whose lines no test checks at its boundary / marks each mutant a test fails killed, naming that test \(
+Clause: when audit --mutate runs the mutants of a change one of whose lines no test checks at its boundary → marks each mutant a test fails killed, naming that test
+--- a/cmd/gotest/auditmutate_run.go
++++ b/cmd/gotest/auditmutate_run.go
+@@ -489,6 +489,7 @@
+ 			}
+ 			continue
+ 		}
++		by = ev.Package
+ 		w.killedBy, w.part = by, nil
+ 		w.first <- by
+ 		return len(p), nil

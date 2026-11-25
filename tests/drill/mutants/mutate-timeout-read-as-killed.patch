@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditMutate / AMutantsVerdict / when audit --mutate runs the mutants of a change one of whose lines no test checks at its boundary / marks a mutant that keeps its suite from ending a timeout, apart from the killed ones \(
+Clause: when audit --mutate runs the mutants of a change one of whose lines no test checks at its boundary → marks a mutant that keeps its suite from ending a timeout, apart from the killed ones
+--- a/cmd/gotest/auditmutate_run.go
++++ b/cmd/gotest/auditmutate_run.go
+@@ -360,7 +360,7 @@
+ 	o := mutate.Outcome{Elapsed: time.Since(start)}
+ 	switch {
+ 	case w.timedOut:
+-		o.Verdict = mutate.Timeout
++		o.Verdict = mutate.Killed
+ 	case w.killedBy != "":
+ 		o.Verdict, o.By = mutate.Killed, w.killedBy
+ 	case code == 130 || code < 0 || ctx.Err() != nil:

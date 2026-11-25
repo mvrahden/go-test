@@ -1,0 +1,16 @@
+Expect: ^FAIL .*conformance/audit AuditMutate / KeepingALineFromMutation / when audit --mutate meets a comment with a reason at the end of a changed line, and one without a reason above a function / judges the function's mutants and notes that the comment without a reason keeps no line \(
+Clause: when audit --mutate meets a comment with a reason at the end of a changed line, and one without a reason above a function → judges the function's mutants and notes that the comment without a reason keeps no line
+--- a/cmd/gotest/auditmutate.go
++++ b/cmd/gotest/auditmutate.go
+@@ -164,7 +164,10 @@
+ 	f := m.files[mu.File]
+ 	for i := range m.ignores {
+ 		ig := &m.ignores[i]
+-		if f != nil && ig.File == f.File && ig.Module == f.Module && ig.Reason != "" && ig.Start <= mu.Line && mu.Line <= ig.End {
++		if f != nil && ig.File == f.File && ig.Module == f.Module && ig.Start <= mu.Line && mu.Line <= ig.End {
++			if ig.Reason == "" {
++				return "no reason"
++			}
+ 			return ig.Reason
+ 		}
+ 	}

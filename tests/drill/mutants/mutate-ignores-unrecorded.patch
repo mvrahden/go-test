@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditMutate / KeepingALineFromMutation / when the head adds mutate-ignore comments / audit --record lists each with its file, line, scope and reason \(
+Clause: when the head adds mutate-ignore comments → audit --record lists each with its file, line, scope and reason
+--- a/internal/gotestaudit/read.go
++++ b/internal/gotestaudit/read.go
+@@ -57,7 +57,7 @@
+ 		rec.Snapshots = append(rec.Snapshots, snapshotsIn(pkgs.Broken[i].Dir, m)...)
+ 		mods = append(mods, m)
+ 	}
+-	rec.MutateIgnores = mutateIgnores(pkgs.Graph)
++	rec.MutateIgnores = mutateIgnores(pkgs.Graph)[:0]
+ 	rec.ModuleDirs = moduleDirs(mods)
+ 	slices.SortFunc(rec.Packages, func(a, b Package) int { return cmp.Compare(a.Path, b.Path) })
+ 	slices.SortFunc(rec.Snapshots, func(a, b Snapshot) int {

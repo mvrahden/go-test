@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/audit AuditMutate / MutantsInTheDocument / when audit --mutate renders text / writes per file the survived and timed-out lines first, each with its mutants, function and suites, and counts the other lines \(
+Expect: ^FAIL .*conformance/audit AuditMutate / MutantsInTheDocument / when audit --mutate renders --format=md / writes the survived and timed-out lines as a table \(
+Clause: when audit --mutate renders text → writes per file the survived and timed-out lines first, each with its mutants, function and suites, and counts the other lines
+Clause: when audit --mutate renders --format=md → writes the survived and timed-out lines as a table
+--- a/internal/gotestaudit/render_mutation.go
++++ b/internal/gotestaudit/render_mutation.go
+@@ -36,7 +36,7 @@
+ // killed, not covered or ignored.
+ func actionable(l *MutatedLine) bool {
+ 	switch l.Verdict {
+-	case MutantSurvived, MutantTimeout, MutantNotJudged, MutantUncompilable:
++	case MutantSurvived, MutantNotJudged, MutantUncompilable:
+ 		return true
+ 	}
+ 	return false

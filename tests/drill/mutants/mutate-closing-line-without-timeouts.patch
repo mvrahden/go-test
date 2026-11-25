@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditMutate / MutantsInTheDocument / when audit --mutate renders text / the closing line counts the mutants survived, killed, timed out and not judged \(
+Clause: when audit --mutate renders text → the closing line counts the mutants survived, killed, timed out and not judged
+--- a/internal/gotestaudit/render_mutation.go
++++ b/internal/gotestaudit/render_mutation.go
+@@ -166,7 +166,7 @@
+ // mutationSegment is the closing line's mutation segment.
+ func mutationSegment(m *Mutation) string {
+ 	c := &m.Counts
+-	return fmt.Sprintf("mutation: %d survived on %d line%s, %d killed, %d timeout, %d not judged", c.Survived, c.SurvivedLines, plural(c.SurvivedLines), c.Killed, c.Timeout, c.NotJudged)
++	return fmt.Sprintf("mutation: %d survived on %d line%s, %d killed, %d not judged", c.Survived, c.SurvivedLines, plural(c.SurvivedLines), c.Killed, c.NotJudged)
+ }
+ 
+ // writeMutationMarkdown writes the mutation section as a table of the

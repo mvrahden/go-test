@@ -2,12 +2,12 @@ Expect: ^FAIL .*conformance/audit AuditRun / TheAuditsOwnRun / when audit --run 
 Clause: when audit --run compares the working tree with a base → lists the changed production lines that run did not execute
 --- a/cmd/gotest/auditproof.go
 +++ b/cmd/gotest/auditproof.go
-@@ -42,7 +42,7 @@
+@@ -57,7 +57,7 @@
  		}
  		defer removeProfile(ranProfile)
  		if profile == "" {
 -			profile = ranProfile
 +			_ = ranProfile
  		}
- 	}
- 	for _, side := range []struct {
+ 		if mut != nil && in != nil {
+ 			if zero, err = a.readMutationBaseline(doc, mut, in.Events, ranProfile); err != nil {

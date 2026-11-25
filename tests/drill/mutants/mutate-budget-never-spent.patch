@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditMutate / TheMutationBudget / when audit --mutate is given a budget spent before its first mutant / reads each mutant it would run as not judged and none as killed or survived \(
+Clause: when audit --mutate is given a budget spent before its first mutant → reads each mutant it would run as not judged and none as killed or survived
+--- a/cmd/gotest/auditmutate_run.go
++++ b/cmd/gotest/auditmutate_run.go
+@@ -158,7 +158,7 @@
+ 				first[doc.Behaviors[i].Package] = true
+ 			}
+ 			todo = mutate.Order(todo, func(pkg string) bool { return first[pkg] })
+-			outcomes, spent := (&mutate.Scheduler{Jobs: jobs, Budget: a.mutateBudget}).Run(ctx, todo, j.run)
++			outcomes, spent := (&mutate.Scheduler{Jobs: jobs, Budget: a.mutateBudget + time.Hour}).Run(ctx, todo, j.run)
+ 			run.Spent = spent
+ 			for i, o := range outcomes {
+ 				r := results[todo[i].ID]

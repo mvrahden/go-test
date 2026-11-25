@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditMutate / AMutantsVerdict / when a suite that judges a mutant fails before any mutant is switched on / judges no mutant, names the failing test among what was not compared and exits 2 \(
+Clause: when a suite that judges a mutant fails before any mutant is switched on → judges no mutant, names the failing test among what was not compared and exits 2
+--- a/cmd/gotest/auditmutate_run.go
++++ b/cmd/gotest/auditmutate_run.go
+@@ -146,7 +146,7 @@
+ 	if b != nil {
+ 		run.Baseline.Failed = b.failed
+ 	}
+-	results, todo, covering := m.classify(b, run.Baseline.Passed && !a.stopped)
++	results, todo, covering := m.classify(b, b != nil && !a.stopped)
+ 	j := &mutantJudge{a: a, m: m, per: per, covering: covering}
+ 	if len(todo) > 0 {
+ 		ctx, stop := a.mutationContext()

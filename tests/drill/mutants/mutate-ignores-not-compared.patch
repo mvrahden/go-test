@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditMutate / KeepingALineFromMutation / when the head adds mutate-ignore comments / audit lists each as a suppression finding naming the comment \(
+Clause: when the head adds mutate-ignore comments → audit lists each as a suppression finding naming the comment
+--- a/internal/gotestaudit/compare.go
++++ b/internal/gotestaudit/compare.go
+@@ -342,7 +342,7 @@
+ // comments, compared alike: one added is a suppression finding.
+ func withMutateIgnores(r *Record) []Suppression {
+ 	out := slices.Clone(r.Suppressions)
+-	for _, ig := range r.MutateIgnores {
++	for _, ig := range r.MutateIgnores[:0] {
+ 		out = append(out, Suppression{Module: ig.Module, File: ig.File, Line: ig.Line, Rules: []string{mutateIgnoreRule}, Reason: ig.Reason})
+ 	}
+ 	return out

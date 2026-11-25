@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditMutate / TheMutationBudget / when audit --mutate is given a budget spent before its first mutant / names the budget and the time spent \(
+Clause: when audit --mutate is given a budget spent before its first mutant → names the budget and the time spent
+--- a/internal/gotestaudit/mutation.go
++++ b/internal/gotestaudit/mutation.go
+@@ -161,7 +161,7 @@
+ // result, one entry per line, and counts the lines with a survivor as the
+ // survived class.
+ func AddMutation(d *Document, results []MutantResult, run *MutationRun) {
+-	m := &Mutation{Budget: run.Budget.String(), Spent: run.Spent.Round(time.Millisecond).String(), Jobs: run.Jobs,
++	m := &Mutation{Budget: run.Budget.String(), Spent: run.Budget.String(), Jobs: run.Jobs,
+ 		Operators: slices.Clone(run.Operators), Baseline: run.Baseline, Ignores: slices.Clone(run.Ignores)}
+ 	if m.Operators == nil {
+ 		m.Operators = []string{}

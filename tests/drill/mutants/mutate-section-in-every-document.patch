@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditMutate / MutantsInTheDocument / when a tool reads the document of audit --mutate as JSON / finds neither in a document made without --mutate \(
+Clause: when a tool reads the document of audit --mutate as JSON → finds neither in a document made without --mutate
+--- a/internal/gotestaudit/document.go
++++ b/internal/gotestaudit/document.go
+@@ -84,7 +84,7 @@
+ 	ChangedLines int `json:"changedLines"`
+ 	NoCoverage   int `json:"noCoverage"`
+ 	// Mutation counts the mutants by verdict; absent without --mutate.
+-	Mutation *MutationCounts `json:"mutation,omitempty"`
++	Mutation *MutationCounts `json:"mutation"`
+ }
+ 
+ // Change kinds.

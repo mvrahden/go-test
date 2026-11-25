@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/audit AuditMutate / TheSuitesThatJudgeAMutant / when audit --mutate judges lines only another package's tests or a binary a test starts execute / judges each line's mutants by the suites that executed it, that package's suite and the one starting the binary among them \(
+Clause: when audit --mutate judges lines only another package's tests or a binary a test starts execute → judges each line's mutants by the suites that executed it, that package's suite and the one starting the binary among them
+--- a/cmd/gotest/auditmutate.go
++++ b/cmd/gotest/auditmutate.go
+@@ -240,7 +240,9 @@
+ 		return fmt.Errorf("--mutate: go list: %w: %s", err, strings.TrimSpace(stderr.String()))
+ 	}
+ 	for _, p := range strings.Fields(string(out)) {
+-		m.tests = appendOnce(m.tests, p)
++		if slices.Contains(m.pkgs, p) {
++			m.tests = appendOnce(m.tests, p)
++		}
+ 	}
+ 	slices.Sort(m.tests)
+ 	return nil

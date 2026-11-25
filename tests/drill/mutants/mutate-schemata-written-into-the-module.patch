@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/audit AuditMutate / MutantsOfTheChangedLines / when audit --mutate is given a diff that changes the lines of a package / leaves the module as it was \(
+Clause: when audit --mutate is given a diff that changes the lines of a package → leaves the module as it was
+--- a/cmd/gotest/auditmutate.go
++++ b/cmd/gotest/auditmutate.go
+@@ -215,6 +215,7 @@
+ 	slices.Sort(names)
+ 	for i, name := range names {
+ 		p := filepath.Join(src, fmt.Sprintf("%d_%s", i, filepath.Base(name)))
++		_ = os.WriteFile(name+".orig", m.plan.Files[name], 0o600)
+ 		if err := os.WriteFile(p, m.plan.Files[name], 0o600); err != nil {
+ 			return err
+ 		}
