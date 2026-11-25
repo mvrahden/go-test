@@ -259,6 +259,7 @@ func childEnv(markerDir string) []string {
 			strings.HasPrefix(kv, "GOTEST_CANARY_DIR="),
 			strings.HasPrefix(kv, agentenv.EnvAgent+"="),
 			strings.HasPrefix(kv, "CLAUDECODE="),
+			strings.HasPrefix(kv, protocol.EnvAgentOutput+"="),
 			strings.HasPrefix(kv, protocol.EnvCacheDir+"="):
 			continue
 		}
