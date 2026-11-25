@@ -379,7 +379,9 @@ func ExportRunEnv(env []string, overlay string, id int) []string {
 	return (&mutation{overlay: overlay}).runEnv(env, id)
 }
 
-func ExportCoverageEnv(env []string, dir string) []string { return (&mutation{dir: dir}).coverageEnv(env) }
+func ExportCoverageEnv(env []string, dir string) []string {
+	return (&mutation{dir: dir}).coverageEnv(env)
+}
 
 var ExportTestsFirst = testsFirst
 

@@ -305,7 +305,7 @@ func (s *AuditMutateRunTestSuite) TestNotJudged(t *gotest.T) {
 	t.When("no production line changed", func(w *gotest.T) {
 		w.It("mutates nothing and says so", func(it *gotest.T) {
 			doc := s.mutate(it, nil, time.Minute, true, s.runner)
-			gotest.Nil(it, doc.Mutation)
+			gotest.Zero(it, doc.Mutation)
 			gotest.Equal(it, []string{"--mutate: no changed production line, so nothing was mutated"}, doc.Notes)
 		})
 	})
