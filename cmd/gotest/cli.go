@@ -88,6 +88,8 @@ func main() {
 		os.Exit(runRefactor(inv))
 	case "lint":
 		os.Exit(runLint(inv))
+	case "audit":
+		os.Exit(runAudit(inv))
 	case "skill":
 		os.Exit(runSkill(inv))
 	default:

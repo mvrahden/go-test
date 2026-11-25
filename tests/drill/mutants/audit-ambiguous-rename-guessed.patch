@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditCompare / BehaviorsCompared / when two removed behaviors have the body of one added behavior / lists both as removed and the new one as added \(
+Clause: when two removed behaviors have the body of one added behavior → lists both as removed and the new one as added
+--- a/internal/gotestaudit/match.go
++++ b/internal/gotestaudit/match.go
+@@ -196,7 +196,7 @@
+ 	var out [][2]*node
+ 	for _, b := range base {
+ 		k := key(b)
+-		if bc[k] == 1 && hc[k] == 1 && bf[k] == b {
++		if bc[k] >= 1 && hc[k] == 1 && bf[k] == b {
+ 			out = append(out, [2]*node{b, hf[k]})
+ 		}
+ 	}

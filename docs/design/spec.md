@@ -120,6 +120,7 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `bench` | Run `BenchmarkX` suite methods serially via `go test -bench` |
 | `fuzz` | Orchestrate `FuzzX` suite targets with a shared time budget |
 | `lint` | Run gotest-specific linter checks |
+| `audit` | Record a tree's test estate from source, or compare a head with a base: behaviors added, removed, reworded, moved and changed, and what got weaker ([Audit](../../specs/audit/spec.md#requirement-the-tree-record)) |
 | `refactor` | Toggle focus prefixes: `refactor toggle-focus <file> <Suite[.Method]>` |
 | `skill` | Install the agent skill shipped with this version: `skill install [--dir=<skills-dir>]` |
 | `hook` | Answer a coding agent's hook event read on stdin: `hook post-edit\|pre-shell\|stop` |
@@ -176,6 +177,11 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `--dry-run` | Print the unified diff of every edit instead of writing it (`migrate`) |
 | `--dir=<skills-dir>` | Skills directory to install into, default `.agents/skills` (`skill install`) |
 | `--cache` | Remove every cached test binary no run is using (`clean`) |
+| `--record` | Write the record of the tree as JSON instead of comparing (`audit`) ([The tree record](../../specs/audit/spec.md#requirement-the-tree-record)) |
+| `--base=<ref>` | Record the commit the ref names, exported by git outside the checkout, as the base (`audit`) ([A base from git](../../specs/audit/spec.md#requirement-a-base-from-git)) |
+| `--base-record=<file>` | The base of the comparison, a record `--record` wrote (`audit`) |
+| `--head-record=<file>` | The head of the comparison, a record `--record` wrote; default the working tree (`audit`) |
+| `--fail-on=<classes>` | Exit 1 when the audit lists a finding of one of the comma-separated classes, `all` for every weakening (`audit`) ([The policy exit](../../specs/audit/spec.md#requirement-the-policy-exit)) |
 
 The requirements behind some of these flags: `--control` [Stopping gotest through its standard input](../../specs/lifecycle/spec.md#requirement-stopping-gotest-through-its-standard-input), `--stamp` [Stamping a saved stream](../../specs/cli/spec.md#requirement-stamping-a-saved-stream), `--declared` [The declared specification under a run's verdicts](../../specs/spec/spec.md#requirement-the-declared-specification-under-a-runs-verdicts), `--hide` [Hiding rows by status](../../specs/spec/spec.md#requirement-hiding-rows-by-status), `--match` and `--only` [Searching and picking rows](../../specs/spec/spec.md#requirement-searching-and-picking-rows).
 A `--control` value other than `stdin`, or one beside `--input=-`, exits 2. The commands that take `--control` are the runs, `spec`, `summary`, `watch`, `bench`, `fuzz` with its `triage` and `promote`, and `prepare`.
@@ -197,6 +203,7 @@ gotest ./... -v -race                    # run tests (default mode)
 gotest watch ./... -v                    # watch mode with verbose output
 gotest clean ./...                       # remove orphaned generated files
 gotest generate ./...                    # generate, no test execution
+gotest audit --base=origin/main          # what the change did to the suites
 gotest scaffold ./pkg/user.UserService   # generate suite skeleton
 gotest spec ./...                        # run tests, show behavioral spec
 gotest spec ./... --format=md --output=docs/spec.md

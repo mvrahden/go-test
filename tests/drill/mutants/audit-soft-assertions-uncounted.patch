@@ -1,0 +1,18 @@
+Expect: ^FAIL .*conformance/audit AuditRecord / TheTreeRecord / when audit --record runs over a module / counts the gotest assertions written in each body, those on t.Soft\(\) included, and marks AssertsBy, F_ and X_ \(
+Clause: when audit --record runs over a module → counts the gotest assertions written in each body, those on t.Soft() included, and marks AssertsBy, F_ and X_
+--- a/internal/gotestaudit/body.go
++++ b/internal/gotestaudit/body.go
+@@ -134,6 +134,13 @@
+ 				by = true
+ 			}
+ 		case assertionFuncs[fn.Name()]:
++			if len(call.Args) > 0 {
++				if arg, ok := call.Args[0].(*ast.CallExpr); ok {
++					if sel, ok := arg.Fun.(*ast.SelectorExpr); ok && sel.Sel.Name == "Soft" {
++						return true
++					}
++				}
++			}
+ 			n++
+ 			if polls[fn.Name()] {
+ 				return false

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditCompare / ThePolicyExit / when --fail-on names a class the document lists / exits 1 and the closing line names FAIL and the classes \(
+Clause: when --fail-on names a class the document lists → exits 1 and the closing line names FAIL and the classes
+--- a/internal/gotestaudit/policy.go
++++ b/internal/gotestaudit/policy.go
+@@ -45,7 +45,7 @@
+ func Breaks(d *Document, classes []string) bool {
+ 	for _, c := range classes {
+ 		if d.Summary.Classes[c] > 0 {
+-			return true
++			return false
+ 		}
+ 	}
+ 	return false

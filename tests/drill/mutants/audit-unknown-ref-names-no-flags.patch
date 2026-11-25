@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditGitBase / ABaseFromGit / when audit --base names no commit of the checkout / exits 2 naming --base-record and --head-record \(
+Clause: when audit --base names no commit of the checkout → exits 2 naming --base-record and --head-record
+--- a/cmd/gotest/auditbase.go
++++ b/cmd/gotest/auditbase.go
+@@ -33,7 +33,7 @@
+ 	}
+ 	commit, err := gitOutput(cwd, "rev-parse", "--verify", "--quiet", "--end-of-options", ref+"^{commit}")
+ 	if err != nil {
+-		return nil, fmt.Errorf("--base %q names no commit of this checkout; record the base yourself and give --base-record and --head-record", ref)
++		return nil, fmt.Errorf("--base %q names no commit of this checkout", ref)
+ 	}
+ 	prefix, err := gitOutput(cwd, "rev-parse", "--show-prefix")
+ 	if err != nil {

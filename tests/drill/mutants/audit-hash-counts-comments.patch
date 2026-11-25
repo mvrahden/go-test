@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditRecord / TheTreeRecord / when audit --record runs over a module / prints one document opening with version and schema that lists each suite, test, When, It and row with its display path, module-relative file and lines and body hash, and exits 0 \(
+Clause: when audit --record runs over a module → prints one document opening with version and schema that lists each suite, test, When, It and row with its display path, module-relative file and lines and body hash, and exits 0
+--- a/internal/gotestaudit/body.go
++++ b/internal/gotestaudit/body.go
+@@ -78,7 +78,7 @@
+ 	seg := src[start:end]
+ 	fs := token.NewFileSet()
+ 	var sc scanner.Scanner
+-	sc.Init(fs.AddFile("", -1, len(seg)), seg, nil, 0)
++	sc.Init(fs.AddFile("", -1, len(seg)), seg, nil, scanner.ScanComments)
+ 	var out []string
+ 	inSpan := -1
+ 	for {

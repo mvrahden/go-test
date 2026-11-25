@@ -1086,6 +1086,26 @@ shards of one run do not add up to every mutant exactly once.
 | `text-run-panic-read-as-a-pass` | a leaf that reported its count and then panicked reads as a pass in a text run | runner suite: the panicked leaf is vacuous |
 | `counts-file-never-opened` | the runtime writes no count to the file a text run names | canary: the assertcount text run under --ci exits 0 |
 | `raw-subtest-parent-a-text-leaf` | a test that ran a subtest through `t.T().Run` writes its count as a leaf's | canary: the assertcount text run names the raw parent vacuous |
+| `audit-hash-counts-comments` | a body's hash counts its comments, so a body only commented anew hashes differently | audit conformance: the record It finds the reworded It's hashes apart |
+| `audit-soft-assertions-uncounted` | an assertion given `t.Soft()` is not counted | audit conformance: the record It counts 1 assertion where the It writes 2 |
+| `audit-nodeadline-read-as-default` | `NoDeadline` is recorded as the 30s default | audit conformance: the record It finds the Stock suite's SetupTimeout 30s, not none |
+| `audit-record-paths-absolute` | a record's files are absolute paths | audit conformance: the record holds the staged directory |
+| `audit-rename-base-is-the-head` | a reworded or moved behavior's base place is its head's | audit conformance: the behaviors It finds the head's path on the base side |
+| `audit-ambiguous-rename-guessed` | a rename two removed behaviors could explain pairs the first | audit conformance: the ambiguous It finds the first copy reworded |
+| `audit-guard-unfound` | a guard the head adds is no finding | audit conformance: the weakenings It misses the guard finding |
+| `audit-changed-counted-as-a-weakening` | a changed body is a weakening | audit conformance: the informational It finds no informational finding |
+| `audit-suppression-matched-by-line` | suppressions are matched by line too, so one that moved is added | audit conformance: the moved-suppression It finds the moved comment |
+| `audit-evidence-null` | the document's evidence is null instead of an empty list | audit conformance: the JSON It finds no `"evidence":[]` |
+| `audit-text-behaviors-first` | the text format leaves the behaviors out | audit conformance: the text It finds no behaviors line |
+| `audit-markdown-weakenings-untabled` | the Markdown leaves the weakenings' table out | audit conformance: the Markdown It finds no weakenings table |
+| `audit-weakenings-fail-by-default` | a weakening fails the audit without a policy | audit conformance: the default-policy It sees exit 1 |
+| `audit-fail-on-ignored` | `--fail-on` never fails | audit conformance: the policy It sees exit 0 |
+| `audit-unknown-class-taken` | an unknown class is taken | audit conformance: the unknown-class It sees exit 0 |
+| `audit-base-recorded-from-the-worktree` | `--base` records the working tree as the base | audit conformance: the git It finds no finding where the records find 15 |
+| `audit-base-in-a-git-worktree` | `--base` checks the commit out as a git worktree of the checkout | audit conformance: the git It finds the worktree list changed |
+| `audit-unknown-ref-names-no-flags` | a ref the checkout lacks is refused without naming the record flags | audit conformance: the unknown-ref It finds the flags unnamed |
+| `audit-broken-package-unrecorded` | a package that does not compile is left out of the record | audit conformance: the broken-tree It finds no package |
+| `audit-broken-package-compared` | a package the head cannot read is compared, every behavior removed | audit conformance: the broken-tree It finds behaviors listed |
 
 ## Adding a mutant
 

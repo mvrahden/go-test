@@ -680,6 +680,7 @@ percentage = covered / total</div>
           <tr><td><code>gotest bench ./...</code></td><td>Run <code>Benchmark*</code> suite methods serially; <code>--save</code>, <code>--against</code> and <code>--gate</code> keep and compare baselines.</td></tr>
           <tr><td><code>gotest fuzz ./...</code></td><td>Search for new failing inputs with <code>Fuzz*</code> suite methods for a time budget (<code>--for</code>); <code>fuzz triage</code> and <code>fuzz promote</code> handle what it finds.</td></tr>
           <tr><td><code>gotest lint ./...</code></td><td>Static analysis for test suites — see <a href="#linter">Linter</a>.</td></tr>
+          <tr><td><code>gotest audit --base=&lt;ref&gt;</code></td><td>Compare the suites a change declares with its base, read from source: behaviors added, removed, reworded, moved and changed, and every finding that the estate got weaker; <code>--record</code> writes a tree&#39;s record for a later comparison.</td></tr>
           <tr><td><code>gotest scaffold ./pkg/user.Svc</code></td><td>Generate a suite skeleton from any Go type.</td></tr>
           <tr><td><code>gotest migrate ./...</code></td><td>Convert testify/suite tests automatically.</td></tr>
           <tr><td><code>gotest generate ./...</code></td><td>Generate suite files without running tests.</td></tr>
@@ -741,6 +742,11 @@ percentage = covered / total</div>
           <tr><td><code>--dry-run</code></td><td>Print the unified diff of every edit instead of writing it (<code>migrate</code>).</td></tr>
           <tr><td><code>--dir=&lt;skills-dir&gt;</code></td><td>Skills directory to install into, default <code>.agents/skills</code> (<code>skill install</code>).</td></tr>
           <tr><td><code>--cache</code></td><td>Remove every cached test binary no run is using (<code>clean</code>).</td></tr>
+          <tr><td><code>--record</code></td><td>Write the record of the tree as JSON instead of comparing (<code>audit</code>).</td></tr>
+          <tr><td><code>--base=&lt;ref&gt;</code></td><td>Record the commit the ref names, exported by git outside the checkout, as the base (<code>audit</code>).</td></tr>
+          <tr><td><code>--base-record=&lt;file&gt;</code></td><td>The base of the comparison, a record <code>--record</code> wrote (<code>audit</code>).</td></tr>
+          <tr><td><code>--head-record=&lt;file&gt;</code></td><td>The head of the comparison, a record <code>--record</code> wrote; default the working tree (<code>audit</code>).</td></tr>
+          <tr><td><code>--fail-on=&lt;classes&gt;</code></td><td>Exit 1 when the audit lists a finding of one of the comma-separated classes, <code>all</code> for every weakening (<code>audit</code>).</td></tr>
         </tbody>
       </table>
 

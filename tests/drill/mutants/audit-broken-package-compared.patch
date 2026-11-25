@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/audit AuditRecord / ATreeThatDoesNotCompile / when the head tree holds a package that does not compile / audit compares none of its behaviors, names it as not compared and exits 2 \(
+Clause: when the head tree holds a package that does not compile → audit compares none of its behaviors, names it as not compared and exits 2
+--- a/internal/gotestaudit/compare.go
++++ b/internal/gotestaudit/compare.go
+@@ -60,9 +60,6 @@
+ 				skipAll(hn)
+ 				hRoots = append(hRoots, hn...)
+ 			}
+-		case hp != nil && len(hp.Unreadable) > 0:
+-			doc.Incomplete = append(doc.Incomplete, bp.Path+": the head cannot be read: "+hp.Unreadable[0])
+-			skipAll(bn)
+ 		case hp != nil:
+ 			hn := suiteNodes(hp)
+ 			m.level(bn, hn)

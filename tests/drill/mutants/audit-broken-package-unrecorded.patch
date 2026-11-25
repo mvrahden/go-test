@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditRecord / ATreeThatDoesNotCompile / when the head tree holds a package that does not compile / audit --record lists the package with its errors and no suites and exits 2 \(
+Clause: when the head tree holds a package that does not compile → audit --record lists the package with its errors and no suites and exits 2
+--- a/internal/gotestaudit/read.go
++++ b/internal/gotestaudit/read.go
+@@ -50,7 +50,7 @@
+ 	}
+ 	for i := range pkgs.Broken {
+ 		pkg, m := brokenPackage(&pkgs.Broken[i])
+-		rec.Packages = append(rec.Packages, pkg)
++		_ = pkg
+ 		rec.Snapshots = append(rec.Snapshots, snapshotsIn(pkgs.Broken[i].Dir, m)...)
+ 	}
+ 	slices.SortFunc(rec.Packages, func(a, b Package) int { return cmp.Compare(a.Path, b.Path) })

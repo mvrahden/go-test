@@ -42,6 +42,8 @@ func showHelp(topic string) {
 		printScaffoldHelp()
 	case "lint":
 		printLintHelp()
+	case "audit":
+		printAuditHelp()
 	case "migrate":
 		printMigrateHelp()
 	case "refactor":
@@ -82,6 +84,7 @@ Subcommands:
   discover    Discover test suites and output JSON
   scaffold    Generate test suite skeleton
   lint        Run gotest-specific linter checks
+  audit       Compare a change's test estate with its base, from source
   migrate     Convert testify/suite tests to go-test format
   refactor    Source code refactoring tools
   skill       Install the agent skill matching this version
@@ -137,7 +140,14 @@ Use a bare "--" to separate gotest flags from go test flags,
 or to pass unrecognized flags to go test without validation.
 Everything after "-args" goes to the test binary as written.
 
-Environment:
+`, about.ShortInfo())
+	printUsageEnvironment()
+}
+
+// printUsageEnvironment ends the usage: the environment, the configuration
+// and examples.
+func printUsageEnvironment() {
+	fmt.Print(`Environment:
   CI=true                 Auto-enables --ci when GOTEST_CI is unset
   GOTEST_CI=0             Opt out of CI auto-detection
   GOTEST_AGENT=0          Turn agent output off where an agent is detected
@@ -164,7 +174,7 @@ Examples:
   gotest watch ./pkg/auth/...               Re-run on file changes
   gotest scaffold ./pkg/auth.ServiceImpl    Generate test suite skeleton
   gotest lint ./...                         Check for common suite mistakes
-`, about.ShortInfo())
+`)
 }
 
 func printTestHelp() {

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditGitBase / ABaseFromGit / when audit --base names a commit of the checkout / compares that commit's tree with the working tree's, as the records of both would \(
+Clause: when audit --base names a commit of the checkout → compares that commit's tree with the working tree's, as the records of both would
+--- a/cmd/gotest/auditbase.go
++++ b/cmd/gotest/auditbase.go
+@@ -64,7 +64,7 @@
+ 	}
+ 	args := append([]string{"audit", "--record", "--output=" + out}, loadFlags...)
+ 	cmd := exec.CommandContext(ctx, exe, append(args, patterns...)...) //nolint:gosec // G204: this CLI, recording the exported tree
+-	cmd.Dir = filepath.Join(tree, filepath.FromSlash(prefix))
++	cmd.Dir = filepath.Join(top, filepath.FromSlash(prefix))
+ 	var stderr strings.Builder
+ 	cmd.Stderr = &stderr
+ 	if err := cmd.Run(); err != nil {
