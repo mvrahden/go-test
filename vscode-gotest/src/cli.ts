@@ -5,6 +5,7 @@ import { execFile } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { promisify } from "node:util";
 import { resolveGoBinary, fileExists, clearGoBinaryCache } from "./goBinary.js";
+import { ManagedChild } from "./managedChild.js";
 import {
   goLine,
   hasReplaceDirective,
@@ -39,6 +40,10 @@ const DEFAULT_MODULE_PATH = "github.com/mvrahden/go-test/cmd/gotest";
 // gotestgen.MinRuntimeVersion (a Go test guards the order): a CLI the
 // extension accepts must enforce a runtime floor no newer than itself.
 export const MIN_CLI_VERSION = "v1.39.0";
+
+// The Change scope reads `gotest audit`, which v1.42.0 brings. A floor of
+// that one feature: below it the rest of the extension still works.
+export const AUDIT_CLI_VERSION = "v1.42.0";
 
 export interface CliCommand {
   bin: string;
@@ -226,16 +231,18 @@ export class GotestNotRequiredError extends CliUnavailableError {
 // already tells the user, so callers show no toast of their own. The advice
 // names the floor, the smallest move that satisfies it: @latest could raise
 // the go line further than needed. The dialog picks the newest that fits.
+// floor is the version required: the extension's, or one feature's.
 export class CliBelowFloorError extends CliUnavailableError {
   constructor(
     readonly pin: string,
     readonly modulePath: string,
     readonly pinnedDirs: string[],
     readonly log?: vscode.LogOutputChannel,
+    readonly floor: string = MIN_CLI_VERSION,
   ) {
     super(
-      `go.mod pins gotest ${pin}, but >= ${MIN_CLI_VERSION} is required. ` +
-        `Run: go get -tool ${modulePath}@${MIN_CLI_VERSION}`,
+      `go.mod pins gotest ${pin}, but >= ${floor} is required. ` +
+        `Run: go get -tool ${modulePath}@${floor}`,
     );
     this.name = "CliBelowFloorError";
   }
@@ -249,6 +256,75 @@ export function offerCliUpgrade(err: unknown): boolean {
   if (!(err instanceof CliBelowFloorError)) return false;
   showUpgradeDialog(err);
   return true;
+}
+
+// cliMeets says whether a CLI's reported version is at or above floor. A
+// dev build, a source checkout or a replace directive, is current.
+export function cliMeets(version: string, floor: string): boolean {
+  return version.startsWith("dev") || compareVersions(version, floor) >= 0;
+}
+
+// queryCliVersion asks the folder's CLI who it is: `gotest version`, through
+// the command the extension would run. Undefined when it says nothing usable.
+export async function queryCliVersion(
+  workspaceDir: string,
+  log?: vscode.LogOutputChannel,
+  timeoutMs = 120_000,
+): Promise<string | undefined> {
+  const cmd = await buildCliCommand(["version"], workspaceDir, log);
+  // A managed child: through go run the CLI is a grandchild a budget must
+  // reach too.
+  const mc = new ManagedChild(cmd.bin, cmd.args, {
+    cwd: workspaceDir,
+    kind: "version",
+  });
+  let stdout = "";
+  mc.child.stdout?.on("data", (chunk: string) => (stdout += chunk));
+  mc.child.stderr?.on("data", () => {});
+  mc.child.on("error", (err: Error) =>
+    log?.debug(`[cli] version query failed: ${err.message}`),
+  );
+  mc.child.stdin?.on("error", () => {});
+  mc.child.stdin?.end();
+  const budget = setTimeout(() => void mc.terminate("prompt"), timeoutMs);
+  try {
+    const { code } = await mc.exited;
+    if (code !== 0) return undefined;
+    return /^gotest\s+(\S+)/m.exec(stdout)?.[1];
+  } finally {
+    clearTimeout(budget);
+    mc.dispose();
+  }
+}
+
+// pinnedBelow is the floor error for a folder whose go.mod pins the CLI below
+// floor, so the upgrade dialog can move it; undefined when nothing pins it
+// below, or a replace directive decides the version.
+export async function pinnedBelow(
+  workspaceDir: string,
+  floor: string,
+  log?: vscode.LogOutputChannel,
+): Promise<CliBelowFloorError | undefined> {
+  const modulePath = cliPackagePath(workspaceDir);
+  const roots = await readModuleRoots(workspaceDir);
+  if (roots.some((r) => hasReplaceDirective(r.goMod, modulePath))) {
+    return undefined;
+  }
+  const pinned = roots
+    .map((root) => ({ root, version: requireVersion(root.goMod, modulePath) }))
+    .filter((p): p is { root: ModuleRoot; version: string } => !!p.version);
+  const pin = pinned
+    .map((p) => p.version)
+    .sort(compareVersions)
+    .at(-1);
+  if (!pin || compareVersions(pin, floor) >= 0) return undefined;
+  return new CliBelowFloorError(
+    pin,
+    modulePath,
+    pinned.map((p) => p.root.dir),
+    log,
+    floor,
+  );
 }
 
 function meetsFloor(version: string): boolean {
@@ -310,7 +386,7 @@ function showUpgradeDialog(err: CliBelowFloorError): void {
   upgradeState = "asking";
   vscode.window
     .showWarningMessage(
-      `gotest: go.mod pins gotest ${err.pin}, but >= ${MIN_CLI_VERSION} is required.`,
+      `gotest: go.mod pins gotest ${err.pin}, but >= ${err.floor} is required.`,
       "Upgrade",
     )
     .then(async (choice) => {
@@ -349,7 +425,7 @@ async function upgradeCli(err: CliBelowFloorError): Promise<void> {
       .join(", ");
     log?.warn(`[cli] upgrade blocked: ${declared}`);
     vscode.window.showWarningMessage(
-      `gotest: ${MIN_CLI_VERSION} and newer need go ${plan.needs.goLine}, but ${declared}. ` +
+      `gotest: ${err.floor} and newer need go ${plan.needs.goLine}, but ${declared}. ` +
         `Raise the go line to upgrade: go get -tool ${modulePath}@${plan.needs.release} raises it.`,
     );
   }
@@ -391,7 +467,7 @@ async function upgradeCli(err: CliBelowFloorError): Promise<void> {
 // lookUpUpgrade plans the upgrade, or says why there is none: undefined
 // after a failed or cancelled lookup, which leaves go.mod unchanged.
 async function lookUpUpgrade(
-  { modulePath, pinnedDirs, log }: CliBelowFloorError,
+  { modulePath, pinnedDirs, log, floor }: CliBelowFloorError,
   token: vscode.CancellationToken,
 ): Promise<UpgradePlan | undefined> {
   const cancel = new AbortController();
@@ -414,7 +490,7 @@ async function lookUpUpgrade(
       planUpgrade(
         modules.map((m) => ({ dir: m.dir, goLine: goLine(m.goMod) })),
         module,
-        MIN_CLI_VERSION,
+        floor,
         goReleaseQuery(goBin, dir, cancel.signal, log),
       ),
     );
