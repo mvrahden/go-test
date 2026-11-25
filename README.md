@@ -684,6 +684,13 @@ val  := gotest.Must(cache.Get(key))
 ```
 
 All assertions work with `*gotest.T` (suites), `*testing.T` (standalone tests), `*gotest.B` and `*gotest.F` (benchmarks and fuzz targets), and `*gotest.R` (polling callbacks).
+An assertion stops the test when it fails. Given `t.Soft()` it reports the failure and returns, so one run shows every mismatch, and the test fails when it ends ([Soft assertions](specs/assertions/spec.md#requirement-soft-assertions)):
+
+```go
+gotest.NoError(t, err)                       // fatal: the lines below read user
+gotest.Equal(t.Soft(), "ada", user.Name)
+gotest.Equal(t.Soft(), "ada@example.com", user.Email)
+```
 Assertion failures automatically trace back to the test call site — no `t.Helper()` calls needed in helper functions. The failure is located at the line that failed, a helper's included, and the message names the test's call site after it.
 
 ### Data-Driven Tests
@@ -705,7 +712,7 @@ func (s *Suite) TestParsing(t *gotest.T) {
 }
 ```
 
-Each entry becomes a subtest with its own verdict. A row that fails or skips ends the method there, so the rows after it do not run ([Each rows](specs/lifecycle/spec.md#requirement-each-rows)); a row to pass over uses `continue`. Over a literal table, `gotest spec --declared` lists the rows a failing row left unrun, as not run.
+Each entry becomes a subtest with its own verdict. A row's `t` is soft: a failing assertion fails the row and the method, and the rows after it still run, so one run reports every failing row. A row that calls `FailNow` or skips ends the method there ([Each rows](specs/lifecycle/spec.md#requirement-each-rows)); a row to pass over uses `continue`. Over a literal table, `gotest spec --declared` lists the rows a stopped row left unrun, as not run.
 Uses `Desc` or `Name` field for the test name, falls back to `#0`, `#1`, etc.
 
 ### Testing a Callback

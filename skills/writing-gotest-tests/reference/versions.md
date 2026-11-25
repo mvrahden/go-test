@@ -734,3 +734,23 @@ What v1.40 changes:
 5. **No result cache, now stated** — every run executes every suite it
    selects and never prints `(cached)`, as before; to rerun only what a
    change touches, use `gotest watch`.
+
+## v1.42
+
+What v1.42 changes:
+
+1. **Soft assertions** — `t.Soft()` hands any assertion a `T` it reports
+   to and goes on, so one run shows every mismatch (`api.md`, Soft
+   assertions). Below v1.42 every assertion stops the test.
+
+2. **An `Each` row's failure lets the rows after it run** — a row's `t`
+   is soft: a failing assertion fails the row and the method, and the row
+   and the rows after it go on. Below v1.42 the first failing assertion
+   in a row ended the method there. A row that relied on that to stop
+   before a dereference now panics after the failure; guard it with
+   `if t.T().Failed() { continue }` or a fatal check first.
+
+3. **`migrate` keeps testify's soft assertions soft** — `s.X`,
+   `s.Assert().X` and `assert.X` become `gotest.X(t.Soft(), …)`, and the
+   closing summary no longer counts assertions that now stop. Below v1.42
+   they became fatal.

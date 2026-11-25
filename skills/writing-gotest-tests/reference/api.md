@@ -4,7 +4,7 @@ Signatures and rules for assertions, polling, goroutines, suites, lifecycle, con
 
 ## Assertions
 
-All assertion functions call `FailNow()` on failure (fatal — test stops immediately).
+All assertion functions call `FailNow()` on failure (fatal — test stops immediately), unless given a soft `T` (v1.42+, below).
 All except `Eventually`, `Consistently` and `MatchSnapshot` (whose trailing arguments name the snapshot) accept optional trailing `msgAndArgs ...any` for custom error messages.
 
 ### Unconditional Failure
@@ -144,6 +144,32 @@ Assertions take the types they are given at face value and say what they cannot 
 - `InDelta` fails on a NaN delta and holds equal infinities within any delta ([InDelta at the edges of float64](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-indelta-at-the-edges-of-float64)), and measures integers exactly ([InDelta on integers](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-indelta-on-integers)).
 - A first extra argument of any string kind formats the rest; any other puts every extra argument in the message, and `ErrorAs` names the type it expected ([Failure messages](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-failure-messages)).
 - `JSONEq` compares numbers by value ([JSON numbers](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-json-numbers)) and refuses anything after the value ([One JSON value](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-one-json-value)), and `Equal` on values that do not fit one short line marks the lines that differ in a diff of their field-by-field renderings, each hunk led by the path of its first change such as `at [1].Name:` ([Mismatch diffs](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-mismatch-diffs), [Renderings](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-renderings), [Mismatches without a diff](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-mismatches-without-a-diff)); it names different dynamic types, diffs values that render alike by their raw fields or says where the rendering hides the difference, and never shows an address ([Values that look alike](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-values-that-look-alike)).
+
+### Soft assertions (v1.42+)
+
+```go
+t.Soft() *gotest.T                                   // a T whose failing assertions report and return
+```
+
+```go
+gotest.Equal(t.Soft(), want.Name, got.Name)
+gotest.Equal(t.Soft(), want.Email, got.Email)       // runs even when the line above failed
+```
+
+Every assertion takes it, so one run reports every mismatch instead of the first; the
+failure is located as a fatal one is, a helper's line included, and the test fails when
+it ends ([Soft assertions](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-soft-assertions)).
+Pass it to a helper taking `*gotest.T` and the helper's assertions go on too.
+`FailNow` and `Skipf` on it still stop, and `It`/`When` on it hand their bodies a fatal
+`T`. In a hook it fails the test the hook runs for and the hook goes on; `Eventually` and
+`Consistently` given it fail and return. `*gotest.B`, `*gotest.F` and a poll's `*gotest.R`
+have no soft form.
+
+Code after a failing soft assertion runs on the value that failed. Keep what a later line
+dereferences fatal — `gotest.NoError(t, err)` before `got.Name`, `gotest.NotZero(t, p)`
+before `p.X` — and make soft only the checks that can each fail on their own; a nil
+dereference after a soft failure panics, which fails the test with a second, noisier
+report.
 
 ## Eventually & Consistently
 
@@ -562,6 +588,7 @@ t.Context() context.Context                          // test context (respects d
 t.Skipf(format, args...)                             // skip the test with a formatted reason
 t.Errorf(format, args...)                            // fail and go on, at the caller's line
 t.FailNow()                                          // stop the test now
+t.Soft() *gotest.T                                   // v1.42+: assertions given it report and go on
 t.Setenv(key, value)                                 // set env var, restored after test
 t.TempDir() string                                   // create a temp dir, cleaned up after test
 t.Name() string                                      // the test's name (the wrapper's in a hook under a benchmark or fuzz target)
@@ -597,9 +624,14 @@ for t, entry := range gotest.Each(t, entries) {
 }
 ```
 Subtest names are derived from the entry struct's `Desc` or `Name` string field (if present), otherwise `#0`, `#1`, etc.
-Every row is its own subtest with its own verdict. A row that leaves early ends the method
-there — Go's range-over-func cannot resume a loop whose body left through `FailNow` or
-`Skipf` — so a row that should merely be passed over uses `continue` ([Each rows](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-each-rows)).
+Every row is its own subtest with its own verdict, and its `t` is soft (v1.42+): a failing
+assertion fails the row and the method, the row goes on, and so do the rows after it, so
+one run reports every failing row. Below v1.42 the first failing assertion ended the
+method there. A row that calls `FailNow` or `Skipf` still ends the method — Go's
+range-over-func cannot resume a loop whose body left early — so a row that should merely
+be passed over uses `continue` ([Each rows](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-each-rows)).
+A row whose later lines need an earlier check to hold guards them itself:
+`if t.T().Failed() { continue }`, or puts them in a `t.It`, whose `t` is fatal.
 
 ## Utilities
 

@@ -10,6 +10,9 @@ Assertions ARE the control flow: they halt the test on failure, so never
 wrap them (or manual fails) in guards — `if err != nil { gotest.Fail(t,
 …) }` and `if got != want { t.Fatal(…) }` are `fail-guard` lint errors;
 write `gotest.NoError(t, err)` / `gotest.Equal(t, want, got)` directly.
+`t.Soft()` (v1.42+) is the exception that goes on: an assertion given it
+reports and returns, and the test fails at its end; an `Each` row's `t` is
+soft already. Keep fatal every check a later line depends on.
 `Equal`/`NotEqual` take the EXPECTED value first. The linter does not
 check the order of an `Equal` you write; it only puts the constant first
 when it rewrites a `True(t, a == b)` or a guard into one.
@@ -33,7 +36,7 @@ when it rewrites a `True(t, a == b)` or a guard into one.
 | `Fail` | unconditional failure (Errorf + FailNow) — never as an if-guard body; state the assertion instead (`fail-guard`) |
 | `MatchSnapshot` | `(t, value, name...)` — `value` is a string (a named string type too), `[]byte`, `encoding.TextMarshaler`, `fmt.Stringer`, `json.Marshaler`, `error` or `io.Reader`; a nil value or nil pointer fails as such, and any other type fails with a list of the common ones (string, `[]byte`, `encoding.TextMarshaler`, `fmt.Stringer`, `json.Marshaler`, `error`); golden snapshots in `testdata/__snapshots__/<TestName>.snap` beside the test file (`<TestName>_ext.snap` for an external `_test` package); the trailing strings name several snapshots in one test, they are not a message. Update via `go tool gotest ./... --update-snapshots` — which writes in CI too; CI only refuses to create a missing baseline |
 | `Must[T]` | panic-on-error value extraction, for setup code |
-| `Each[E]` | table driver: `for t, tc := range gotest.Each(t, entries)` — subtest names come from a `Desc` or `Name` string field |
+| `Each[E]` | table driver: `for t, tc := range gotest.Each(t, entries)` — subtest names come from a `Desc` or `Name` string field; the row's `t` is soft (v1.42+), so every row runs |
 
 The poll handle `*gotest.R` intentionally satisfies testify's `TestingT`
 contract (`Errorf`+`FailNow`) — its surface is `Errorf`, `FailNow`,
