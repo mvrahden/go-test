@@ -23,7 +23,13 @@ export type ChangeState =
     }
   | { kind: "newSchema"; version?: string; schema: number; supported: number }
   | { kind: "error"; message: string }
-  | { kind: "doc"; model: ChangeModel; exitCode: number | null };
+  | {
+      kind: "doc";
+      model: ChangeModel;
+      exitCode: number | null;
+      // The audit's run was stopped: the document is incomplete, not failed.
+      stopped?: boolean;
+    };
 
 export interface ChangeView {
   state: ChangeState;
@@ -147,7 +153,7 @@ function changeContent(view: ChangeView): string {
     case "error":
       return `${noticeHtml(view)}<div class="render-error" role="alert">The audit failed.<pre class="error-output">${esc(s.message)}</pre></div>`;
     case "doc":
-      return docHtml(view, s.model, s.exitCode);
+      return docHtml(view, s.model, s.exitCode, s.stopped);
   }
 }
 
@@ -169,12 +175,13 @@ function docHtml(
   view: ChangeView,
   m: ChangeModel,
   exitCode: number | null,
+  stopped = false,
 ): string {
   const branch = m.headBranch ? `<b>${esc(m.headBranch)}</b> ` : "";
-  const exit =
-    exitCode !== 0 && exitCode !== null
-      ? ` · <span class="fail">exit ${exitCode}</span>`
-      : "";
+  let exit = "";
+  if (stopped) exit = ` · <span class="warn">run stopped</span>`;
+  else if (exitCode !== 0 && exitCode !== null)
+    exit = ` · <span class="fail">exit ${exitCode}</span>`;
   const counters = m.counters
     .map((c) => {
       const lit = c.tone && (typeof c.value === "string" || c.value > 0);
@@ -384,4 +391,5 @@ details.decision-group[open] > summary::before, details.accepted-group[open] > s
 details.more-ranges { display: inline; }
 details.more-ranges > summary { display: inline; cursor: pointer; color: var(--vscode-descriptionForeground); }
 .fail { color: var(--vscode-testing-iconFailed); }
+.warn { color: var(--vscode-testing-iconSkipped); }
 `;

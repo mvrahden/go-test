@@ -39,7 +39,7 @@ vi.mock("vscode", async () => {
   return buildVscodeStub(state as never);
 });
 
-import { ChangeScope } from "../../src/changeScope.js";
+import { ChangeScope, STOPPED_NOTICE } from "../../src/changeScope.js";
 import { SpecViewPanel } from "../../src/specView.js";
 import { clearBinaryCache } from "../../src/cli.js";
 import type { Memento } from "../../src/acceptance.js";
@@ -351,6 +351,39 @@ describe.skipIf(sh)("the Change scope", () => {
     );
     if (v.state.kind !== "doc") throw new Error(v.state.kind);
     expect(v.state.model.streams).toEqual([]);
+  }, 300_000);
+
+  it("stops a running audit's run through its stdin and shows the document it still writes", async () => {
+    const { s } = scope(checkout);
+    let spawned!: () => void;
+    const started = new Promise<void>((r) => (spawned = r));
+    setChildObserver({
+      spawned: (_pid, kind) => {
+        if (kind === "audit-run") spawned();
+        return undefined;
+      },
+      exited: () => {},
+    });
+    try {
+      const running = s.audit(checkout, "run");
+      await started;
+      await s.act({ act: "cancel" });
+      await running;
+    } finally {
+      setChildObserver(undefined);
+    }
+    const v = s.view();
+    expect(v.busy).toBe(false);
+    expect(v.notice).toBe(STOPPED_NOTICE);
+    if (v.state.kind !== "doc") throw new Error(JSON.stringify(v.state));
+    expect(v.state.exitCode).toBe(130);
+    expect(v.state.stopped).toBe(true);
+    expect(v.state.model.incomplete).toContain(
+      "--run: the run was stopped before its end; what it did not reach reads as not run",
+    );
+    expect(v.state.model.streams[0].text).toMatch(
+      /^this audit's run.*exit 130$/,
+    );
   }, 300_000);
 
   it("renders in the panel when the Change scope is chosen", async () => {

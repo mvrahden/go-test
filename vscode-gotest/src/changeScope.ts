@@ -69,6 +69,14 @@ export type AuditOutcome =
   | { ok: true; doc: AuditDocument; exitCode: number | null }
   | { ok: false; message: string };
 
+// The exit of an audit whose run was stopped through its stdin; it still
+// writes its document, the run named under incomplete.
+export const AUDIT_STOPPED_EXIT = 130;
+
+// The notice over the document of an audit whose run was stopped.
+export const STOPPED_NOTICE =
+  "The run was stopped: this audit judged what it reached; the rest reads as not run.";
+
 // interpretAuditExit reads a finished audit. A document on stdout stands
 // whatever the exit code: 2 still writes one for a package it could not
 // read, 1 for a policy. Without one, stderr says why.
@@ -114,6 +122,8 @@ interface FolderState {
   notice?: string;
   doc?: AuditDocument;
   exitCode?: number | null;
+  // The document is of a run that was stopped.
+  stopped?: boolean;
   baseRef?: string;
   baseLabel?: string;
   toplevel?: string;
@@ -219,6 +229,7 @@ export class ChangeScope implements vscode.Disposable {
         kind: "doc",
         model: buildChangeModel(fs.doc, (k) => accepted.has(k)),
         exitCode: fs.exitCode ?? null,
+        stopped: fs.stopped,
       };
     }
     return {
@@ -426,17 +437,25 @@ export class ChangeScope implements vscode.Disposable {
     this.deps.log.info(
       `[change] ${cmd.bin} ${cmd.args.join(" ")} (cwd ${folder})`,
     );
-    const outcome = await this.runChild(folder, fs, cmd.bin, cmd.args, mode);
+    const out = await this.spawnAudit(folder, fs, cmd.bin, cmd.args, mode);
+    const outcome = interpretAuditExit(out.code, out.stdout, out.stderr);
     if (!outcome.ok) {
       fs.state = { kind: "error", message: outcome.message };
       return;
     }
     fs.doc = outcome.doc;
     fs.exitCode = outcome.exitCode;
+    fs.stopped = out.stopped;
+    if (out.stopped) fs.notice = STOPPED_NOTICE;
     const model = buildChangeModel(outcome.doc);
     fs.targets = this.place(folder, fs.toplevel, outcome.doc, model);
     fs.runs = runsOf(model);
-    fs.state = { kind: "doc", model, exitCode: outcome.exitCode };
+    fs.state = {
+      kind: "doc",
+      model,
+      exitCode: outcome.exitCode,
+      stopped: out.stopped,
+    };
   }
 
   // evidenceArgs are --evidence for each chosen run whose file is there.
@@ -482,38 +501,29 @@ export class ChangeScope implements vscode.Disposable {
     return false;
   }
 
-  // runChild runs one audit. A plain one has a budget; one with a run
-  // runs tests, so it runs until it ends or is cancelled, and a stop gives
-  // its fixtures their teardown.
-  private async runChild(
-    folder: string,
-    fs: FolderState,
-    bin: string,
-    args: string[],
-    mode: AuditMode,
-  ): Promise<AuditOutcome> {
-    const { code, stdout, stderr } = await this.spawnAudit(
-      folder,
-      fs,
-      bin,
-      args,
-      mode,
-    );
-    return interpretAuditExit(code, stdout, stderr);
-  }
-
+  // spawnAudit runs one audit. A plain one has a budget; one with a run
+  // runs tests, so it runs until it ends or is cancelled: a stop on its
+  // stdin gives its fixtures their teardown, and the audit still writes
+  // its document; the signals are the fallback after the kill timeout.
   private async spawnAudit(
     folder: string,
     fs: FolderState,
     bin: string,
     args: string[],
     mode: AuditMode,
-  ): Promise<{ code: number | null; stdout: string; stderr: string }> {
+  ): Promise<{
+    code: number | null;
+    stdout: string;
+    stderr: string;
+    stopped: boolean;
+  }> {
     if (fs.cancelled) throw new Error("audit stopped");
     const budgetSeconds = auditTimeoutSeconds(folder);
+    const control = mode === "run";
     const mc = new ManagedChild(bin, args, {
       cwd: folder,
-      kind: mode === "run" ? "audit-run" : "audit",
+      kind: control ? "audit-run" : "audit",
+      control,
     });
     fs.child = mc;
     let stdout = "";
@@ -526,8 +536,11 @@ export class ChangeScope implements vscode.Disposable {
       if (stderr.length > 2 * STDERR_KEEP) stderr = stderr.slice(-STDERR_KEEP);
     });
     mc.child.on("error", (err: Error) => (spawnError = err));
-    mc.child.stdin?.on("error", () => {});
-    mc.child.stdin?.end();
+    // A control child's stdin stays open for the stop line.
+    if (!control) {
+      mc.child.stdin?.on("error", () => {});
+      mc.child.stdin?.end();
+    }
     const budget =
       mode === "static"
         ? setTimeout(() => {
@@ -539,8 +552,12 @@ export class ChangeScope implements vscode.Disposable {
       const { code } = await mc.exited;
       if (spawnError) throw spawnError;
       if (timedOut) throw new Error(`audit timed out after ${budgetSeconds}s`);
-      if (this.disposed || fs.cancelled) throw new Error("audit stopped");
-      return { code, stdout, stderr };
+      if (this.disposed) throw new Error("audit stopped");
+      if (!fs.cancelled) return { code, stdout, stderr, stopped: false };
+      // Stopped through its stdin, the run's audit is still a document.
+      if (control && code === AUDIT_STOPPED_EXIT && stdout.trim())
+        return { code, stdout, stderr, stopped: true };
+      throw new Error("audit stopped");
     } finally {
       clearTimeout(budget);
       mc.dispose();

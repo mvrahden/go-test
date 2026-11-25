@@ -278,6 +278,25 @@ describe("buildChangeBody", () => {
     );
   });
 
+  it("shows a stopped run's document as stopped, not as a failed exit", () => {
+    const d = doc({
+      incomplete: [
+        "--run: the run was stopped before its end; what it did not reach reads as not run",
+      ],
+    });
+    const state = { kind: "doc" as const, model: buildChangeModel(d) };
+    const stopped = buildChangeBody(
+      view({ state: { ...state, exitCode: 130, stopped: true } }),
+    );
+    expect(stopped).toContain('<span class="warn">run stopped</span>');
+    expect(stopped).not.toContain("exit 130");
+    expect(stopped).toContain("--run: the run was stopped before its end");
+    const failed = buildChangeBody(
+      view({ state: { ...state, exitCode: 130 } }),
+    );
+    expect(failed).toContain('<span class="fail">exit 130</span>');
+  });
+
   it("asks for a newer extension for an audit schema it does not read", () => {
     const html = buildChangeBody(
       view({
