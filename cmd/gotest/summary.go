@@ -134,16 +134,18 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		PackageOrder:    pkgs.Order,
 		Groups:          cfg.Groups,
 		SkipGroups:      cfg.SkipGroups,
+		Manifest:        runManifest(),
 	}, overlay)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
 
-	code := result.ExitCode
+	code, coverageFailure := coverageVerdict(coverProfile, minCoverage, result.ExitCode)
 	events, err := gotestspec.ParseEvents(bytes.NewReader(result.CapturedJSON))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: parsing test events: %s\n", err)
+		gotestrunner.EndRun(2)
 		return 2
 	}
 	noteStdlibTests(overlay.Plan.StdlibTests())
@@ -160,12 +162,15 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	if note := stdlibNote(overlay.Plan.StdlibTests()); note != "" {
 		notes = []string{note}
 	}
-	if err := writeSummaryOutput(tree, format, output, coverageProfile, noColor, github, elapsed, badgePath, groupRuns(result.Groups), notes); err != nil {
+	if err := writeSummaryOutput(tree, format, output, coverageProfile, noColor, github, elapsed, badgePath, groupRuns(result.Groups), notes, runOptions(events, &code)); err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		gotestrunner.EndRun(2)
 		return 2
 	}
 
-	return enforceCoverage(coverProfile, minCoverage, code)
+	fmt.Fprint(os.Stderr, coverageFailure)
+	gotestrunner.EndRun(code)
+	return code
 }
 
 func runSummaryFromInput(input, format, output, coverageProfile string, noColor, github, renderOnly bool, badgePath string) int {
@@ -190,7 +195,7 @@ func runSummaryFromInput(input, format, output, coverageProfile string, noColor,
 
 	tree := gotestspec.BuildTree(events, gotestspec.WithDeclarations(declarationsForStream(events, nil)))
 
-	if err := writeSummaryOutput(tree, format, output, coverageProfile, noColor, github, 0, badgePath, nil, nil); err != nil {
+	if err := writeSummaryOutput(tree, format, output, coverageProfile, noColor, github, 0, badgePath, nil, nil, runOptions(events, nil)); err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
@@ -221,7 +226,7 @@ func stdlibNote(byPkg map[string]int) string {
 
 // notes go under the Markdown headline only: the terminal summary and the
 // JSON document leave them on stderr.
-func writeSummaryOutput(tree []*gotestspec.Package, format, output, coverageProfile string, noColor, github bool, elapsed time.Duration, badgePath string, groups []gotestspec.GroupRun, notes []string) error {
+func writeSummaryOutput(tree []*gotestspec.Package, format, output, coverageProfile string, noColor, github bool, elapsed time.Duration, badgePath string, groups []gotestspec.GroupRun, notes []string, run []gotestspec.RenderOption) error {
 	var w io.Writer = os.Stdout
 	var closeFunc func()
 	if output != "" {
@@ -268,7 +273,7 @@ func writeSummaryOutput(tree []*gotestspec.Package, format, output, coverageProf
 	case "md", "markdown":
 		gotestspec.RenderMarkdownSummary(w, tree, mdOpts...)
 	case "json":
-		gotestspec.RenderJSON(w, tree, renderOpts...)
+		gotestspec.RenderJSON(w, tree, append(renderOpts, run...)...)
 	default:
 		gotestspec.RenderSummary(w, tree, renderOpts...)
 	}

@@ -204,7 +204,9 @@ func runTest(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	cfg.JSON = jsonMode
 	cfg.Events = eventsWriter(events)
 
-	return enforceCoverage(coverProfile, minCoverage, Run(cfg))
+	code := enforceCoverage(coverProfile, minCoverage, Run(cfg))
+	gotestrunner.EndRun(code)
+	return code
 }
 
 func parseMinFlag(own OwnFlags) (int, error) {
@@ -379,19 +381,25 @@ func ensureCoverProfile(goTestArgs []string, needed bool) ([]string, string, fun
 }
 
 func enforceCoverage(coverProfile string, minCoverage, code int) int {
+	code, failure := coverageVerdict(coverProfile, minCoverage, code)
+	fmt.Fprint(os.Stderr, failure)
+	return code
+}
+
+// coverageVerdict is the exit code a --min limit leaves code at, and what
+// stderr says when the limit fails the run; "" when it does not.
+func coverageVerdict(coverProfile string, minCoverage, code int) (int, string) {
 	if code != 0 || minCoverage <= 0 || coverProfile == "" {
-		return code
+		return code, ""
 	}
 	pct, err := readCoverageTotal(coverProfile)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "FAIL: reading coverage: %s\n", err)
-		return 2
+		return 2, fmt.Sprintf("FAIL: reading coverage: %s\n", err)
 	}
 	if pct < float64(minCoverage) {
-		fmt.Fprintf(os.Stderr, "\nFAIL: %.1f%% coverage (minimum %d%%)\n", pct, minCoverage)
-		return 1
+		return 1, fmt.Sprintf("\nFAIL: %.1f%% coverage (minimum %d%%)\n", pct, minCoverage)
 	}
-	return code
+	return code, ""
 }
 
 func readCoverageTotal(profilePath string) (float64, error) {

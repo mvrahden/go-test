@@ -119,6 +119,9 @@ type event struct {
 	Action  string `json:"Action"`
 	Package string `json:"Package"`
 	Test    string `json:"Test"`
+	Result  *struct {
+		ExitCode int `json:"ExitCode"`
+	} `json:"Result"`
 }
 
 // run executes the CLI in -json mode over one fixture package.
@@ -156,6 +159,14 @@ func (s *canary) runIn(t *gotest.T, dir, path, pkg, canaryDir string, env []stri
 		}
 		var ev event
 		if err := json.Unmarshal(line, &ev); err != nil {
+			continue
+		}
+		if ev.Package == protocol.RunPackage {
+			// The run's own verdict is no package's: it must name the exit
+			// code, and adds no row.
+			if ev.Result != nil && ev.Result.ExitCode != code {
+				fatalf(t, "run %s: the stream closed with exit code %d, the run exited %d", pkg, ev.Result.ExitCode, code)
+			}
 			continue
 		}
 		if ev.Action != "pass" && ev.Action != "fail" && ev.Action != "skip" {

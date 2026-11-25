@@ -2,12 +2,12 @@ Expect: ^FAIL .*conformance/cli CLISummary / TheStdlibNote / when gotest summary
 Clause: when gotest summary writes Markdown for a package that holds a suite and a stdlib test → the note of the stdlib tests not run follows the headline
 --- a/cmd/gotest/summary.go
 +++ b/cmd/gotest/summary.go
-@@ -161,7 +161,7 @@
+@@ -160,7 +160,7 @@
  	elapsed := time.Since(pipelineStart)
  	var notes []string
  	if note := stdlibNote(overlay.Plan.StdlibTests()); note != "" {
 -		notes = []string{note}
 +		_ = note
  	}
- 	if err := writeSummaryOutput(tree, format, output, coverageProfile, noColor, github, elapsed, badgePath, groupRuns(result.Groups), notes); err != nil {
+ 	if err := writeSummaryOutput(tree, format, output, coverageProfile, noColor, github, elapsed, badgePath, groupRuns(result.Groups), notes, runOptions(events, &code)); err != nil {
  		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
