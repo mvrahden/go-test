@@ -1111,6 +1111,7 @@ gotest scaffold ./pkg/user.Svc # generate suite skeleton from type
 gotest lint ./...              # static analysis for test suites
 gotest refactor toggle-focus user_test.go UserTestSuite  # toggle an F_ prefix on a suite (or Suite.Method)
 gotest skill install           # install the agent skill matching this version
+gotest hook pre-shell          # answer a coding agent's hook event on stdin (the plugin wires it)
 gotest migrate ./...           # convert testify/suite to go-test
 gotest generate ./...          # run code generation only (no tests)
 gotest clean ./...             # remove orphaned generated files
@@ -1171,6 +1172,29 @@ Agents with a plugin system can install it as a plugin instead. A plugin carries
 | GitHub Copilot CLI | `copilot plugin marketplace add mvrahden/go-test`, then `copilot plugin install gotest@go-test` |
 | VS Code with Copilot Chat | included in the [gotest extension](vscode-gotest) |
 | Any other agent | `npx skills add mvrahden/go-test` |
+
+The Claude Code plugin also carries hooks that call `gotest hook` ([An agent's hook events](specs/cli/spec.md#requirement-an-agents-hook-events)).
+After the agent edits a `_test.go` file, it hands the agent what `gotest lint` reports for that package ([Lint findings after an agent's edit](specs/cli/spec.md#requirement-lint-findings-after-an-agents-edit)).
+Before the agent runs `go test` over suites, which `go test` does not run, it names the gotest command line that does ([A note before go test skips the suites](specs/cli/spec.md#requirement-a-note-before-go-test-skips-the-suites)); the command still runs.
+The hooks use `go tool gotest` where `go.mod` declares the tool and the `gotest` on `PATH` otherwise, download nothing, and do nothing where neither knows the `hook` command.
+They need `sh`, which Claude Code on Windows has through Git Bash.
+
+Codex reads the same hook events from `.codex/hooks.json` (or `~/.codex/hooks.json`), which you trust once with `/hooks`. In a module that declares the tool, this gives Codex the note before `go test`:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [{ "type": "command", "command": "GOPROXY=off go tool gotest hook pre-shell", "timeout": 30 }]
+      }
+    ]
+  }
+}
+```
+
+Codex passes an `apply_patch` edit to its hooks in `tool_input.command`, with no file path, so `post-edit` has no file to lint there; Cursor's shell hook must return a permission decision, so it is not wired.
 
 An agent without skill support can still be pointed at the installed `SKILL.md` from its instructions file, such as `AGENTS.md`. The skill source lives in [`skills/writing-gotest-tests`](skills/writing-gotest-tests).
 
