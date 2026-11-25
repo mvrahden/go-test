@@ -24,7 +24,7 @@ type SoftTestSuite struct{}
 
 func (s *SoftTestSuite) TestMethod(t *gotest.T) {
 	gotest.Equal(t.Soft(), 1, 2)
-	gotest.True(t.Soft(), false)
+	gotest.True(gotest.NewTWithDeadline(t.Soft(), time.Minute), false)
 	mark("after the soft failures")
 }
 
