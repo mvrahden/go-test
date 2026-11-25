@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/scenarios ScenariosBinding / Ambiguity / when a clause's text equals Its declared at two places under Whens with the scenario's text / lists the scenario as ambiguous, naming the file and line of both Its \(
+Clause: when a clause's text equals Its declared at two places under Whens with the scenario's text → lists the scenario as ambiguous, naming the file and line of both Its
+--- a/internal/gotestscenarios/bind.go
++++ b/internal/gotestscenarios/bind.go
+@@ -258,7 +258,7 @@
+ 			c.Status = StatusUnbound
+ 		case len(c.its) == 0:
+ 			c.Status = StatusUnbound
+-		case len(c.its) > 1 || c.shared:
++		case len(c.its) > 2 || c.shared:
+ 			c.Status = StatusAmbiguous
+ 		case !evidence:
+ 			c.Status = StatusBound

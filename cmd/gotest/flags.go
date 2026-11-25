@@ -78,6 +78,9 @@ var gotestFlags = map[string]FlagKind{
 	"--base-evidence": ListFlag,
 	"--run":           BoolFlag,
 	"--diff":          ValueFlag,
+	"--specs":         ValueFlag,
+	"--verify":        BoolFlag,
+	"--unstated":      BoolFlag,
 }
 
 var testAllowed = flagSet(

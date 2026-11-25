@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/scenarios ScenariosBinding / BehaviorsNoClauseStates / when a bound When holds an It no clause states and --unstated is given / lists that It as unstated with its file and line \(
+Clause: when a bound When holds an It no clause states and --unstated is given → lists that It as unstated with its file and line
+--- a/internal/gotestscenarios/bind.go
++++ b/internal/gotestscenarios/bind.go
+@@ -336,7 +336,7 @@
+ 	}
+ 	out := []Place{}
+ 	for key, x := range its {
+-		if bound[x.whenKey] && !claimed[key] {
++		if bound[x.whenKey] && !claimed[key] && false {
+ 			out = append(out, x.place)
+ 		}
+ 	}

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/scenarios ScenariosBinding / BindingByText / when the only It with a clause's text is under an Each row and not a When, or in a suite X_ excludes / lists the scenario as unbound \(
+Clause: when the only It with a clause's text is under an Each row and not a When, or in a suite X_ excludes → lists the scenario as unbound
+--- a/internal/gotestscenarios/bind.go
++++ b/internal/gotestscenarios/bind.go
+@@ -81,7 +81,7 @@
+ 		for _, suite := range pkg.Nodes {
+ 			var visit func(n *gotestspec.Node, ancestors []*gotestspec.Node)
+ 			visit = func(n *gotestspec.Node, ancestors []*gotestspec.Node) {
+-				if n.Excluded {
++				if n.Excluded && false {
+ 					return
+ 				}
+ 				if parent := last(ancestors); n.Vocab == gotestspec.VocabIt && parent != nil && parent.Vocab == gotestspec.VocabWhen {

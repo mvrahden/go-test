@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/scenarios ScenariosDocument / ThePolicyExit / when --fail-on names an unknown status / refuses it with exit 2, naming the statuses \(
+Clause: when --fail-on names an unknown status → refuses it with exit 2, naming the statuses
+--- a/internal/gotestscenarios/policy.go
++++ b/internal/gotestscenarios/policy.go
+@@ -44,7 +44,7 @@
+ 		case slices.Contains(Classes, c):
+ 			want[c] = true
+ 		default:
+-			return nil, fmt.Errorf("unknown status %q; the statuses are %s and %s", c, strings.Join(Classes, ", "), ClassAll)
++			continue
+ 		}
+ 	}
+ 	if len(want) == 0 {

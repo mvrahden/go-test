@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/scenarios ScenariosEvidence / Evidence / when a clause's It was skipped or its suite's guard kept it from running / lists the scenario as not-run, not verified \(
+Clause: when a clause's It was skipped or its suite's guard kept it from running → lists the scenario as not-run, not verified
+--- a/internal/gotestscenarios/bind.go
++++ b/internal/gotestscenarios/bind.go
+@@ -283,7 +283,7 @@
+ 		switch {
+ 		case n.Status == gotestspec.StatusFail:
+ 			s = StatusFailing
+-		case n.NotRun || n.Status == gotestspec.StatusSkip || n.Status == gotestspec.StatusNone:
++		case n.NotRun:
+ 			s = StatusNotRun
+ 		case n.Vacuous():
+ 			s = StatusVacuous

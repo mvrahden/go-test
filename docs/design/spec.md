@@ -121,6 +121,7 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `fuzz` | Orchestrate `FuzzX` suite targets with a shared time budget |
 | `lint` | Run gotest-specific linter checks |
 | `audit` | Record a tree's test estate from source, or compare a head with a base: behaviors added, removed, reworded, moved and changed, and what got weaker ([Audit](../../specs/audit/spec.md#requirement-the-tree-record)) |
+| `scenarios` | Bind the scenarios of OpenSpec spec files to the suites' `When` and `It` labels by text, read from source, and judge them by a saved stream or a run of the bound packages ([Binding by text](../../specs/scenarios/spec.md#requirement-binding-by-text), [Evidence](../../specs/scenarios/spec.md#requirement-evidence)) |
 | `refactor` | Toggle focus prefixes: `refactor toggle-focus <file> <Suite[.Method]>` |
 | `skill` | Install the agent skill shipped with this version: `skill install [--dir=<skills-dir>]` |
 | `hook` | Answer a coding agent's hook event read on stdin: `hook post-edit\|pre-shell\|stop` |
@@ -151,7 +152,7 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `--skip-group=<name>` | Leave the suites of this `ExclusiveGroup` out (repeatable) |
 | `--agent` | Print a text run for a coding agent: what failed, whole, then the verdict as the last line of stdout; on by itself under `AI_AGENT` or `CLAUDECODE=1`, off with `--agent=false` or `GOTEST_AGENT=0` ([Agent output](../../specs/cli/spec.md#requirement-agent-output), [The closing line](../../specs/cli/spec.md#requirement-the-closing-line)) |
 | `--failed` | Rerun only what the last run in the working directory failed, read from the record each run leaves in the cache (default runs, `-json`, `spec`, `summary`) ([Rerunning what failed](../../specs/cli/spec.md#requirement-rerunning-what-failed), [A run's record](../../specs/cli/spec.md#requirement-a-runs-record)) |
-| `--input=<path>` | Replay a saved `go test -json` stream in `spec`/`summary` (`-` reads stdin); exit 2 when it holds no test events, a package or failed build has no verdict, or a package failed to build |
+| `--input=<path>` | Replay a saved `go test -json` stream in `spec`/`summary`, or judge the scenarios by it in `scenarios` (`-` reads stdin); exit 2 when it holds no test events, a package or failed build has no verdict, or a package failed to build |
 | `--events-file=<path>` | With `-json`, or in `summary`, also write the run's `go test -json` event stream to the file as `-json` prints it (a suite's events when its process ends), making its directories and replacing a file there; `summary --input` reads it back; a text run refuses it, and an unwritable path exits 2 before anything is built |
 | `--control=stdin` | Read `stop` and `force` lines on standard input, a first and a second interrupt, counted with the signals, the input's end a stop when none is under way; taken by every command that stops on an interrupt, and without it standard input is never read |
 | `--github` | Emit GitHub annotations and step summary (auto-enabled in GitHub Actions) |
@@ -186,6 +187,9 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `--base-evidence=<stream>` | A saved `-json` stream of a run of the base, repeatable, for the run-time assertions of an assertions finding (`audit`) ([Assertions at run time](../../specs/audit/spec.md#requirement-assertions-at-run-time)) |
 | `--run` | Run the packages of the changed behaviors, with coverage of the changed production packages, and take the run as current evidence (`audit`) ([The audit's own run](../../specs/audit/spec.md#requirement-the-audits-own-run)) |
 | `--diff=<file\|->` | The changed lines the unproven ones are read from, as a unified diff, where `--base` does not give them (`audit`) |
+| `--specs=<paths>` | Spec files and directories to read, comma-separated, instead of `specs/` and `openspec/specs/` (`scenarios`; default `scenarios.specs` from `.gotest.yml`) ([Reading the spec files](../../specs/scenarios/spec.md#requirement-reading-the-spec-files)) |
+| `--verify` | Run the packages that hold a bound `It` and judge the scenarios by that run (`scenarios`) ([Evidence](../../specs/scenarios/spec.md#requirement-evidence)) |
+| `--unstated` | Also list the `It`s under bound `When`s that no clause states (`scenarios`) ([Behaviors no clause states](../../specs/scenarios/spec.md#requirement-behaviors-no-clause-states)) |
 
 The requirements behind some of these flags: `--control` [Stopping gotest through its standard input](../../specs/lifecycle/spec.md#requirement-stopping-gotest-through-its-standard-input), `--stamp` [Stamping a saved stream](../../specs/cli/spec.md#requirement-stamping-a-saved-stream), `--declared` [The declared specification under a run's verdicts](../../specs/spec/spec.md#requirement-the-declared-specification-under-a-runs-verdicts), `--hide` [Hiding rows by status](../../specs/spec/spec.md#requirement-hiding-rows-by-status), `--match` and `--only` [Searching and picking rows](../../specs/spec/spec.md#requirement-searching-and-picking-rows).
 A `--control` value other than `stdin`, or one beside `--input=-`, exits 2. The commands that take `--control` are the runs, `spec`, `summary`, `watch`, `bench`, `fuzz` with its `triage` and `promote`, and `prepare`.
@@ -208,6 +212,7 @@ gotest watch ./... -v                    # watch mode with verbose output
 gotest clean ./...                       # remove orphaned generated files
 gotest generate ./...                    # generate, no test execution
 gotest audit --base=origin/main          # what the change did to the suites
+gotest scenarios --verify                # which OpenSpec scenarios the suites prove
 gotest scaffold ./pkg/user.UserService   # generate suite skeleton
 gotest spec ./...                        # run tests, show behavioral spec
 gotest spec ./... --format=md --output=docs/spec.md
@@ -246,6 +251,8 @@ compile-parallel: 4        # --compile-parallel
 debounce: 500ms            # --debounce (watch)
 lint:
   skip: [stdlib-test, testify]   # lint rule IDs to disable project-wide
+scenarios:
+  specs: [specs, openspec/specs] # --specs (scenarios), relative to the module root
 ```
 
 The file configures tool behavior only — never test semantics (see Design Principle 2).

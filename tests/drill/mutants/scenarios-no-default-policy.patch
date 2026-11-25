@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/scenarios ScenariosDocument / ThePolicyExit / when the evidence holds a failing scenario and no --fail-on is given / exits 1 and the closing line names FAIL and the statuses failing and ambiguous \(
+Clause: when the evidence holds a failing scenario and no --fail-on is given → exits 1 and the closing line names FAIL and the statuses failing and ambiguous
+--- a/internal/gotestscenarios/policy.go
++++ b/internal/gotestscenarios/policy.go
+@@ -18,7 +18,7 @@
+ 
+ // DefaultFailOn is the policy of a document with evidence when --fail-on
+ // is not given.
+-var DefaultFailOn = []string{StatusAmbiguous, StatusFailing}
++var DefaultFailOn []string
+ 
+ // NeedsEvidence reports a class only evidence can find.
+ func NeedsEvidence(class string) bool {

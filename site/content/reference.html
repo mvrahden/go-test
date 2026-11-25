@@ -490,6 +490,7 @@ CacheFixture.AfterAll <span class="d">─┘</span></div>
           <tr><td><code>compile-parallel</code></td><td>int</td><td>0 (auto)</td><td><code>--compile-parallel</code></td><td>Concurrent compilation processes. 0 means NumCPU, auto-halved under <code>-race</code>/<code>-msan</code>/<code>-asan</code>.</td></tr>
           <tr><td><code>debounce</code></td><td>duration</td><td>200ms</td><td><code>--debounce</code></td><td>Watch mode re-run delay.</td></tr>
           <tr><td><code>lint.skip</code></td><td>[string]</td><td><em>none</em></td><td>—</td><td>Non-integrity lint rules to disable: <code>assertion-redundant</code>, <code>assertion-simplify</code>, <code>behavior-wording</code>, <code>bench-fixture-io</code>, <code>bench-wait</code>, <code>config-no-deadline</code>, <code>fail-guard</code>, <code>fuzz-hook-io</code>, <code>fuzz-no-oracle</code>, <code>fuzz-raw-seed</code>, <code>fuzz-seed</code>, <code>stdlib-test</code>, <code>t-escape</code>, <code>testify</code>.</td></tr>
+          <tr><td><code>scenarios.specs</code></td><td>[string]</td><td><code>specs</code>, <code>openspec/specs</code></td><td><code>--specs</code></td><td>Spec files and directories <code>gotest scenarios</code> reads, relative to the module root.</td></tr>
         </tbody>
       </table>
       <div class="code-block">
@@ -681,6 +682,7 @@ percentage = covered / total</div>
           <tr><td><code>gotest fuzz ./...</code></td><td>Search for new failing inputs with <code>Fuzz*</code> suite methods for a time budget (<code>--for</code>); <code>fuzz triage</code> and <code>fuzz promote</code> handle what it finds.</td></tr>
           <tr><td><code>gotest lint ./...</code></td><td>Static analysis for test suites — see <a href="#linter">Linter</a>.</td></tr>
           <tr><td><code>gotest audit --base=&lt;ref&gt;</code></td><td>Compare the suites a change declares with its base, read from source: behaviors added, removed, reworded, moved and changed, and every finding that the estate got weaker; <code>--record</code> writes a tree&#39;s record for a later comparison.</td></tr>
+          <tr><td><code>gotest scenarios</code></td><td>Bind the scenarios of OpenSpec spec files to the suites&#39; <code>When</code> and <code>It</code> labels by text, read from source; <code>--input</code> or <code>--verify</code> judges each bound scenario verified, failing, not-run or vacuous.</td></tr>
           <tr><td><code>gotest scaffold ./pkg/user.Svc</code></td><td>Generate a suite skeleton from any Go type.</td></tr>
           <tr><td><code>gotest migrate ./...</code></td><td>Convert testify/suite tests automatically.</td></tr>
           <tr><td><code>gotest generate ./...</code></td><td>Generate suite files without running tests.</td></tr>
@@ -751,6 +753,9 @@ percentage = covered / total</div>
           <tr><td><code>--base-evidence=&lt;stream&gt;</code></td><td>A saved <code>-json</code> stream of a run of the base, repeatable, for the run-time assertions of an assertions finding (<code>audit</code>).</td></tr>
           <tr><td><code>--run</code></td><td>Run the packages of the changed behaviors, with coverage of the changed production packages, and take the run as current evidence (<code>audit</code>).</td></tr>
           <tr><td><code>--diff=&lt;file|-&gt;</code></td><td>The changed lines the unproven ones are read from, as a unified diff, where <code>--base</code> does not give them (<code>audit</code>).</td></tr>
+          <tr><td><code>--specs=&lt;paths&gt;</code></td><td>Spec files and directories to read instead of <code>specs/</code> and <code>openspec/specs/</code> (<code>scenarios</code>).</td></tr>
+          <tr><td><code>--verify</code></td><td>Run the packages that hold a bound <code>It</code> and judge the scenarios by that run (<code>scenarios</code>).</td></tr>
+          <tr><td><code>--unstated</code></td><td>Also list the <code>It</code>s under bound <code>When</code>s that no clause states (<code>scenarios</code>).</td></tr>
         </tbody>
       </table>
 

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/scenarios ScenariosReading / ReadingTheSpecFiles / when --specs names a change's specs directory / reads its ADDED and MODIFIED requirements and none of its REMOVED ones \(
+Clause: when --specs names a change's specs directory → reads its ADDED and MODIFIED requirements and none of its REMOVED ones
+--- a/internal/gotestscenarios/spec.go
++++ b/internal/gotestscenarios/spec.go
+@@ -59,7 +59,7 @@
+ 	heading     = regexp.MustCompile(`^ {0,3}(#{1,6})(?:[ \t]+(.*?))?[ \t]*$`)
+ 	closingHash = regexp.MustCompile(`[ \t]+#+$`)
+ 	// Requirement sections a main spec or a change's delta spec holds.
+-	readSections = map[string]bool{"requirements": true, "added requirements": true, "modified requirements": true}
++	readSections = map[string]bool{"requirements": true, "added requirements": true, "modified requirements": true, "removed requirements": true}
+ )
+ 
+ // Parse reads a spec file's scenarios. Every level-3 heading in a

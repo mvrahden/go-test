@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/scenarios ScenariosDocument / TheScenariosDocument / when scenarios writes the text format / lists the scenarios that are not bound or verified, each with the clause at fault, and ends stdout with a closing line naming the verdict, the exit code and the counts, with nothing on stderr \(
+Clause: when scenarios writes the text format → lists the scenarios that are not bound or verified, each with the clause at fault, and ends stdout with a closing line naming the verdict, the exit code and the counts, with nothing on stderr
+--- a/internal/gotestscenarios/render.go
++++ b/internal/gotestscenarios/render.go
+@@ -20,7 +20,7 @@
+ 				continue
+ 			}
+ 			fmt.Fprintf(w, "%-10s %s:%d  %s / %s\n", status, sc.File, sc.Line, sc.Requirement, sc.Title)
+-			for _, why := range faults(sc) {
++			for _, why := range faults(sc)[:0] {
+ 				fmt.Fprintf(w, "             %s\n", why)
+ 			}
+ 		}

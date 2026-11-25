@@ -1135,6 +1135,35 @@ shards of one run do not add up to every mutant exactly once.
 | `audit-needs-decision-only-on-failure` | only a failing row needs a decision | audit conformance: the decision It finds the vacuous row undecided |
 | `version-json-without-schema` | `version --json` names a schema the audit does not write | cli conformance: the version It finds schema 2 |
 | `audit-base-records-a-missing-directory` | a directory the commit lacks is recorded as a package that cannot be read | audit conformance: the missing-directory It sees exit 2 |
+| `scenarios-openspec-dir-unread` | the default directories leave out openspec/specs | scenarios conformance: the It of its clause fails |
+| `scenarios-bare-keywords-unread` | a clause whose keyword is bare capitals is not read | scenarios conformance: the It of its clause fails |
+| `scenarios-fences-read` | a code fence is read like the text around it | scenarios conformance: the It of its clause fails |
+| `scenarios-removed-requirements-read` | a REMOVED requirement of a delta spec is read | scenarios conformance: the It of its clause fails |
+| `scenarios-config-specs-ignored` | the scenarios.specs key is not read | scenarios conformance: the It of its clause fails |
+| `scenarios-no-spec-taken` | finding no spec file is no error | scenarios conformance: the It of its clause fails |
+| `scenarios-first-letter-unfolded` | the first letter keeps its case | scenarios conformance: the It of its clause fails |
+| `scenarios-given-ignored` | only the last condition is compared | scenarios conformance: the It of its clause fails |
+| `scenarios-missing-it-bound` | a clause no It states counts as bound | scenarios conformance: the It of its clause fails |
+| `scenarios-non-ascii-dropped` | letters outside ASCII are dropped before comparing | scenarios conformance: the It of its clause fails |
+| `scenarios-excluded-its-bind` | an It of an excluded suite binds | scenarios conformance: the It of its clause fails |
+| `scenarios-two-its-one-clause` | a clause two Its state binds the first | scenarios conformance: the It of its clause fails |
+| `scenarios-shared-it-unflagged` | an It two scenarios bind is no ambiguity | scenarios conformance: the It of its clause fails |
+| `scenarios-rows-apart` | each row of a table is an It of its own | scenarios conformance: the It of its clause fails |
+| `scenarios-unstated-unlisted` | --unstated lists nothing | scenarios conformance: the It of its clause fails |
+| `scenarios-unstated-unasked` | the unstated Its are listed without --unstated | scenarios conformance: the It of its clause fails |
+| `scenarios-vacuous-verified` | a pass with no assertion is verified | scenarios conformance: the It of its clause fails |
+| `scenarios-run-packages-unnamed` | the run names no package | scenarios conformance: the It of its clause fails |
+| `scenarios-skip-verified` | a skipped It reads as verified | scenarios conformance: the It of its clause fails |
+| `scenarios-verify-runs-everything` | --verify runs every package given | scenarios conformance: the It of its clause fails |
+| `scenarios-paths-absolute` | the document names files by their absolute path | scenarios conformance: the It of its clause fails |
+| `scenarios-text-faults-unsaid` | the text format names no clause at fault | scenarios conformance: the It of its clause fails |
+| `scenarios-markdown-untabled` | the Markdown writes no table header | scenarios conformance: the It of its clause fails |
+| `scenarios-default-policy-without-evidence` | the default policy holds without evidence too | scenarios conformance: the It of its clause fails |
+| `scenarios-no-default-policy` | evidence has no default policy | scenarios conformance: the It of its clause fails |
+| `scenarios-fail-on-statuses-ignored` | --fail-on matches no scenario status | scenarios conformance: the It of its clause fails |
+| `scenarios-unknown-status-taken` | an unknown status is taken | scenarios conformance: the It of its clause fails |
+| `scenarios-evidence-status-taken` | an evidence status is taken without evidence | scenarios conformance: the It of its clause fails |
+| `scenarios-broken-package-passes` | a package that does not compile leaves the exit at 0 | scenarios conformance: the It of its clause fails |
 
 ## Adding a mutant
 

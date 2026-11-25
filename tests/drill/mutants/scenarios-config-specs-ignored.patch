@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/scenarios ScenariosReading / ReadingTheSpecFiles / when \.gotest\.yml names a directory under scenarios\.specs and no --specs is given / reads the spec files of that directory and no other \(
+Clause: when .gotest.yml names a directory under scenarios.specs and no --specs is given → reads the spec files of that directory and no other
+--- a/cmd/gotest/scenarios.go
++++ b/cmd/gotest/scenarios.go
+@@ -165,7 +165,7 @@
+ 			return a, errors.New("--specs needs a spec file or directory")
+ 		}
+ 		a.specsBase = "."
+-	} else if len(cfg.Scenarios.Specs) > 0 {
++	} else if len(cfg.Scenarios.Specs) > 0 && false {
+ 		a.specs, a.specsBase = cfg.Scenarios.Specs, root
+ 	}
+ 	if own.Given("--fail-on") {

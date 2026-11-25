@@ -86,7 +86,7 @@
                       "vocab": "it"
                     }
                   ],
-                  "display": "when a leaf asserts on its T, its *testing.T, Ts made from them, in a helper, on a gotest.Go goroutine, in a poll and with TimeIsNow",
+                  "display": "when a leaf asserts on its T, a soft T, its *testing.T, Ts made from them, in a helper, on a gotest.Go goroutine, in a poll and with TimeIsNow",
                   "duration": 0,
                   "excluded": false,
                   "external": false,
@@ -94,7 +94,7 @@
                   "focused": false,
                   "kind": "block",
                   "line": 31,
-                  "name": "a_leaf_asserts_on_its_T,_its_*testing.T,_Ts_made_from_them,_in_a_helper,_on_a_gotest.Go_goroutine,_in_a_poll_and_with_TimeIsNow",
+                  "name": "a_leaf_asserts_on_its_T,_a_soft_T,_its_*testing.T,_Ts_made_from_them,_in_a_helper,_on_a_gotest.Go_goroutine,_in_a_poll_and_with_TimeIsNow",
                   "output": [],
                   "status": "none",
                   "vocab": "when"
@@ -3591,6 +3591,221 @@
           "name": "TestSnapshotKeysTestSuite",
           "output": [],
           "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "each failure names its assertion and the line it failed at",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "soft_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 25,
+                      "name": "each_failure_names_its_assertion_and_the_line_it_failed_at",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "the method goes on past them and fails",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "soft_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 30,
+                      "name": "the_method_goes_on_past_them_and_fails",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when soft assertions fail in a method",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "soft_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 24,
+                  "name": "soft_assertions_fail_in_a_method",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "an assertion that fails in its body ends the It there",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "soft_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 36,
+                      "name": "an_assertion_that_fails_in_its_body_ends_the_It_there",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when an It runs on a soft T",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "soft_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 35,
+                  "name": "an_It_runs_on_a_soft_T",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "BeforeEach goes on, the method runs and fails",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "soft_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 43,
+                      "name": "BeforeEach_goes_on,_the_method_runs_and_fails",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a soft assertion fails in BeforeEach",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "soft_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 42,
+                  "name": "a_soft_assertion_fails_in_BeforeEach",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the test goes on past it and fails",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "soft_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 51,
+                      "name": "the_test_goes_on_past_it_and_fails",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when Eventually is given a soft T and no poll passes",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "soft_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 50,
+                  "name": "Eventually_is_given_a_soft_T_and_no_poll_passes",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "SoftAssertions",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "soft_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 21,
+              "name": "TestSoftAssertions",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the soft failure names the helper's line and the caller's, and the test goes on",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "soft_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 68,
+                      "name": "the_soft_failure_names_the_helper's_line_and_the_caller's,_and_the_test_goes_on",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a soft assertion fails in a helper of a module whose path has no dot, built with -trimpath",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "soft_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 67,
+                  "name": "a_soft_assertion_fails_in_a_helper_of_a_module_whose_path_has_no_dot,_built_with_-trimpath",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "SoftHelperUnderTrimpath",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "soft_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 59,
+              "name": "TestSoftHelperUnderTrimpath",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "SoftAssertions",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "soft_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 13,
+          "name": "TestSoftAssertionsTestSuite",
+          "output": [],
+          "status": "none"
         }
       ],
       "output": [],
@@ -4039,617 +4254,6 @@
                   "children": [
                     {
                       "children": [],
-                      "display": "states for each added, reworded, moved and changed behavior and each finding's behavior its verdict, its run-time assertions, whether it passed vacuous and its AssertsBy",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "evidence_suite_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 167,
-                      "name": "states_for_each_added,_reworded,_moved_and_changed_behavior_and_each_finding's_behavior_its_verdict,_its_run-time_assertions,_whether_it_passed_vacuous_and_its_AssertsBy",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    },
-                    {
-                      "children": [],
-                      "display": "names a behavior the stream did not report not run, one X_ excludes skipped, and one of a package no stream holds no evidence",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "evidence_suite_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 198,
-                      "name": "names_a_behavior_the_stream_did_not_report_not_run,_one_X__excludes_skipped,_and_one_of_a_package_no_stream_holds_no_evidence",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    },
-                    {
-                      "children": [],
-                      "display": "lists the stream with its manifest's CLI version, commit, dirty flag, agent and exit code",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "evidence_suite_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 211,
-                      "name": "lists_the_stream_with_its_manifest's_CLI_version,_commit,_dirty_flag,_agent_and_exit_code",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    }
-                  ],
-                  "display": "when audit is given a stream of the head's run",
-                  "duration": 0,
-                  "excluded": false,
-                  "external": false,
-                  "file": "evidence_suite_test.go",
-                  "focused": false,
-                  "kind": "block",
-                  "line": 166,
-                  "name": "audit_is_given_a_stream_of_the_head's_run",
-                  "output": [],
-                  "status": "none",
-                  "vocab": "when"
-                }
-              ],
-              "display": "EvidenceFromRuns",
-              "duration": 0,
-              "excluded": false,
-              "external": false,
-              "file": "evidence_suite_test.go",
-              "focused": false,
-              "kind": "method",
-              "line": 165,
-              "name": "TestEvidenceFromRuns",
-              "output": [],
-              "status": "none"
-            },
-            {
-              "children": [
-                {
-                  "children": [
-                    {
-                      "children": [],
-                      "display": "marks each stale, naming another commit, uncommitted changes and no manifest",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "evidence_suite_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 228,
-                      "name": "marks_each_stale,_naming_another_commit,_uncommitted_changes_and_no_manifest",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    }
-                  ],
-                  "display": "when audit is given streams of another commit, of a tree with uncommitted changes and without a manifest",
-                  "duration": 0,
-                  "excluded": false,
-                  "external": false,
-                  "file": "evidence_suite_test.go",
-                  "focused": false,
-                  "kind": "block",
-                  "line": 227,
-                  "name": "audit_is_given_streams_of_another_commit,_of_a_tree_with_uncommitted_changes_and_without_a_manifest",
-                  "output": [],
-                  "status": "none",
-                  "vocab": "when"
-                },
-                {
-                  "children": [
-                    {
-                      "children": [],
-                      "display": "states the current stream's verdict and names the stale one's among the others",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "evidence_suite_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 247,
-                      "name": "states_the_current_stream's_verdict_and_names_the_stale_one's_among_the_others",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    }
-                  ],
-                  "display": "when a current and a stale stream judge one behavior",
-                  "duration": 0,
-                  "excluded": false,
-                  "external": false,
-                  "file": "evidence_suite_test.go",
-                  "focused": false,
-                  "kind": "block",
-                  "line": 246,
-                  "name": "a_current_and_a_stale_stream_judge_one_behavior",
-                  "output": [],
-                  "status": "none",
-                  "vocab": "when"
-                }
-              ],
-              "display": "CurrentAndStaleEvidence",
-              "duration": 0,
-              "excluded": false,
-              "external": false,
-              "file": "evidence_suite_test.go",
-              "focused": false,
-              "kind": "method",
-              "line": 226,
-              "name": "TestCurrentAndStaleEvidence",
-              "output": [],
-              "status": "none"
-            },
-            {
-              "children": [
-                {
-                  "children": [
-                    {
-                      "children": [],
-                      "display": "the assertions finding carries the base's and the head's run-time counts",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "evidence_suite_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 270,
-                      "name": "the_assertions_finding_carries_the_base's_and_the_head's_run-time_counts",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    }
-                  ],
-                  "display": "when audit is given a stream of each side's run and the head drops an assertion",
-                  "duration": 0,
-                  "excluded": false,
-                  "external": false,
-                  "file": "evidence_suite_test.go",
-                  "focused": false,
-                  "kind": "block",
-                  "line": 269,
-                  "name": "audit_is_given_a_stream_of_each_side's_run_and_the_head_drops_an_assertion",
-                  "output": [],
-                  "status": "none",
-                  "vocab": "when"
-                }
-              ],
-              "display": "AssertionsAtRunTime",
-              "duration": 0,
-              "excluded": false,
-              "external": false,
-              "file": "evidence_suite_test.go",
-              "focused": false,
-              "kind": "method",
-              "line": 268,
-              "name": "TestAssertionsAtRunTime",
-              "output": [],
-              "status": "none"
-            },
-            {
-              "children": [
-                {
-                  "children": [
-                    {
-                      "children": [],
-                      "display": "lists per file the changed executable lines no test executed as ranges, and counts them in the summary",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "evidence_suite_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 291,
-                      "name": "lists_per_file_the_changed_executable_lines_no_test_executed_as_ranges,_and_counts_them_in_the_summary",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    },
-                    {
-                      "children": [],
-                      "display": "counts no changed line that no block of the profile spans",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "evidence_suite_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 304,
-                      "name": "counts_no_changed_line_that_no_block_of_the_profile_spans",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    },
-                    {
-                      "children": [],
-                      "display": "lists a changed file of a package the profile does not cover as without coverage data",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "evidence_suite_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 311,
-                      "name": "lists_a_changed_file_of_a_package_the_profile_does_not_cover_as_without_coverage_data",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    }
-                  ],
-                  "display": "when audit is given a coverage profile and a diff that changes production lines",
-                  "duration": 0,
-                  "excluded": false,
-                  "external": false,
-                  "file": "evidence_suite_test.go",
-                  "focused": false,
-                  "kind": "block",
-                  "line": 290,
-                  "name": "audit_is_given_a_coverage_profile_and_a_diff_that_changes_production_lines",
-                  "output": [],
-                  "status": "none",
-                  "vocab": "when"
-                }
-              ],
-              "display": "UnprovenLines",
-              "duration": 0,
-              "excluded": false,
-              "external": false,
-              "file": "evidence_suite_test.go",
-              "focused": false,
-              "kind": "method",
-              "line": 289,
-              "name": "TestUnprovenLines",
-              "output": [],
-              "status": "none"
-            },
-            {
-              "children": [
-                {
-                  "children": [
-                    {
-                      "children": [],
-                      "display": "exits 1 and the closing line counts the evidence and names the class",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "evidence_suite_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 325,
-                      "name": "exits_1_and_the_closing_line_counts_the_evidence_and_names_the_class",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    },
-                    {
-                      "children": [],
-                      "display": "--fail-on=all names every weakening class and no proof class",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "evidence_suite_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 331,
-                      "name": "--fail-on=all_names_every_weakening_class_and_no_proof_class",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    }
-                  ],
-                  "display": "when --fail-on names failing and a stream fails a behavior the comparison names",
-                  "duration": 0,
-                  "excluded": false,
-                  "external": false,
-                  "file": "evidence_suite_test.go",
-                  "focused": false,
-                  "kind": "block",
-                  "line": 324,
-                  "name": "--fail-on_names_failing_and_a_stream_fails_a_behavior_the_comparison_names",
-                  "output": [],
-                  "status": "none",
-                  "vocab": "when"
-                },
-                {
-                  "children": [
-                    {
-                      "children": [],
-                      "display": "audit refuses it with exit 2, naming the flags that give it",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "evidence_suite_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 338,
-                      "name": "audit_refuses_it_with_exit_2,_naming_the_flags_that_give_it",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    }
-                  ],
-                  "display": "when --fail-on names a proof class and no stream or profile is given",
-                  "duration": 0,
-                  "excluded": false,
-                  "external": false,
-                  "file": "evidence_suite_test.go",
-                  "focused": false,
-                  "kind": "block",
-                  "line": 337,
-                  "name": "--fail-on_names_a_proof_class_and_no_stream_or_profile_is_given",
-                  "output": [],
-                  "status": "none",
-                  "vocab": "when"
-                }
-              ],
-              "display": "ProofInThePolicy",
-              "duration": 0,
-              "excluded": false,
-              "external": false,
-              "file": "evidence_suite_test.go",
-              "focused": false,
-              "kind": "method",
-              "line": 323,
-              "name": "TestProofInThePolicy",
-              "output": [],
-              "status": "none"
-            },
-            {
-              "children": [
-                {
-                  "children": [
-                    {
-                      "children": [],
-                      "display": "marks each row with its verdict and names each stream read under the first line",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "evidence_suite_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 354,
-                      "name": "marks_each_row_with_its_verdict_and_names_each_stream_read_under_the_first_line",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    },
-                    {
-                      "children": [],
-                      "display": "lists the removed, weakened and failing behaviors before the others",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "evidence_suite_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 371,
-                      "name": "lists_the_removed,_weakened_and_failing_behaviors_before_the_others",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    }
-                  ],
-                  "display": "when audit renders evidence in the text format",
-                  "duration": 0,
-                  "excluded": false,
-                  "external": false,
-                  "file": "evidence_suite_test.go",
-                  "focused": false,
-                  "kind": "block",
-                  "line": 353,
-                  "name": "audit_renders_evidence_in_the_text_format",
-                  "output": [],
-                  "status": "none",
-                  "vocab": "when"
-                },
-                {
-                  "children": [
-                    {
-                      "children": [],
-                      "display": "folds them into one line that counts them, and -v lists each",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "evidence_suite_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 400,
-                      "name": "folds_them_into_one_line_that_counts_them,_and_-v_lists_each",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    }
-                  ],
-                  "display": "when the text format lists five or more rows alike of one suite",
-                  "duration": 0,
-                  "excluded": false,
-                  "external": false,
-                  "file": "evidence_suite_test.go",
-                  "focused": false,
-                  "kind": "block",
-                  "line": 399,
-                  "name": "the_text_format_lists_five_or_more_rows_alike_of_one_suite",
-                  "output": [],
-                  "status": "none",
-                  "vocab": "when"
-                },
-                {
-                  "children": [
-                    {
-                      "children": [],
-                      "display": "writes the evidence as a column of the behaviors table and the unproven lines as a table",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "evidence_suite_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 432,
-                      "name": "writes_the_evidence_as_a_column_of_the_behaviors_table_and_the_unproven_lines_as_a_table",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    }
-                  ],
-                  "display": "when audit renders evidence with --format=md",
-                  "duration": 0,
-                  "excluded": false,
-                  "external": false,
-                  "file": "evidence_suite_test.go",
-                  "focused": false,
-                  "kind": "block",
-                  "line": 431,
-                  "name": "audit_renders_evidence_with_--format=md",
-                  "output": [],
-                  "status": "none",
-                  "vocab": "when"
-                }
-              ],
-              "display": "EvidenceInTheRenderings",
-              "duration": 0,
-              "excluded": false,
-              "external": false,
-              "file": "evidence_suite_test.go",
-              "focused": false,
-              "kind": "method",
-              "line": 352,
-              "name": "TestEvidenceInTheRenderings",
-              "output": [],
-              "status": "none"
-            },
-            {
-              "children": [
-                {
-                  "children": [
-                    {
-                      "children": [],
-                      "display": "finds on each finding and evidence row an id that stays when the lines move",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "evidence_suite_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 489,
-                      "name": "finds_on_each_finding_and_evidence_row_an_id_that_stays_when_the_lines_move",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    },
-                    {
-                      "children": [],
-                      "display": "finds on a finding each side's location, and the module of one without a package",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "evidence_suite_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 524,
-                      "name": "finds_on_a_finding_each_side's_location,_and_the_module_of_one_without_a_package",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    },
-                    {
-                      "children": [],
-                      "display": "finds on a finding, behavior and evidence row about a test the go test name and -run pattern that select it",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "evidence_suite_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 547,
-                      "name": "finds_on_a_finding,_behavior_and_evidence_row_about_a_test_the_go_test_name_and_-run_pattern_that_select_it",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    },
-                    {
-                      "children": [],
-                      "display": "finds each module's directory relative to the audited one and each side's branch",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "evidence_suite_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 582,
-                      "name": "finds_each_module's_directory_relative_to_the_audited_one_and_each_side's_branch",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    },
-                    {
-                      "children": [],
-                      "display": "finds on each evidence row whether it needs a decision, the stream it was judged by and that stream's commit",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "evidence_suite_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 591,
-                      "name": "finds_on_each_evidence_row_whether_it_needs_a_decision,_the_stream_it_was_judged_by_and_that_stream's_commit",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    }
-                  ],
-                  "display": "when a tool reads the audit document as JSON",
-                  "duration": 0,
-                  "excluded": false,
-                  "external": false,
-                  "file": "evidence_suite_test.go",
-                  "focused": false,
-                  "kind": "block",
-                  "line": 488,
-                  "name": "a_tool_reads_the_audit_document_as_JSON",
-                  "output": [],
-                  "status": "none",
-                  "vocab": "when"
-                }
-              ],
-              "display": "WhatAToolReads",
-              "duration": 0,
-              "excluded": false,
-              "external": false,
-              "file": "evidence_suite_test.go",
-              "focused": false,
-              "kind": "method",
-              "line": 487,
-              "name": "TestWhatAToolReads",
-              "output": [],
-              "status": "none"
-            }
-          ],
-          "display": "AuditEvidence",
-          "duration": 0,
-          "excluded": false,
-          "external": true,
-          "file": "evidence_suite_test.go",
-          "focused": false,
-          "kind": "suite",
-          "line": 16,
-          "name": "TestAuditEvidenceTestSuite",
-          "output": [],
-          "status": "none"
-        },
-        {
-          "children": [
-            {
-              "children": [
-                {
-                  "children": [
-                    {
-                      "children": [],
                       "display": "compares that commit's tree with the working tree's, as the records of both would",
                       "duration": 0,
                       "excluded": false,
@@ -4772,7 +4376,7 @@
                     },
                     {
                       "children": [],
-                      "display": "counts the gotest assertions written in each body, and marks AssertsBy, F_ and X_",
+                      "display": "counts the gotest assertions written in each body, those on t.Soft() included, and marks AssertsBy, F_ and X_",
                       "duration": 0,
                       "excluded": false,
                       "external": false,
@@ -4780,7 +4384,7 @@
                       "focused": false,
                       "kind": "block",
                       "line": 76,
-                      "name": "counts_the_gotest_assertions_written_in_each_body,_and_marks_AssertsBy,_F__and_X_",
+                      "name": "counts_the_gotest_assertions_written_in_each_body,_those_on_t.Soft()_included,_and_marks_AssertsBy,_F__and_X_",
                       "output": [],
                       "status": "none",
                       "vocab": "it"
@@ -4929,235 +4533,6 @@
           "kind": "suite",
           "line": 15,
           "name": "TestAuditRecordTestSuite",
-          "output": [],
-          "status": "none"
-        },
-        {
-          "children": [
-            {
-              "children": [
-                {
-                  "children": [
-                    {
-                      "children": [],
-                      "display": "runs the packages of the changed behaviors and states their verdicts as current evidence of that run",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "run_suite_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 111,
-                      "name": "runs_the_packages_of_the_changed_behaviors_and_states_their_verdicts_as_current_evidence_of_that_run",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    },
-                    {
-                      "children": [],
-                      "display": "lists the changed production lines that run did not execute",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "run_suite_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 130,
-                      "name": "lists_the_changed_production_lines_that_run_did_not_execute",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    }
-                  ],
-                  "display": "when audit --run compares the working tree with a base",
-                  "duration": 0,
-                  "excluded": false,
-                  "external": false,
-                  "file": "run_suite_test.go",
-                  "focused": false,
-                  "kind": "block",
-                  "line": 110,
-                  "name": "audit_--run_compares_the_working_tree_with_a_base",
-                  "output": [],
-                  "status": "none",
-                  "vocab": "when"
-                }
-              ],
-              "display": "TheAuditsOwnRun",
-              "duration": 0,
-              "excluded": false,
-              "external": false,
-              "file": "run_suite_test.go",
-              "focused": false,
-              "kind": "method",
-              "line": 109,
-              "name": "TestTheAuditsOwnRun",
-              "output": [],
-              "status": "none"
-            },
-            {
-              "children": [
-                {
-                  "children": [
-                    {
-                      "children": [],
-                      "display": "takes the changed lines from the commit to the files on disk, every line of an untracked file included",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "run_suite_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 156,
-                      "name": "takes_the_changed_lines_from_the_commit_to_the_files_on_disk,_every_line_of_an_untracked_file_included",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    }
-                  ],
-                  "display": "when audit --base with --coverage runs in a checkout with uncommitted and untracked production files",
-                  "duration": 0,
-                  "excluded": false,
-                  "external": false,
-                  "file": "run_suite_test.go",
-                  "focused": false,
-                  "kind": "block",
-                  "line": 155,
-                  "name": "audit_--base_with_--coverage_runs_in_a_checkout_with_uncommitted_and_untracked_production_files",
-                  "output": [],
-                  "status": "none",
-                  "vocab": "when"
-                }
-              ],
-              "display": "LinesFromGit",
-              "duration": 0,
-              "excluded": false,
-              "external": false,
-              "file": "run_suite_test.go",
-              "focused": false,
-              "kind": "method",
-              "line": 154,
-              "name": "TestLinesFromGit",
-              "output": [],
-              "status": "none"
-            },
-            {
-              "children": [
-                {
-                  "children": [
-                    {
-                      "children": [],
-                      "display": "exports it once into one directory under gotest's cache, outside the checkout",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "run_suite_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 179,
-                      "name": "exports_it_once_into_one_directory_under_gotest's_cache,_outside_the_checkout",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    },
-                    {
-                      "children": [],
-                      "display": "gotest clean --cache removes that directory",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "run_suite_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 190,
-                      "name": "gotest_clean_--cache_removes_that_directory",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    }
-                  ],
-                  "display": "when audit --base records one commit twice",
-                  "duration": 0,
-                  "excluded": false,
-                  "external": false,
-                  "file": "run_suite_test.go",
-                  "focused": false,
-                  "kind": "block",
-                  "line": 178,
-                  "name": "audit_--base_records_one_commit_twice",
-                  "output": [],
-                  "status": "none",
-                  "vocab": "when"
-                }
-              ],
-              "display": "WhereABaseIsExported",
-              "duration": 0,
-              "excluded": false,
-              "external": false,
-              "file": "run_suite_test.go",
-              "focused": false,
-              "kind": "method",
-              "line": 177,
-              "name": "TestWhereABaseIsExported",
-              "output": [],
-              "status": "none"
-            },
-            {
-              "children": [
-                {
-                  "children": [
-                    {
-                      "children": [],
-                      "display": "records no package of that directory for the base and compares the rest, exiting 0",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "run_suite_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 200,
-                      "name": "records_no_package_of_that_directory_for_the_base_and_compares_the_rest,_exiting_0",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    }
-                  ],
-                  "display": "when audit --base names a commit that lacks a directory one of the packages names",
-                  "duration": 0,
-                  "excluded": false,
-                  "external": false,
-                  "file": "run_suite_test.go",
-                  "focused": false,
-                  "kind": "block",
-                  "line": 199,
-                  "name": "audit_--base_names_a_commit_that_lacks_a_directory_one_of_the_packages_names",
-                  "output": [],
-                  "status": "none",
-                  "vocab": "when"
-                }
-              ],
-              "display": "ABaseWithoutADirectory",
-              "duration": 0,
-              "excluded": false,
-              "external": false,
-              "file": "run_suite_test.go",
-              "focused": false,
-              "kind": "method",
-              "line": 198,
-              "name": "TestABaseWithoutADirectory",
-              "output": [],
-              "status": "none"
-            }
-          ],
-          "display": "AuditRun",
-          "duration": 0,
-          "excluded": false,
-          "external": true,
-          "file": "run_suite_test.go",
-          "focused": false,
-          "kind": "suite",
-          "line": 19,
-          "name": "TestAuditRunTestSuite",
           "output": [],
           "status": "none"
         }
@@ -15678,7 +15053,7 @@
                       "file": "version_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 23,
+                      "line": 21,
                       "name": "exits_0_and_prints_the_version_on_stdout",
                       "output": [],
                       "status": "none",
@@ -15692,7 +15067,7 @@
                   "file": "version_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 22,
+                  "line": 20,
                   "name": "the_version_subcommand_runs",
                   "output": [],
                   "status": "none",
@@ -15706,54 +15081,8 @@
               "file": "version_suite_test.go",
               "focused": false,
               "kind": "method",
-              "line": 19,
+              "line": 17,
               "name": "TestVersion",
-              "output": [],
-              "status": "none"
-            },
-            {
-              "children": [
-                {
-                  "children": [
-                    {
-                      "children": [],
-                      "display": "prints one JSON document naming the version, the subcommands and the audit's schema",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "version_suite_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 33,
-                      "name": "prints_one_JSON_document_naming_the_version,_the_subcommands_and_the_audit's_schema",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    }
-                  ],
-                  "display": "when the version subcommand runs with --json",
-                  "duration": 0,
-                  "excluded": false,
-                  "external": false,
-                  "file": "version_suite_test.go",
-                  "focused": false,
-                  "kind": "block",
-                  "line": 32,
-                  "name": "the_version_subcommand_runs_with_--json",
-                  "output": [],
-                  "status": "none",
-                  "vocab": "when"
-                }
-              ],
-              "display": "VersionAsJSON",
-              "duration": 0,
-              "excluded": false,
-              "external": false,
-              "file": "version_suite_test.go",
-              "focused": false,
-              "kind": "method",
-              "line": 31,
-              "name": "TestVersionAsJSON",
               "output": [],
               "status": "none"
             }
@@ -15765,7 +15094,7 @@
           "file": "version_suite_test.go",
           "focused": false,
           "kind": "suite",
-          "line": 13,
+          "line": 11,
           "name": "TestCLIVersionTestSuite",
           "output": [],
           "status": "none"
@@ -25052,7 +24381,7 @@
                       "file": "eachrows_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 22,
+                      "line": 21,
                       "name": "fails_that_row_and_the_method,_and_the_rows_after_it_still_run",
                       "output": [],
                       "status": "none",
@@ -25066,132 +24395,8 @@
                   "file": "eachrows_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 21,
+                  "line": 20,
                   "name": "one_row_of_an_Each_table_fails",
-                  "output": [],
-                  "status": "none",
-                  "vocab": "when"
-                },
-                {
-                  "children": [
-                    {
-                      "children": [],
-                      "display": "the failure names the helper's line, and the row goes on",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "eachrows_suite_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 34,
-                      "name": "the_failure_names_the_helper's_line,_and_the_row_goes_on",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    }
-                  ],
-                  "display": "when an assertion fails in a helper an Each row hands its T",
-                  "duration": 0,
-                  "excluded": false,
-                  "external": false,
-                  "file": "eachrows_suite_test.go",
-                  "focused": false,
-                  "kind": "block",
-                  "line": 33,
-                  "name": "an_assertion_fails_in_a_helper_an_Each_row_hands_its_T",
-                  "output": [],
-                  "status": "none",
-                  "vocab": "when"
-                },
-                {
-                  "children": [
-                    {
-                      "children": [],
-                      "display": "an assertion that fails in its body ends the It there, and the row goes on",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "eachrows_suite_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 41,
-                      "name": "an_assertion_that_fails_in_its_body_ends_the_It_there,_and_the_row_goes_on",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    }
-                  ],
-                  "display": "when an It runs on an Each row's T",
-                  "duration": 0,
-                  "excluded": false,
-                  "external": false,
-                  "file": "eachrows_suite_test.go",
-                  "focused": false,
-                  "kind": "block",
-                  "line": 40,
-                  "name": "an_It_runs_on_an_Each_row's_T",
-                  "output": [],
-                  "status": "none",
-                  "vocab": "when"
-                },
-                {
-                  "children": [
-                    {
-                      "children": [],
-                      "display": "fails the row, and the row goes on",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "eachrows_suite_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 48,
-                      "name": "fails_the_row,_and_the_row_goes_on",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    }
-                  ],
-                  "display": "when an assertion fails on NewTWithDeadline of an Each row's T",
-                  "duration": 0,
-                  "excluded": false,
-                  "external": false,
-                  "file": "eachrows_suite_test.go",
-                  "focused": false,
-                  "kind": "block",
-                  "line": 47,
-                  "name": "an_assertion_fails_on_NewTWithDeadline_of_an_Each_row's_T",
-                  "output": [],
-                  "status": "none",
-                  "vocab": "when"
-                },
-                {
-                  "children": [
-                    {
-                      "children": [],
-                      "display": "fails the row, and the row goes on",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "eachrows_suite_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 55,
-                      "name": "fails_the_row,_and_the_row_goes_on",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    }
-                  ],
-                  "display": "when Eventually is given an Each row's T and no poll passes",
-                  "duration": 0,
-                  "excluded": false,
-                  "external": false,
-                  "file": "eachrows_suite_test.go",
-                  "focused": false,
-                  "kind": "block",
-                  "line": 54,
-                  "name": "Eventually_is_given_an_Each_row's_T_and_no_poll_passes",
                   "output": [],
                   "status": "none",
                   "vocab": "when"
@@ -25207,7 +24412,7 @@
                       "file": "eachrows_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 62,
+                      "line": 33,
                       "name": "fails_that_row_and_the_method_there,_and_the_rows_after_it_never_run",
                       "output": [],
                       "status": "none",
@@ -25221,7 +24426,7 @@
                   "file": "eachrows_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 61,
+                  "line": 32,
                   "name": "a_row_of_an_Each_table_calls_FailNow",
                   "output": [],
                   "status": "none",
@@ -25238,7 +24443,7 @@
                       "file": "eachrows_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 72,
+                      "line": 43,
                       "name": "skips_that_row_and_the_method_from_there,_and_the_rows_after_it_never_run",
                       "output": [],
                       "status": "none",
@@ -25252,7 +24457,7 @@
                   "file": "eachrows_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 71,
+                  "line": 42,
                   "name": "one_row_of_an_Each_table_skips",
                   "output": [],
                   "status": "none",
@@ -25269,7 +24474,7 @@
                       "file": "eachrows_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 82,
+                      "line": 53,
                       "name": "the_method_skips_or_fails_there,_with_no_failure_of_its_own",
                       "output": [],
                       "status": "none",
@@ -25283,7 +24488,7 @@
                   "file": "eachrows_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 81,
+                  "line": 52,
                   "name": "a_row_of_an_Each_table_skips_or_fatally_fails_the_method's_own_T",
                   "output": [],
                   "status": "none",
@@ -25300,7 +24505,7 @@
                       "file": "eachrows_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 91,
+                      "line": 62,
                       "name": "stops_at_the_break_and_the_method_goes_on",
                       "output": [],
                       "status": "none",
@@ -25314,7 +24519,7 @@
                   "file": "eachrows_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 90,
+                  "line": 61,
                   "name": "the_loop_over_an_Each_table_breaks",
                   "output": [],
                   "status": "none",
@@ -25328,7 +24533,7 @@
               "file": "eachrows_suite_test.go",
               "focused": false,
               "kind": "method",
-              "line": 18,
+              "line": 17,
               "name": "TestRowsAreSubtests",
               "output": [],
               "status": "none"
@@ -25341,7 +24546,7 @@
           "file": "eachrows_suite_test.go",
           "focused": false,
           "kind": "suite",
-          "line": 12,
+          "line": 11,
           "name": "TestEachRowsTestSuite",
           "output": [],
           "status": "none"
@@ -29515,191 +28720,6 @@
                   "children": [
                     {
                       "children": [],
-                      "display": "fail-guard leaves it unreported, through an alias and inside a closure too",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "eachrows_suite_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 21,
-                      "name": "fail-guard_leaves_it_unreported,_through_an_alias_and_inside_a_closure_too",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    }
-                  ],
-                  "display": "when a guard on an Each row's T ends the method",
-                  "duration": 0,
-                  "excluded": false,
-                  "external": false,
-                  "file": "eachrows_suite_test.go",
-                  "focused": false,
-                  "kind": "block",
-                  "line": 20,
-                  "name": "a_guard_on_an_Each_row's_T_ends_the_method",
-                  "output": [],
-                  "status": "none",
-                  "vocab": "when"
-                },
-                {
-                  "children": [
-                    {
-                      "children": [],
-                      "display": "fail-guard leaves it unreported",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "eachrows_suite_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 29,
-                      "name": "fail-guard_leaves_it_unreported",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    }
-                  ],
-                  "display": "when an or-chained or else-if guard fails an Each row's T",
-                  "duration": 0,
-                  "excluded": false,
-                  "external": false,
-                  "file": "eachrows_suite_test.go",
-                  "focused": false,
-                  "kind": "block",
-                  "line": 28,
-                  "name": "an_or-chained_or_else-if_guard_fails_an_Each_row's_T",
-                  "output": [],
-                  "status": "none",
-                  "vocab": "when"
-                },
-                {
-                  "children": [
-                    {
-                      "children": [],
-                      "display": "t-escape leaves it unreported and still fixes one given the outer t.T()",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "eachrows_suite_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 36,
-                      "name": "t-escape_leaves_it_unreported_and_still_fixes_one_given_the_outer_t.T()",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    }
-                  ],
-                  "display": "when an assertion is given an Each row's T()",
-                  "duration": 0,
-                  "excluded": false,
-                  "external": false,
-                  "file": "eachrows_suite_test.go",
-                  "focused": false,
-                  "kind": "block",
-                  "line": 35,
-                  "name": "an_assertion_is_given_an_Each_row's_T()",
-                  "output": [],
-                  "status": "none",
-                  "vocab": "when"
-                },
-                {
-                  "children": [
-                    {
-                      "children": [],
-                      "display": "assertion-redundant leaves it unreported and still reports a pair on one T",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "eachrows_suite_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 44,
-                      "name": "assertion-redundant_leaves_it_unreported_and_still_reports_a_pair_on_one_T",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    }
-                  ],
-                  "display": "when a redundant pair splits between an Each row's T and another T",
-                  "duration": 0,
-                  "excluded": false,
-                  "external": false,
-                  "file": "eachrows_suite_test.go",
-                  "focused": false,
-                  "kind": "block",
-                  "line": 43,
-                  "name": "a_redundant_pair_splits_between_an_Each_row's_T_and_another_T",
-                  "output": [],
-                  "status": "none",
-                  "vocab": "when"
-                },
-                {
-                  "children": [
-                    {
-                      "children": [],
-                      "display": "fail-guard reports it with a fix and no claim that an assertion halts",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "eachrows_suite_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 50,
-                      "name": "fail-guard_reports_it_with_a_fix_and_no_claim_that_an_assertion_halts",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    }
-                  ],
-                  "display": "when a guard of one condition calls Fail or Errorf on an Each row's T",
-                  "duration": 0,
-                  "excluded": false,
-                  "external": false,
-                  "file": "eachrows_suite_test.go",
-                  "focused": false,
-                  "kind": "block",
-                  "line": 49,
-                  "name": "a_guard_of_one_condition_calls_Fail_or_Errorf_on_an_Each_row's_T",
-                  "output": [],
-                  "status": "none",
-                  "vocab": "when"
-                }
-              ],
-              "display": "FailureGuards",
-              "duration": 0,
-              "excluded": false,
-              "external": false,
-              "file": "eachrows_suite_test.go",
-              "focused": false,
-              "kind": "method",
-              "line": 19,
-              "name": "TestFailureGuards",
-              "output": [],
-              "status": "none"
-            }
-          ],
-          "display": "EachRowGuards",
-          "duration": 0,
-          "excluded": false,
-          "external": true,
-          "file": "eachrows_suite_test.go",
-          "focused": false,
-          "kind": "suite",
-          "line": 11,
-          "name": "TestEachRowGuardsTestSuite",
-          "output": [],
-          "status": "none"
-        },
-        {
-          "children": [
-            {
-              "children": [
-                {
-                  "children": [
-                    {
-                      "children": [],
                       "display": "ends each past its posn, at the end of the call and of the function's signature",
                       "duration": 0,
                       "excluded": false,
@@ -32911,6 +31931,190 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "lint reports each as a poll-scope finding that names t",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "soft_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 24,
+                      "name": "lint_reports_each_as_a_poll-scope_finding_that_names_t",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a polling callback asserts on the test's t.Soft(), hands it to a helper and calls Errorf on it",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "soft_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 23,
+                  "name": "a_polling_callback_asserts_on_the_test's_t.Soft(),_hands_it_to_a_helper_and_calls_Errorf_on_it",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "assertion-redundant leaves the pair unreported",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "soft_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 33,
+                      "name": "assertion-redundant_leaves_the_pair_unreported",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "assertion-redundant reports the pair when both are soft",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "soft_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 36,
+                      "name": "assertion-redundant_reports_the_pair_when_both_are_soft",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a fatal assertion is followed by a stronger soft one on the same operand",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "soft_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 32,
+                  "name": "a_fatal_assertion_is_followed_by_a_stronger_soft_one_on_the_same_operand",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "fail-guard leaves it unreported, an or-chained one too",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "soft_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 42,
+                      "name": "fail-guard_leaves_it_unreported,_an_or-chained_one_too",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a failure guard calls Fail on t.Soft()",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "soft_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 41,
+                  "name": "a_failure_guard_calls_Fail_on_t.Soft()",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "True(t.Soft(), a == b) becomes Equal(t.Soft(), a, b)",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "soft_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 60,
+                      "name": "True(t.Soft(),_a_==_b)_becomes_Equal(t.Soft(),_a,_b)",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a guard calling FailNow on t.Soft() becomes an assertion on t",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "soft_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 63,
+                      "name": "a_guard_calling_FailNow_on_t.Soft()_becomes_an_assertion_on_t",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when lint -fix rewrites assertions and guards on t.Soft()",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "soft_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 50,
+                  "name": "lint_-fix_rewrites_assertions_and_guards_on_t.Soft()",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "SoftAssertions",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "soft_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 22,
+              "name": "TestSoftAssertions",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "LinterSoft",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "soft_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 14,
+          "name": "TestLinterSoftTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "lint reports the comment under nolint-reason at the comment and still honours its suppression",
                       "duration": 0,
                       "excluded": false,
@@ -34772,7 +33976,7 @@
                   "children": [
                     {
                       "children": [],
-                      "display": "the summary counts the assertions that now stop the test and the stdlib tests left, and lists the id that changed",
+                      "display": "the summary counts the stdlib tests left and lists the id that changed",
                       "duration": 0,
                       "excluded": false,
                       "external": false,
@@ -34780,7 +33984,7 @@
                       "focused": false,
                       "kind": "block",
                       "line": 631,
-                      "name": "the_summary_counts_the_assertions_that_now_stop_the_test_and_the_stdlib_tests_left,_and_lists_the_id_that_changed",
+                      "name": "the_summary_counts_the_stdlib_tests_left_and_lists_the_id_that_changed",
                       "output": [],
                       "status": "none",
                       "vocab": "it"
@@ -34794,14 +33998,14 @@
                       "file": "verdicts_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 663,
+                      "line": 662,
                       "name": "a_migration_with_none_of_these_prints_no_such_section",
                       "output": [],
                       "status": "none",
                       "vocab": "it"
                     }
                   ],
-                  "display": "when migrate converts a suite with soft assertions, under a runner of another name, beside a plain testify test",
+                  "display": "when migrate converts a suite under a runner of another name, beside a plain testify test",
                   "duration": 0,
                   "excluded": false,
                   "external": false,
@@ -34809,7 +34013,7 @@
                   "focused": false,
                   "kind": "block",
                   "line": 630,
-                  "name": "migrate_converts_a_suite_with_soft_assertions,_under_a_runner_of_another_name,_beside_a_plain_testify_test",
+                  "name": "migrate_converts_a_suite_under_a_runner_of_another_name,_beside_a_plain_testify_test",
                   "output": [],
                   "status": "none",
                   "vocab": "when"
@@ -34824,6 +34028,67 @@
               "kind": "method",
               "line": 629,
               "name": "TestWhatMigrateDidNotKeep",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "migrate writes the first three on t.Soft() and the others on t",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "verdicts_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 720,
+                      "name": "migrate_writes_the_first_three_on_t.Soft()_and_the_others_on_t",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "the migrated test goes on past a failing soft assertion and fails",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "verdicts_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 731,
+                      "name": "the_migrated_test_goes_on_past_a_failing_soft_assertion_and_fails",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a suite calls s.X, s.Assert().X and assert.X beside s.Require().X and FailNow",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "verdicts_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 713,
+                  "name": "a_suite_calls_s.X,_s.Assert().X_and_assert.X_beside_s.Require().X_and_FailNow",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AssertionsThatGoOnAfterFailing",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "verdicts_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 712,
+              "name": "TestAssertionsThatGoOnAfterFailing",
               "output": [],
               "status": "none"
             }
@@ -34843,6 +34108,1061 @@
       ],
       "output": [],
       "path": "github.com/mvrahden/go-test/tests/conformance/migrate",
+      "status": "none"
+    },
+    {
+      "duration": 0,
+      "nodes": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "binds the scenario, naming the file and line of each clause's It, and exits 0 without running a test",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "binding_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 43,
+                      "name": "binds_the_scenario,_naming_the_file_and_line_of_each_clause's_It,_and_exits_0_without_running_a_test",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a scenario's texts equal a When and its Its, but for the first letter's case, backticks and a trailing period",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "binding_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 42,
+                  "name": "a_scenario's_texts_equal_a_When_and_its_Its,_but_for_the_first_letter's_case,_backticks_and_a_trailing_period",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "binds it only where its When sits directly in a When labelled with the GIVEN text",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "binding_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 57,
+                      "name": "binds_it_only_where_its_When_sits_directly_in_a_When_labelled_with_the_GIVEN_text",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a scenario has a GIVEN",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "binding_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 56,
+                  "name": "a_scenario_has_a_GIVEN",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lists the scenario as unbound, naming the clause that has no When or no It",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "binding_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 66,
+                      "name": "lists_the_scenario_as_unbound,_naming_the_clause_that_has_no_When_or_no_It",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a scenario's WHEN text is no When's label, or a THEN text is no It's under it",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "binding_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 65,
+                  "name": "a_scenario's_WHEN_text_is_no_When's_label,_or_a_THEN_text_is_no_It's_under_it",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "binds each to the When that spells it and not to the other",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "binding_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 81,
+                      "name": "binds_each_to_the_When_that_spells_it_and_not_to_the_other",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when two scenarios differ only in letters outside ASCII",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "binding_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 80,
+                  "name": "two_scenarios_differ_only_in_letters_outside_ASCII",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lists the scenario as unbound",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "binding_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 92,
+                      "name": "lists_the_scenario_as_unbound",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the only It with a clause's text is under an Each row and not a When, or in a suite X_ excludes",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "binding_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 91,
+                  "name": "the_only_It_with_a_clause's_text_is_under_an_Each_row_and_not_a_When,_or_in_a_suite_X__excludes",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "BindingByText",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "binding_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 41,
+              "name": "TestBindingByText",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lists the scenario as ambiguous, naming the file and line of both Its",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "binding_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 104,
+                      "name": "lists_the_scenario_as_ambiguous,_naming_the_file_and_line_of_both_Its",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a clause's text equals Its declared at two places under Whens with the scenario's text",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "binding_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 103,
+                  "name": "a_clause's_text_equals_Its_declared_at_two_places_under_Whens_with_the_scenario's_text",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lists both scenarios as ambiguous",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "binding_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 112,
+                      "name": "lists_both_scenarios_as_ambiguous",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when two capabilities hold a scenario with the same WHEN and THEN texts",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "binding_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 111,
+                  "name": "two_capabilities_hold_a_scenario_with_the_same_WHEN_and_THEN_texts",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "Ambiguity",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "binding_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 102,
+              "name": "TestAmbiguity",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lists that It as unstated with its file and line",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "binding_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 121,
+                      "name": "lists_that_It_as_unstated_with_its_file_and_line",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a bound When holds an It no clause states and --unstated is given",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "binding_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 120,
+                  "name": "a_bound_When_holds_an_It_no_clause_states_and_--unstated_is_given",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lists no unstated behavior",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "binding_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 128,
+                      "name": "lists_no_unstated_behavior",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a bound When holds an It no clause states and --unstated is not given",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "binding_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 127,
+                  "name": "a_bound_When_holds_an_It_no_clause_states_and_--unstated_is_not_given",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "BehaviorsNoClauseStates",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "binding_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 119,
+              "name": "TestBehaviorsNoClauseStates",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "ScenariosBinding",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "binding_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 14,
+          "name": "TestScenariosBindingTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "prints one document opening with version and schema that holds evidence, run, specs, summary and scenarios, each with its clauses and their Its, with no absolute path",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "document_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 59,
+                      "name": "prints_one_document_opening_with_version_and_schema_that_holds_evidence,_run,_specs,_summary_and_scenarios,_each_with_its_clauses_and_their_Its,_with_no_absolute_path",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when scenarios writes --format=json",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "document_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 58,
+                  "name": "scenarios_writes_--format=json",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lists the scenarios that are not bound or verified, each with the clause at fault, and ends stdout with a closing line naming the verdict, the exit code and the counts, with nothing on stderr",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "document_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 75,
+                      "name": "lists_the_scenarios_that_are_not_bound_or_verified,_each_with_the_clause_at_fault,_and_ends_stdout_with_a_closing_line_naming_the_verdict,_the_exit_code_and_the_counts,_with_nothing_on_stderr",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when scenarios writes the text format",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "document_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 74,
+                  "name": "scenarios_writes_the_text_format",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "writes a heading and a table of requirements and scenarios per capability",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "document_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 87,
+                      "name": "writes_a_heading_and_a_table_of_requirements_and_scenarios_per_capability",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when scenarios writes --format=md",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "document_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 86,
+                  "name": "scenarios_writes_--format=md",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "TheScenariosDocument",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "document_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 57,
+              "name": "TestTheScenariosDocument",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "exits 0",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "document_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 100,
+                      "name": "exits_0",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when scenarios finds unbound scenarios without evidence and without --fail-on",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "document_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 99,
+                  "name": "scenarios_finds_unbound_scenarios_without_evidence_and_without_--fail-on",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "exits 1 and the closing line names FAIL and the statuses failing and ambiguous",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "document_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 107,
+                      "name": "exits_1_and_the_closing_line_names_FAIL_and_the_statuses_failing_and_ambiguous",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the evidence holds a failing scenario and no --fail-on is given",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "document_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 106,
+                  "name": "the_evidence_holds_a_failing_scenario_and_no_--fail-on_is_given",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "exits 1",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "document_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 115,
+                      "name": "exits_1",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when --fail-on=unbound is given and a scenario is unbound",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "document_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 114,
+                  "name": "--fail-on=unbound_is_given_and_a_scenario_is_unbound",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "refuses it with exit 2, naming the statuses",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "document_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 121,
+                      "name": "refuses_it_with_exit_2,_naming_the_statuses",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when --fail-on names an unknown status",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "document_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 120,
+                  "name": "--fail-on_names_an_unknown_status",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "refuses it with exit 2, naming --input and --verify",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "document_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 129,
+                      "name": "refuses_it_with_exit_2,_naming_--input_and_--verify",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when --fail-on names failing without --input or --verify",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "document_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 128,
+                  "name": "--fail-on_names_failing_without_--input_or_--verify",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "names it and exits 2",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "document_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 137,
+                      "name": "names_it_and_exits_2",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a package of the module does not compile",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "document_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 136,
+                  "name": "a_package_of_the_module_does_not_compile",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ThePolicyExit",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "document_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 98,
+              "name": "TestThePolicyExit",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "ScenariosDocument",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "document_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 16,
+          "name": "TestScenariosDocumentTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lists each bound scenario as verified, failing, not-run or vacuous as its Its ran",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "evidence_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 47,
+                      "name": "lists_each_bound_scenario_as_verified,_failing,_not-run_or_vacuous_as_its_Its_ran",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "names the stream's run, its version and arguments and the packages it ran, as the run judged",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "evidence_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 59,
+                      "name": "names_the_stream's_run,_its_version_and_arguments_and_the_packages_it_ran,_as_the_run_judged",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when scenarios is given a saved stream with --input",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "evidence_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 46,
+                  "name": "scenarios_is_given_a_saved_stream_with_--input",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lists the scenario as not-run, not verified",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "evidence_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 68,
+                      "name": "lists_the_scenario_as_not-run,_not_verified",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a clause's It was skipped or its suite's guard kept it from running",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "evidence_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 67,
+                  "name": "a_clause's_It_was_skipped_or_its_suite's_guard_kept_it_from_running",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "runs the packages that hold a bound It and no other, and judges the scenarios by that run",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "evidence_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 78,
+                      "name": "runs_the_packages_that_hold_a_bound_It_and_no_other,_and_judges_the_scenarios_by_that_run",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when scenarios is given --verify",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "evidence_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 77,
+                  "name": "scenarios_is_given_--verify",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "Evidence",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "evidence_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 45,
+              "name": "TestEvidence",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "binds each clause to one It, every row's run counting toward its verdict",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "evidence_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 90,
+                      "name": "binds_each_clause_to_one_It,_every_row's_run_counting_toward_its_verdict",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a bound When sits under the rows of an Each table",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "evidence_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 89,
+                  "name": "a_bound_When_sits_under_the_rows_of_an_Each_table",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "Rows",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "evidence_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 88,
+              "name": "TestRows",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "ScenariosEvidence",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "evidence_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 14,
+          "name": "TestScenariosEvidenceTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "reads the scenarios of both, each under the capability its directory names",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "reading_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 50,
+                      "name": "reads_the_scenarios_of_both,_each_under_the_capability_its_directory_names",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when scenarios runs in a module with spec files under specs and openspec/specs and no --specs",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "reading_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 49,
+                  "name": "scenarios_runs_in_a_module_with_spec_files_under_specs_and_openspec/specs_and_no_--specs",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "reads the same clauses as from the plain bold form",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "reading_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 76,
+                      "name": "reads_the_same_clauses_as_from_the_plain_bold_form",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "reads no heading or clause inside a code fence",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "reading_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 85,
+                      "name": "reads_no_heading_or_clause_inside_a_code_fence",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a spec writes its clauses bold, bold with a colon, underlined, bare in capitals and wrapped onto a second line",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "reading_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 63,
+                  "name": "a_spec_writes_its_clauses_bold,_bold_with_a_colon,_underlined,_bare_in_capitals_and_wrapped_onto_a_second_line",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "reads its ADDED and MODIFIED requirements and none of its REMOVED ones",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "reading_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 92,
+                      "name": "reads_its_ADDED_and_MODIFIED_requirements_and_none_of_its_REMOVED_ones",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when --specs names a change's specs directory",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "reading_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 91,
+                  "name": "--specs_names_a_change's_specs_directory",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "reads the spec files of that directory and no other",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "reading_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 103,
+                      "name": "reads_the_spec_files_of_that_directory_and_no_other",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when .gotest.yml names a directory under scenarios.specs and no --specs is given",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "reading_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 102,
+                  "name": ".gotest.yml_names_a_directory_under_scenarios.specs_and_no_--specs_is_given",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "exits 2 naming the places it looked",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "reading_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 110,
+                      "name": "exits_2_naming_the_places_it_looked",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when scenarios finds no spec file",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "reading_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 109,
+                  "name": "scenarios_finds_no_spec_file",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ReadingTheSpecFiles",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "reading_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 48,
+              "name": "TestReadingTheSpecFiles",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "ScenariosReading",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "reading_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 14,
+          "name": "TestScenariosReadingTestSuite",
+          "output": [],
+          "status": "none"
+        }
+      ],
+      "output": [],
+      "path": "github.com/mvrahden/go-test/tests/conformance/scenarios",
       "status": "none"
     },
     {
@@ -38377,13 +38697,13 @@
     }
   ],
   "stats": {
-    "behaviors": 1116,
+    "behaviors": 1122,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 157,
+    "suites": 160,
     "tests": 0
   }
 }

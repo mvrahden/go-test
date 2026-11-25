@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/scenarios ScenariosBinding / BindingByText / when a scenario's WHEN text is no When's label, or a THEN text is no It's under it / lists the scenario as unbound, naming the clause that has no When or no It \(
+Clause: when a scenario's WHEN text is no When's label, or a THEN text is no It's under it → lists the scenario as unbound, naming the clause that has no When or no It
+--- a/internal/gotestscenarios/bind.go
++++ b/internal/gotestscenarios/bind.go
+@@ -257,7 +257,7 @@
+ 		case sc.Problem != "" || len(sc.Whens) == 0:
+ 			c.Status = StatusUnbound
+ 		case len(c.its) == 0:
+-			c.Status = StatusUnbound
++			c.Status = StatusBound
+ 		case len(c.its) > 1 || c.shared:
+ 			c.Status = StatusAmbiguous
+ 		case !evidence:

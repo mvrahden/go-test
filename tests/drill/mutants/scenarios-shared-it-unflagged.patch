@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/scenarios ScenariosBinding / Ambiguity / when two capabilities hold a scenario with the same WHEN and THEN texts / lists both scenarios as ambiguous \(
+Clause: when two capabilities hold a scenario with the same WHEN and THEN texts → lists both scenarios as ambiguous
+--- a/internal/gotestscenarios/bind.go
++++ b/internal/gotestscenarios/bind.go
+@@ -231,7 +231,7 @@
+ 	claimed := map[string]bool{}
+ 	for key, by := range owners {
+ 		claimed[key] = true
+-		if len(by) < 2 {
++		if len(by) < 3 {
+ 			continue
+ 		}
+ 		for i := range by {

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/scenarios ScenariosDocument / TheScenariosDocument / when scenarios writes --format=json / prints one document opening with version and schema that holds evidence, run, specs, summary and scenarios, each with its clauses and their Its, with no absolute path \(
+Clause: when scenarios writes --format=json → prints one document opening with version and schema that holds evidence, run, specs, summary and scenarios, each with its clauses and their Its, with no absolute path
+--- a/internal/gotestscenarios/bind.go
++++ b/internal/gotestscenarios/bind.go
+@@ -148,7 +148,7 @@
+ func relFile(root, dir, file string) string {
+ 	abs := filepath.Join(dir, file)
+ 	if rel, err := filepath.Rel(root, abs); err == nil {
+-		return filepath.ToSlash(rel)
++		return filepath.ToSlash(abs + rel[:0])
+ 	}
+ 	return filepath.ToSlash(file)
+ }

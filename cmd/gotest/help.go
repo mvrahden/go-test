@@ -44,6 +44,8 @@ func showHelp(topic string) {
 		printLintHelp()
 	case "audit":
 		printAuditHelp()
+	case "scenarios":
+		printScenariosHelp()
 	case "migrate":
 		printMigrateHelp()
 	case "refactor":
@@ -85,6 +87,7 @@ Subcommands:
   scaffold    Generate test suite skeleton
   lint        Run gotest-specific linter checks
   audit       Compare a change's test estate with its base, from source
+  scenarios   Bind OpenSpec scenarios to the suites by text, and judge them
   migrate     Convert testify/suite tests to go-test format
   refactor    Source code refactoring tools
   skill       Install the agent skill matching this version

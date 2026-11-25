@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/scenarios ScenariosBinding / BindingByText / when a scenario has a GIVEN / binds it only where its When sits directly in a When labelled with the GIVEN text \(
+Clause: when a scenario has a GIVEN → binds it only where its When sits directly in a When labelled with the GIVEN text
+--- a/internal/gotestscenarios/bind.go
++++ b/internal/gotestscenarios/bind.go
+@@ -207,7 +207,7 @@
+ 	}
+ 	off := len(chain) - len(conds)
+ 	for i, c := range conds {
+-		if chain[off+i] != c {
++		if chain[off+i] != c && i == len(conds)-1 {
+ 			return false
+ 		}
+ 	}

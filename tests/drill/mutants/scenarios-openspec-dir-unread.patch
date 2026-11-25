@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/scenarios ScenariosReading / ReadingTheSpecFiles / when scenarios runs in a module with spec files under specs and openspec/specs and no --specs / reads the scenarios of both, each under the capability its directory names \(
+Clause: when scenarios runs in a module with spec files under specs and openspec/specs and no --specs → reads the scenarios of both, each under the capability its directory names
+--- a/internal/gotestscenarios/find.go
++++ b/internal/gotestscenarios/find.go
+@@ -12,7 +12,7 @@
+ 
+ // DefaultDirs are where a module's specs are read from when nothing names
+ // other places: gotest's own layout and OpenSpec's.
+-var DefaultDirs = []string{"specs", "openspec/specs"}
++var DefaultDirs = []string{"specs"}
+ 
+ // SpecFile is the name every capability's spec has.
+ const SpecFile = "spec.md"
