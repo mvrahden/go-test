@@ -1347,8 +1347,18 @@ carries as an `attr` event, and the generated code calls nothing new. The
 runner reads the events as the stream is written
 (`internal/gotestrunner/vacuous.go`) and the tree marks a leaf that passed
 with a count of 0 and no `t.AssertsBy(reason)` as vacuous; `--ci` fails such
-a run with exit 1. A count an older runtime does not report is unknown,
-never zero. The counter lives in what a test binary links, so its mutants
+a run with exit 1. testing prints attributes only under `-v`, so a text run
+reads them from a side file instead: the runner creates one per suite
+process and names it in `GOTEST_ASSERTIONS_FILE`, and the runtime appends a
+JSON line per leaf as it reports, marking one that had failed, and takes the
+variable out of its environment so the test's own children write none. A
+test that ran a subtest through `t.T().Run` is no leaf; the stream shows it
+by the subtest's `run` event, the side file by testing's unexported
+`hasSub`, read by reflection; where that field is missing the runtime
+writes no file. A leaf that panicked reports before testing fails it, so
+the runner reads a `--- FAIL` line no failed record accounts for as the
+name's last run failing. A count an older runtime does not report, by
+attribute or line, is unknown, never zero. The counter lives in what a test binary links, so its mutants
 are judged by the canary's `assertcount` fixture, read from the raw stream.
 
 A nightly workflow (`.github/workflows/nightly.yml`) re-runs the whole gate on
