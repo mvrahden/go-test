@@ -340,6 +340,12 @@
           "scope": "resource",
           "description": "Collect coverage data alongside normal test runs"
         },
+        "gotest.liveResults": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Show each test's result as it happens: test runs, coverage runs and Run Changed have the CLI stream every suite's events live (GOTEST_LIVE=1) instead of when the suite's process ends"
+        },
         "gotest.coverTestOnlyPackages": {
           "type": "boolean",
           "default": false,

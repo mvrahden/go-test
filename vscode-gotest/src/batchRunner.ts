@@ -22,6 +22,7 @@ import {
 } from "./runnerUtils.js";
 import { coverOf, type RunPiece } from "./specStore.js";
 import { nextEventsFile, pruneEventsFiles } from "./eventsFiles.js";
+import { liveResults } from "./config.js";
 import {
   runGoToolCoverFunc,
   splitCoverByPackage,
@@ -55,6 +56,16 @@ export interface BatchConfig {
   // selection would let its focus skip the selected suites. Without it the
   // patterns widen unchecked.
   knownPackages?: { importPath: string; dir: string }[];
+}
+
+// liveEnv is the environment of a run child: GOTEST_LIVE=1 unless the
+// folder turned live results off. The CLI reads it only for a -json run.
+export function liveEnv(
+  workspaceDir: string,
+  env: Record<string, string> | undefined,
+): Record<string, string> | undefined {
+  if (!liveResults(workspaceDir)) return env;
+  return { ...env, GOTEST_LIVE: "1" };
 }
 
 export interface BatchResult {
@@ -193,7 +204,7 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
     const pkgDirMap = new Map(pkgInfos.map((p) => [p.importPath, p.dir]));
     // A package's output is kept for the whole run, not dropped at its
     // verdict: a --timeout writes the hung test's verdict after the
-    // package's, and a live stream interleaves suites.
+    // package's, and under GOTEST_LIVE suites interleave.
     const applier = new StreamApplier(
       controller,
       run,
@@ -227,7 +238,7 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
       token,
       outputChannel,
       label,
-      env,
+      liveEnv(workspaceDir, env),
       handleStdoutLine,
       handleStderrLine,
     );

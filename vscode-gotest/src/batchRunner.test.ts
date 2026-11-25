@@ -1,9 +1,19 @@
 import { describe, it, expect, vi } from "vitest";
 
+const settings = vi.hoisted(() => ({
+  values: {} as Record<string, unknown>,
+  scopes: [] as unknown[],
+}));
+
 vi.mock("vscode", () => ({
   TestMessage: class {},
   Uri: { file: (p: string) => ({ fsPath: p }) },
-  workspace: { getConfiguration: () => ({ get: () => undefined }) },
+  workspace: {
+    getConfiguration: (_section: string, scope?: unknown) => {
+      settings.scopes.push(scope);
+      return { get: (key: string) => settings.values[key] };
+    },
+  },
   window: {},
 }));
 
@@ -186,5 +196,54 @@ describe("a --changed batch", () => {
     expect(args.slice(0, args.indexOf("--"))).toContain("--changed");
     expect(out.join("")).toContain("narrowed by --changed: ran 0 packages");
     expect(errored).toEqual([]);
+  });
+});
+
+describe("a batch's live stream", () => {
+  const config = (extra: object = {}) =>
+    ({
+      pkgInfos: [{ importPath: "example.com/cart", items: [], dir: "/w/cart" }],
+      filter: "^TestX$",
+      workspaceDir: "/w",
+      testFlags: [],
+      run: {
+        appendOutput: () => {},
+        started: () => {},
+        passed: () => {},
+        failed: () => {},
+      },
+      token: { isCancellationRequested: false },
+      controller: {
+        findItem: () => undefined,
+        recordResult: () => {},
+        noteStart: () => {},
+      },
+      outputChannel: { info: () => {}, warn: () => {}, error: () => {} },
+      label: "runner",
+      ...extra,
+    }) as never;
+  const envOfLastRun = () =>
+    vi.mocked(spawnTestProcess).mock.calls.at(-1)![6] as
+      Record<string, string> | undefined;
+
+  it("has the CLI write each suite's events as they happen", async () => {
+    settings.values = {};
+    await executeBatch(config({ env: { GOTEST_UPDATE_SNAPSHOTS: "1" } }));
+    expect(envOfLastRun()).toEqual({
+      GOTEST_UPDATE_SNAPSHOTS: "1",
+      GOTEST_LIVE: "1",
+    });
+  });
+
+  it("leaves the variable out where the folder turned live results off", async () => {
+    settings.values = { liveResults: false };
+    settings.scopes = [];
+    try {
+      await executeBatch(config());
+      expect(envOfLastRun()).toBeUndefined();
+      expect(settings.scopes).toContainEqual({ fsPath: "/w" });
+    } finally {
+      settings.values = {};
+    }
   });
 });

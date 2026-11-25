@@ -70,6 +70,7 @@ The tree itself is restored from disk on startup, so suites are browsable straig
 A run the CLI failed is never green: when it exits non-zero and no test or package carries a failing verdict, the packages (for a fuzz or bench run, the selected targets) are marked errored with what the CLI said and its exit code.
 A test that started and got no verdict because its process died — a test timeout, a panic on a goroutine — is marked errored with what it printed, and its package's message names it. The Spec View shows such a test as NOT RUN until the CLI reports it otherwise.
 When a Go file of a package changes, the verdicts shown for that package are marked outdated (VS Code dims them) until it runs again. Packages that import the changed one are not marked here: the extension does not know the import graph. The Spec View asks the CLI instead, which does (see *Stale verdicts* below).
+**Live results**: test runs, coverage runs and Run Changed have the CLI write each suite's events as they happen (`GOTEST_LIVE=1`), so each test's result shows when it finishes, not when its suite's process ends. `gotest.liveResults` turns this off per folder; a CLI that predates it ignores the variable. Watch mode streams each cycle as before.
 The **Run Changed** profile (and **Go Test: Run Changed Packages**) runs `gotest --changed` in a folder: only the packages whose inputs changed since the last run record, and those that failed or never ran. Its run is named *changed packages only*, its output says how many packages it ran and how many it left out, and a package it left out keeps the verdict it had; it is not a full run.
 
 ### CodeLens
@@ -297,6 +298,7 @@ These can be set in `.vscode/settings.json` per workspace folder:
 | `gotest.buildFlags` | `[]` | Additional build flags passed to Delve |
 | `gotest.discoverOnSave` | `true` | Re-discover tests when `_test.go` files change |
 | `gotest.coverOnRun` | `true` | Collect coverage data alongside normal test runs |
+| `gotest.liveResults` | `true` | Show each test's result as it happens: runs stream every suite's events live (`GOTEST_LIVE=1`) |
 | `gotest.coverOnSave` | `false` | Re-run package coverage when a `.go` file is saved |
 | `gotest.lintOnSave` | `true` | Lint the package of a saved `_test.go` file and show its findings as problems |
 | `gotest.coverTestOnlyPackages` | `false` | Enable cross-package coverage instrumentation for test-only packages |
