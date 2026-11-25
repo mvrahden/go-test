@@ -123,6 +123,8 @@ var witnesses = []witness{
 	{file: "reference/api.md", quote: "### A test asserts, or says how it checks", label: "v1.42+", path: "pkg/gotest/census.go", literal: "func (t *T) AssertsBy(reason string)"},
 	{file: "reference/api.md", quote: "the test checks by other means; never to silence the count", label: "v1.42+", path: "pkg/gotest/census.go", literal: "func (t *T) AssertsBy(reason string)"},
 	{file: "reference/ci.md", quote: "an assertion fails it (v1.42+", label: "v1.42+", path: "pkg/gotest/census.go", literal: "func (t *T) AssertsBy(reason string)"},
+	{file: "reference/api.md", quote: "## Fake time", label: "v1.42+", path: "pkg/gotest/bubble.go", literal: "func Bubble(t *T, fn func(bt *T))"},
+	{file: "SKILL.md", quote: "instead (v1.42+): it", label: "v1.42+", path: "pkg/gotest/bubble.go", literal: "func Settle(t *T)"},
 }
 
 var (

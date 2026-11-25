@@ -451,6 +451,8 @@ CacheFixture.AfterAll <span class="d">─┘</span></div>
           <tr><td><code>Eventually(t, timeout, tick, fn)</code></td><td>Poll <code>func(poll *R)</code> until assertions pass or timeout.</td></tr>
           <tr><td><code>Consistently(t, duration, tick, fn)</code></td><td>Assert <code>func(poll *R)</code> holds for the full duration.</td></tr>
           <tr><td><code>Go(t, fn)</code></td><td>Run <code>fn</code> on a goroutine that captures panics and re-raises them on the test's goroutine. Returns a <code>wait</code> func; also registered as cleanup.</td></tr>
+          <tr><td><code>Bubble(t, fn)</code></td><td>Run <code>func(bt *T)</code> in a <code>testing/synctest</code> bubble, on its fake clock: time moves only when every goroutine in it is blocked. Assert on <code>bt</code>; <code>It</code>, <code>When</code>, <code>Each</code>, <code>Parallel</code> and the outer <code>t</code> fail inside it.</td></tr>
+          <tr><td><code>Settle(bt)</code></td><td>Wait until every other goroutine in the bubble is blocked, so what they wrote is safe to read.</td></tr>
         </tbody>
       </table>
       <div class="callout">

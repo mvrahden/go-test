@@ -235,6 +235,14 @@ those are your job, below.
    *gotest.R) { ... })` — assert a stable fixed point, not a transient
    state. The callback's `poll` handle has only `Errorf`/`FailNow`/
    `Failed`/`Message`; pass `poll` (not `t`) to assertions inside it.
+   Code whose verdict reads the clock in-process (a backoff, ticker, TTL,
+   debounce, rate limiter or context deadline) goes in a
+   `gotest.Bubble(t, func(bt *gotest.T) { ... })` instead (v1.42+): it
+   runs on testing/synctest's fake clock, so an hour passes at once and the
+   same under load. Assert on `bt`, `gotest.Settle(bt)` before reading
+   what another goroutine wrote, and open no `It` inside it. Never bubble a
+   child process, real network I/O or a shared fixture: their time is the
+   wall clock's ([reference/api.md](reference/api.md), Fake time).
 6. **Never call `t.T().Helper()`** — call sites resolve automatically; the
    linter flags it. Reach for `t.T()` only when nothing on `gotest.T`
    (`It`, `When`, `Context`, `TempDir`, `Setenv`, `Name`, `Skipf`,
