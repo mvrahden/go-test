@@ -30,29 +30,48 @@ func withCoverDir(env []string, dir string) []string {
 // binary a test started: built with -cover it writes there too, and its
 // data is dropped.
 func foldChildCoverage(dir, profile string, pkgs []string) (int, error) {
+	text, n, err := childCoverage(dir, pkgs)
+	if err != nil || n == 0 {
+		return 0, err
+	}
+	return n, appendFile(profile, text)
+}
+
+// appendFile appends data to the file at path.
+func appendFile(path string, data []byte) error {
+	out, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600) //nolint:gosec // G304: a profile the run wrote
+	if err != nil {
+		return err
+	}
+	if _, err := out.Write(data); err != nil {
+		_ = out.Close()
+		return err
+	}
+	return out.Close()
+}
+
+// childCoverage is the coverage data binaries wrote into dir as a profile's
+// text, limited to pkgs, and how many binaries wrote counters.
+func childCoverage(dir string, pkgs []string) ([]byte, int, error) {
 	metas, err := filepath.Glob(filepath.Join(dir, "covmeta.*"))
 	if err != nil || len(metas) == 0 {
-		return 0, err
+		return nil, 0, err
 	}
 	if self := ownMeta(filepath.Join(filepath.Dir(dir), "covself")); self != "" {
 		metas = slices.DeleteFunc(metas, func(m string) bool { return filepath.Base(m) == self })
 	}
 	slices.Sort(metas)
-	out, err := os.OpenFile(profile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600) //nolint:gosec // G304: the profile the run wrote
-	if err != nil {
-		return 0, err
-	}
-	defer out.Close()
+	var out []byte
 	n := 0
 	for i, meta := range metas {
 		hash := strings.TrimPrefix(filepath.Base(meta), "covmeta.")
 		one := filepath.Join(dir, fmt.Sprintf("binary-%d", i))
 		if err := os.Mkdir(one, 0o700); err != nil {
-			return 0, err
+			return nil, 0, err
 		}
 		counters, err := filepath.Glob(filepath.Join(dir, "covcounters."+hash+".*"))
 		if err != nil {
-			return 0, err
+			return nil, 0, err
 		}
 		if len(counters) == 0 {
 			continue
@@ -60,23 +79,21 @@ func foldChildCoverage(dir, profile string, pkgs []string) (int, error) {
 		n++
 		for _, f := range append(counters, meta) {
 			if err := os.Rename(f, filepath.Join(one, filepath.Base(f))); err != nil {
-				return 0, err
+				return nil, 0, err
 			}
 		}
 		text := filepath.Join(dir, fmt.Sprintf("binary-%d.out", i))
 		cmd := exec.Command("go", "tool", "covdata", "textfmt", "-i="+one, "-o="+text, "-pkg="+strings.Join(pkgs, ",")) //nolint:gosec // G204: go tool with controlled arguments
 		if msg, err := cmd.CombinedOutput(); err != nil {
-			return 0, fmt.Errorf("go tool covdata: %w: %s", err, strings.TrimSpace(string(msg)))
+			return nil, 0, fmt.Errorf("go tool covdata: %w: %s", err, strings.TrimSpace(string(msg)))
 		}
 		data, err := os.ReadFile(text) //nolint:gosec // G304: the file covdata just wrote
 		if err != nil {
-			return 0, err
+			return nil, 0, err
 		}
-		if _, err := out.Write(data); err != nil {
-			return 0, err
-		}
+		out = append(out, data...)
 	}
-	return n, out.Close()
+	return out, n, nil
 }
 
 // ownMeta is the name of this binary's coverage meta-data file, written

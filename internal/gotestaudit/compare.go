@@ -293,13 +293,14 @@ func (c *collector) suppressions(base, head *Record) {
 	}
 	rules := func(s *Suppression) string { return s.Module + "\x00" + s.File + "\x00" + strings.Join(s.Rules, ",") }
 	key := func(s *Suppression) string { return rules(s) + "\x00" + s.Reason }
+	baseList, headList := withMutateIgnores(base), withMutateIgnores(head)
 	have := map[string]int{}
-	for i := range base.Suppressions {
-		have[key(&base.Suppressions[i])]++
+	for i := range baseList {
+		have[key(&baseList[i])]++
 	}
 	var added []*Suppression
-	for i := range head.Suppressions {
-		s := &head.Suppressions[i]
+	for i := range headList {
+		s := &headList[i]
 		if k := key(s); have[k] > 0 {
 			have[k]--
 			continue
@@ -307,8 +308,8 @@ func (c *collector) suppressions(base, head *Record) {
 		added = append(added, s)
 	}
 	left := map[string][]*Suppression{}
-	for i := range base.Suppressions {
-		s := &base.Suppressions[i]
+	for i := range baseList {
+		s := &baseList[i]
 		if k := key(s); have[k] > 0 {
 			have[k]--
 			left[rules(s)] = append(left[rules(s)], s)
@@ -333,7 +334,24 @@ func (c *collector) suppressions(base, head *Record) {
 	}
 }
 
+// mutateIgnoreRule is the rule a //gotest:mutate-ignore comment is
+// compared under, beside the nolint comments.
+const mutateIgnoreRule = "gotest:mutate-ignore"
+
+// withMutateIgnores is a record's suppressions and its mutate-ignore
+// comments, compared alike: one added is a suppression finding.
+func withMutateIgnores(r *Record) []Suppression {
+	out := slices.Clone(r.Suppressions)
+	for _, ig := range r.MutateIgnores {
+		out = append(out, Suppression{Module: ig.Module, File: ig.File, Line: ig.Line, Rules: []string{mutateIgnoreRule}, Reason: ig.Reason})
+	}
+	return out
+}
+
 func suppressionText(s *Suppression) string {
+	if len(s.Rules) == 1 && s.Rules[0] == mutateIgnoreRule {
+		return strings.TrimSpace("//" + mutateIgnoreRule + " " + s.Reason)
+	}
 	text := "//nolint:" + strings.Join(s.Rules, ",")
 	if s.Reason != "" {
 		text += " // " + s.Reason

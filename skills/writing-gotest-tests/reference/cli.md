@@ -145,7 +145,13 @@ invocation runs tests — there is NO `test` subcommand:
   binary a test starts counts when built with `go build -cover`, which
   writes to the `GOCOVERDIR` the run sets);
   `--fail-on=proof` fails on a failing, not run, vacuous or stale
-  behavior or an unproven line. `-v` lists the rows text groups.
+  behavior, an unproven line or a survived one. `-v` lists the rows text
+  groups. `--mutate` (**v1.42+**) runs as `--run` does, then makes each
+  changed line a test executed wrong, one mutant at a time, and reruns the
+  suites that executed it: a mutant no test fails *survived*, and
+  `--fail-on=survived` exits 1 on one. `--mutate-budget=<d>` (default 3m)
+  bounds the time, the rest reads not judged; `--mutate-strings` adds
+  string literals; `--parallel=<n>` bounds the tests the runs make.
 - `go tool gotest summary --input=<events file> --format=intoto-test-result`
   (**v1.42+**) — prints the saved run's result as the in-toto test-result
   predicate (PASSED, WARNED for a test that passed without an assertion,

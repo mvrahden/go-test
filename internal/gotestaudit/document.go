@@ -41,6 +41,9 @@ type Document struct {
 	// Unproven holds, per production file, the changed lines no test
 	// executed, and the files no profile covers.
 	Unproven []Unproven `json:"unproven"`
+	// Mutation is what --mutate found of the changed lines; absent without
+	// it.
+	Mutation *Mutation `json:"mutation,omitempty"`
 	// Incomplete names what could not be compared, such as a package that
 	// does not compile on one side.
 	Incomplete []string `json:"incomplete"`
@@ -80,6 +83,8 @@ type Summary struct {
 	// NoCoverage the changed production files no profile covers.
 	ChangedLines int `json:"changedLines"`
 	NoCoverage   int `json:"noCoverage"`
+	// Mutation counts the mutants by verdict; absent without --mutate.
+	Mutation *MutationCounts `json:"mutation,omitempty"`
 }
 
 // Change kinds.
@@ -170,7 +175,8 @@ var Classes = []string{
 
 // Proof classes judge what the runs and the profile given say, not the
 // change: a behavior that failed, did not run, passed vacuous or was
-// judged by a stale stream, and a file with changed lines no test executed.
+// judged by a stale stream, a file with changed lines no test executed,
+// and a line with a mutant no test noticed (ClassSurvived).
 const (
 	ClassFailing  = "failing"
 	ClassNotRun   = "not-run"
@@ -180,7 +186,7 @@ const (
 )
 
 // ProofClasses are the proof classes in order.
-var ProofClasses = []string{ClassFailing, ClassNotRun, ClassVacuous, ClassStale, ClassUnproven}
+var ProofClasses = []string{ClassFailing, ClassNotRun, ClassVacuous, ClassStale, ClassUnproven, ClassSurvived}
 
 // Weakens reports whether a class is a weakening, not information. A
 // suppression that only changed its reason is information of its class.

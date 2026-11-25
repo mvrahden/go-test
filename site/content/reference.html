@@ -757,6 +757,9 @@ percentage = covered / total</div>
           <tr><td><code>--evidence=&lt;stream&gt;</code></td><td>A saved <code>-json</code> stream of a run of the head, repeatable: each changed behavior's verdict, current or stale (<code>audit</code>).</td></tr>
           <tr><td><code>--base-evidence=&lt;stream&gt;</code></td><td>A saved <code>-json</code> stream of a run of the base, repeatable, for the run-time assertions of an assertions finding (<code>audit</code>).</td></tr>
           <tr><td><code>--run</code></td><td>Run the packages of the changed behaviors, with coverage of the changed production packages, a binary built with <code>go build -cover</code> that a test starts included, and take the run as current evidence (<code>audit</code>).</td></tr>
+          <tr><td><code>--mutate</code></td><td>Run as <code>--run</code> does, then judge the mutants of the changed lines by the suites that executed each, within <code>--mutate-budget</code> (<code>audit</code>).</td></tr>
+          <tr><td><code>--mutate-budget=&lt;d&gt;</code></td><td>The time the mutants of <code>audit --mutate</code> may take, three minutes by default.</td></tr>
+          <tr><td><code>--mutate-strings</code></td><td>Mutate string literals too (<code>audit --mutate</code>).</td></tr>
           <tr><td><code>--diff=&lt;file|-&gt;</code></td><td>The changed lines the unproven ones are read from, as a unified diff, where <code>--base</code> does not give them (<code>audit</code>).</td></tr>
           <tr><td><code>--specs=&lt;paths&gt;</code></td><td>Spec files and directories to read instead of <code>specs/</code> and <code>openspec/specs/</code> (<code>scenarios</code>).</td></tr>
           <tr><td><code>--verify</code></td><td>Run the packages that hold a bound <code>It</code> and judge the scenarios by that run (<code>scenarios</code>).</td></tr>
@@ -921,6 +924,7 @@ FAIL  pkg/bar TestProcessOrder / concurrent writes (1.2s)
           <tr><td><code>events-file</code></td><td></td><td>Also save the run's <code>go test -json</code> event stream to this path, for <code>upload-artifact</code>, gotestsum or <code>gotest summary --input</code>; prefer a path under <code>runner.temp</code>. Needs gotest v1.36.0 or newer. Artifacts are not masked like logs: a token a test prints ends up in the file.</td></tr>
           <tr><td><code>audit</code></td><td><code>auto</code></td><td>Append <code>gotest audit</code>'s comparison with the base commit to the step summary: on <code>pull_request</code> events for <code>auto</code>, on every event that names a base for <code>true</code>, never for <code>false</code>.</td></tr>
           <tr><td><code>audit-fail-on</code></td><td><em>none</em></td><td>Finding classes the audit fails the step on (<code>--fail-on</code>); empty reports and never fails.</td></tr>
+          <tr><td><code>audit-mutate</code></td><td><em>none</em></td><td>Also judge the mutants of the changed lines (<code>--mutate</code>): a duration is their budget (<code>--mutate-budget</code>), <code>true</code> the CLI's default; empty mutates nothing.</td></tr>
           <tr><td><code>attest</code></td><td><code>false</code></td><td>Attest the run's result with the in-toto test-result predicate through <code>actions/attest</code>; the job must grant <code>id-token: write</code> and <code>attestations: write</code>.</td></tr>
           <tr><td><code>version</code></td><td><code>gomod</code></td><td>Version to install, or <code>gomod</code> to resolve from <code>go.mod</code>.</td></tr>
         </tbody>

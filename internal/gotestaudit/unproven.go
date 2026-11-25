@@ -125,6 +125,8 @@ type ProdFile struct {
 	File    string
 	Package string
 	Lines   []int
+	// Abs is the file's absolute path.
+	Abs string
 }
 
 // key is the name a coverage profile gives the file.

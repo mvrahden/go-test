@@ -208,7 +208,7 @@ func (s *AuditCompareTestSuite) TestThePolicyExit(t *gotest.T) {
 			run := s.audit(it, "--fail-on=focus,flaky")
 			gotest.Equal(it, 2, run.Exit)
 			gotest.Empty(it, run.Stdout)
-			gotest.Equal(it, "FAIL: --fail-on: unknown finding class \"flaky\"; the classes are removed, excluded, focus, guard, budget, suppression, snapshot, assertions, asserts-by, changed, failing, not-run, vacuous, stale, unproven, all and proof\n", run.Stderr)
+			gotest.Equal(it, "FAIL: --fail-on: unknown finding class \"flaky\"; the classes are removed, excluded, focus, guard, budget, suppression, snapshot, assertions, asserts-by, changed, failing, not-run, vacuous, stale, unproven, survived, all and proof\n", run.Stderr)
 		})
 	})
 }
