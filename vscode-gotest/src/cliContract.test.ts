@@ -68,7 +68,14 @@ import {
   targetsOf,
 } from "./auditModel.js";
 import { interpretAuditExit } from "./changeScope.js";
-import { parseCliCapabilities } from "./cli.js";
+import { parseCliCapabilities, RUNS_COMMAND } from "./cli.js";
+import {
+  buildRunRows,
+  parseRunsDocument,
+  type RunsDocument,
+} from "./runsModel.js";
+import { parseFreshness, CHECK_FRESH_ARGS } from "./freshness.js";
+import { changedOf } from "./batchRunner.js";
 
 interface Invocation {
   exitCode: number | null;
@@ -197,7 +204,18 @@ const golden = JSON.parse(
   outputs: Record<string, OutputRun>;
   lint: Record<string, LintRun>;
   audit: Record<string, AuditRun>;
+  runs: Record<string, RunsCase>;
 };
+
+// A `gotest runs` invocation, or the freshness and --changed steps, masked.
+interface RunsCase {
+  args: string[];
+  exitCode: number | null;
+  stderr?: string;
+  document?: unknown;
+  manifestChanged?: unknown;
+  run?: { args: string[]; exitCode: number | null };
+}
 
 // nodesOf lists every node beneath pkg, keyed by its slash-joined path.
 function nodesOf(pkg: SpecPackage): Map<string, SpecNode> {
@@ -1148,6 +1166,8 @@ describe("recorded version", () => {
     const caps = parseCliCapabilities(JSON.stringify(out.document));
     expect(caps?.json).toBe(true);
     expect(caps?.commands).toContain("audit");
+    // The Runs scope, --changed and --check-fresh are asked by this word.
+    expect(caps?.commands).toContain(RUNS_COMMAND);
     expect(caps?.schemas.audit).toBe(AUDIT_SCHEMA);
     expect(Object.keys(out.document as object)).toEqual([
       "version",
@@ -1399,5 +1419,86 @@ describe("recorded audit", () => {
     );
     expect(outcome.ok).toBe(false);
     if (!outcome.ok) expect(outcome.message).toContain("--base-record");
+  });
+});
+
+describe("recorded run records", () => {
+  const r = golden.runs;
+  const rows = (name: string, exists: (f: string) => boolean = () => true) =>
+    buildRunRows(
+      parseRunsDocument(JSON.stringify(r[name].document)) as RunsDocument,
+      { now: new Date(), exists, evidence: () => false },
+    );
+
+  it("records exactly the stated steps", () => {
+    expect(Object.keys(r).sort()).toEqual([
+      "changed",
+      "check-fresh",
+      "import-another-commit",
+      "import-current",
+      "import-no-manifest",
+      "import-uncommitted",
+      "list-after-changed",
+      "list-empty",
+      "list-imported",
+    ]);
+  });
+
+  it("lists no run of a checkout nothing ran in", () => {
+    expect(r["list-empty"].exitCode).toBe(0);
+    expect(rows("list-empty")).toEqual([]);
+  });
+
+  it("lists imported runs newest first, marked imported, with their events files", () => {
+    expect(r["import-current"].exitCode).toBe(0);
+    const list = rows("list-imported");
+    expect(list.map((x) => x.imported)).toEqual([
+      "current.json",
+      "uncommitted.json",
+      "another-commit.json",
+      "no-manifest.json",
+    ]);
+    expect(list[0].who).toBe("agent <agent>");
+    expect(list[1].commit).toBe("HEAD_COMMIT dirty");
+    expect(list[3].args).toBe("gotest");
+    // Streams without input hashes judge nothing.
+    expect(list[0].judges).toBe(
+      "judges this tree: 0 current / 0 stale / 1 unknown",
+    );
+    expect(list.every((x) => x.eventsFile?.startsWith("<proof>/"))).toBe(true);
+  });
+
+  it("judges a run's stream stale once a file of its package changed", () => {
+    const c = r["check-fresh"];
+    expect(c.run?.exitCode).toBe(0);
+    expect(c.args).toEqual(CHECK_FRESH_ARGS);
+    expect(c.exitCode).toBe(0);
+    const judged = parseFreshness(JSON.stringify(c.document));
+    expect(Object.fromEntries(judged!)).toEqual({ "auditmod/shop": "stale" });
+  });
+
+  it("narrows a --changed run to the changed package and says so in its manifest", () => {
+    const ch = r.changed;
+    expect(ch.exitCode).toBe(0);
+    const line = JSON.stringify({
+      Action: "start",
+      Package: "gotest run",
+      RunLevel: true,
+      Manifest: { Changed: ch.manifestChanged },
+    });
+    expect(changedOf(line)).toEqual({ ran: 1, unchanged: 1, noRecord: false });
+    const list = rows("list-after-changed", (f) => f.startsWith("<stage>"));
+    expect(list[0].narrowed).toBe(
+      "--changed: ran 1 package, left out 1 unchanged",
+    );
+    expect(list[0].judges).toBe(
+      "judges this tree: 1 current / 0 stale / 0 unknown",
+    );
+    // The run before it wrote its stream: openable, and stale for shop.
+    expect(list[1].canOpen).toBe(true);
+    expect(list[1].judges).toBe(
+      "judges this tree: 1 current / 1 stale / 0 unknown",
+    );
+    expect(list[1].judgesTone).toBe("warn");
   });
 });

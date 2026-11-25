@@ -11,6 +11,9 @@ export default defineConfig({
     // Real `go run` invocations compete for the build cache; serialising keeps
     // the first cold compile from timing out its siblings.
     fileParallelism: false,
+    // gotest's cache, run records included, stays out of the user's.
+    setupFiles: ["test/integration/privateCache.ts"],
+    globalSetup: ["test/integration/privateCache.ts"],
   },
   resolve: {
     extensions: [".ts", ".js"],

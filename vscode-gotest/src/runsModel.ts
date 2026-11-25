@@ -142,8 +142,9 @@ export function buildRunRows(
     const p = r.packages;
     return {
       id: r.id,
-      when: whenText(at, opts.now),
-      whenTitle: at.toISOString(),
+      // A time the CLI wrote that does not parse is shown as written.
+      when: isNaN(at.getTime()) ? r.recorded : whenText(at, opts.now),
+      whenTitle: isNaN(at.getTime()) ? r.recorded : at.toISOString(),
       pass,
       verdict: `${pass ? "PASS" : "FAIL"} exit ${r.result.exitCode}`,
       who: m.agent ? `agent ${m.agent}` : "no agent",

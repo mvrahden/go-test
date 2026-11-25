@@ -172,6 +172,9 @@ function maskDir(text, dir, token) {
 const bin = await buildBinary();
 const cases = {};
 
+// Every run here keeps its record in a cache of its own, never the user's.
+process.env.GOTEST_CACHE_DIR = tempDir("gotest-contract-cache-");
+
 for (const file of readdirSync(streamDir).sort()) {
   if (!file.endsWith(".jsonl")) continue;
   const name = file.replace(/\.jsonl$/, "");
@@ -863,13 +866,154 @@ removeAudit();
   };
 }
 
+// The run records: the conformance suite's saved runs imported into a
+// staged module's history, listed as the Runs scope reads them; then a run
+// of the module, one of its files changed, the run's stream judged against
+// the tree (--check-fresh), and a --changed run's manifest. Ids, times,
+// the stage, versions and hashes are masked.
+const runsRoot = path.join(tmpdir(), "gotest-contract-runs");
+const removeRuns = () => rmSync(runsRoot, { recursive: true, force: true });
+process.on("exit", removeRuns);
+removals.push(removeRuns);
+removeRuns();
+const runs = {};
+{
+  const mod = path.join(runsRoot, "mod");
+  cpSync(path.join(auditSource, "head"), mod, { recursive: true });
+  const goMod = path.join(mod, "go.mod");
+  writeFileSync(
+    goMod,
+    readFileSync(goMod, "utf-8").replaceAll("REPO_ROOT", repoRoot),
+  );
+  const env = outputEnv({
+    GOWORK: "off",
+    GOTEST_CACHE_DIR: path.join(runsRoot, "cache"),
+  });
+  const proofSource = path.join(auditSource, "proof");
+  const unstage = (text) =>
+    maskDir(maskDir(text, proofSource, "<proof>"), runsRoot, "<stage>");
+  const maskRecord = (r) => ({
+    ...r,
+    id: "<id>",
+    recorded: "<time>",
+    // A live run's start is now; an imported one's is its stream's.
+    ...(r.started && !r.imported ? { started: "<time>" } : {}),
+    ...(r.eventsFile ? { eventsFile: unstage(r.eventsFile) } : {}),
+    manifest: {
+      ...r.manifest,
+      ...(r.manifest.version ? { version: "<version>" } : {}),
+      ...(r.manifest.goVersion ? { goVersion: "<go>" } : {}),
+      ...(r.manifest.commit && r.manifest.commit !== "HEAD_COMMIT"
+        ? { commit: "<commit>" }
+        : {}),
+      ...(r.manifest.agent ? { agent: "<agent>" } : {}),
+      args: r.manifest.args.map(unstage),
+    },
+  });
+  const list = async (name) => {
+    const args = ["runs", "--format=json"];
+    const result = await run(bin, args, "", { cwd: mod, env });
+    runs[name] = {
+      args,
+      exitCode: result.exitCode,
+      stderr: unstage(result.stderr),
+      ...document(result.stdout, (d) => ({
+        ...d,
+        version: "<version>",
+        dir: unstage(d.dir),
+        runs: d.runs.map(maskRecord),
+      })),
+    };
+  };
+  await list("list-empty");
+  for (const name of [
+    "no-manifest",
+    "another-commit",
+    "uncommitted",
+    "current",
+  ]) {
+    const file = path.join(proofSource, `${name}.json`);
+    const args = ["runs", `--import=${file}`];
+    const result = await run(bin, args, "", { cwd: mod, env });
+    runs[`import-${name}`] = {
+      args: args.map(unstage),
+      exitCode: result.exitCode,
+      stderr: unstage(result.stderr),
+    };
+  }
+  await list("list-imported");
+
+  const events = path.join(runsRoot, "run.jsonl");
+  const runArgs = [
+    "--agent=false",
+    `--events-file=${events}`,
+    "--",
+    "-json",
+    "-count=1",
+    "./...",
+  ];
+  const first = await run(bin, runArgs, "", { cwd: mod, env });
+  writeFileSync(
+    path.join(mod, "shop", "shop.go"),
+    readFileSync(path.join(mod, "shop", "shop.go"), "utf-8") +
+      "\n// changed after the run\n",
+  );
+  const freshArgs = [
+    "spec",
+    "--input=-",
+    "--render-only",
+    "--check-fresh",
+    "--format=json",
+    "--hide=fail,none,pass,skip",
+  ];
+  const fresh = await run(bin, freshArgs, readFileSync(events, "utf-8"), {
+    cwd: mod,
+    env,
+  });
+  runs["check-fresh"] = {
+    run: { args: runArgs.map(unstage), exitCode: first.exitCode },
+    args: freshArgs,
+    exitCode: fresh.exitCode,
+    stderr: unstage(fresh.stderr),
+    ...document(fresh.stdout, (d) => ({
+      packages: d.packages.map((p) => ({
+        path: p.path,
+        freshness: p.freshness,
+        inputHash: p.inputHash ? "<hash>" : undefined,
+      })),
+      stale: d.stats.stale,
+    })),
+  };
+  const changedArgs = [
+    "--agent=false",
+    "--changed",
+    "--",
+    "-json",
+    "-count=1",
+    "./...",
+  ];
+  const changed = await run(bin, changedArgs, "", { cwd: mod, env });
+  const manifest = changed.stdout
+    .split("\n")
+    .filter((l) => l.includes('"Manifest"'))
+    .map((l) => JSON.parse(l).Manifest)[0];
+  runs.changed = {
+    args: changedArgs,
+    exitCode: changed.exitCode,
+    manifestChanged: manifest?.Changed ?? null,
+  };
+  await list("list-after-changed");
+}
+removeRuns();
+
 const golden = {
   note: [
     "Recorded contract of `gotest spec --input=- --format=json`, of its",
     "--declared and --hide forms (`spec`), of live `gotest -json` runs",
     "(`live`), of the other documents the extension reads (`outputs`), and",
     "of `gotest lint -json` and `gotest lint -rules -json` (`lint`), and",
-    "of `gotest audit` over the conformance suite's base and head (`audit`).",
+    "of `gotest audit` over the conformance suite's base and head (`audit`),",
+    "and of `gotest runs`, --check-fresh and --changed over a staged module (`runs`).",
     "Generated by scripts/record-cli-contract.mjs — do not hand-edit.",
     "A diff here is a change to an interface the VS Code extension consumes.",
   ],
@@ -879,9 +1023,10 @@ const golden = {
   outputs,
   lint,
   audit,
+  runs,
 };
 
 writeFileSync(goldenPath, JSON.stringify(golden, null, 2) + "\n", "utf-8");
 console.log(
-  `recorded ${Object.keys(cases).length} cases, ${Object.keys(spec).length} spec runs, ${Object.keys(live).length} live runs, ${Object.keys(outputs).length} outputs, ${Object.keys(lint).length} lint runs and ${Object.keys(audit).length} audit runs -> ${path.relative(extensionDir, goldenPath)}`,
+  `recorded ${Object.keys(cases).length} cases, ${Object.keys(spec).length} spec runs, ${Object.keys(live).length} live runs, ${Object.keys(outputs).length} outputs, ${Object.keys(lint).length} lint runs, ${Object.keys(audit).length} audit runs and ${Object.keys(runs).length} runs cases -> ${path.relative(extensionDir, goldenPath)}`,
 );
