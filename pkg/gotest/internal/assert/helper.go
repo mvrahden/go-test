@@ -37,6 +37,13 @@ func SkipInternalFrames(tb testing.TB) string {
 		return ""
 	}
 	v = v.Elem()
+	// A synctest bubble's T logs at its parent's lines, located by the
+	// parent's helpers.
+	if inner := v.FieldByName("isSynctest"); inner.IsValid() && inner.Kind() == reflect.Bool && inner.Bool() {
+		if parent := v.FieldByName("parent"); parent.IsValid() && parent.Kind() == reflect.Pointer && !parent.IsNil() {
+			v = parent.Elem()
+		}
+	}
 
 	muField := v.FieldByName("mu")
 	hpField := v.FieldByName("helperPCs")

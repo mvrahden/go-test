@@ -45,6 +45,10 @@ func (s *HelperTestSuite) TestGoTestingInternalsCompatible(t *gotest.T, _ *ring0
 	check("mu", reflect.TypeFor[sync.RWMutex]())
 	check("helperPCs", reflect.TypeFor[map[uintptr]struct{}]())
 	check("helperNames", reflect.TypeFor[map[string]struct{}]())
+	check("isSynctest", reflect.TypeFor[bool]())
+	if parent := v.FieldByName("parent"); !parent.IsValid() || parent.Kind() != reflect.Pointer || parent.Type().Elem() != v.FieldByName("common").Type() {
+		fatalf(t, "testing.T field %q is no *common: Go internals changed", "parent")
+	}
 }
 
 func (s *HelperTestSuite) TestSkipInternalFrames_NilT_NoPanic(t *gotest.T, _ *ring0Ctx) {
