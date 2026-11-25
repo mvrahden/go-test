@@ -79,8 +79,10 @@ jobs:
   setup-go's build cache alone would not carry it: that cache is never
   re-saved on a key hit.
 - CI environments auto-arm `--ci` (any non-falsy `CI`/`GOTEST_CI` value):
-  committed `F_` focus prefixes FAIL the run, and a missing snapshot
-  baseline fails instead of being created. `--update-snapshots` still
+  committed `F_` focus prefixes FAIL the run, a test that passed without
+  an assertion fails it (v1.42+; under `spec`, `summary` and `-json`, and
+  a text run only with `-v`), and a missing snapshot baseline fails
+  instead of being created. `--update-snapshots` still
   rewrites baselines there, so never pass it in CI. Opt out with
   `GOTEST_CI=0`.
 - **Coexisting with golangci-lint:** there is NO golangci-lint plugin for

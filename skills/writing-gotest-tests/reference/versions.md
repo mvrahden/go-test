@@ -757,3 +757,11 @@ What v1.42 changes:
 
 3. **`--failed`** reruns only what the last run in the directory failed.
    Below v1.42 rerun by `-run` with the names the run printed.
+
+6. **A pass that asserted nothing is vacuous** — each leaf reports how
+   many assertions it made; the spec marks one that passed with none,
+   the run names it, and `--ci` fails the run on it with exit 1.
+   `t.AssertsBy(reason)` declares a test that checks by other means
+   (`api.md`, A test asserts, or says how it checks). Below v1.42 such a
+   pass is green everywhere; a newer CLI over an older module's runtime
+   sees no counts and judges nothing.
