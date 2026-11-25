@@ -106,6 +106,10 @@
         "title": "Go Test: Show Change View"
       },
       {
+        "command": "gotest.runChanged",
+        "title": "Go Test: Run Changed Packages"
+      },
+      {
         "command": "gotest.openEventsFile",
         "title": "Go Test: Open Events File…"
       },

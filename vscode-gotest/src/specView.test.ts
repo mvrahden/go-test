@@ -1119,6 +1119,20 @@ describe("the document's run and groups", () => {
     expect(html).toContain("Run: abc1234 · exit 0");
   });
 
+  it("says a --changed run was narrowed and how many packages it left out", () => {
+    expect(
+      provenanceText({ exitCode: 0, changed: { ran: 1, unchanged: 3 } }),
+    ).toBe(
+      "exit 0 · narrowed by --changed: ran 1 package, left out 3 unchanged",
+    );
+    expect(
+      provenanceText({
+        exitCode: 0,
+        changed: { ran: 4, unchanged: 0, noRecord: true },
+      }),
+    ).toBe("exit 0 · --changed found no record and ran everything");
+  });
+
   it("words a group as the CLI's summary does", () => {
     expect(groupText({ name: "e2e", suites: 1, wall: 72 })).toBe(
       "group e2e: 1 suite, 72.0s, run apart",
@@ -1184,6 +1198,9 @@ describe("scopes", () => {
     const html = buildScopeTabs("change");
     expect(html).toContain('data-scope="spec" aria-selected="false"');
     expect(html).toContain('data-scope="change" aria-selected="true"');
+    expect(html).toContain('data-scope="runs" aria-selected="false"');
+    const noRuns = buildScopeTabs("spec", { change: true, runs: false });
+    expect(noRuns).not.toContain('data-scope="runs"');
   });
 
   it("restores the scope, its folder and the spec, and an older panel's spec", () => {
@@ -1191,8 +1208,16 @@ describe("scopes", () => {
     expect(parseStoredState(spec)).toEqual({ spec });
     expect(
       parseStoredState({ scope: "change", folder: "/ws", spec: null }),
-    ).toEqual({ scope: "change", folder: "/ws", spec: undefined });
-    expect(parseStoredState({ scope: "runs" }).scope).toBeUndefined();
+    ).toEqual({
+      scope: "change",
+      folder: "/ws",
+      runsFolder: undefined,
+      spec: undefined,
+    });
+    expect(parseStoredState({ scope: "runs", runsFolder: "/r" })).toMatchObject(
+      { scope: "runs", runsFolder: "/r" },
+    );
+    expect(parseStoredState({ scope: "history" }).scope).toBeUndefined();
     expect(parseStoredState(null)).toEqual({});
   });
 });

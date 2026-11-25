@@ -30,6 +30,9 @@ export interface ChangeView {
   // The audit running now: a plain one, or one that runs the change.
   busy: false | "static" | "run";
   folders: { path: string; label: string; selected: boolean }[];
+  // The runs taken as the audit's evidence, from the Runs scope; a missing
+  // one's events file is gone and is not passed.
+  evidence: { id: string; label: string; missing: boolean }[];
   // The folder's base as the user chose it.
   baseLabel?: string;
   // Said above the document, such as an audit that was stopped.
@@ -53,6 +56,7 @@ function attr(s: string): string {
 export function buildChangeBody(view: ChangeView): string {
   return `<div class="change-container">
   ${changeToolbar(view)}
+  ${evidenceChips(view)}
   <div class="change-body" id="change-body">${changeContent(view)}</div>
 </div>`;
 }
@@ -89,6 +93,18 @@ function changeToolbar(view: ChangeView): string {
     <button class="tool-btn" data-change="auditRun" title="Run the packages of the changed behaviors, with coverage of the changed production packages, and audit with that run as evidence"${off}>Audit with a run</button>
   </div>
 </div>`;
+}
+
+// evidenceChips lists the runs the next audit takes as --evidence.
+function evidenceChips(view: ChangeView): string {
+  if (view.evidence.length === 0) return "";
+  const chips = view.evidence
+    .map(
+      (e) =>
+        `<span class="evidence-chip${e.missing ? " missing" : ""}" title="${attr(e.missing ? "Its events file is gone; the audit does not get it" : "Passed to the audit as --evidence")}">${esc(e.label)}<button class="act" data-change="dropEvidence" data-key="${attr(e.id)}" title="Stop using this run as evidence" aria-label="Remove">×</button></span>`,
+    )
+    .join("");
+  return `<div class="evidence-chips"><span class="dim">Evidence from runs:</span>${chips}</div>`;
 }
 
 function changeContent(view: ChangeView): string {

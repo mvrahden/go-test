@@ -82,6 +82,7 @@ function view(over: Partial<ChangeView> = {}): ChangeView {
     busy: false,
     folders: [{ path: "/ws", label: "ws", selected: true }],
     baseLabel: "merge-base with origin/main (aaaa1111)",
+    evidence: [],
     canRun: () => false,
     canOpen: () => false,
     ...over,
@@ -89,6 +90,25 @@ function view(over: Partial<ChangeView> = {}): ChangeView {
 }
 
 describe("buildChangeBody", () => {
+  it("shows the runs taken as evidence as chips, each with a remove", () => {
+    const html = buildChangeBody(
+      view({
+        evidence: [
+          { id: "r1", label: "14:02 abc1234", missing: false },
+          { id: "r2", label: "09:10", missing: true },
+        ],
+      }),
+    );
+    expect(html).toContain("Evidence from runs:");
+    expect(html).toMatch(
+      /<span class="evidence-chip" [^>]*>14:02 abc1234<button class="act" data-change="dropEvidence" data-key="r1"/,
+    );
+    expect(html).toMatch(
+      /<span class="evidence-chip missing" title="Its events file is gone/,
+    );
+    expect(buildChangeBody(view())).not.toContain("Evidence from runs:");
+  });
+
   it("opens with the head, the base and the summary's counts", () => {
     const html = buildChangeBody(view());
     expect(html).toContain("head <b>feat/x</b> bbbb2222 ← base main aaaa1111");

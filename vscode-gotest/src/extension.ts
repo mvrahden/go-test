@@ -31,6 +31,9 @@ import {
 import { FocusDiagnostics } from "./diagnostics.js";
 import { SpecViewPanel, nearestItemId } from "./specView.js";
 import { ChangeScope } from "./changeScope.js";
+import { RunsScope } from "./runsScope.js";
+import { EvidenceSelection } from "./evidence.js";
+import { readFile } from "node:fs/promises";
 import { BASE_SCHEME, parseBaseQuery, showFile } from "./git.js";
 import { WatchManager } from "./watch.js";
 import {
@@ -52,10 +55,15 @@ import {
   scopedConfig,
   cliPackagePath,
   clearBinaryCache,
+  hasRuns,
+  offerCliUpgrade,
+  pinnedBelow,
+  RUNS_CLI_VERSION,
 } from "./cli.js";
 import {
   buildRunFilter,
   getPackageDir,
+  getPackageItem,
   restoreStoredResults,
 } from "./runnerUtils.js";
 import { copyCoverageSummary, copyTestResults } from "./reporting.js";
@@ -170,6 +178,8 @@ export function activate(context: vscode.ExtensionContext): void {
     () => active.list(),
   );
   specView.setExtensionUri(context.extensionUri);
+  // The runs taken as the Change scope's evidence, chosen in the Runs scope.
+  const evidence = new EvidenceSelection(context.workspaceState);
   // The panel's Change scope: the audit of each folder against its base.
   // Its rows run the test the document selects, in its package.
   const changeScope = new ChangeScope({
@@ -190,9 +200,25 @@ export function activate(context: vscode.ExtensionContext): void {
         cts.dispose();
       }
     },
+    evidence,
     changed: () => specView.changeChanged(),
   });
   specView.setChangeScope(changeScope);
+  // The panel's Runs scope: the folder's run records, as the CLI keeps them.
+  const runsScope = new RunsScope({
+    log: outputChannel,
+    folders: () => active.list(),
+    evidence,
+    openStream: async (id, label, folder, file) => {
+      const stream = await readFile(file, "utf-8");
+      await specView.openStream(id, label, { stream, folder }, "spec");
+    },
+    runChanged: async (folder) => {
+      await vscode.commands.executeCommand("gotest.runChanged", folder);
+    },
+    changed: () => specView.runsChanged(),
+  });
+  specView.setRunsScope(runsScope);
   // A file as the audit's base commit holds it, for the diff editor.
   const baseContent = vscode.workspace.registerTextDocumentContentProvider(
     BASE_SCHEME,
@@ -286,6 +312,56 @@ export function activate(context: vscode.ExtensionContext): void {
     },
   });
 
+  // Run changed: --changed in each folder, through the runner. A CLI
+  // without run records cannot narrow a run, and is told so.
+  const runChanged = async (
+    folders: string[],
+    token?: vscode.CancellationToken,
+  ): Promise<void> => {
+    const ok: string[] = [];
+    for (const folder of folders) {
+      if (await hasRuns(folder, outputChannel)) {
+        ok.push(folder);
+        continue;
+      }
+      const upgrade = await pinnedBelow(
+        folder,
+        RUNS_CLI_VERSION,
+        outputChannel,
+      );
+      if (upgrade) offerCliUpgrade(upgrade);
+      else
+        void vscode.window.showInformationMessage(
+          `Run changed needs gotest ${RUNS_CLI_VERSION}, whose run records say what changed since the last run. Run: go get -tool ${cliPackagePath(folder)}@${RUNS_CLI_VERSION}`,
+        );
+    }
+    if (ok.length === 0) return;
+    const cts = new vscode.CancellationTokenSource();
+    const sub = token?.onCancellationRequested(() => cts.cancel());
+    try {
+      await runner.run(new vscode.TestRunRequest(), cts.token, {
+        changed: ok,
+      });
+    } finally {
+      sub?.dispose();
+      cts.dispose();
+    }
+  };
+  const changedProfile = controller.testController.createRunProfile(
+    "Run Changed",
+    vscode.TestRunProfileKind.Run,
+    (request, token) => {
+      const picked = (request.include ?? [])
+        .map((i) => cache.getWorkspaceDir(getPackageItem(i).id))
+        .filter((d): d is string => !!d);
+      const folders =
+        picked.length > 0 ? Array.from(new Set(picked)) : active.list();
+      return runChanged(folders, token);
+    },
+    false,
+  );
+  context.subscriptions.push(changedProfile);
+
   const specViewRefreshDisposable = runner.onDidComplete((pieces) => {
     void specView.refresh(pieces);
   });
@@ -339,6 +415,7 @@ export function activate(context: vscode.ExtensionContext): void {
     outputChannel,
     lint,
     active,
+    runChanged,
   });
   const watcherDisposables = setupFileWatchers(
     cache,
@@ -491,6 +568,7 @@ export function registerCommands(deps: {
   outputChannel: vscode.LogOutputChannel;
   lint: LintService;
   active: ActiveFolders;
+  runChanged: (folders: string[]) => Promise<void>;
 }): vscode.Disposable[] {
   const {
     controller,
@@ -507,6 +585,7 @@ export function registerCommands(deps: {
     outputChannel,
     lint,
     active,
+    runChanged,
   } = deps;
 
   // Promote edits user source (typed f.Add seeds), so the fuzz surfaces
@@ -755,6 +834,17 @@ export function registerCommands(deps: {
     vscode.commands.registerCommand("gotest.showChangeView", async () => {
       await specView.showChange();
     }),
+
+    vscode.commands.registerCommand(
+      "gotest.runChanged",
+      // The folder named, else the active editor's, else every one.
+      (folder?: string) => {
+        const here = resolveActiveWorkspaceDir();
+        const all = active.list();
+        if (typeof folder === "string") return runChanged([folder]);
+        return runChanged(here && all.includes(here) ? [here] : all);
+      },
+    ),
 
     vscode.commands.registerCommand(
       "gotest.openEventsFile",

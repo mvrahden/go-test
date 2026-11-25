@@ -29,6 +29,7 @@ import {
 } from "./auditModel.js";
 import type { ChangeState, ChangeView } from "./changeView.js";
 import { AcceptanceStore, type Memento } from "./acceptance.js";
+import type { EvidenceSelection } from "./evidence.js";
 import {
   BASE_SCHEME,
   baseQuery,
@@ -56,6 +57,9 @@ export interface ChangeScopeDeps {
   // in it through the extension's runner.
   hasPackage?: (pkg: string) => boolean;
   runTest?: (pkg: string, run: string) => Promise<void>;
+  // The runs chosen in the Runs scope; their events files are the audit's
+  // --evidence.
+  evidence?: EvidenceSelection;
   // Called whenever what the scope shows changed.
   changed: () => void;
 }
@@ -195,6 +199,7 @@ export class ChangeScope implements vscode.Disposable {
       state: { kind: "idle" },
       busy: false,
       folders,
+      evidence: [],
       canRun: () => false,
       canOpen: () => false,
     };
@@ -216,6 +221,11 @@ export class ChangeScope implements vscode.Disposable {
       state,
       busy: fs.busy,
       folders,
+      evidence: (this.deps.evidence?.list(folder) ?? []).map((p) => ({
+        id: p.id,
+        label: p.label,
+        missing: !existsSync(p.file),
+      })),
       baseLabel: fs.baseLabel,
       notice: fs.notice,
       canOpen: (key) => fs.targets.has(key),
@@ -298,6 +308,7 @@ export class ChangeScope implements vscode.Disposable {
     const patterns = (await this.deps.patternsFor?.(folder)) ?? [];
     const args = ["audit", `--base=${base.ref}`, "--format=json"];
     if (mode === "run") args.push("--run");
+    args.push(...this.evidenceArgs(folder));
     let cmd;
     try {
       cmd = await buildCliCommand(
@@ -323,6 +334,13 @@ export class ChangeScope implements vscode.Disposable {
     fs.targets = this.place(folder, fs.toplevel, outcome.doc, model);
     fs.runs = runsOf(model);
     fs.state = { kind: "doc", model, exitCode: outcome.exitCode };
+  }
+
+  // evidenceArgs are --evidence for each chosen run whose file is there.
+  private evidenceArgs(folder: string): string[] {
+    return (this.deps.evidence?.list(folder) ?? [])
+      .filter((p) => existsSync(p.file))
+      .map((p) => `--evidence=${p.file}`);
   }
 
   // checkCli asks the folder's CLI what it can do before the first audit:
@@ -556,6 +574,9 @@ export class ChangeScope implements vscode.Disposable {
         return;
       case "upgrade":
         if (fs.upgrade) offerCliUpgrade(fs.upgrade);
+        return;
+      case "dropEvidence":
+        if (key) await this.deps.evidence?.remove(folder, key);
         return;
       case "accept":
         if (!fs.doc || !key) return;

@@ -14,6 +14,8 @@ import { JsonStore } from "./jsonStore.js";
 import { SpecStore, type RunPiece } from "./specStore.js";
 import type { DiscoveryCache } from "./discovery.js";
 import type { ChangeScope } from "./changeScope.js";
+import type { RunsScope } from "./runsScope.js";
+import { buildRunsBody, RUNS_CSS } from "./runsView.js";
 import { buildChangeBody, CHANGE_CSS } from "./changeView.js";
 import {
   CHECK_FRESH_ARGS,
@@ -50,7 +52,7 @@ export interface SpecViewActions {
 
 // The panel's scopes: the specification of the runs, and the audit of the
 // change against a base.
-export type Scope = "spec" | "change";
+export type Scope = "spec" | "change" | "runs";
 const SCOPES: { id: Scope; label: string; title: string }[] = [
   {
     id: "spec",
@@ -62,7 +64,15 @@ const SCOPES: { id: Scope; label: string; title: string }[] = [
     label: "Change",
     title: "What the working tree changed in the tests, against a base",
   },
+  {
+    id: "runs",
+    label: "Runs",
+    title:
+      "The runs recorded in this folder, and what each says of the tree now",
+  },
 ];
+
+const isScope = (v: unknown): v is Scope => SCOPES.some((sc) => sc.id === v);
 
 export class SpecViewPanel implements vscode.Disposable {
   private panel: vscode.WebviewPanel | undefined;
@@ -89,6 +99,7 @@ export class SpecViewPanel implements vscode.Disposable {
   private readonly hidden = new Set<string>();
   private scope: Scope = "spec";
   private change: ChangeScope | undefined;
+  private runsScope: RunsScope | undefined;
   // Per source on show ("" for the workspace's runs), each package's
   // freshness as the CLI last judged it.
   private readonly freshness = new Map<string, Map<string, Freshness>>();
@@ -139,6 +150,23 @@ export class SpecViewPanel implements vscode.Disposable {
   // changeChanged redraws the Change scope when it is on show.
   changeChanged(): void {
     if (this.panel && this.scope === "change") this.draw();
+  }
+
+  // setRunsScope gives the panel its Runs scope.
+  setRunsScope(runs: RunsScope): void {
+    this.runsScope = runs;
+  }
+
+  // runsChanged redraws the Runs scope when it is on show; the Change
+  // scope shows the runs taken as evidence, so it is redrawn too.
+  runsChanged(): void {
+    if (this.panel && this.scope !== "spec") this.draw();
+  }
+
+  // ensureScope has the scope on show fetch what it lacks.
+  private ensureScope(): void {
+    if (this.scope === "change") this.change?.ensure();
+    else if (this.scope === "runs") this.runsScope?.ensure();
   }
 
   private isVisible(): boolean {
@@ -201,7 +229,7 @@ export class SpecViewPanel implements vscode.Disposable {
 
   private rebuildIfVisible(): void {
     if (!this.panel) return;
-    if (this.scope === "change" || this.lastSpecData) this.draw();
+    if (this.scope !== "spec" || this.lastSpecData) this.draw();
   }
 
   // draw writes the panel for its scope from what it holds.
@@ -223,7 +251,7 @@ export class SpecViewPanel implements vscode.Disposable {
     if (this.panel) {
       this.panel.reveal(vscode.ViewColumn.Beside);
       if (scope) this.draw();
-      if (this.scope === "change") this.change?.ensure();
+      this.ensureScope();
       if (this.stale) await this.render();
       return;
     }
@@ -232,7 +260,7 @@ export class SpecViewPanel implements vscode.Disposable {
     await this.resolveModulePaths();
 
     this.draw();
-    if (this.scope === "change") this.change?.ensure();
+    this.ensureScope();
     if (this.stale) await this.render();
   }
 
@@ -260,9 +288,10 @@ export class SpecViewPanel implements vscode.Disposable {
     if (stored.spec) this.lastSpecData = stored.spec;
     if (stored.scope) this.scope = stored.scope;
     if (stored.folder) this.change?.select(stored.folder);
+    if (stored.runsFolder) this.runsScope?.select(stored.runsFolder);
     if (!this.lastSpecData && this.unranFolders().length > 0) this.stale = true;
     this.draw();
-    if (this.scope === "change") this.change?.ensure();
+    this.ensureScope();
     // A panel with a picture to show renders again when it is seen; one with
     // nothing but a declared tree to show renders now.
     if (!this.lastSpecData && this.stale && this.autoRefresh()) {
@@ -314,7 +343,7 @@ export class SpecViewPanel implements vscode.Disposable {
     this.panel!.onDidChangeViewState?.(
       (e) => {
         if (!e.webviewPanel.visible) return;
-        if (this.scope === "change") this.change?.ensure();
+        this.ensureScope();
         this.checkFreshSoon([], 0);
         if (this.stale && this.autoRefresh()) void this.render();
       },
@@ -362,6 +391,8 @@ export class SpecViewPanel implements vscode.Disposable {
       this.select(typeof msg.id === "string" ? msg.id : undefined);
     } else if (msg.type === "runTests") {
       vscode.commands.executeCommand("testing.runAll");
+    } else if (msg.type === "runChanged") {
+      void vscode.commands.executeCommand("gotest.runChanged");
     } else if (msg.type === "refresh") {
       this.stale = true;
       void this.render();
@@ -381,14 +412,16 @@ export class SpecViewPanel implements vscode.Disposable {
       this.stale = true;
       void this.render();
     } else if (msg.type === "scope") {
-      if (msg.scope !== "spec" && msg.scope !== "change") return;
+      if (!isScope(msg.scope)) return;
       this.scope = msg.scope;
       this.draw();
-      if (this.scope === "change") this.change?.ensure();
+      if (this.scope !== "spec") this.ensureScope();
       else if (this.stale) void this.render();
       else this.checkFreshSoon([], 0);
     } else if (msg.type === "change") {
       void this.change?.act(msg);
+    } else if (msg.type === "runs") {
+      void this.runsScope?.act(msg);
     } else if (msg.type === "clearResults") {
       this.clear();
     } else if (msg.type === "goToLocation" && msg.file && msg.line) {
@@ -446,6 +479,10 @@ export class SpecViewPanel implements vscode.Disposable {
       list.map((p) => p.folder),
       this.isVisible() && this.scope === "change",
     );
+    this.runsScope?.invalidate(
+      list.map((p) => p.folder),
+      this.isVisible() && this.scope === "runs",
+    );
     this.persist();
     // The newest change is what the panel shows.
     this.selected = undefined;
@@ -459,19 +496,26 @@ export class SpecViewPanel implements vscode.Disposable {
   // openStream shows a saved event stream as a source of its own, beside
   // the workspace's runs and never merged into them: it is evidence about
   // another machine. Opening the same file again replaces it.
-  async openStream(id: string, label: string, piece: RunPiece): Promise<void> {
+  async openStream(
+    id: string,
+    label: string,
+    piece: RunPiece,
+    scope?: Scope,
+  ): Promise<void> {
     const runs = new SpecStore();
     runs.merge(piece);
     this.imports.set(id, { label, runs });
     this.freshness.delete(id);
     this.selected = id;
     this.stale = true;
-    await this.show();
+    await this.show(scope);
   }
 
   // sourceChanged asks again, once a burst of edits settles, whether the
   // verdicts the panel shows for folder still belong to its tree.
   sourceChanged(folder: string): void {
+    // What a record says of the tree moves with it too.
+    this.runsScope?.invalidate([folder], false);
     if (!this.renderFolders().includes(folder)) return;
     this.checkFreshSoon([folder], FRESH_DEBOUNCE_MS);
   }
@@ -743,6 +787,7 @@ export class SpecViewPanel implements vscode.Disposable {
   }
 
   dispose(): void {
+    this.runsScope?.dispose();
     clearTimeout(this.freshTimer);
     for (const c of this.freshChecks.values())
       void c.child?.terminate("prompt");
@@ -790,15 +835,25 @@ export class SpecViewPanel implements vscode.Disposable {
             this.sourcesForToolbar(),
             this.hidden,
           );
-    const showChange = this.scope === "change" && this.change !== undefined;
+    const scopeBody =
+      this.scope === "change" && this.change
+        ? buildChangeBody(this.change.view())
+        : this.scope === "runs" && this.runsScope
+          ? buildRunsBody(this.runsScope.view())
+          : specBody;
     const body =
-      (this.change ? buildScopeTabs(this.scope) : "") +
-      (showChange ? buildChangeBody(this.change!.view()) : specBody);
+      (this.change || this.runsScope
+        ? buildScopeTabs(this.scope, {
+            change: !!this.change,
+            runs: !!this.runsScope,
+          })
+        : "") + scopeBody;
     const stateJson =
       msg.type === "specData" ? encodeStateForScript(msg.data) : "null";
     const panelJson = encodeStateForScript({
       scope: this.scope,
       folder: this.change?.folder,
+      runsFolder: this.runsScope?.folder,
     });
 
     return `<!DOCTYPE html>
@@ -809,6 +864,7 @@ export class SpecViewPanel implements vscode.Disposable {
 <style nonce="${nonce}">
 ${CSS}
 ${CHANGE_CSS}
+${RUNS_CSS}
 </style>
 </head>
 <body>
@@ -993,6 +1049,8 @@ export interface SpecRun {
   dirty?: boolean;
   agent?: string;
   exitCode?: number;
+  // A --changed run: how many packages it ran and left out unchanged.
+  changed?: { ran: number; unchanged: number; noRecord?: boolean };
 }
 
 export interface SpecGroup {
@@ -1230,6 +1288,13 @@ export function provenanceText(run: SpecRun): string {
   if (run.agent) parts.push(`agent ${run.agent}`);
   if (run.exitCode !== undefined) parts.push(`exit ${run.exitCode}`);
   else parts.push("run did not finish");
+  const c = run.changed;
+  if (c)
+    parts.push(
+      c.noRecord
+        ? "--changed found no record and ran everything"
+        : `narrowed by --changed: ran ${countNoun(c.ran, "package")}, left out ${c.unchanged} unchanged`,
+    );
   if (run.version) parts.push(`gotest ${run.version}`);
   return parts.join(" · ");
 }
@@ -1292,6 +1357,7 @@ function buildToolbar(
   </div>
   <div class="toolbar-group">
     <button class="tool-btn" id="rerun-failed-btn" title="Run what failed again"${rerun}>Rerun failed</button>
+    <button class="tool-btn" id="run-changed-btn" title="Run only the packages whose inputs changed since the last record, and those that failed or never ran (--changed)">Run changed</button>
     <button class="tool-btn" id="refresh-btn" title="Render the newest runs">Refresh</button>
     <button class="tool-btn" id="copy-spec-btn" title="Copy the spec as Markdown">Copy</button>
     <button class="tool-btn" id="clear-results-btn" title="Clear results">Clear</button>
@@ -1892,6 +1958,7 @@ export function parseStoredState(state: unknown): {
   spec?: SpecData;
   scope?: Scope;
   folder?: string;
+  runsFolder?: string;
 } {
   const isSpec = (v: unknown): v is SpecData =>
     !!v &&
@@ -1903,17 +1970,26 @@ export function parseStoredState(state: unknown): {
   const s = state as Record<string, unknown>;
   return {
     spec: isSpec(s.spec) ? s.spec : undefined,
-    scope: s.scope === "spec" || s.scope === "change" ? s.scope : undefined,
+    scope: isScope(s.scope) ? s.scope : undefined,
     folder: typeof s.folder === "string" ? s.folder : undefined,
+    runsFolder: typeof s.runsFolder === "string" ? s.runsFolder : undefined,
   };
 }
 
 // buildScopeTabs is the panel's scope switch.
-export function buildScopeTabs(scope: Scope): string {
-  return `<div class="scopes" role="tablist" aria-label="Scope">${SCOPES.map(
-    (sc) =>
-      `<button class="scope-tab" role="tab" data-scope="${sc.id}" aria-selected="${sc.id === scope}" title="${escapeAttr(sc.title)}">${sc.label}</button>`,
-  ).join("")}</div>`;
+export function buildScopeTabs(
+  scope: Scope,
+  has: { change: boolean; runs: boolean } = { change: true, runs: true },
+): string {
+  const shown = SCOPES.filter(
+    (sc) => sc.id === "spec" || has[sc.id as "change" | "runs"],
+  );
+  return `<div class="scopes" role="tablist" aria-label="Scope">${shown
+    .map(
+      (sc) =>
+        `<button class="scope-tab" role="tab" data-scope="${sc.id}" aria-selected="${sc.id === scope}" title="${escapeAttr(sc.title)}">${sc.label}</button>`,
+    )
+    .join("")}</div>`;
 }
 
 function getNonce(): string {
@@ -2242,6 +2318,14 @@ document.addEventListener('click', (e) => {
     e.stopPropagation();
     return;
   }
+  const runsEl = t.closest('[data-runs]');
+  if (runsEl) {
+    if (runsEl.disabled) return;
+    vscode.postMessage({ type: 'runs', act: runsEl.dataset.runs, key: runsEl.dataset.key });
+    e.preventDefault();
+    e.stopPropagation();
+    return;
+  }
   const act = t.closest('.act');
   if (act) {
     if (act.dataset.act === 'copyNode') {
@@ -2289,6 +2373,10 @@ document.addEventListener('click', (e) => {
       return;
     }
   }
+  if (t.id === 'run-changed-btn') {
+    vscode.postMessage({ type: 'runChanged' });
+    return;
+  }
   if (t.id === 'copy-spec-btn') {
     const box = document.getElementById('search-input');
     vscode.postMessage({ type: 'copySpec', search: box ? box.value.trim() : '' });
@@ -2322,6 +2410,13 @@ const changeFolder = document.getElementById('change-folder');
 if (changeFolder) {
   changeFolder.addEventListener('change', () => {
     vscode.postMessage({ type: 'change', act: 'folder', folder: changeFolder.value });
+  });
+}
+
+const runsFolder = document.getElementById('runs-folder');
+if (runsFolder) {
+  runsFolder.addEventListener('change', () => {
+    vscode.postMessage({ type: 'runs', act: 'folder', folder: runsFolder.value });
   });
 }
 
