@@ -24,6 +24,8 @@ type T struct {
 	t   *testing.T
 	tb  testing.TB
 	ctx context.Context
+	// soft makes a failing assertion record its failure and return.
+	soft bool
 }
 
 // T returns the underlying *testing.T. It is nil when a suite hook runs under
@@ -68,7 +70,7 @@ func NewTWithDeadline[TB *testing.T | *T](t TB, timeout time.Duration) *T {
 	}
 	ctx, cancel := context.WithTimeout(base.Context(), timeout)
 	base.testingTB().Cleanup(cancel)
-	return &T{t: base.t, tb: base.tb, ctx: ctx}
+	return &T{t: base.t, tb: base.tb, ctx: ctx, soft: base.soft}
 }
 
 // NewTWithContext wraps t, overriding what [T.Context] reports. Use it when the
@@ -81,6 +83,17 @@ func NewTWithDeadline[TB *testing.T | *T](t TB, timeout time.Duration) *T {
 func NewTWithContext(tb testing.TB, ctx context.Context) *T {
 	t, _ := tb.(*testing.T)
 	return &T{t: t, tb: tb, ctx: ctx}
+}
+
+// Soft returns t for assertions that fail the test and go on: a failing
+// assertion given it reports where a fatal one would and returns, and the
+// test fails when it ends. FailNow and Skipf on it still stop the test, and
+// It and When on it give their bodies a fatal T. Code after a soft assertion
+// runs on the value that failed: check what it dereferences fatally first.
+func (t *T) Soft() *T {
+	soft := *t
+	soft.soft = true
+	return &soft
 }
 
 // Errorf fails the test at the caller's line and goes on.

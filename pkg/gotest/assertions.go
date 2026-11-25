@@ -34,6 +34,9 @@ func fail(t testingT, msg string, msgAndArgs []any) {
 	} else {
 		t.Errorf("%s", msg)
 	}
+	if st, ok := t.(*T); ok && st.soft {
+		return
+	}
 	t.FailNow()
 }
 
