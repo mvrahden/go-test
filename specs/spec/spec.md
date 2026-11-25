@@ -307,3 +307,37 @@ A skipped row SHALL show the reason its skip gave, in the terminal and the Markd
 - **WHEN** a run's row logs a line and then skips
 - **THEN** the spec shows the skip's reason, not the logged line
 - **AND** shows no reason when the skip gave none
+
+### Requirement: A pass that asserted nothing
+A leaf's node SHALL carry `assertions` only when its runtime reported a count, and SHALL be `vacuous` when it passed with a count of 0 and no declared means; a failed, skipped, interior, benchmark or fuzz node, and one whose count is unknown, as under a runtime that reports none, SHALL never be. stats SHALL count vacuous leaves in `vacuous`; the terminal and Markdown spec and summary SHALL mark each and list it with what needs attention.
+
+#### Scenario: Leaves that pass with and without assertions
+- **WHEN** a run holds leaves that pass with assertions, pass with none and fail with none
+- **THEN** the JSON spec gives each leaf its count and marks only the leaves that passed with none vacuous
+- **AND** stats count the vacuous leaves
+
+#### Scenario: A vacuous leaf in the reports
+- **WHEN** a run holds a vacuous leaf
+- **THEN** the terminal spec marks it VACUOUS on its row and under Needs attention
+- **AND** the Markdown spec marks it VACUOUS on its row and under Needs attention
+- **AND** the summary names it
+
+#### Scenario: A stream that holds no count
+- **WHEN** a saved stream's leaves carry no count, as a runtime's that reports none
+- **THEN** the JSON spec gives no leaf a count and marks none vacuous
+
+### Requirement: A declared means of asserting
+A leaf that declared how it asserts SHALL carry the reason in `assertsBy` and SHALL NOT be vacuous; stats SHALL count it in `assertsBy`, apart from `vacuous`, and the terminal and Markdown spec SHALL show the reason on its row.
+
+#### Scenario: A leaf that declared how it asserts
+- **WHEN** a run holds leaves that declared how they assert
+- **THEN** the JSON spec carries each reason and stats count them apart from the vacuous ones
+- **AND** the terminal spec shows the reason on the row
+
+### Requirement: Skip reasons and exclusions in the JSON spec
+A skipped node SHALL carry in `skipReason` the reason the spec shows for it, a guard's and the runner's for a suite it excluded included, and stats SHALL count in `excluded` the leaves the X_ prefix excludes, itself or above them.
+
+#### Scenario: A guarded and an excluded suite
+- **WHEN** a run holds a suite its guard kept from running and an excluded suite
+- **THEN** the JSON spec gives each its skip reason
+- **AND** stats count the excluded suite as excluded

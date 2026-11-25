@@ -132,6 +132,21 @@ Outside CI mode, a run, gotest spec or gotest summary that holds a focused suite
 - **THEN** spec notes on stderr that F_ narrows the run, naming the method where it is declared, and exits 0
 - **AND** summary notes on stderr that F_ narrows the run, naming the method where it is declared, and exits 0
 
+### Requirement: Passes without an assertion under CI mode
+With --ci, a run, gotest spec or gotest summary whose stream holds a test that passed without an assertion and declared no means SHALL fail with exit 1 when nothing else failed it, naming each such test on stderr. It is 1, not 2: the run completed and its verdicts can be believed; a test broke the run's policy, as a focused one breaks the focus guard. The text run holds no stream and is not judged.
+
+#### Scenario: A vacuous pass under CI mode
+- **WHEN** --ci runs a package whose only problem is a test that passed without an assertion
+- **THEN** fails with exit 1, naming the test on stderr, in the -json mode and under spec
+- **AND** exits 0 for a package whose tests all assert or declare how
+
+### Requirement: Passes without an assertion outside CI mode
+Outside CI mode, a run, gotest spec or gotest summary whose stream holds a test that passed without an assertion SHALL say on stderr how many did and name them, and SHALL exit by what ran.
+
+#### Scenario: A vacuous pass outside CI mode
+- **WHEN** a run outside CI mode holds a test that passed without an assertion
+- **THEN** notes on stderr how many passed without an assertion, naming the test, and exits 0
+
 ### Requirement: Value flags and unknown flags
 Every command SHALL refuse with exit 2 a value flag given no value, a flag it does not know and a flag another command owns. The cases are the table in `tests/conformance/cli/flags_suite_test.go`.
 
@@ -656,6 +671,14 @@ The stream's last event SHALL be the verdict of `gotest run`, `pass` for exit co
 #### Scenario: A run the census does not judge
 - **WHEN** a -json run is narrowed with -run
 - **THEN** closes the stream with no count of units not run
+
+### Requirement: The vacuous count a run closes with
+The `Result` of the stream's last event SHALL hold `Vacuous`, how many tests passed without an assertion and declared no means, only when a test of the run reported its count.
+
+#### Scenario: A run that counts vacuous passes
+- **WHEN** a -json run holds tests that passed without an assertion
+- **THEN** closes the stream with their count as Vacuous
+- **AND** a run whose tests reported no count closes it with no Vacuous
 
 ### Requirement: The run a document renders
 spec and summary --format=json SHALL name the run they render in `run`, right after `version`: its `version`, `goVersion`, `args`, `commit`, `dirty`, `agent` and `exitCode`, as the run's events hold them, the exit code left out for a stream the run did not close. A document of a stream without the run's start SHALL hold no `run`.
