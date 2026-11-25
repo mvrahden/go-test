@@ -2124,7 +2124,7 @@
         "./examples/search/"
       ],
       "exitCode": 0,
-      "stderr": "",
+      "stderr": "gotest: PASS exit 0 | packages: 1 passed, 0 failed, 0 skipped\n",
       "profile": [
         "mode: atomic",
         "github.com/mvrahden/go-test/examples/search/index.go:16.40,16.71 1 16",

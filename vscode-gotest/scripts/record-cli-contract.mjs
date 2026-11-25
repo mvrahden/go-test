@@ -278,11 +278,14 @@ for (const [name, args] of Object.entries(LIVE)) {
   };
 }
 
-// The environment of the outputs cases: no CI variables, which change what
-// the CLI writes, and no slow-build notice on a slow machine.
+// The environment of the outputs cases: no CI or agent variables, which
+// change what the CLI writes, and no slow-build notice on a slow machine.
 function outputEnv(extra = {}) {
   const env = { ...process.env, GOTEST_SLOW_BUILD_THRESHOLD: "1h", ...extra };
   for (const name of [
+    "AI_AGENT",
+    "CLAUDECODE",
+    "GOTEST_AGENT",
     "CI",
     "GOTEST_CI",
     "GOTEST_UPDATE_SNAPSHOTS",

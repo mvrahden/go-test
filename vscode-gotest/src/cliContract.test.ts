@@ -906,7 +906,10 @@ describe("recorded outputs", () => {
 
     it("succeeds and writes the profile it was asked for", () => {
       expect(recorded.exitCode).toBe(0);
-      expect(recorded.stderr).toBe("");
+      // A text run ends stderr with its closing line, and says nothing else.
+      expect(recorded.stderr).toBe(
+        "gotest: PASS exit 0 | packages: 1 passed, 0 failed, 0 skipped\n",
+      );
       expect(recorded.profile?.[0]).toBe("mode: atomic");
     });
 
