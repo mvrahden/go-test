@@ -2,10 +2,10 @@ Expect: ^FAIL .*conformance/cli .* / fails with exit 1, naming the test on stder
 Clause: when --ci runs a package whose only problem is a test that passed without an assertion → fails with exit 1, naming the test on stderr, in the -json mode and under spec
 --- a/internal/gotestrunner/vacuous.go
 +++ b/internal/gotestrunner/vacuous.go
-@@ -189,7 +189,7 @@
- 	for _, v := range vacuous {
+@@ -203,7 +203,7 @@
  		fmt.Fprintf(c.stderr, "  %s %s\n", v.Pkg, v.Path)
  	}
+ 	c.vacuousFailed = vacuous
 -	return max(code, 1)
 +	return code
  }

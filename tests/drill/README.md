@@ -1080,6 +1080,12 @@ shards of one run do not add up to every mutant exactly once.
 | `asserts-by-terminal-dropped` | the terminal spec shows no declared reason | spec conformance: the declared row shows no reason |
 | `skip-reason-json-dropped` | the JSON spec drops a skipped node's reason | spec conformance: the guarded and the excluded suite carry no reason |
 | `excluded-uncounted` | stats count no excluded leaf | spec conformance: the JSON stats say 0 excluded |
+| `text-run-asks-no-counts` | a text run asks its suite processes for no assertion counts | cli conformance: a text run under --ci exits 0, with and without -v, notes nothing outside CI and its closing line counts nothing vacuous |
+| `closing-line-drops-the-vacuous-count` | the closing line never counts the tests vacuous | cli conformance: the text and the agent's closing line end the tests at not run |
+| `failed-skips-vacuous-passes` | the vacuous passes that failed a --ci run are not recorded as failed | cli conformance: --failed after that run has nothing to rerun |
+| `text-run-panic-read-as-a-pass` | a leaf that reported its count and then panicked reads as a pass in a text run | runner suite: the panicked leaf is vacuous |
+| `counts-file-never-opened` | the runtime writes no count to the file a text run names | canary: the assertcount text run under --ci exits 0 |
+| `raw-subtest-parent-a-text-leaf` | a test that ran a subtest through `t.T().Run` writes its count as a leaf's | canary: the assertcount text run names the raw parent vacuous |
 
 ## Adding a mutant
 

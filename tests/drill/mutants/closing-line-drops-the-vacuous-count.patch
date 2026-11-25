@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / under agent output with --ci ends stdout with the closing line naming FAIL, exit 1 and 5 vacuous after the tests not run \(
+Clause: when a run of a package with 5 tests that passed without an assertion ends → under agent output with --ci ends stdout with the closing line naming FAIL, exit 1 and 5 vacuous after the tests not run
+--- a/internal/gotestrunner/agentoutput.go
++++ b/internal/gotestrunner/agentoutput.go
+@@ -61,7 +61,7 @@
+ 	if c.NotRun != nil && (c.Tests != nil || *c.NotRun > 0) {
+ 		tests = append(tests, count{*c.NotRun, "not run"})
+ 	}
+-	if c.Vacuous != nil && *c.Vacuous > 0 {
++	if c.Vacuous != nil && *c.Vacuous < 0 {
+ 		tests = append(tests, count{*c.Vacuous, "vacuous"})
+ 	}
+ 	if len(tests) > 0 {

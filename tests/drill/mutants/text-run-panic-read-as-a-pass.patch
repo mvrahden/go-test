@@ -1,0 +1,12 @@
+Judge: ./internal/gotestrunner VacuousCountsTestSuite/TestTheLeavesAPassWithoutAnAssertionNames
+Expect: ^FAIL .*internal/gotestrunner VacuousCounts .* / a leaf that panicked after it reported \(
+--- a/internal/gotestrunner/vacuous.go
++++ b/internal/gotestrunner/vacuous.go
+@@ -145,7 +145,6 @@
+ 	}
+ 	for i := len(leaves) - 1; i >= 0; i-- {
+ 		if lc := &leaves[i]; !lc.Failed && unmarked[lc.Test] > 0 {
+-			lc.Failed = true
+ 			unmarked[lc.Test]--
+ 		}
+ 	}

@@ -1,0 +1,17 @@
+Expect: ^FAIL .*conformance/cli .* / fails with exit 1, naming the test on stderr, in a text run with and without -v / 
+Expect: ^FAIL .*conformance/cli .* / a text run without -v notes so too \(
+Expect: ^FAIL .*conformance/cli .* / a text run ends stderr with the closing line naming PASS, exit 0 and 5 tests vacuous \(
+Clause: when --ci runs a package whose only problem is a test that passed without an assertion → fails with exit 1, naming the test on stderr, in a text run with and without -v
+Clause: when a run outside CI mode holds a test that passed without an assertion → a text run without -v notes so too
+Clause: when a run of a package with 5 tests that passed without an assertion ends → a text run ends stderr with the closing line naming PASS, exit 0 and 5 tests vacuous
+--- a/internal/gotestrunner/dispatch.go
++++ b/internal/gotestrunner/dispatch.go
+@@ -317,7 +317,7 @@
+ 		r.coverTargets = append(r.coverTargets, targets...)
+ 	}
+ 	for j := range targets {
+-		targets[j].CountsDir = r.countsDir
++		targets[j].CountsDir = ""
+ 	}
+ 
+ 	r.collector.Register(cr.Package, len(targets))

@@ -1,0 +1,13 @@
+Expect: assertcount text: stderr names the vacuous passes .*TestCountTestSuite/TestRaw
+Judge: ./tests/canary CanaryTestSuite/TestATextRunReadsTheCounts
+--- a/pkg/gotest/census.go
++++ b/pkg/gotest/census.go
+@@ -90,7 +90,7 @@
+ // ranSubtests reports whether tt ran a subtest through its own Run, as the
+ // stream's run events show it.
+ func ranSubtests(tt *testing.T) bool {
+-	return reflect.ValueOf(tt).Elem().FieldByIndex(subtestsField).FieldByName("v").Uint() != 0
++	return reflect.ValueOf(tt).Elem().FieldByIndex(subtestsField).FieldByName("v").Uint() > 1
+ }
+ 
+ // writeCount appends tt's count to countsFile, one line written whole; a test
