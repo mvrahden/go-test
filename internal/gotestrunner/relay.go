@@ -74,6 +74,8 @@ var converterStarted = func(*os.Process) {}
 type relay struct {
 	pkg, suite, dir string
 	events, stderr  *bytes.Buffer
+	// live relays the events as the converter writes them; nil for none.
+	live *liveSuite
 
 	// raw is written only by the suite's output copier, and read once the
 	// suite's output is drained.
@@ -89,13 +91,17 @@ type relay struct {
 	timedOut bool // it had not exited converterGrace after its input ended
 }
 
-// startRelay starts a converter for target that writes its events to events
-// and its own complaints to stderr. A converter that does not start leaves
-// the relay keeping the stream alone, which finish converts.
-func startRelay(target SuiteTarget, events, stderr *bytes.Buffer) *relay { //nolint:gocritic // hugeParam: as startSuite
-	r := &relay{pkg: target.Package, suite: target.SuiteName, dir: target.Dir, events: events, stderr: stderr}
+// startRelay starts a converter for target that writes its events to events,
+// and to live as well when it is not nil, and its own complaints to stderr.
+// A converter that does not start leaves the relay keeping the stream alone,
+// which finish converts.
+func startRelay(target SuiteTarget, events, stderr *bytes.Buffer, live *liveSuite) *relay { //nolint:gocritic // hugeParam: as startSuite
+	r := &relay{pkg: target.Package, suite: target.SuiteName, dir: target.Dir, events: events, stderr: stderr, live: live}
 	cmd := converterCmd(context.Background(), r.pkg, r.dir)
-	cmd.Stdout, cmd.Stderr = events, stderr
+	cmd.Stdout, cmd.Stderr = io.Writer(events), stderr
+	if live != nil {
+		cmd.Stdout = io.MultiWriter(events, live)
+	}
 	stdin, err := cmd.StdinPipe()
 	if err == nil {
 		err = cmd.Start()
@@ -147,6 +153,9 @@ func (r *relay) finish(status int) error {
 	}
 	r.events.Reset()
 	r.events.Write(events)
+	if r.live != nil {
+		r.live.redo(events)
+	}
 	r.stderr.Write(stderr)
 	fmt.Fprintf(r.stderr, "gotest: %s %s: the converter ended early (%s); the suite's output was converted again\n", r.pkg, r.suite, how)
 	r.raw = bytes.Buffer{}

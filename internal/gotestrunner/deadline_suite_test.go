@@ -514,7 +514,7 @@ func (s *DeadlineAttributionTestSuite) TestAMethodTheStopEnded(t *gotest.T) {
 // Two suite processes whose lines reach the collector interleaved.
 const (
 	ranA    = `A:{"Action":"run","Package":"example.com/pkg","Test":"TestATestSuite/TestDone"}`
-	passA   = `A:{"Action":"pass","Package":"example.com/pkg","Test":"TestATestSuite/TestDone"}`
+	doneA   = `A:{"Action":"pass","Package":"example.com/pkg","Test":"TestATestSuite/TestDone"}`
 	ranB    = `B:{"Action":"run","Package":"example.com/pkg","Test":"TestBTestSuite/TestHangs"}`
 	resultB = `B:{"Action":"output","Package":"example.com/pkg","Test":"TestBTestSuite/TestHangs","Output":"--- FAIL: TestBTestSuite/TestHangs (1.00s)\n"}`
 	failB   = `B:{"Action":"fail","Package":"example.com/pkg","Test":"TestBTestSuite/TestHangs"}`
@@ -522,7 +522,7 @@ const (
 
 func (s *DeadlineAttributionTestSuite) TestSuitesWhoseLinesInterleave(t *gotest.T) {
 	t.It("names another suite's method still running when one suite ends on its own", func(it *gotest.T) {
-		running, booked := gotestrunner.ExportInterleavedDeadline(ranA, ranB, passA, "end A")
+		running, booked := gotestrunner.ExportInterleavedDeadline(ranA, ranB, doneA, "end A")
 		gotest.Equal(it, []unit{{Pkg: censusPkg, Path: "TestBTestSuite/TestHangs"}}, running)
 		gotest.Contains(it, booked, `"Test":"TestBTestSuite/TestHangs","Output":"    gotest: --timeout expired while this test was running\n"`)
 	})

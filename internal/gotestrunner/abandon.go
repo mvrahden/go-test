@@ -36,9 +36,16 @@ func untrack(tree *proctree.Tree) {
 	delete(live, tree)
 }
 
-// runRecorded runs a suite and records its result.
+// runRecorded runs a suite and records its result; a live run's events were
+// written as they came.
 func runRecorded(ctx context.Context, c *OutputCollector, pkg string, idx int, t SuiteTarget, env []string, test2json bool) { //nolint:gocritic // hugeParam: as RunSingleSuite
-	c.RecordResult(pkg, idx, RunSingleSuite(ctx, t, env, test2json))
+	live := c.openLive(test2json)
+	r := runSuiteProcess(ctx, t, env, test2json, live)
+	if live != nil {
+		live.flush()
+		r.relayed = live.census
+	}
+	c.RecordResult(pkg, idx, r)
 }
 
 // Abandon gives up on every process tree still running, for a CLI about to

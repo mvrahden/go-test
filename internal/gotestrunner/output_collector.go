@@ -58,6 +58,9 @@ type OutputCollector struct {
 	runLevel map[string]bool
 	// events receives a copy of the JSON stream; nil for none.
 	events io.Writer
+	// live writes a -json run's suite events as their processes write them,
+	// not when each process ends.
+	live bool
 	// manifest opens the JSON stream and makes the run close it; nil for a
 	// stream that is neither opened nor closed.
 	manifest *protocol.Manifest
@@ -96,6 +99,12 @@ type OutputOption func(*OutputCollector)
 // WithEvents tees the JSON stream into w as it is written; nil for none.
 func WithEvents(w io.Writer) OutputOption {
 	return func(c *OutputCollector) { c.events = w }
+}
+
+// WithLive writes a -json run's suite events as each process writes them;
+// false keeps them until the process ends.
+func WithLive(on bool) OutputOption {
+	return func(c *OutputCollector) { c.live = on }
 }
 
 // WithStdout sends the JSON stream to w in place of os.Stdout; nil keeps it.
@@ -184,7 +193,7 @@ func (c *OutputCollector) Register(pkg string, count int) {
 func (c *OutputCollector) RecordResult(pkg string, idx int, r SuiteResult) { //nolint:gocritic // hugeParam: stable API
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.recordResultLocked(pkg, idx, r, nil)
+	c.recordResultLocked(pkg, idx, r, r.relayed)
 }
 
 // recordResultLocked books r; census is the reading its events were written

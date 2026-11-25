@@ -100,6 +100,9 @@ type PipelineConfig struct {
 	// Inputs is each package's input hash, which stamps its verdict; nil
 	// for none.
 	Inputs func(pkg string) string
+	// Live writes a RunStreamJSON run's suite events as each suite process
+	// writes them, not when it ends.
+	Live bool
 }
 
 // flushOrder is the order a text run prints its verdicts in: the matched

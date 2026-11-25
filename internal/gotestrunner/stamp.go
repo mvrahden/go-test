@@ -15,7 +15,7 @@ import (
 // Each package is placed apart: a block the runner writes itself may hold
 // several.
 func stampBlock(block []byte) []byte {
-	placers := map[string]*protocol.Placer{}
+	st := newStamper()
 	out := make([]byte, 0, len(block)+len(block)/8)
 	for len(block) > 0 {
 		line := block
@@ -23,10 +23,18 @@ func stampBlock(block []byte) []byte {
 			line = block[:i+1]
 		}
 		block = block[len(line):]
-		out = append(out, stampLine(placers, line)...)
+		out = append(out, st.line(line)...)
 	}
 	return out
 }
+
+// stamper stamps one suite process's -json output a line at a time, in the
+// order the process wrote it: what stampBlock does over the whole block.
+type stamper struct{ placers map[string]*protocol.Placer }
+
+func newStamper() *stamper { return &stamper{placers: map[string]*protocol.Placer{}} }
+
+func (s *stamper) line(line []byte) []byte { return stampLine(s.placers, line) }
 
 // StampStream is stampBlock over a saved stream, such as an older CLI's or
 // plain go test's: the file's order is the order the stamps are placed by.

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -1042,5 +1043,31 @@ func (s *OutputCollectorTestSuite) TestASuiteThatRanNoTests(t *gotest.T) {
 			code, _, _ := record(true, r.stdout, r.stderr)
 			gotest.Equal(sub, 0, code)
 		}
+	})
+}
+
+// liveSuiteStream is one suite's -json output; its last line has no newline,
+// as a converter cut off at the end leaves it.
+const liveSuiteStream = `{"Action":"run","Package":"example.com/pkg","Test":"TestCartTestSuite"}
+{"Action":"run","Package":"example.com/pkg","Test":"TestCartTestSuite/TestAdd"}
+{"Action":"output","Package":"example.com/pkg","Test":"TestCartTestSuite/TestAdd","Output":"--- PASS: TestCartTestSuite/TestAdd (0.00s)\n"}
+{"Action":"pass","Package":"example.com/pkg","Test":"TestCartTestSuite/TestAdd"}
+{"Action":"pass","Package":"example.com/pkg","Test":"TestCartTestSuite"}`
+
+func (s *OutputCollectorTestSuite) TestALiveSuitesStream(t *gotest.T) {
+	// Times are the collector's clock: the two streams are written apart.
+	untimed := func(stream string) string {
+		return regexp.MustCompile(`"Time":"[^"]*",?`).ReplaceAllString(stream, "")
+	}
+	t.It("writes what the burst writes when the converter's writes cut lines anywhere", func(it *gotest.T) {
+		cut := []string{liveSuiteStream[:30], liveSuiteStream[30:200], liveSuiteStream[200:]}
+		live, burst := gotestrunner.ExportLiveRelay(cut, "", liveSuiteStream)
+		gotest.Contains(it, burst, `"Test":"TestCartTestSuite/TestAdd"`)
+		gotest.Equal(it, untimed(burst), untimed(live))
+	})
+	t.It("writes each line once when a converter that ended early is run again", func(it *gotest.T) {
+		ended := liveSuiteStream[:strings.Index(liveSuiteStream, `{"Action":"output"`)+20]
+		live, burst := gotestrunner.ExportLiveRelay([]string{ended}, liveSuiteStream, liveSuiteStream)
+		gotest.Equal(it, untimed(burst), untimed(live))
 	})
 }
