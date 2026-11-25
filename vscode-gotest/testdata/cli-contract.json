@@ -2406,6 +2406,14 @@
             "description": "//nolint ids that name no gotest rule or golangci-lint linter"
           },
           {
+            "id": "nolint-reason",
+            "tier": "integrity",
+            "scope": "everywhere",
+            "skippable": false,
+            "fixable": false,
+            "description": "//nolint comments reaching gotest rules with no // reason"
+          },
+          {
             "id": "suite-declaration",
             "tier": "integrity",
             "scope": "suites",
