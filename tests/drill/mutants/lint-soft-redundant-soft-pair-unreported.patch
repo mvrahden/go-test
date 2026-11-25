@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint .* / assertion-redundant reports the pair when both are soft \(
+Clause: when a fatal assertion is followed by a stronger soft one on the same operand → assertion-redundant reports the pair when both are soft
+--- a/internal/lint/redundant.go
++++ b/internal/lint/redundant.go
+@@ -19,7 +19,7 @@
+ 				continue
+ 			}
+ 			// Only one soft: removing the first changes where the test stops.
+-			if isSoft(pass, first.call.Args[0]) != isSoft(pass, second.call.Args[0]) {
++			if isSoft(pass, first.call.Args[0]) || isSoft(pass, second.call.Args[0]) {
+ 				continue
+ 			}
+ 			if cl.anyWithin(first.call.Pos(), first.call.End()) || cl.anyWithin(second.call.Pos(), second.call.End()) {

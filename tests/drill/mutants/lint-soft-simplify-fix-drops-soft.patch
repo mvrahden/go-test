@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint .* / True\(t\.Soft\(\), a == b\) becomes Equal\(t\.Soft\(\), a, b\) \(
+Clause: when lint -fix rewrites assertions and guards on t.Soft() → True(t.Soft(), a == b) becomes Equal(t.Soft(), a, b)
+--- a/internal/lint/simplify.go
++++ b/internal/lint/simplify.go
+@@ -90,7 +90,7 @@
+ 		report(pass, AssertionSimplify, call, "use %s instead of %s for %s — %s", m.target, source, m.desc, m.noFix)
+ 		return
+ 	}
+-	emitSimplify(pass, call, source, m.target, append([]ast.Expr{call.Args[0]}, m.args...), call.Args[2:], m.desc)
++	emitSimplify(pass, call, source, m.target, append([]ast.Expr{softBase(pass, call.Args[0])}, m.args...), call.Args[2:], m.desc)
+ }
+ 
+ // mapBoolExpr maps a boolean expression to the assertion that expresses it

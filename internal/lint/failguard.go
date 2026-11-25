@@ -224,6 +224,10 @@ func extractHaltingUnit(pass *analysis.Pass, body *ast.BlockStmt) *failGuardUnit
 	}
 
 	if assertionFuncName(pass, call.Fun) == "Fail" && len(call.Args) >= 1 {
+		// Fail on a soft T goes on: no assertion sequence keeps what runs.
+		if isSoft(pass, call.Args[0]) {
+			return nil
+		}
 		return &failGuardUnit{
 			tArg:    call.Args[0],
 			msgArgs: call.Args[1:],
@@ -255,7 +259,8 @@ func extractHaltingUnit(pass *analysis.Pass, body *ast.BlockStmt) *failGuardUnit
 	if !imported {
 		return nil
 	}
-	unit := &failGuardUnit{tArg: sel.X, label: name, halting: halting, returns: hasReturn, qual: qual}
+	// FailNow on a soft T still stops: the assertion takes the fatal T.
+	unit := &failGuardUnit{tArg: softBase(pass, sel.X), label: name, halting: halting, returns: hasReturn, qual: qual}
 	if name != "FailNow" {
 		unit.msgArgs = call.Args
 	}

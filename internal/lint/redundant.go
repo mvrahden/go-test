@@ -18,6 +18,10 @@ func checkRedundantAssertion(pass *analysis.Pass, insp *inspector.Inspector, cl 
 			if first == nil || second == nil {
 				continue
 			}
+			// Only one soft: removing the first changes where the test stops.
+			if isSoft(pass, first.call.Args[0]) != isSoft(pass, second.call.Args[0]) {
+				continue
+			}
 			if cl.anyWithin(first.call.Pos(), first.call.End()) || cl.anyWithin(second.call.Pos(), second.call.End()) {
 				continue
 			}
