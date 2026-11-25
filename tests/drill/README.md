@@ -1209,6 +1209,9 @@ shards of one run do not add up to every mutant exactly once.
 | `audit-evidence-location-dropped` | an evidence row's location keeps its file, not its lines | audit conformance: the location It finds no lines |
 | `audit-mark-without-stale-star` | the `*` goes on the marks of current streams | audit conformance: the mark It finds a stale mark without it |
 | `audit-order-by-document` | a behavior's order is its place in the document | audit conformance: the order It finds the changes in the document's order |
+| `audit-stopped-run-unnamed` | a stopped `--run` is not named among what was not compared | audit conformance: the stopped-run It finds nothing not compared |
+| `audit-stopped-run-exits-by-policy` | a stopped `--run` exits 130 only where the policy passes | audit conformance: the closing-line It sees exit 1 |
+| `audit-control-without-run-taken` | `--control` without `--run` is taken | audit conformance: the refusal It sees exit 0 |
 
 ## Adding a mutant
 

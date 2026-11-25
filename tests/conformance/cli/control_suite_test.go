@@ -59,6 +59,7 @@ func (s *ControlFlagTestSuite) TestEveryCommandThatStopsOnASIGINT(t *gotest.T) {
 				{Desc: "fuzz triage", args: []string{"fuzz", "triage", "--control=stdin", "../testdata/fuzzing/"}, exit: 0, stdoutHas: "no crashers found"},
 				{Desc: "fuzz promote", args: []string{"fuzz", "promote", "--control", "stdin", "../testdata/fuzzing/"}, exit: 0},
 				{Desc: "prepare, which waits for a stop", args: []string{"prepare", "--control=stdin", "../testdata/passing/"}, exit: 0, stdoutHas: `"overlayFile"`},
+				{Desc: "audit with --run", args: []string{"audit", "--base-record=../testdata/audit/empty-record.json", "--run", "--control=stdin", "../testdata/passing/"}, exit: 130, stdoutHas: "gotest audit: FAIL exit 130"},
 			}) {
 				run, err := testkit.RunCLI(sub.Context(), ".", row.args...)
 				gotest.NoError(sub, err)

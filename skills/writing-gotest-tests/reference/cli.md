@@ -179,7 +179,8 @@ coverage, `--no-cache` skips the test binary cache and forces a fresh link (`got
 with one stderr line, `DEBUG: phases: discover=… generate=… compile=… run=…
 report=… total=…`; compile overlaps run, so it is part of `run`'s span, not
 added to the total.
-`--control=stdin` (**v1.37+**, every command that stops on Ctrl-C) reads
+`--control=stdin` (**v1.37+**, every command that stops on Ctrl-C, and
+`audit --run`, v1.42+) reads
 `stop` and `force` lines on stdin, a first and a second Ctrl-C; the input's
 end is a stop. For a program driving gotest that cannot signal it (Windows);
 without the flag stdin is never read, and `--input=-` refuses it.

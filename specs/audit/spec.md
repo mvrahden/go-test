@@ -204,6 +204,18 @@ In the JSON document a finding and a behavior SHALL name, as `evidence`, the id 
 - **AND** finds on each evidence row the mark the text format writes on its rows
 - **AND** finds on each behavior its place in the text format's list of behaviors
 
+### Requirement: A stopped audit run
+`gotest audit --run --control=stdin` SHALL hand its standard input to the run it makes, which stops on a stop line or the input's end as a run does; the audit SHALL then write its document with what that run reported, name the run as stopped among what was not compared, and exit 130 whatever the policy. --control SHALL be refused with exit 2 without --run, and beside a stream or diff read from standard input.
+
+#### Scenario: A run stopped by the input's end
+- **WHEN** audit --run --control=stdin has its standard input at its end
+- **THEN** writes the document naming the stopped run among what was not compared and exits 130
+- **AND** the text format's closing line names exit 130
+
+#### Scenario: Control without the run
+- **WHEN** --control=stdin is given to audit without --run, or beside --evidence=-
+- **THEN** audit refuses it with exit 2, naming --run or standard input
+
 ### Requirement: A tree that does not compile
 A record SHALL list a package that does not compile with its errors and no suites, and exit 2; the audit SHALL compare none of that package's behaviors, name it as not compared and exit 2 unless the policy failed.
 

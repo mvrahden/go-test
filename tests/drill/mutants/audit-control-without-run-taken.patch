@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditEvidence / AStoppedAuditRun / when --control=stdin is given to audit without --run, or beside --evidence=- / audit refuses it with exit 2, naming --run or standard input \(
+Clause: when --control=stdin is given to audit without --run, or beside --evidence=- → audit refuses it with exit 2, naming --run or standard input
+--- a/cmd/gotest/audit.go
++++ b/cmd/gotest/audit.go
+@@ -176,7 +176,7 @@
+ func (a *auditArgs) check(own OwnFlags) error {
+ 	if a.control {
+ 		switch {
+-		case !a.run:
++		case !a.run && a.format == "md":
+ 			return errors.New("--control=stdin stops the run --run makes; give it with --run")
+ 		case a.diff == "-" || slices.Contains(a.evidence, "-") || slices.Contains(a.baseEvidence, "-"):
+ 			return errors.New("--control=stdin and a stream or diff from - both read standard input; save it to a file")

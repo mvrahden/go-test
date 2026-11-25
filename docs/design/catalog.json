@@ -4795,6 +4795,98 @@
               "name": "TestRowsAToolLinks",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "writes the document naming the stopped run among what was not compared and exits 130",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "evidence_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 825,
+                      "name": "writes_the_document_naming_the_stopped_run_among_what_was_not_compared_and_exits_130",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "the text format's closing line names exit 130",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "evidence_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 844,
+                      "name": "the_text_format's_closing_line_names_exit_130",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when audit --run --control=stdin has its standard input at its end",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "evidence_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 824,
+                  "name": "audit_--run_--control=stdin_has_its_standard_input_at_its_end",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "audit refuses it with exit 2, naming --run or standard input",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "evidence_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 852,
+                      "name": "audit_refuses_it_with_exit_2,_naming_--run_or_standard_input",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when --control=stdin is given to audit without --run, or beside --evidence=-",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "evidence_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 851,
+                  "name": "--control=stdin_is_given_to_audit_without_--run,_or_beside_--evidence=-",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AStoppedAuditRun",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "evidence_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 823,
+              "name": "TestAStoppedAuditRun",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "AuditEvidence",
@@ -17576,6 +17668,21 @@
                           "output": [],
                           "status": "none",
                           "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "audit with --run",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "control_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 62,
+                          "name": "audit_with_--run",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
                         }
                       ],
                       "display": "takes the flag and ends, stopped by the input's end where it was still running",
@@ -17633,7 +17740,7 @@
                           "file": "control_suite_test.go",
                           "focused": false,
                           "kind": "block",
-                          "line": 84,
+                          "line": 85,
                           "name": "spec",
                           "output": [],
                           "status": "none",
@@ -17648,7 +17755,7 @@
                           "file": "control_suite_test.go",
                           "focused": false,
                           "kind": "block",
-                          "line": 85,
+                          "line": 86,
                           "name": "summary",
                           "output": [],
                           "status": "none",
@@ -17662,7 +17769,7 @@
                       "file": "control_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 82,
+                      "line": 83,
                       "name": "refuses_it_with_exit_2:_both_read_standard_input",
                       "output": [],
                       "status": "none",
@@ -17676,7 +17783,7 @@
                   "file": "control_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 81,
+                  "line": 82,
                   "name": "--control=stdin_is_given_beside_--input=-",
                   "output": [],
                   "status": "none",
@@ -17690,7 +17797,7 @@
               "file": "control_suite_test.go",
               "focused": false,
               "kind": "method",
-              "line": 80,
+              "line": 81,
               "name": "TestBesideInputFromStdin",
               "output": [],
               "status": "none"
@@ -40974,7 +41081,7 @@
     }
   ],
   "stats": {
-    "behaviors": 1191,
+    "behaviors": 1195,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

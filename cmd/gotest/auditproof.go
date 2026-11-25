@@ -290,6 +290,9 @@ func (a *auditArgs) runChanged(doc *gotestaudit.Document, files []gotestaudit.Pr
 		return nil, "", err
 	}
 	args := append([]string{"-json"}, a.loadFlags...)
+	if a.control {
+		args = append([]string{"--control=stdin"}, args...)
+	}
 	profile := ""
 	if a.unproven() && len(cover) > 0 {
 		profile = filepath.Join(dir, "cover.out")
@@ -303,11 +306,19 @@ func (a *auditArgs) runChanged(doc *gotestaudit.Document, files []gotestaudit.Pr
 	cmd := exec.Command(exe, append(args, run...)...) //nolint:gosec // G204: this CLI, running the changed packages
 	var stdout strings.Builder
 	cmd.Stdout, cmd.Stderr = &stdout, os.Stderr
+	if a.control {
+		cmd.Stdin = os.Stdin
+	}
 	runErr := cmd.Run()
 	var exit *exec.ExitError
 	if runErr != nil && !errors.As(runErr, &exit) {
 		_ = os.RemoveAll(dir)
 		return nil, "", fmt.Errorf("--run: %w", runErr)
+	}
+	if exit != nil && exit.ExitCode() == 130 {
+		a.stopped = true
+		doc.Incomplete = append(doc.Incomplete, "--run: the run was stopped before its end; what it did not reach reads as not run")
+		doc.Summary.Incomplete = len(doc.Incomplete)
 	}
 	events, err := gotestspec.ParseEvents(strings.NewReader(stdout.String()))
 	if err != nil || len(events) == 0 {

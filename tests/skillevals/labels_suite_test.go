@@ -98,6 +98,7 @@ var witnesses = []witness{
 	{file: "SKILL.md", quote: "Write the reason", label: "v1.42+", path: "internal/lint/lint.go", literal: "nolint-reason"},
 	{file: "SKILL.md", quote: "audit it against its base", label: "v1.42+", path: "cmd/gotest/audit.go", literal: "func runAudit"},
 	{file: "reference/cli.md", quote: "go tool gotest audit --base=<ref>", label: "v1.42+", path: "cmd/gotest/audit.go", literal: "--head-record"},
+	{file: "reference/cli.md", quote: "`audit --run`", label: "v1.42+", path: "cmd/gotest/auditproof.go", literal: "--control=stdin"},
 	{file: "SKILL.md", quote: "bind each one you implement by its text", label: "v1.42+", path: "cmd/gotest/scenarios.go", literal: "func runScenarios"},
 	{file: "reference/ci.md", quote: "audit and attestation inputs", label: "v1.42+", path: "action.yml", literal: "audit-fail-on"},
 	{file: "reference/cli.md", quote: "prints the saved run's result", label: "v1.42+", path: "cmd/gotest/attest.go", literal: "func runTestResult"},

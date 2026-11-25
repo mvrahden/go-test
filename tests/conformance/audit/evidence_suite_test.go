@@ -819,3 +819,50 @@ func (s *AuditEvidenceTestSuite) TestRowsAToolLinks(t *gotest.T) {
 		})
 	})
 }
+
+func (s *AuditEvidenceTestSuite) TestAStoppedAuditRun(t *gotest.T) {
+	t.When("audit --run --control=stdin has its standard input at its end", func(w *gotest.T) {
+		w.It("writes the document naming the stopped run among what was not compared and exits 130", func(it *gotest.T) {
+			run := s.cli(it, "--run", "--control=stdin", "--format=json")
+			gotest.Equal(it, 130, run.Exit, "stderr: %s", run.Stderr)
+			var doc struct {
+				Incomplete []string `json:"incomplete"`
+				Streams    []struct {
+					Ran bool
+					Run *struct{ ExitCode *int } `json:"run"`
+				} `json:"streams"`
+				Evidence []struct{ Verdict string } `json:"evidence"`
+			}
+			gotest.NoError(it, json.Unmarshal([]byte(run.Stdout), &doc), "document: %s", run.Stdout)
+			gotest.Equal(it, []string{"--run: the run was stopped before its end; what it did not reach reads as not run"}, doc.Incomplete)
+			gotest.Len(it, doc.Streams, 1)
+			gotest.True(it, doc.Streams[0].Ran)
+			gotest.NotZero(it, doc.Streams[0].Run)
+			gotest.Equal(it, 130, *doc.Streams[0].Run.ExitCode)
+			gotest.Len(it, doc.Evidence, 11)
+		})
+		w.It("the text format's closing line names exit 130", func(it *gotest.T) {
+			run := s.cli(it, "--run", "--control=stdin", "--fail-on=all")
+			gotest.Equal(it, 130, run.Exit, "stderr: %s", run.Stderr)
+			gotest.Contains(it, run.Stdout, "\nnot compared:\n  --run: the run was stopped before its end; what it did not reach reads as not run\n")
+			gotest.Regexp(it, `\ngotest audit: FAIL exit 130 \| .* \| not compared: 1 \| fail-on: removed,`, run.Stdout)
+		})
+	})
+	t.When("--control=stdin is given to audit without --run, or beside --evidence=-", func(w *gotest.T) {
+		w.It("audit refuses it with exit 2, naming --run or standard input", func(it *gotest.T) {
+			type refusal struct {
+				args []string
+				want string
+			}
+			for _, row := range []refusal{
+				{[]string{"--control=stdin"}, "FAIL: --control=stdin stops the run --run makes; give it with --run\n"},
+				{[]string{"--run", "--control=stdin", "--evidence=-"}, "FAIL: --control=stdin and a stream or diff from - both read standard input; save it to a file\n"},
+			} {
+				run := s.cli(it, row.args...)
+				gotest.Equal(it, 2, run.Exit, "%v", row.args)
+				gotest.Empty(it, run.Stdout, "%v", row.args)
+				gotest.Equal(it, row.want, run.Stderr)
+			}
+		})
+	})
+}

@@ -157,7 +157,7 @@ Every command SHALL refuse with exit 2 a value flag given no value, a flag it do
 - **THEN** refuses a missing value, an unknown flag and another command's flag with exit 2
 
 ### Requirement: The control flag
---control SHALL take one value, stdin, on every command that stops on a SIGINT: a run, spec, summary, watch, bench, fuzz, fuzz triage, fuzz promote and prepare. Any other value SHALL be a usage error with exit 2 naming the flag and stdin, and so SHALL --control=stdin beside --input=-. The cases are the table in `tests/conformance/cli/control_suite_test.go`.
+--control SHALL take one value, stdin, on every command that stops on a SIGINT: a run, spec, summary, watch, bench, fuzz, fuzz triage, fuzz promote, prepare and audit with --run. Any other value SHALL be a usage error with exit 2 naming the flag and stdin, and so SHALL --control=stdin beside --input=-. The cases are the table in `tests/conformance/cli/control_suite_test.go`.
 
 #### Scenario: A value other than stdin
 - **WHEN** --control is given a value other than stdin
