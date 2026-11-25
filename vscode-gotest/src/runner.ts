@@ -19,6 +19,9 @@ import type { RunPiece } from "./specStore.js";
 
 export interface RunOptions {
   updateSnapshots?: boolean;
+  // A -run pattern that decides what runs instead of the items: the items
+  // only start, and nothing they hold is cleared or skipped.
+  filter?: string;
 }
 
 export class TestRunner {
@@ -103,9 +106,10 @@ export class TestRunner {
       this.activeRecordId = recordId;
 
       for (const item of items) {
-        this.controller.clearResults(item);
+        const whole = options?.filter === undefined;
+        if (whole) this.controller.clearResults(item);
         run.started(item);
-        enqueueDescendants(run, item);
+        if (whole) enqueueDescendants(run, item);
       }
       startAncestors(run, items);
 
@@ -148,7 +152,7 @@ export class TestRunner {
           continue;
         }
 
-        const filter = buildRunFilter(groupItems);
+        const filter = options?.filter ?? buildRunFilter(groupItems);
         validPkgs.push({
           importPath,
           items: groupItems,
@@ -226,8 +230,10 @@ export class TestRunner {
       }
 
       resolveAncestorItems(run, this.controller);
-      for (const item of items) {
-        skipUnresolved(run, item, this.controller);
+      if (options?.filter === undefined) {
+        for (const item of items) {
+          skipUnresolved(run, item, this.controller);
+        }
       }
 
       if (anyCoverOnRun) {
@@ -250,7 +256,10 @@ export class TestRunner {
             if (choice !== "Update Snapshots") return;
             const cts2 = new vscode.CancellationTokenSource();
             try {
-              await this.run(request, cts2.token, { updateSnapshots: true });
+              await this.run(request, cts2.token, {
+                ...options,
+                updateSnapshots: true,
+              });
             } catch (err: unknown) {
               const msg = err instanceof Error ? err.message : String(err);
               this.outputChannel.error(

@@ -80,6 +80,7 @@ vi.mock("./batchRunner.js", () => ({
 import * as vscode from "vscode";
 import { TestRunner } from "./runner.js";
 import { executeBatch } from "./batchRunner.js";
+import { enqueueDescendants, skipUnresolved } from "./runnerUtils.js";
 import type { RunPiece } from "./specStore.js";
 
 const batch = vi.mocked(executeBatch);
@@ -263,6 +264,21 @@ describe("TestRunner", () => {
         env: undefined,
       },
     ]);
+  });
+
+  it("runs a given -run pattern in the item's package, clearing and skipping nothing", async () => {
+    const { runner, controller, runs } = setup([A]);
+    const pkg = item("m/a", "m/a", { filter: "^TestOther$" });
+    await runner.run({ include: [pkg] } as any, token().token, {
+      filter: "^TestCartTestSuite$/^TestRounds$",
+    });
+    expect(batch.mock.calls.map(([cfg]) => cfg.filter)).toEqual([
+      "^TestCartTestSuite$/^TestRounds$",
+    ]);
+    expect(runs[0].started).toHaveBeenCalledWith(pkg);
+    expect(controller.clearResults).not.toHaveBeenCalled();
+    expect(enqueueDescendants).not.toHaveBeenCalled();
+    expect(skipUnresolved).not.toHaveBeenCalled();
   });
 
   it("sets GOTEST_UPDATE_SNAPSHOTS when asked to update snapshots", async () => {
