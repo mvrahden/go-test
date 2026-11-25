@@ -26,7 +26,22 @@ const (
 	// input, not just failing ones. Set by triage/promote when re-running a
 	// single corpus entry, so a no-longer-failing crasher is still readable.
 	EnvFuzzEchoInput = "GOTEST_FUZZ_ECHO_INPUT"
+
+	// EnvAssertionsFile names the file a text run's suite process appends a
+	// LeafCount line to as each leaf ends: testing prints attributes only
+	// under -v. The runner creates the file; the runtime takes the variable
+	// out of its environment.
+	EnvAssertionsFile = "GOTEST_ASSERTIONS_FILE"
 )
+
+// LeafCount is one line of the file EnvAssertionsFile names: what a leaf's
+// attributes say, and whether it had failed when it reported them.
+type LeafCount struct {
+	Test       string `json:"Test"`
+	Assertions int64  `json:"Assertions"`
+	AssertsBy  bool   `json:"AssertsBy,omitempty"`
+	Failed     bool   `json:"Failed,omitempty"`
+}
 
 // The test attributes the runtime reports on a leaf test as it ends, which go
 // test -json carries as attr events: how many assertions it made, and the
