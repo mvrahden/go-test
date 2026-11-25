@@ -302,6 +302,29 @@ func (s *CanaryTestSuite) TestEveryAssertionFamilyFails(t *gotest.T) {
 	}
 }
 
+// Soft assertions report every failure and let the test go on: both soft
+// failures show, and the row after a failing one runs; an It on a soft T and
+// a row that calls FailNow still stop.
+func (s *CanaryTestSuite) TestSoftAssertionsGoOn(t *gotest.T) {
+	r := s.check(t, "softfailing")
+	for _, want := range []string{"first soft", "second soft"} {
+		if !strings.Contains(r.stream, want) {
+			t.Errorf("softfailing: no failure message says %q", want)
+		}
+	}
+	data, _ := os.ReadFile(filepath.Join(r.dir, testkit.MarkersFile))
+	got := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if !slices.Contains(got, "row third") {
+		t.Errorf("softfailing: the row after a failing one did not run: %v", got)
+	}
+	if slices.Contains(got, "stop third") {
+		t.Errorf("softfailing: the row after one that called FailNow ran: %v", got)
+	}
+	if slices.Contains(got, "after the failure in the It") {
+		t.Errorf("softfailing: an It on a soft T went on past its failure: %v", got)
+	}
+}
+
 // A failure inside a helper names the helper's line and the caller's, also
 // under -trimpath in a module whose path has no dot, which the standard
 // library's import paths resemble.

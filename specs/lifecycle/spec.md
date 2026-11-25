@@ -55,11 +55,15 @@ A FailFast suite SHALL stop at the first failing method, failing it and the run 
 - **THEN** skips the method after it and runs the shared fixture's AfterAll before gotest exits
 
 ### Requirement: Each rows
-Every row of an Each table SHALL be its own subtest with its own verdict; a row that fails or skips SHALL end the method there, a row that ends the method's own T SHALL end the method with that verdict alone, and a loop that breaks SHALL leave the method running.
+Every row of an Each table SHALL be its own subtest with its own verdict and a soft T: a row whose assertion fails SHALL fail that row and the method, and the rows after it SHALL still run. A row that calls FailNow or skips SHALL end the method there, a row that ends the method's own T SHALL end the method with that verdict alone, and a loop that breaks SHALL leave the method running.
 
 #### Scenario: A row fails
 - **WHEN** one row of an Each table fails
-- **THEN** fails that row and the method, and the rows after it never run
+- **THEN** fails that row and the method, and the rows after it still run
+
+#### Scenario: A row stops
+- **WHEN** a row of an Each table calls FailNow
+- **THEN** fails that row and the method there, and the rows after it never run
 
 #### Scenario: A row skips
 - **WHEN** one row of an Each table skips

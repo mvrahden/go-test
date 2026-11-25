@@ -266,3 +266,16 @@ specmarkdown pass TestLabelsTestSuite/TestPaths
 specmarkdown pass TestLabelsTestSuite/TestPaths/a_path_is_read
 specmarkdown pass TestLabelsTestSuite/TestPaths/a_path_is_read/reads_a/b_paths
 specmarkdown skip TestX_ParkedTestSuite
+softfailing exit 1
+softfailing fail -
+softfailing fail TestSoftFailingTestSuite
+softfailing fail TestSoftFailingTestSuite/TestAnItOnASoftT
+softfailing fail TestSoftFailingTestSuite/TestAnItOnASoftT/stops
+softfailing fail TestSoftFailingTestSuite/TestEachRowFails
+softfailing fail TestSoftFailingTestSuite/TestEachRowFails/second
+softfailing fail TestSoftFailingTestSuite/TestEachRowStops
+softfailing fail TestSoftFailingTestSuite/TestEachRowStops/second
+softfailing fail TestSoftFailingTestSuite/TestTwoSoftFailures
+softfailing pass TestSoftFailingTestSuite/TestEachRowFails/first
+softfailing pass TestSoftFailingTestSuite/TestEachRowFails/third
+softfailing pass TestSoftFailingTestSuite/TestEachRowStops/first

@@ -29,6 +29,30 @@ An assertion that fails SHALL name the line it failed at and the assertion, in a
 - **WHEN** a helper fails in a file under a pkg/gotest directory of the user's module
 - **THEN** the failure names the helper's line and the caller's
 
+### Requirement: Soft assertions
+An assertion given t.Soft() SHALL fail the test at the lines a fatal one names and return, so that the test goes on past it and fails when it ends, also in a helper of a module whose path has no dot built with -trimpath. It and When on a soft T SHALL give their bodies a fatal T. In a hook a soft assertion SHALL fail the test the hook runs for and let the hook go on. Eventually and Consistently given a soft T SHALL fail it and return. A *gotest.B, *gotest.F and a poll's *gotest.R have no soft form.
+
+#### Scenario: Soft failures in a method
+- **WHEN** soft assertions fail in a method
+- **THEN** each failure names its assertion and the line it failed at
+- **AND** the method goes on past them and fails
+
+#### Scenario: A soft failure in a helper under -trimpath
+- **WHEN** a soft assertion fails in a helper of a module whose path has no dot, built with -trimpath
+- **THEN** the soft failure names the helper's line and the caller's, and the test goes on
+
+#### Scenario: An It on a soft T
+- **WHEN** an It runs on a soft T
+- **THEN** an assertion that fails in its body ends the It there
+
+#### Scenario: A soft failure in a hook
+- **WHEN** a soft assertion fails in BeforeEach
+- **THEN** BeforeEach goes on, the method runs and fails
+
+#### Scenario: A soft poll
+- **WHEN** Eventually is given a soft T and no poll passes
+- **THEN** the test goes on past it and fails
+
 ### Requirement: Named string types
 Regexp, Contains and JSONEq SHALL treat a value of a named string type as the string it holds; JSONEq marshals one that implements json.Marshaler or encoding.TextMarshaler.
 
