@@ -61,6 +61,8 @@ type OutputCollector struct {
 	// manifest opens the JSON stream and makes the run close it; nil for a
 	// stream that is neither opened nor closed.
 	manifest *protocol.Manifest
+	// inputs is each package's input hash, "" for none; nil for no hashes.
+	inputs func(pkg string) string
 	// censusAside is why the census does not judge this test run beyond
 	// its patterns and groups, "" when it does (see censusAside).
 	censusAside string
@@ -103,6 +105,12 @@ func WithStdout(w io.Writer) OutputOption {
 			c.stdout = w
 		}
 	}
+}
+
+// WithInputs stamps each package's verdict with the hash inputs gives it,
+// which may wait for the hashes; nil for none.
+func WithInputs(inputs func(pkg string) string) OutputOption {
+	return func(c *OutputCollector) { c.inputs = inputs }
 }
 
 // WithManifest opens the JSON stream with m, and has EndRun close it; nil for
@@ -629,7 +637,7 @@ func (c *OutputCollector) jsonTarget() io.Writer {
 		if c.events != nil {
 			w = io.MultiWriter(w, c.events)
 		}
-		c.starts = &startWriter{w: w, started: map[string]bool{}, gate: c.gate, runLevel: c.runLevel}
+		c.starts = &startWriter{w: w, started: map[string]bool{}, gate: c.gate, runLevel: c.runLevel, inputs: c.inputs}
 		if c.manifest != nil {
 			c.starts.open(c.manifest)
 		}
@@ -653,6 +661,8 @@ type startWriter struct {
 	runLevel map[string]bool
 	// run tallies a stream its manifest opened; nil for one without.
 	run *runTally
+	// inputs stamps a package's verdict with its input hash; nil for none.
+	inputs func(pkg string) string
 }
 
 func (s *startWriter) Write(p []byte) (int, error) {
@@ -684,13 +694,20 @@ func (s *startWriter) bookExit() {
 
 func (s *startWriter) writeLine(line []byte) {
 	var ev struct {
-		Time    json.RawMessage
-		Action  string
-		Package string
-		Test    string
+		Time      json.RawMessage
+		Action    string
+		Package   string
+		Test      string
+		Elapsed   float64
+		InputHash string
 	}
 	if json.Unmarshal(line, &ev) == nil && ev.Package != "" {
-		s.run.count(ev.Package, ev.Test, ev.Action)
+		if ev.Test == "" && isVerdict(ev.Action) && !s.runLevel[ev.Package] && ev.InputHash == "" && s.inputs != nil {
+			if h := s.inputs(ev.Package); h != "" {
+				line, ev.InputHash = withInputHash(line, h), h
+			}
+		}
+		s.run.count(ev.Package, ev.Test, ev.Action, ev.Elapsed, ev.InputHash)
 		switch {
 		case !s.started[ev.Package] && ev.Action == "start":
 			s.started[ev.Package] = true
@@ -709,6 +726,25 @@ func (s *startWriter) writeLine(line []byte) {
 		}
 	}
 	_, _ = s.w.Write(line)
+}
+
+func isVerdict(action string) bool {
+	return action == "pass" || action == "fail" || action == "skip"
+}
+
+// withInputHash is an event line with its package's input hash added
+// before its final brace, every other byte kept.
+func withInputHash(line []byte, hash string) []byte {
+	end := bytes.LastIndexByte(line, '}')
+	if end < 0 {
+		return line
+	}
+	field, _ := json.Marshal(hash)
+	out := make([]byte, 0, len(line)+len(field)+16)
+	out = append(out, line[:end]...)
+	out = append(out, `,"`+protocol.InputHashField+`":`...)
+	out = append(out, field...)
+	return append(out, line[end:]...)
 }
 
 func (c *OutputCollector) emitJSONPackageSummary(w io.Writer, pkg string, s *pkgState) {

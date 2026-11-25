@@ -223,7 +223,7 @@ func newStreamRun(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 		r.free(r.ledger.DoneExcept(overlay.BrokenPackages[i].PkgPath, nil))
 	}
 
-	c := NewOutputCollector(cfg.OutputMode, pf.Verbose, WithStdout(cfg.Stdout), WithEvents(cfg.Events), WithManifest(cfg.Manifest))
+	c := NewOutputCollector(cfg.OutputMode, pf.Verbose, WithStdout(cfg.Stdout), WithEvents(cfg.Events), WithInputs(cfg.Inputs), WithManifest(cfg.Manifest))
 	r.collector = c
 	c.StdlibTestsByPkg = r.plan.StdlibTests()
 	c.holdToTests = cfg.OutputMode == RunBatchText && !mayRunNothing(cfg.GoTestArgs, r.pf.RunFlags) && cfg.Only == nil
@@ -493,5 +493,6 @@ func (r *streamRun) finish() PipelineResult {
 		result.CapturedJSON = c.CapturedJSON()
 	}
 	result.Judged, result.Failed = c.judged()
+	result.Packages = c.packageVerdicts()
 	return result
 }

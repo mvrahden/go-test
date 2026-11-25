@@ -97,6 +97,9 @@ type PipelineConfig struct {
 	Only map[string]string
 	// Stdout is where a JSON stream goes; nil for os.Stdout.
 	Stdout io.Writer
+	// Inputs is each package's input hash, which stamps its verdict; nil
+	// for none.
+	Inputs func(pkg string) string
 }
 
 // flushOrder is the order a text run prints its verdicts in: the matched
@@ -140,6 +143,8 @@ type PipelineResult struct {
 	Judged *protocol.RunResult
 	// Failed are the units the run failed, for --failed.
 	Failed []protocol.FailedUnit
+	// Packages are the verdicts of the packages the run judged.
+	Packages []protocol.PackageVerdict
 }
 
 // sharedFixturesPkg names the synthetic package a shared fixture failure is
