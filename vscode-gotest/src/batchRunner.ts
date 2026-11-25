@@ -45,6 +45,9 @@ export interface BatchConfig {
   outputChannel: vscode.LogOutputChannel;
   label: string;
   env?: Record<string, string>;
+  // Run with --changed: packages the CLI leaves out are neither skipped
+  // nor errored; they keep what they have.
+  changed?: boolean;
   coverage?: {
     store: CoverageStore;
     testOnly?: boolean;
@@ -81,6 +84,46 @@ export function runPiece(
   return piece;
 }
 
+// How a --changed run narrowed itself, as its manifest says.
+export interface Narrowed {
+  ran: number;
+  unchanged: number;
+  noRecord: boolean;
+}
+
+// changedOf reads the run's manifest from its -json stream.
+export function changedOf(stdout: string): Narrowed | undefined {
+  for (const line of stdout.split("\n")) {
+    if (!line.includes('"Manifest"')) continue;
+    try {
+      const ev = JSON.parse(line) as {
+        RunLevel?: boolean;
+        Manifest?: {
+          Changed?: { Ran?: number; Unchanged?: number; NoRecord?: boolean };
+        };
+      };
+      const c = ev.RunLevel ? ev.Manifest?.Changed : undefined;
+      if (!c) continue;
+      return {
+        ran: c.Ran ?? 0,
+        unchanged: c.Unchanged ?? 0,
+        noRecord: !!c.NoRecord,
+      };
+    } catch {
+      // not an event
+    }
+  }
+  return undefined;
+}
+
+// narrowedLine says, in the run's output, that it was not a full run.
+export function narrowedLine(n: Narrowed): string {
+  const pkgs = (k: number) => `${k} package${k === 1 ? "" : "s"}`;
+  if (n.noRecord)
+    return `[gotest] --changed found no run record, so it ran everything: ${pkgs(n.ran)}.`;
+  return `[gotest] narrowed by --changed: ran ${pkgs(n.ran)}, left out ${pkgs(n.unchanged)} whose inputs did not change; their verdicts are the last record's, not this run's.`;
+}
+
 export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
   const {
     pkgInfos,
@@ -96,6 +139,7 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
     coverage,
     onResults,
     knownPackages,
+    changed,
   } = config;
 
   const importPaths = pkgInfos.map((p) => p.importPath);
@@ -125,6 +169,7 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
     // The stream on disk too, so the run's record names a file to open.
     const eventsFile = nextEventsFile();
     if (eventsFile) gotestArgs.push(`--events-file=${eventsFile}`);
+    if (changed) gotestArgs.push("--changed");
     const goTestArgs: string[] = ["-json", "-count=1", ...cliPkgArgs];
     if (coverFile) {
       goTestArgs.push("-covermode=atomic", `-coverprofile=${coverFile}`);
@@ -239,10 +284,13 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
       handleStderrLine,
     );
 
+    const narrowed = changed ? changedOf(result.stdout) : undefined;
+    if (narrowed) run.appendOutput(narrowedLine(narrowed) + "\r\n");
+
     if (token.isCancellationRequested) {
-      const skippedPkgs = pkgInfos.filter(
-        (i) => !streamedPkgs.has(i.importPath),
-      );
+      const skippedPkgs = changed
+        ? []
+        : pkgInfos.filter((i) => !streamedPkgs.has(i.importPath));
       if (skippedPkgs.length > 0) {
         outputChannel.info(
           `[${label}] cancelled, skipping ${skippedPkgs.length} remaining package(s)`,
@@ -266,7 +314,8 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
 
       let attributed = false;
       for (const info of pkgInfos) {
-        if (streamedPkgs.has(info.importPath)) {
+        // A narrowed run left the package out; it did not fail.
+        if (streamedPkgs.has(info.importPath) || changed) {
           continue;
         }
 
@@ -295,7 +344,9 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
       // here — it is the whole run's output, not something to read on an item.
       markFailedRun(
         run,
-        pkgInfos.flatMap((info) => info.items.map(getPackageItem)),
+        pkgInfos
+          .filter((info) => !changed || streamedPkgs.has(info.importPath))
+          .flatMap((info) => info.items.map(getPackageItem)),
         {
           exitCode: result.exitCode,
           cancelled: false,

@@ -11,6 +11,7 @@ import {
   buildRunFilter,
   resolveAncestorItems,
   erroredItem,
+  getPackageItem,
 } from "./runnerUtils.js";
 import type { CoverageStore } from "./coverageStore.js";
 import { executeBatch } from "./batchRunner.js";
@@ -22,6 +23,10 @@ export interface RunOptions {
   // A -run pattern that decides what runs instead of the items: the items
   // only start, and nothing they hold is cleared or skipped.
   filter?: string;
+  // Run with --changed in these folders: only the packages whose inputs
+  // changed since the last record, and those that failed or never ran. The
+  // rest keep the verdicts they have.
+  changed?: string[];
 }
 
 export class TestRunner {
@@ -70,7 +75,11 @@ export class TestRunner {
     const effectiveToken = cts.token;
 
     this.outputChannel.info("[runner] run started");
-    const run = this.controller.createTestRun(request, "Go Test Run");
+    const narrow = options?.changed;
+    const run = this.controller.createTestRun(
+      request,
+      narrow ? "Go Test Run (changed packages only)" : "Go Test Run",
+    );
     this._lastJsonOutput = "";
     this._lastPieces = [];
     let anyCoverOnRun = false;
@@ -88,7 +97,12 @@ export class TestRunner {
       // at the same time. The Bench profile (tag-scoped) is their only door.
       const collected = collectItems(this.controller, request);
       const items = collected.filter(
-        (i) => !i.tags.some((t) => t.id === "benchmark"),
+        (i) =>
+          !i.tags.some((t) => t.id === "benchmark") &&
+          (!narrow ||
+            narrow.includes(
+              this.cache.getWorkspaceDir(getPackageItem(i).id) ?? "",
+            )),
       );
       if (items.length === 0) {
         if (collected.length > 0) {
@@ -105,13 +119,17 @@ export class TestRunner {
       }).id;
       this.activeRecordId = recordId;
 
-      for (const item of items) {
-        const whole = options?.filter === undefined;
-        if (whole) this.controller.clearResults(item);
-        run.started(item);
-        if (whole) enqueueDescendants(run, item);
+      // A narrowed run starts nothing up front: a package it leaves out
+      // keeps its verdict, and one it runs is marked as its events come.
+      if (!narrow) {
+        for (const item of items) {
+          const whole = options?.filter === undefined;
+          if (whole) this.controller.clearResults(item);
+          run.started(item);
+          if (whole) enqueueDescendants(run, item);
+        }
+        startAncestors(run, items);
       }
-      startAncestors(run, items);
 
       const groups = groupByPackage(items);
 
@@ -152,7 +170,9 @@ export class TestRunner {
           continue;
         }
 
-        const filter = options?.filter ?? buildRunFilter(groupItems);
+        const filter = narrow
+          ? undefined
+          : (options?.filter ?? buildRunFilter(groupItems));
         validPkgs.push({
           importPath,
           items: groupItems,
@@ -206,6 +226,7 @@ export class TestRunner {
             run,
             effectiveToken,
             extraEnv,
+            !!narrow,
           );
         }
 
@@ -230,7 +251,7 @@ export class TestRunner {
       }
 
       resolveAncestorItems(run, this.controller);
-      if (options?.filter === undefined) {
+      if (options?.filter === undefined && !narrow) {
         for (const item of items) {
           skipUnresolved(run, item, this.controller);
         }
@@ -309,8 +330,10 @@ export class TestRunner {
     run: vscode.TestRun,
     token: vscode.CancellationToken,
     env?: Record<string, string>,
+    changed = false,
   ): Promise<void> {
     const result = await executeBatch({
+      changed,
       pkgInfos,
       filter,
       workspaceDir,

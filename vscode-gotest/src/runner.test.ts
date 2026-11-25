@@ -71,6 +71,7 @@ vi.mock("./runnerUtils.js", async (importOriginal) => ({
   startAncestors: vi.fn(),
   skipUnresolved: vi.fn(),
   resolveAncestorItems: vi.fn(),
+  getPackageItem: (i: any) => ({ id: i.pkg }),
 }));
 
 vi.mock("./batchRunner.js", () => ({
@@ -181,6 +182,30 @@ describe("TestRunner", () => {
     expect(vscode.window.showInformationMessage).toHaveBeenCalledWith(
       expect.stringContaining("Bench profile"),
     );
+  });
+
+  it("runs a folder's packages with --changed, clearing, starting and skipping none", async () => {
+    const { runner, runs, controller } = setup([A, B, C]);
+    await runner.run(
+      {
+        include: [item("m/a", "m/a"), item("m/b", "m/b"), item("m/c", "m/c")],
+      } as any,
+      token().token,
+      { changed: ["/ws"] },
+    );
+    expect(controller.createTestRun).toHaveBeenCalledWith(
+      expect.anything(),
+      "Go Test Run (changed packages only)",
+    );
+    expect(batch).toHaveBeenCalledTimes(1);
+    const cfg = batch.mock.calls[0][0];
+    expect(cfg.changed).toBe(true);
+    expect(cfg.filter).toBeUndefined();
+    expect(cfg.workspaceDir).toBe("/ws");
+    expect(cfg.pkgInfos.map((p) => p.importPath)).toEqual(["m/a", "m/b"]);
+    expect(controller.clearResults).not.toHaveBeenCalled();
+    expect(runs[0].started).not.toHaveBeenCalled();
+    expect(skipUnresolved).not.toHaveBeenCalled();
   });
 
   it("says nothing for a request with no items", async () => {

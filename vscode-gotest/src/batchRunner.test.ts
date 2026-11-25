@@ -20,7 +20,13 @@ vi.mock("./runnerUtils.js", async (orig) => ({
   })),
 }));
 
-import { executeBatch, runPiece } from "./batchRunner.js";
+import {
+  changedOf,
+  executeBatch,
+  narrowedLine,
+  runPiece,
+} from "./batchRunner.js";
+import { spawnTestProcess } from "./runnerUtils.js";
 import { buildCliCommand } from "./cli.js";
 import { setEventsDir } from "./eventsFiles.js";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -121,5 +127,64 @@ describe("executeBatch's events file", () => {
     await executeBatch(config());
     const args = vi.mocked(buildCliCommand).mock.calls.at(-1)![0];
     expect(args.some((a) => a.startsWith("--events-file="))).toBe(false);
+  });
+});
+
+const manifest = (changed: object) =>
+  JSON.stringify({
+    Action: "start",
+    Package: "gotest run",
+    RunLevel: true,
+    Manifest: { Version: "v1.42.0", Args: [], Changed: changed },
+  });
+
+describe("a --changed batch", () => {
+  it("reads how the run narrowed itself from its manifest", () => {
+    expect(changedOf(manifest({ Ran: 1, Unchanged: 3 }) + "\n")).toEqual({
+      ran: 1,
+      unchanged: 3,
+      noRecord: false,
+    });
+    expect(changedOf('{"Action":"start","Package":"p"}\n')).toBeUndefined();
+    expect(narrowedLine({ ran: 1, unchanged: 3, noRecord: false })).toBe(
+      "[gotest] narrowed by --changed: ran 1 package, left out 3 packages whose inputs did not change; their verdicts are the last record's, not this run's.",
+    );
+  });
+
+  it("asks for --changed, says the run was narrowed, and leaves the packages it left out alone", async () => {
+    const out: string[] = [];
+    const errored: string[] = [];
+    vi.mocked(spawnTestProcess).mockResolvedValueOnce({
+      stdout: manifest({ Ran: 0, Unchanged: 1 }) + "\n",
+      stderr: "",
+      exitCode: 1,
+    } as never);
+    const item = {
+      id: "example.com/cart",
+      tags: [{ id: "package" }],
+      children: { forEach: () => {} },
+    };
+    await executeBatch({
+      pkgInfos: [
+        { importPath: "example.com/cart", items: [item], dir: "/w/cart" },
+      ],
+      filter: undefined,
+      workspaceDir: "/w",
+      testFlags: [],
+      run: {
+        appendOutput: (s: string) => out.push(s),
+        errored: (i: { id: string }) => errored.push(i.id),
+        skipped: () => {},
+      },
+      token: { isCancellationRequested: false },
+      controller: { recordResult: () => {}, getResult: () => undefined },
+      outputChannel: { info: () => {}, warn: () => {}, error: () => {} },
+      label: "runner",
+      changed: true,
+    } as never);
+    const args = vi.mocked(buildCliCommand).mock.calls.at(-1)![0];
+    expect(args.slice(0, args.indexOf("--"))).toContain("--changed");
+    expect(out.join("")).toContain("narrowed by --changed: ran 0 packages");
+    expect(errored).toEqual([]);
   });
 });
