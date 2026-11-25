@@ -87,14 +87,11 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		return 2
 	}
 
-	classified := gotestrunner.ClassifyGoTestArgs(goTestArgs)
-	loadFlags := gotestrunner.StripNonLoadFlags(classified.BuildFlags)
-	pkgs, err := loadRunPackages(cfg.PackagePatterns, loadFlags)
-	loaded, broken, noTestFiles := pkgs.Loaded, pkgs.Broken, pkgs.NoTestFiles
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+	pkgs, ok := loadReportPackages(cfg, goTestArgs)
+	if !ok {
 		return 2
 	}
+	loaded, broken, noTestFiles := pkgs.Loaded, pkgs.Broken, pkgs.NoTestFiles
 
 	if code, err := focusGate(loaded, cfg.CI); err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
@@ -120,6 +117,7 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 
 	pipelineStart := time.Now()
+	manifest := runManifest()
 	result, err := gotestrunner.RunPipeline(ctx, gotestrunner.PipelineConfig{
 		GoTestArgs:      cfg.GoTestArgs,
 		SetupTimeout:    cfg.SetupTimeout,
@@ -134,7 +132,8 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		PackageOrder:    pkgs.Order,
 		Groups:          cfg.Groups,
 		SkipGroups:      cfg.SkipGroups,
-		Manifest:        runManifest(),
+		Manifest:        manifest,
+		Only:            cfg.Only,
 	}, overlay)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
@@ -142,6 +141,7 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 
 	code, coverageFailure := coverageVerdict(coverProfile, minCoverage, result.ExitCode)
+	recordRun(&result, code, manifest)
 	events, err := gotestspec.ParseEvents(bytes.NewReader(result.CapturedJSON))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: parsing test events: %s\n", err)

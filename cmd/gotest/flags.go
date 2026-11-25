@@ -64,12 +64,16 @@ var gotestFlags = map[string]FlagKind{
 	"--control": ValueFlag,
 
 	"--cache": BoolFlag,
+
+	"--agent":  BoolFlag,
+	"--failed": BoolFlag,
 }
 
 var testAllowed = flagSet(
 	"--debug", "--ci", "--spec", "--update-snapshots", "--no-cache",
 	"--min", "--setup-timeout", "--timeout", "--parallel", "--compile-parallel",
 	"--no-harvest", "--events-file", "--group", "--skip-group", "--control",
+	"--agent", "--failed",
 )
 
 var specAllowed = flagSet(
@@ -77,6 +81,7 @@ var specAllowed = flagSet(
 	"--min", "--setup-timeout", "--timeout", "--parallel", "--compile-parallel",
 	"--format", "--output", "--input", "--no-color", "--render-only", "--stamp",
 	"--static", "--declared", "--hide", "--match", "--only", "--group", "--skip-group", "--control",
+	"--failed",
 )
 
 var summaryAllowed = flagSet(
@@ -84,7 +89,7 @@ var summaryAllowed = flagSet(
 	"--min", "--setup-timeout", "--timeout", "--parallel", "--compile-parallel",
 	"--format", "--output", "--input", "--no-color", "--github",
 	"--coverage", "--render-only", "--badge", "--events-file",
-	"--group", "--skip-group", "--control",
+	"--group", "--skip-group", "--control", "--failed",
 )
 
 var watchAllowed = flagSet(

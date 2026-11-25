@@ -13,6 +13,7 @@ import (
 	"github.com/mvrahden/go-test/internal/about"
 	"github.com/mvrahden/go-test/internal/config"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
+	"github.com/mvrahden/go-test/internal/protocol"
 )
 
 func main() {
@@ -171,6 +172,25 @@ func runTest(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		return 2
 	}
 	jsonMode, goTestArgs := stripJSONFlag(goTestArgs)
+	agent, why := agentOutput(own, os.Getenv)
+	// A -json stream is already for machines, and -list's names are the answer.
+	agent = agent && !jsonMode && !hasFlag(goTestArgs, "-list")
+	if !agent {
+		return runText(inv, own, goTestArgs, jsonMode, nil)
+	}
+	announceAgentOutput(os.Stderr, why)
+	out := gotestrunner.NewAgentOutput(os.Stdout)
+	code := runText(inv, own, goTestArgs, jsonMode, out)
+	if !out.Closed() {
+		// The run ended before its stream opened: the line still comes last.
+		fmt.Fprintln(os.Stdout, gotestrunner.ClosingOf(nil, code, false))
+	}
+	return code
+}
+
+// runText runs the tests of a text or -json run, rendered for an agent
+// when agent is not nil, and leaves the run's record.
+func runText(inv Invocation, own OwnFlags, goTestArgs []string, jsonMode bool, agent *gotestrunner.AgentOutput) int { //nolint:gocritic // hugeParam: stable API
 	if own.Given("--events-file") && !jsonMode {
 		fmt.Fprintln(os.Stderr, "FAIL: --events-file saves the go test -json event stream, which a text run does not produce; add -json, or use gotest summary")
 		return 2
@@ -207,9 +227,32 @@ func runTest(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 	cfg.JSON = jsonMode
 	cfg.Events = eventsWriter(events)
+	cfg.Agent = agent
+	// A text run's manifest is only recorded, so it is read beside the run.
+	manifest := make(chan *protocol.Manifest, 1)
+	if jsonMode || agent != nil {
+		cfg.Manifest = runManifest()
+		manifest <- cfg.Manifest
+	} else {
+		go func() { manifest <- runManifest() }()
+	}
 
-	code := enforceCoverage(coverProfile, minCoverage, Run(cfg))
+	code, result, phases := execRun(cfg)
+	code = enforceCoverage(coverProfile, minCoverage, code)
+	failed := recordRun(result, code, <-manifest)
+	if agent != nil && len(failed) > 0 {
+		if dir, err := os.Getwd(); err == nil {
+			agent.SetRerun(rerunCommand(dir, inv.Args))
+		}
+	}
 	gotestrunner.EndRun(code)
+	if !jsonMode && agent == nil && result != nil {
+		// stdout stays go test's text; the verdict closes stderr.
+		fmt.Fprintln(os.Stderr, gotestrunner.ClosingOf(result.Judged, code, false))
+	}
+	if phases != "" {
+		fmt.Fprintln(os.Stderr, phases)
+	}
 	return code
 }
 
@@ -347,6 +390,12 @@ func parseExecFlags(own OwnFlags, goTestArgs []string, projCfg *config.ProjectCo
 	if err != nil {
 		return ExecConfig{}, err
 	}
+	var only map[string]string
+	if own.Bool("--failed") {
+		if only, patterns, err = rerunFailed(goTestArgs, patterns); err != nil {
+			return ExecConfig{}, err
+		}
+	}
 	return ExecConfig{
 		GoTestArgs:      goTestArgs,
 		PackagePatterns: patterns,
@@ -362,7 +411,30 @@ func parseExecFlags(own OwnFlags, goTestArgs []string, projCfg *config.ProjectCo
 		Groups:          own.Values("--group"),
 		SkipGroups:      own.Values("--skip-group"),
 		Control:         control,
+		Only:            only,
 	}, nil
+}
+
+// rerunFailed is --failed's selection and the packages it runs: those given,
+// else the packages of the last run's failures.
+func rerunFailed(goTestArgs, patterns []string) (map[string]string, []string, error) {
+	for _, flag := range []string{"-run", "-list"} {
+		if hasFlag(goTestArgs, flag) {
+			return nil, nil, fmt.Errorf("--failed selects the tests it runs itself; drop %s", flag)
+		}
+	}
+	dir, err := os.Getwd()
+	if err != nil {
+		return nil, nil, err
+	}
+	only, failedPkgs, err := failedSelection(dir)
+	if err != nil {
+		return nil, nil, err
+	}
+	if len(gotestrunner.PatternIndices(goTestArgs, ownFlag)) == 0 {
+		patterns = failedPkgs
+	}
+	return only, patterns, nil
 }
 
 // ensureCoverProfile makes sure a -coverprofile is in play when a coverage

@@ -10,6 +10,7 @@ import (
 	"github.com/mvrahden/go-test/internal/config"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
 	"github.com/mvrahden/go-test/internal/pkgpattern"
+	"github.com/mvrahden/go-test/internal/protocol"
 )
 
 // Invocation carries the resolved state for a single CLI invocation.
@@ -83,6 +84,14 @@ type ExecConfig struct {
 	Events io.Writer
 	// Control carries stop and force lines; nil without --control.
 	Control io.Reader
+	// Only is --failed's selection: each package's own -run, "" for all its
+	// suites; nil without the flag.
+	Only map[string]string
+	// Agent renders a text run for a coding agent; nil for go test's text.
+	Agent *gotestrunner.AgentOutput
+	// Manifest opens a -json or agent run's stream and goes into the run's
+	// record; nil leaves Run to make the -json run's own.
+	Manifest *protocol.Manifest
 }
 
 // knownSubcommands is the set of recognized subcommands.
