@@ -1362,7 +1362,8 @@ guard:
    unmodified tree then runs, against the copy, only the checks the patch's
    header selects, and must report them red. An `Expect:` line anchored to a
    conformance package's `FAIL` line runs that package, under a `-run` for
-   the suites and methods stating the patch's `Clause:` lines; every other
+   the suites and methods stating the patch's `Clause:` lines, which the
+   planner binds with the judge's own `gotest scenarios`; every other
    `Expect:` line is judged by the packages and tests the `Judge:` lines
    name, and a patch whose `Expect:` lines neither route reaches is refused,
    since nothing runs by default. The judge is built pristine because the
@@ -1515,7 +1516,7 @@ Arrows read "imports". Third-party modules are named where a package needs one.
 | `pkg/gotestruntime` | The library every generated harness calls: suite frame, method loop, fixtures, budgets, stop, the shared fixture setup program, the leaf codecs of fanned fuzz arguments | `pkg/gotest`, `internal/{callsite,carry,control,fuzzcodec,harness,protocol,protocol/sharedwire,runstate,schedinfo,setupwaits}` |
 | `pkg/lint` | The analyzer, exported for other `go/analysis` drivers; `pkg/lint/golangci`, a module of its own, is its golangci-lint plugin | `internal/lint` |
 | `skills` | The agent skill, embedded for `gotest skill install` | — |
-| `internal/{testkit,speccatalog/...,drill}` | Test support: staging and running the CLI, the spec catalog, the drill | `internal/{gotestspec,proctree,protocol,testkit}`, `pkg/{gotest,gotestruntime}`; third-party: `x/sys` (`drill`) |
+| `internal/{testkit,speccatalog/...,drill}` | Test support: staging and running the CLI, the rules `specs/` and the conformance suites keep beside `gotest scenarios`' binding, the drill | `internal/{gotestscenarios,gotestspec,proctree,protocol,testkit}`, `pkg/{gotest,gotestruntime}`; third-party: `x/sys` (`drill`) |
 
 Rules that hold, and what holds them:
 
