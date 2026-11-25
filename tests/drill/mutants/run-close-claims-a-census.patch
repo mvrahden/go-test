@@ -2,12 +2,12 @@ Expect: ^FAIL .*conformance/cli CLIRunManifest .* / closes the stream with no co
 Clause: when a -json run is narrowed with -run → closes the stream with no count of units not run
 --- a/internal/gotestrunner/manifest.go
 +++ b/internal/gotestrunner/manifest.go
-@@ -102,7 +102,7 @@ func (s *startWriter) end(code int) {
+@@ -103,7 +103,7 @@ func (s *startWriter) end(code int) {
  
  // resultLocked is what the stream has held so far, its exit code aside.
  func (r *runTally) resultLocked() protocol.RunResult {
--	result := protocol.RunResult{Tests: r.tests, NotRun: r.notRun}
-+	result := protocol.RunResult{Tests: r.tests, NotRun: new(int)}
+-	result := protocol.RunResult{Tests: r.tests, NotRun: r.notRun, Vacuous: r.vacuous}
++	result := protocol.RunResult{Tests: r.tests, NotRun: new(int), Vacuous: r.vacuous}
  	for _, pkg := range r.order {
  		result.Packages.Add(r.packages[pkg])
  	}
