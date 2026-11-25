@@ -745,3 +745,15 @@ What v1.42 changes:
    in a row ended the method there. A row that relied on that to stop
    before a dereference now panics after the failure; guard it with
    `if t.T().Failed() { continue }` or move it into a `t.It`.
+
+2. **The text run takes the census and ends on a verdict line** — a suite
+   binary that ran none of its tests (a `TestMain` that never calls
+   `m.Run`, an `-exec` that never starts it) fails `go tool gotest ./...`
+   with exit 2, and the run's last stderr line, or under an agent its last
+   stdout line, says the verdict, the exit code and the counts
+   (`cli.md`). Below v1.42 the text run exited 0 there and ended on go
+   test's text; gate on `-json`, `spec` or `summary` instead. `-count=0`
+   and `-h` after `-args` no longer fail a `-json` run's census.
+
+3. **`--failed`** reruns only what the last run in the directory failed.
+   Below v1.42 rerun by `-run` with the names the run printed.

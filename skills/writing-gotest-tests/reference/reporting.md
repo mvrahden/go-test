@@ -13,8 +13,8 @@ Worth a report:
   `gotest_psuite_test.go`/`gotest_pxsuite_test.go`) while running
   `go tool gotest` at the pin;
 - `FAIL: census: N declared test(s) never ran` on a green `spec`,
-  `summary` or `-json` run without `-run`/`-skip`/`-list` (the plain text
-  run is never censused);
+  `summary` or `-json` run without `-run`/`-skip`/`-list`, and on a plain
+  text run (v1.42+; below, the text run is never censused);
 - a verdict that contradicts the run: exit 0 beside a failed test, or a
   failure for a test that passed;
 - `lint -fix` leaving code that no longer compiles, or a finding on code

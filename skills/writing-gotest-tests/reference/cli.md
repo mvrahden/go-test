@@ -265,8 +265,10 @@ passed test but an untrustworthy run. `bench --spec`, `--json`, `--save`
 and `--against` runs apply the same rule to declared benchmark methods
 (`... declared benchmark(s) never ran`). The census only judges green,
 unfiltered runs; `-run`, `-skip`, `-list` and, for bench, `-bench` print
-`note: census skipped` instead. The plain text run is never censused, so
-gate CI on `summary`, `spec`, `-json` or a capturing `bench` run.
+`note: census skipped` instead, and so do `-count=0` and `-h` after `-args`.
+The plain text run is censused too (v1.42+), by each suite binary's result
+line; below v1.42 it never was, so gate CI there on `summary`, `spec`,
+`-json` or a capturing `bench` run.
 
 **v1.30+ census bookings:** a unit the census finds missing is also booked
 into the event stream as a test that ran and failed, with
