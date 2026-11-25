@@ -30,7 +30,7 @@ An assertion that fails SHALL name the line it failed at and the assertion, in a
 - **THEN** the failure names the helper's line and the caller's
 
 ### Requirement: Soft assertions
-An assertion given t.Soft() SHALL fail the test at the lines a fatal one names and return, so that the test goes on past it and fails when it ends, also in a helper of a module whose path has no dot built with -trimpath. NewTWithDeadline on a soft T SHALL keep it soft, and It and When on one SHALL give their bodies a fatal T. In a hook a soft assertion SHALL fail the test the hook runs for and let the hook go on. Eventually and Consistently given a soft T SHALL fail it and return. A *gotest.B, *gotest.F and a poll's *gotest.R have no soft form.
+An assertion given t.Soft() SHALL fail the test at the lines a fatal one names and return, so the test goes on and fails when it ends, also in a helper of a dotless module built with -trimpath. NewTWithDeadline SHALL keep a T soft; It and When on one SHALL give their bodies a fatal T. In a hook a soft failure SHALL fail the hook's test and let the hook go on; Eventually and Consistently given a soft T SHALL fail it and return. B, F and R have no soft form.
 
 #### Scenario: Soft failures in a method
 - **WHEN** soft assertions fail in a method

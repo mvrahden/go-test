@@ -52,7 +52,7 @@ Migrate SHALL leave a suite's file unconverted under a marker giving the reason 
 - **THEN** migrate exits 2 naming the base's package and writes nothing
 
 ### Requirement: Kept verdicts
-Migrate SHALL translate a testify assertion, hook or call only where gotest gives the verdict and the guarantees testify gave. Where a mechanical translation would change what a test passes or fails on, or what runs when, migrate SHALL leave the code unconverted or marked under a `TODO(gotest-migrate)` marker that gives the reason and names the gotest way. An assertion that let the test go on after failing is translated onto the soft T, `t.Soft()`, on which the test goes on too; FailNow and require's assertions stay fatal.
+Migrate SHALL translate a testify assertion, hook or call only where gotest gives the verdict and the guarantees testify gave. Where a mechanical translation would change what a test passes or fails on, or what runs when, migrate SHALL leave the code unconverted or marked under a `TODO(gotest-migrate)` marker that gives the reason and names the gotest way. An assertion that let the test go on after failing goes onto `t.Soft()`; FailNow and require's stay fatal.
 
 #### Scenario: An assertion on a goroutine
 - **WHEN** an assertion runs on a goroutine a go statement starts
