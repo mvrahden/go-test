@@ -1,6 +1,9 @@
 package gotest
 
 import (
+	"encoding/json"
+	"os"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -40,12 +43,66 @@ func openCensus(tt *testing.T, by *string) *census {
 		if c.nested.Load() || tt.Skipped() {
 			return
 		}
-		if by := c.by.Load(); by != nil {
+		by, n := c.by.Load(), c.n.Load()
+		if by != nil {
 			tt.Attr(protocol.AttrAssertsBy, *by)
 		}
-		tt.Attr(protocol.AttrAssertions, strconv.FormatInt(c.n.Load(), 10))
+		tt.Attr(protocol.AttrAssertions, strconv.FormatInt(n, 10))
+		writeCount(tt, n, by != nil)
 	})
 	return c
+}
+
+// countsFile is the file a text run asked for each leaf's count in; nil
+// when none was asked for, or testing's record of subtests cannot be read,
+// so a test that ran one through t.T().Run would read as a leaf.
+var (
+	countsFile = openCountsFile()
+	countsMu   sync.Mutex
+)
+
+func openCountsFile() *os.File {
+	path, ok := os.LookupEnv(protocol.EnvAssertionsFile)
+	_ = os.Unsetenv(protocol.EnvAssertionsFile) // the test's own children are not this run's
+	if !ok || path == "" || subtestsField == nil {
+		return nil
+	}
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND, 0) //nolint:gosec // G304: the file the runner created
+	if err != nil {
+		return nil
+	}
+	return f
+}
+
+// subtestsField is the index of testing's unexported mark that a test ran a
+// subtest, nil where testing has no such field.
+var subtestsField = func() []int {
+	f, ok := reflect.TypeFor[testing.T]().FieldByName("hasSub")
+	if !ok || f.Type != reflect.TypeFor[atomic.Bool]() {
+		return nil
+	}
+	if v, ok := f.Type.FieldByName("v"); !ok || v.Type.Kind() != reflect.Uint32 {
+		return nil
+	}
+	return f.Index
+}()
+
+// ranSubtests reports whether tt ran a subtest through its own Run, as the
+// stream's run events show it.
+func ranSubtests(tt *testing.T) bool {
+	return reflect.ValueOf(tt).Elem().FieldByIndex(subtestsField).FieldByName("v").Uint() != 0
+}
+
+// writeCount appends tt's count to countsFile, one line written whole; a test
+// that ran subtests is no leaf, and a failed write leaves the count unknown.
+func writeCount(tt *testing.T, n int64, by bool) {
+	if countsFile == nil || ranSubtests(tt) {
+		return
+	}
+	line, _ := json.Marshal(protocol.LeafCount{Test: tt.Name(), Assertions: n, AssertsBy: by, Failed: tt.Failed()})
+	countsMu.Lock()
+	defer countsMu.Unlock()
+	_, _ = countsFile.Write(append(line, '\n'))
 }
 
 // censusOf is the census of tb's test; nil when it has none.
