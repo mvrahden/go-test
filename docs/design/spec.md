@@ -148,6 +148,8 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `--compile-parallel=<n>` | Concurrent compilation processes (default: NumCPU, auto-halved for -race/-msan/-asan) |
 | `--group=<name>` | Run only the suites of this `ExclusiveGroup` (repeatable; default runs, `spec`, `summary`); a name no suite declares exits 2 before any build |
 | `--skip-group=<name>` | Leave the suites of this `ExclusiveGroup` out (repeatable) |
+| `--agent` | Print a text run for a coding agent: what failed, whole, then the verdict as the last line of stdout; on by itself under `AI_AGENT` or `CLAUDECODE=1`, off with `--agent=false` or `GOTEST_AGENT=0` ([Agent output](../../specs/cli/spec.md#requirement-agent-output), [The closing line](../../specs/cli/spec.md#requirement-the-closing-line)) |
+| `--failed` | Rerun only what the last run in the working directory failed, read from the record each run leaves in the cache (default runs, `-json`, `spec`, `summary`) ([Rerunning what failed](../../specs/cli/spec.md#requirement-rerunning-what-failed), [A run's record](../../specs/cli/spec.md#requirement-a-runs-record)) |
 | `--input=<path>` | Replay a saved `go test -json` stream in `spec`/`summary` (`-` reads stdin); exit 2 when it holds no test events, a package or failed build has no verdict, or a package failed to build |
 | `--events-file=<path>` | With `-json`, or in `summary`, also write the run's `go test -json` event stream to the file as `-json` prints it (a suite's events when its process ends), making its directories and replacing a file there; `summary --input` reads it back; a text run refuses it, and an unwritable path exits 2 before anything is built |
 | `--control=stdin` | Read `stop` and `force` lines on standard input, a first and a second interrupt, counted with the signals, the input's end a stop when none is under way; taken by every command that stops on an interrupt, and without it standard input is never read |
@@ -1593,7 +1595,8 @@ User-facing:
 | Variable | Effect |
 |---|---|
 | `GOTEST_CI` | CI mode on for any value but `0`, `f`, `F`, `false`, `FALSE` and `False`, which turn it off; unset, the standard `CI` variable turns it on |
-| `GOTEST_CACHE_DIR` | Cache location for test binaries (default `os.UserCacheDir()/gotest`; a run evicts the binaries of a gone checkout, those unused for 7 days, then the least recently used above 5 GiB) |
+| `GOTEST_AGENT` | A text run's agent output, off for the same values as `GOTEST_CI` and on for any other; unset, a detected agent (`AI_AGENT`, `CLAUDECODE=1`) turns it on, and `--agent` wins over it |
+| `GOTEST_CACHE_DIR` | Cache location for test binaries and each working directory's last run record (default `os.UserCacheDir()/gotest`; a run evicts the binaries of a gone checkout, those unused for 7 days, then the least recently used above 5 GiB) |
 | `GOTEST_SLOW_BUILD_THRESHOLD` | How long a build runs, as a Go duration, before the CLI says it is still building (default `15s`; unparsable or not positive → the default) |
 | `GOTEST_UPDATE_SNAPSHOTS` | Regenerate snapshot baselines, off for the same values as `GOTEST_CI` (what `--update-snapshots` sets; the only mechanism under plain `go test`) |
 | `GOTEST_TIMEOUT_SCALE` | Multiply every suite and fixture budget, declared or default, deadline and verdict alike, for a machine slower than the one the budgets were written on (`2` doubles them); the processes the tests start do not inherit it |

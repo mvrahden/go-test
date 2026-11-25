@@ -1102,6 +1102,7 @@ Inputs, outputs, the event stream, the fuzz and bench steps and the coverage bad
 
 ```bash
 gotest ./... -v -race          # generate overlays and run tests (default)
+gotest --failed               # rerun only what the last run here failed
 gotest bench ./...             # run BenchmarkX suite methods, serially
 gotest fuzz ./... --for=5m     # run FuzzX suite methods, budgeted
 gotest spec ./...              # behavioral specification view
@@ -1197,6 +1198,11 @@ Codex reads the same hook events from `.codex/hooks.json` (or `~/.codex/hooks.js
 Codex passes an `apply_patch` edit to its hooks in `tool_input.command`, with no file path, so `post-edit` has no file to lint there; Cursor's shell hook must return a permission decision, so it is not wired.
 
 An agent without skill support can still be pointed at the installed `SKILL.md` from its instructions file, such as `AGENTS.md`. The skill source lives in [`skills/writing-gotest-tests`](skills/writing-gotest-tests).
+
+Under an agent a run prints for it. Where `AI_AGENT` is set, or `CLAUDECODE=1`, a text run prints only what failed, whole, and ends stdout with one line that holds the verdict, the exit code, the counts and the command that reruns the failures, so `tail -1` cannot lose it ([Agent output](specs/cli/spec.md#requirement-agent-output), [The closing line](specs/cli/spec.md#requirement-the-closing-line)); `--agent=false` or `GOTEST_AGENT=0` turns it off, and `--agent` turns it on anywhere.
+Outside agent output the same line closes stderr, after go test's text on stdout.
+A suite binary that ran none of its tests, as under a `TestMain` that never calls `m.Run`, fails a text run as it fails `-json` ([The census in a text run](specs/cli/spec.md#requirement-the-census-in-a-text-run)).
+Every run leaves a record of what it failed in the gotest cache, and `gotest --failed` reruns only that, by method, in a text or `-json` run, `spec` or `summary` ([Rerunning what failed](specs/cli/spec.md#requirement-rerunning-what-failed)).
 
 Two commands give an agent the specification without the source. `gotest spec --static ./...` prints what a package promises before anything runs, and `gotest discover ./...` emits the same tree as JSON with a `behaviorsComplete` flag per method, so an agent never presents a partial list as the whole specification.
 
