@@ -412,14 +412,44 @@ var ExportCompileError = compileError
 func ExportBookDeadlineCut(stream string, cutShort bool) (running []CensusCase, booked string) {
 	var stdout, errw bytes.Buffer
 	c := NewOutputCollector(RunStreamJSON, false, WithWriters(&stdout, &errw))
-	_, _ = io.WriteString(c.jsonWriter(), stream)
-	c.verdicts.endSuite(cutShort)
+	census := c.verdicts.suite()
+	_, _ = io.WriteString(c.jsonWriterTo(census), stream)
+	census.end(cutShort)
 	before := stdout.Len()
 	running = c.bookDeadline(context.DeadlineExceeded)
 	return running, stdout.String()[before:]
 }
 
 var ExportMayRunNothing = mayRunNothing
+
+// ExportInterleavedDeadline writes steps through a -json collector, books the
+// deadline and returns the named units and the booked events. A step is
+// "<suite>:<line>", a line of that suite process's output, "end <suite>",
+// its process ending on its own, or "cut <suite>", the run's context ending
+// it; a suite is any name.
+func ExportInterleavedDeadline(steps ...string) (running []CensusCase, booked string) {
+	var stdout, errw bytes.Buffer
+	c := NewOutputCollector(RunStreamJSON, false, WithWriters(&stdout, &errw))
+	suites := map[string]*suiteCensus{}
+	census := func(name string) *suiteCensus {
+		if suites[name] == nil {
+			suites[name] = c.verdicts.suite()
+		}
+		return suites[name]
+	}
+	for _, step := range steps {
+		if name, ok := strings.CutPrefix(step, "end "); ok {
+			census(name).end(false)
+		} else if name, ok := strings.CutPrefix(step, "cut "); ok {
+			census(name).end(true)
+		} else if name, line, ok := strings.Cut(step, ":"); ok {
+			_, _ = io.WriteString(c.jsonWriterTo(census(name)), line+"\n")
+		}
+	}
+	before := stdout.Len()
+	running = c.bookDeadline(context.DeadlineExceeded)
+	return running, stdout.String()[before:]
+}
 
 func WithWriters(stdout, stderr io.Writer) OutputOption {
 	return func(c *OutputCollector) {

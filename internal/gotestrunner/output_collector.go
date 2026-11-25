@@ -184,10 +184,12 @@ func (c *OutputCollector) Register(pkg string, count int) {
 func (c *OutputCollector) RecordResult(pkg string, idx int, r SuiteResult) { //nolint:gocritic // hugeParam: stable API
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.recordResultLocked(pkg, idx, r)
+	c.recordResultLocked(pkg, idx, r, nil)
 }
 
-func (c *OutputCollector) recordResultLocked(pkg string, idx int, r SuiteResult) { //nolint:gocritic // hugeParam: stable API
+// recordResultLocked books r; census is the reading its events were written
+// through already, nil for events still in r.Stdout.
+func (c *OutputCollector) recordResultLocked(pkg string, idx int, r SuiteResult, census *suiteCensus) { //nolint:gocritic // hugeParam: stable API
 	// A binary stopped from outside reports a status it never chose: -1 for a
 	// signal on Unix, the raw termination status on Windows (0xC000013A for the
 	// console interrupt that a --timeout sends). Neither is a verdict, and
@@ -251,14 +253,16 @@ func (c *OutputCollector) recordResultLocked(pkg string, idx int, r SuiteResult)
 		c.assertions.observeCounts(pkg, r.Counts, r.Stdout)
 		c.flushReadyText()
 	case RunStreamJSON, RunCaptureJSON:
-		w := c.jsonWriter()
-		filterPackageLevelEvents(w, stampBlock(r.Stdout))
-		c.verdicts.endSuite(r.CutShort)
+		if census == nil {
+			census = c.verdicts.suite()
+			filterPackageLevelEvents(c.jsonWriterTo(census), stampBlock(r.Stdout))
+		}
+		census.end(r.CutShort)
 		if len(r.Stderr) > 0 {
 			_, _ = c.stderr.Write(r.Stderr)
 		}
 		if s.completed == s.expected {
-			c.emitJSONPackageSummary(w, pkg, s)
+			c.emitJSONPackageSummary(c.jsonWriter(), pkg, s)
 		}
 	}
 }
@@ -417,21 +421,21 @@ func buildName(pkg, msg string) string {
 
 // RecordGivenUp books a suite that never ran as failed and says why: on
 // stderr, and in JSON modes as a test that failed with the reason as its
-// output, so every renderer shows the suite beside its cause. Its events and
-// its result are one record: the census reads another suite's in between as
-// this one's.
+// output, so every renderer shows the suite beside its cause.
 func (c *OutputCollector) RecordGivenUp(pkg string, idx int, suite, reason string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	var census *suiteCensus
 	if c.mode != RunBatchText {
+		census = c.verdicts.suite()
 		var w bytes.Buffer
 		now := time.Now()
 		writeJSONLine(&w, map[string]any{"Time": now, "Action": "run", "Package": pkg, "Test": suite})
 		writeJSONLine(&w, map[string]any{"Time": now, "Action": "output", "Package": pkg, "Test": suite, "Output": "    " + reason + "\n"})
 		writeJSONLine(&w, map[string]any{"Time": now, "Action": "fail", "Package": pkg, "Test": suite, "Elapsed": 0})
-		_, _ = c.jsonWriter().Write(stampBlock(w.Bytes()))
+		_, _ = c.jsonWriterTo(census).Write(stampBlock(w.Bytes()))
 	}
-	c.recordResultLocked(pkg, idx, SuiteResult{Target: SuiteTarget{SuiteSpec: SuiteSpec{Package: pkg, SuiteName: suite}}, Stderr: []byte(reason + "\n"), ExitCode: 1})
+	c.recordResultLocked(pkg, idx, SuiteResult{Target: SuiteTarget{SuiteSpec: SuiteSpec{Package: pkg, SuiteName: suite}}, Stderr: []byte(reason + "\n"), ExitCode: 1}, census)
 }
 
 // RecordStopped books a suite a stop kept from starting: skipped with the
@@ -441,6 +445,7 @@ func (c *OutputCollector) RecordStopped(pkg string, idx int, suite string) {
 	defer c.mu.Unlock()
 	skip := "--- SKIP: " + suite + " (0.00s)\n"
 	r := SuiteResult{Target: SuiteTarget{SuiteSpec: SuiteSpec{Package: pkg, SuiteName: suite}}, ExitCode: 1}
+	var census *suiteCensus
 	if c.mode == RunBatchText {
 		r.Stdout = []byte(skip + "    run stopping\n")
 	} else {
@@ -450,9 +455,10 @@ func (c *OutputCollector) RecordStopped(pkg string, idx int, suite string) {
 		writeJSONLine(&w, map[string]any{"Time": now, "Action": "output", "Package": pkg, "Test": suite, "Output": skip})
 		writeJSONLine(&w, map[string]any{"Time": now, "Action": "output", "Package": pkg, "Test": suite, "Output": "    run stopping\n"})
 		writeJSONLine(&w, map[string]any{"Time": now, "Action": "skip", "Package": pkg, "Test": suite, "Elapsed": 0})
-		_, _ = c.jsonWriter().Write(stampBlock(w.Bytes()))
+		census = c.verdicts.suite()
+		_, _ = c.jsonWriterTo(census).Write(stampBlock(w.Bytes()))
 	}
-	c.recordResultLocked(pkg, idx, r)
+	c.recordResultLocked(pkg, idx, r, census)
 }
 
 // Finalize closes a text run: it drains the packages still waiting for an
@@ -527,7 +533,9 @@ func (c *OutputCollector) EmitSkippedSuites(skippedByPkg map[string][]string) {
 			})
 		}
 	}
-	_, _ = c.jsonWriter().Write(stampBlock(w.Bytes()))
+	census := c.verdicts.suite()
+	_, _ = c.jsonWriterTo(census).Write(stampBlock(w.Bytes()))
+	census.end(false)
 }
 
 func (c *OutputCollector) anyFailedLocked() bool {
@@ -595,10 +603,18 @@ func ranNothingNote(s *pkgState) string {
 	return ""
 }
 
-// jsonWriter is where JSON events are written; the census indexes them on
-// the way.
+// jsonWriter is where JSON events no suite process wrote are written; the
+// census indexes them on the way.
 func (c *OutputCollector) jsonWriter() io.Writer {
 	return io.MultiWriter(c.jsonTarget(), &c.verdicts, &c.assertions)
+}
+
+// jsonWriterTo is where one suite's JSON events are written, census reading
+// them apart from every other suite's. What one hold of the collector's lock
+// writes ends on a whole line: the stream and the assertion index split by
+// line what every suite writes.
+func (c *OutputCollector) jsonWriterTo(census *suiteCensus) io.Writer {
+	return io.MultiWriter(c.jsonTarget(), census, &c.assertions)
 }
 
 // bookRunFailure books a failure that happened outside any test binary as a
