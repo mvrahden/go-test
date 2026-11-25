@@ -176,6 +176,7 @@ func RenderSummary(w io.Writer, packages []*Package, opts ...RenderOption) {
 			passedColor, passed, c.reset,
 			formatDuration(effectiveDuration(&cfg, packages)))
 		renderVacuous(w, collectVacuous(packages), c)
+		renderStale(w, packages, c)
 		renderGroups(w, cfg.groups, c)
 		if cfg.coverage != nil {
 			fmt.Fprintf(w, "%sCoverage: %.1f%%%s\n", c.dim, cfg.coverage.Total, c.reset)
@@ -221,6 +222,7 @@ func RenderSummary(w io.Writer, packages []*Package, opts ...RenderOption) {
 		fmt.Fprintln(w)
 		renderVacuous(w, vacuous, c)
 	}
+	renderStale(w, packages, c)
 
 	fmt.Fprintln(w)
 	renderGroups(w, cfg.groups, c)
@@ -282,6 +284,7 @@ func RenderMarkdownSummary(w io.Writer, packages []*Package, opts ...RenderOptio
 			all, passed, formatDuration(effectiveDuration(&cfg, packages)))
 		renderMarkdownNotes(w, cfg.notes)
 		renderMarkdownVacuous(w, collectVacuous(packages))
+		renderMarkdownStale(w, packages)
 		renderMarkdownGroups(w, cfg.groups)
 		if cfg.coverage != nil {
 			renderMarkdownCoverage(w, cfg.coverage)
@@ -299,6 +302,7 @@ func RenderMarkdownSummary(w io.Writer, packages []*Package, opts ...RenderOptio
 
 	renderMarkdownFailures(w, failures)
 	renderMarkdownVacuous(w, collectVacuous(packages))
+	renderMarkdownStale(w, packages)
 
 	for _, d := range diags {
 		fmt.Fprintln(w)
@@ -345,6 +349,24 @@ func RenderMarkdownSummary(w io.Writer, packages []*Package, opts ...RenderOptio
 		trailer += ", " + countNoun(stats.FailedPackages, "failed package", "failed packages")
 	}
 	fmt.Fprintf(w, "%s: %s\n", strings.Join(parts, ", "), trailer)
+}
+
+// renderStale lists the packages whose verdict is stale.
+func renderStale(w io.Writer, packages []*Package, c colors) { //nolint:gocritic // hugeParam: as renderSummary
+	for _, pkg := range packages {
+		if pkg.Freshness == FreshStale {
+			fmt.Fprintf(w, "%sSTALE%s  %s%s%s — its inputs changed since the run\n", c.yellow, c.reset, c.dim, pkg.Path, c.reset)
+		}
+	}
+}
+
+// renderMarkdownStale lists the packages whose verdict is stale.
+func renderMarkdownStale(w io.Writer, packages []*Package) {
+	for _, pkg := range packages {
+		if pkg.Freshness == FreshStale {
+			fmt.Fprintf(w, "- **STALE** %s — its inputs changed since the run\n", EscapeLabel(pkg.Path))
+		}
+	}
 }
 
 // renderMarkdownVacuous lists the vacuous leaves.

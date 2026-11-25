@@ -107,6 +107,9 @@ func renderMarkdownPackage(doc *mdDoc, pkg *Package, cfg *renderConfig) {
 	if own {
 		heading += " — FAILED"
 	}
+	if pkg.Freshness == FreshStale {
+		heading += " — " + StaleMark
+	}
 	if !bare {
 		if c := countsPhrase(CollectStats([]*Package{pkg})); c != "" {
 			heading += " — " + c

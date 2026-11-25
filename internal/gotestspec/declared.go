@@ -34,7 +34,7 @@ func Overlay(declared, observed []*Package) []*Package {
 			out = append(out, d)
 			continue
 		}
-		d.Status, d.Duration, d.Output = o.Status, o.Duration, o.Output
+		d.Status, d.Duration, d.Output, d.InputHash = o.Status, o.Duration, o.Output, o.InputHash
 		d.Nodes = overlayRuns(d.Nodes, o.Nodes)
 		sort.SliceStable(d.Nodes, func(i, j int) bool { return d.Nodes[i].Name < d.Nodes[j].Name })
 		FailBranches(d)

@@ -47,7 +47,7 @@ func (r *RunInfo) json() *jsonRun {
 		return nil
 	}
 	m := r.Manifest
-	return &jsonRun{
+	run := &jsonRun{
 		Version:   m.Version,
 		GoVersion: m.GoVersion,
 		Args:      m.Args,
@@ -56,4 +56,8 @@ func (r *RunInfo) json() *jsonRun {
 		Agent:     m.Agent,
 		ExitCode:  r.ExitCode,
 	}
+	if c := m.Changed; c != nil {
+		run.Changed = &jsonChanged{Ran: c.Ran, Unchanged: c.Unchanged, NoRecord: c.NoRecord}
+	}
+	return run
 }

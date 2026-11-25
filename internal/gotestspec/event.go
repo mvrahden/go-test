@@ -50,6 +50,9 @@ type TestEvent struct {
 	ImportPath string `json:"ImportPath"`
 	// FailedBuild names the build whose failure failed this package.
 	FailedBuild string `json:"FailedBuild"`
+	// InputHash is gotest's digest of what a package's verdict judged, on
+	// that verdict.
+	InputHash string `json:"InputHash,omitempty"`
 	// Key and Value are an attr event's attribute.
 	Key   string `json:"Key,omitempty"`
 	Value string `json:"Value,omitempty"`

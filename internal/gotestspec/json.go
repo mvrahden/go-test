@@ -32,6 +32,15 @@ type jsonRun struct {
 	Agent     string   `json:"agent,omitempty"`
 	// ExitCode is absent for a stream that ended before the run closed it.
 	ExitCode *int `json:"exitCode,omitempty"`
+	// Changed says a --changed run left out the packages it found
+	// unchanged: how many it ran and left out.
+	Changed *jsonChanged `json:"changed,omitempty"`
+}
+
+type jsonChanged struct {
+	Ran       int  `json:"ran"`
+	Unchanged int  `json:"unchanged"`
+	NoRecord  bool `json:"noRecord,omitempty"`
 }
 
 type jsonGroup struct {
@@ -48,11 +57,15 @@ type jsonPackage struct {
 	Dir string `json:"dir,omitempty"`
 	// RunLevel marks a package the run booked for itself rather than for
 	// an import path, as its events did.
-	RunLevel bool       `json:"runLevel,omitempty"`
-	Status   string     `json:"status"`
-	Duration float64    `json:"duration"`
-	Nodes    []jsonNode `json:"nodes"`
-	Output   []string   `json:"output"`
+	RunLevel bool    `json:"runLevel,omitempty"`
+	Status   string  `json:"status"`
+	Duration float64 `json:"duration"`
+	// InputHash is the hash the run stamped the verdict with; Freshness
+	// whether the tree still holds what it judged, when that was asked.
+	InputHash string     `json:"inputHash,omitempty"`
+	Freshness string     `json:"freshness,omitempty"`
+	Nodes     []jsonNode `json:"nodes"`
+	Output    []string   `json:"output"`
 	// Stats counts this package alone; present under WithPackageStats.
 	Stats *jsonStats `json:"stats,omitempty"`
 }
@@ -119,6 +132,8 @@ type jsonStats struct {
 	AssertsBy int `json:"assertsBy,omitempty"`
 	// Excluded counts the leaves the X_ prefix excludes.
 	Excluded int `json:"excluded,omitempty"`
+	// Stale counts the packages whose verdict is stale.
+	Stale int `json:"stale,omitempty"`
 }
 
 func RenderJSON(w io.Writer, packages []*Package, opts ...RenderOption) {
@@ -146,13 +161,15 @@ func RenderJSON(w io.Writer, packages []*Package, opts ...RenderOption) {
 			output = []string{}
 		}
 		jp := jsonPackage{
-			Path:     pkg.Path,
-			Dir:      pkg.Dir,
-			RunLevel: pkg.RunLevel,
-			Status:   statusString(pkg.Status),
-			Duration: PackageDuration(pkg).Seconds(),
-			Nodes:    cfg.convertNodes(pkg.Nodes),
-			Output:   output,
+			Path:      pkg.Path,
+			Dir:       pkg.Dir,
+			RunLevel:  pkg.RunLevel,
+			Status:    statusString(pkg.Status),
+			Duration:  PackageDuration(pkg).Seconds(),
+			InputHash: pkg.InputHash,
+			Freshness: string(pkg.Freshness),
+			Nodes:     cfg.convertNodes(pkg.Nodes),
+			Output:    output,
 		}
 		if cfg.packageStats {
 			own := jsonStats(cfg.stats([]*Package{pkg}))
