@@ -45,6 +45,7 @@ import { clearBinaryCache } from "../../src/cli.js";
 import type { Memento } from "../../src/acceptance.js";
 import { createRecordingChannel } from "./vscodeStub.js";
 import { setChildObserver } from "../../src/managedChild.js";
+import { EvidenceSelection } from "../../src/evidence.js";
 
 const extensionDir = path.resolve(__dirname, "..", "..");
 const repoRoot = path.resolve(extensionDir, "..");
@@ -461,5 +462,80 @@ describe.skipIf(sh)("the Change scope", () => {
       schema: 2,
       supported: 1,
     });
+  });
+});
+
+describe.skipIf(sh)("the Change scope's evidence and its Markdown", () => {
+  it("passes the runs chosen as evidence to the audit, and shows them as chips", async () => {
+    const store = memento();
+    const evidence = new EvidenceSelection(store);
+    const file = path.join(fixtures, "proof", "current.json");
+    await evidence.toggle(checkout, { id: "r1", file, label: "13:55" });
+    await evidence.toggle(checkout, {
+      id: "gone",
+      file: path.join(tmp, "gone.json"),
+      label: "09:00",
+    });
+    const rec = createRecordingChannel();
+    const s = new ChangeScope({
+      log: rec.channel as never,
+      memento: store,
+      folders: () => [checkout],
+      evidence,
+      changed: () => {},
+    });
+    await s.audit(checkout);
+    const v = s.view();
+    if (v.state.kind !== "doc") throw new Error(JSON.stringify(v.state));
+    // The one whose file is there reached the audit; the gone one did not.
+    expect(v.state.model.streams.map((st) => st.text)).toEqual([
+      expect.stringContaining("current.json"),
+    ]);
+    expect(v.evidence).toEqual([
+      { id: "r1", label: "13:55", missing: false },
+      { id: "gone", label: "09:00", missing: true },
+    ]);
+    await s.act({ act: "dropEvidence", key: "r1" });
+    expect(evidence.list(checkout).map((p) => p.id)).toEqual(["gone"]);
+  });
+
+  it("writes the audit in Markdown for the tool, in the folder's one audit slot", async () => {
+    let live = 0;
+    let most = 0;
+    const tokens = new Map<string, string>();
+    let n = 0;
+    setChildObserver({
+      spawned: (_pid, kind) => {
+        const token = String(++n);
+        tokens.set(token, kind);
+        if (kind.startsWith("audit")) most = Math.max(most, ++live);
+        return token;
+      },
+      exited: (token) => {
+        if (token && tokens.get(token)?.startsWith("audit")) live--;
+      },
+    });
+    try {
+      const { s } = scope(checkout);
+      const [, md] = await Promise.all([
+        s.audit(checkout),
+        s.auditMarkdown(checkout, {}),
+      ]);
+      expect(md).toMatch(/^#/m);
+      expect(md).toContain("removed");
+      expect(most).toBe(1);
+      expect(s.view().state.kind).toBe("doc");
+      const other = await s.auditMarkdown(checkout, { base: "main" });
+      expect(other).toMatch(/^#/m);
+    } finally {
+      setChildObserver(undefined);
+    }
+  });
+
+  it("tells the tool in plain words when the CLI has no audit", async () => {
+    state.cliPath = oldCli;
+    const { s } = scope(checkout);
+    const md = await s.auditMarkdown(checkout, {});
+    expect(md).toMatch(/has no audit command; it needs v1\.42\.0/);
   });
 });

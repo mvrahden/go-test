@@ -535,8 +535,24 @@ export class SpecViewPanel implements vscode.Disposable {
       if (!this.isVisible() || this.scope !== "spec") return;
       const due = Array.from(this.freshPending);
       this.freshPending.clear();
-      for (const folder of due) void this.checkFresh(folder);
+      for (const folder of due) this.trackFresh(this.checkFresh(folder));
     }, delay);
+  }
+
+  private readonly freshWork = new Set<Promise<void>>();
+
+  private trackFresh(p: Promise<void>): void {
+    const done = p.catch(() => {}).finally(() => this.freshWork.delete(done));
+    this.freshWork.add(done);
+  }
+
+  // freshIdle resolves once no freshness check is due or running.
+  async freshIdle(): Promise<void> {
+    for (;;) {
+      if (this.freshTimer) await new Promise((r) => setTimeout(r, 50));
+      else if (this.freshWork.size > 0) await Promise.all(this.freshWork);
+      else return;
+    }
   }
 
   // checkFresh has the folder's CLI judge the shown stream's packages
