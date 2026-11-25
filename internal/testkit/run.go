@@ -39,6 +39,9 @@ type Event struct {
 	// ImportPath names the package of a build-output or build-fail event,
 	// which carries no Package.
 	ImportPath string `json:"ImportPath"`
+	// Key and Value are an attr event's attribute.
+	Key   string `json:"Key"`
+	Value string `json:"Value"`
 }
 
 // MarkersFile is the file, inside the directory GOTEST_CANARY_DIR names, that
@@ -220,6 +223,17 @@ func (r *Run) Verdict(path string) string {
 
 // MarkerOrder reports whether the markers appear in the run in the order
 // given, judged by each marker's first occurrence; an absent marker is false.
+// Attr is the value of the attribute key that test reported last; ok is
+// false when it reported none.
+func (r *Run) Attr(test, key string) (value string, ok bool) {
+	for _, ev := range r.Events {
+		if ev.Action == "attr" && ev.Test == test && ev.Key == key {
+			value, ok = ev.Value, true
+		}
+	}
+	return value, ok
+}
+
 func (r *Run) MarkerOrder(markers ...string) bool { return MarkerOrderOf(r.Markers, markers...) }
 
 // MarkerOrderOf is MarkerOrder over markers read some other way.

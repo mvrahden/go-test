@@ -18,6 +18,7 @@ type runTally struct {
 	order    []string
 	tests    protocol.Tally
 	notRun   *int
+	vacuous  *int
 	closed   bool
 	// failed are the units of every fail, once each, in stream order.
 	failed []protocol.FailedUnit
@@ -102,7 +103,7 @@ func (s *startWriter) end(code int) {
 
 // resultLocked is what the stream has held so far, its exit code aside.
 func (r *runTally) resultLocked() protocol.RunResult {
-	result := protocol.RunResult{Tests: r.tests, NotRun: r.notRun}
+	result := protocol.RunResult{Tests: r.tests, NotRun: r.notRun, Vacuous: r.vacuous}
 	for _, pkg := range r.order {
 		result.Packages.Add(r.packages[pkg])
 	}
@@ -126,6 +127,16 @@ func (s *startWriter) judged(n int) {
 	s.run.mu.Lock()
 	defer s.run.mu.Unlock()
 	s.run.notRun = &n
+}
+
+// vacuity records how many tests passed without an assertion.
+func (s *startWriter) vacuity(n int) {
+	if s == nil || s.run == nil {
+		return
+	}
+	s.run.mu.Lock()
+	defer s.run.mu.Unlock()
+	s.run.vacuous = &n
 }
 
 // EndRun closes the run's -json stream with its exit code: the last event,

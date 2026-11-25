@@ -29,6 +29,9 @@ type RunResult struct {
 	// NotRun is how many declared units the census found without a verdict;
 	// absent when the census did not judge the run.
 	NotRun *int `json:"NotRun,omitempty"`
+	// Vacuous is how many tests passed without an assertion and declared no
+	// other means; absent when no test's runtime reported a count.
+	Vacuous *int `json:"Vacuous,omitempty"`
 }
 
 // Tally counts verdicts.

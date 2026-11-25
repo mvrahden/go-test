@@ -472,6 +472,7 @@ func (r *streamRun) finish() PipelineResult {
 			exitCode = 1
 		}
 		exitCode = c.takeCensus(r.cfg, r.overlay.Declared, exitCode, dispatchErr)
+		exitCode = c.judgeVacuous(r.cfg.CI, exitCode)
 		running := c.bookDeadline(dispatchErr)
 		result = PipelineResult{ExitCode: exitCode, Groups: r.clock.runs()}
 		applyDeadlineFailure(c, &result, r.cfg, dispatchErr, running)
