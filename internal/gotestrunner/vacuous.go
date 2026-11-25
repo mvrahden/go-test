@@ -19,6 +19,9 @@ type assertionIndex struct {
 	// counted says the stream holds a count: a runtime that reports them ran.
 	counted bool
 	vacuous []CensusCase
+	// parents holds the tests a subtest started under: no leaf, whatever
+	// they reported, as one that ran subtests through t.T().Run does.
+	parents map[assertionKey]bool
 }
 
 type assertionKey struct {
@@ -33,6 +36,7 @@ type leafCount struct {
 }
 
 var (
+	runMarker    = []byte(`"Action":"run"`)
 	attrMarker   = []byte(`"Action":"attr"`)
 	resultMarker = [][]byte{[]byte(`"Action":"pass"`), []byte(`"Action":"fail"`), []byte(`"Action":"skip"`)}
 )
@@ -51,8 +55,8 @@ func (x *assertionIndex) Write(p []byte) (int, error) {
 }
 
 func (x *assertionIndex) observe(line []byte) {
-	attr := bytes.Contains(line, attrMarker)
-	if !attr && (len(x.pending) == 0 || !containsAny(line, resultMarker)) {
+	attr, run := bytes.Contains(line, attrMarker), bytes.Contains(line, runMarker)
+	if !attr && !run && (len(x.pending) == 0 || !containsAny(line, resultMarker)) {
 		return
 	}
 	var ev struct {
@@ -67,10 +71,24 @@ func (x *assertionIndex) observe(line []byte) {
 		key.instance = ev.Gotest.Instance
 	}
 	switch ev.Action {
+	case "run":
+		x.started(key)
 	case "attr":
 		x.attr(key, ev.Key, ev.Value)
 	case "pass", "fail", "skip":
 		x.verdict(key, ev.Action)
+	}
+}
+
+// started marks every test above key's as a parent.
+func (x *assertionIndex) started(key assertionKey) {
+	for i := range len(key.test) {
+		if key.test[i] == '/' {
+			if x.parents == nil {
+				x.parents = map[assertionKey]bool{}
+			}
+			x.parents[assertionKey{key.pkg, key.test[:i], key.instance}] = true
+		}
 	}
 }
 
@@ -102,7 +120,7 @@ func (x *assertionIndex) verdict(key assertionKey, action string) {
 		return
 	}
 	delete(x.pending, key)
-	if action == "pass" && c.known && c.n == 0 && !c.by {
+	if action == "pass" && c.known && c.n == 0 && !c.by && !x.parents[key] {
 		x.vacuous = append(x.vacuous, CensusCase{Pkg: key.pkg, Path: key.test})
 	}
 }
@@ -116,6 +134,10 @@ func (x *assertionIndex) observeText(pkg string, out []byte) {
 	}
 	for line := range bytes.Lines(out) {
 		line = bytes.TrimRight(bytes.TrimLeft(line, " "), "\r\n")
+		if name, ok := bytes.CutPrefix(line, runLineMark); ok {
+			x.started(assertionKey{pkg, string(bytes.TrimSpace(name)), 1})
+			continue
+		}
 		if rest, ok := bytes.CutPrefix(line, attrLineMark); ok {
 			if name, kv, ok := bytes.Cut(rest, []byte(" ")); ok {
 				k, v, _ := bytes.Cut(kv, []byte(" "))
@@ -188,4 +210,7 @@ func dropCountLines(out []byte) []byte {
 	return kept
 }
 
-var attrLineMark = []byte("=== ATTR  ")
+var (
+	attrLineMark = []byte("=== ATTR  ")
+	runLineMark  = []byte("=== RUN   ")
+)
