@@ -78,7 +78,7 @@ func node(t *gotest.T, nodes []specNode, path ...string) specNode {
 	var found specNode
 	for _, name := range path {
 		ok := false
-		for _, n := range nodes {
+		for _, n := range nodes { //nolint:gocritic // rangeValCopy: a few rows of a test
 			if n.Name == name {
 				found, nodes, ok = n, n.Children, true
 				break

@@ -92,7 +92,7 @@ func (s *SpecDeclaredTestSuite) TestRowsOnlyARunCanName(t *gotest.T) {
 			method := node(it, doc.Packages[0].Nodes, "TestDeclaredTestSuite", "TestRanRowsFromAVariable")
 			gotest.True(it, method.Incomplete)
 			var rows []string
-			for _, row := range method.Children {
+			for _, row := range method.Children { //nolint:gocritic // rangeValCopy: a few rows of a test
 				gotest.Equal(it, "pass", row.Status)
 				rows = append(rows, row.Name)
 			}
@@ -114,7 +114,7 @@ func (s *SpecDeclaredTestSuite) TestTableRowsNamedBeforeTheRun(t *gotest.T) {
 			method := node(it, doc.Packages[0].Nodes, "TestSpecRowsTestSuite", "TestRowsNamedByConstants")
 			gotest.False(it, method.Incomplete)
 			var rows []string
-			for _, row := range method.Children {
+			for _, row := range method.Children { //nolint:gocritic // rangeValCopy: a few rows of a test
 				gotest.Equal(it, "none", row.Status)
 				rows = append(rows, row.Name)
 			}
@@ -125,7 +125,7 @@ func (s *SpecDeclaredTestSuite) TestTableRowsNamedBeforeTheRun(t *gotest.T) {
 			method := node(it, doc.Packages[0].Nodes, "TestSpecRowsTestSuite", "TestRowsNamedByConstants")
 			gotest.False(it, method.Incomplete)
 			gotest.Len(it, method.Children, 2)
-			for _, row := range method.Children {
+			for _, row := range method.Children { //nolint:gocritic // rangeValCopy: a few rows of a test
 				gotest.Equal(it, "pass", row.Status)
 			}
 			gotest.Equal(it, "p_suite", method.Children[0].Name)
@@ -144,7 +144,7 @@ func (s *SpecDeclaredTestSuite) TestTableRowsNamedBeforeTheRun(t *gotest.T) {
 			method := node(it, doc.Packages[0].Nodes, "TestSpecRowsTestSuite", "TestRowNamedAtRunTime")
 			gotest.True(it, method.Incomplete)
 			var rows []string
-			for _, row := range method.Children {
+			for _, row := range method.Children { //nolint:gocritic // rangeValCopy: a few rows of a test
 				gotest.Equal(it, "pass", row.Status)
 				rows = append(rows, row.Name)
 			}
@@ -248,7 +248,7 @@ func (s *SpecDeclaredTestSuite) TestWhereTheSourceDeclaresANode(t *gotest.T) {
 				got := map[string]position{}
 				var walk func(prefix string, nodes []specNode)
 				walk = func(prefix string, nodes []specNode) {
-					for _, n := range nodes {
+					for _, n := range nodes { //nolint:gocritic // rangeValCopy: a few rows of a test
 						path := n.Name
 						if prefix != "" {
 							path = prefix + "/" + n.Name
@@ -306,13 +306,13 @@ func (s *SpecDeclaredTestSuite) TestALiveRunUnderItsDeclaredSpecification(t *got
 			doc := specJSON(it, 1, "--declared", pkg, "-count=2")
 			gotest.Len(it, doc.Packages, 1)
 			var runs []specNode
-			for _, n := range doc.Packages[0].Nodes {
+			for _, n := range doc.Packages[0].Nodes { //nolint:gocritic // rangeValCopy: a few rows of a test
 				if n.Name == "TestNotRunTestSuite" {
 					runs = append(runs, n)
 				}
 			}
 			gotest.Len(it, runs, 2)
-			for i, r := range runs {
+			for i, r := range runs { //nolint:gocritic // rangeValCopy: a few rows of a test
 				gotest.Equal(it, int32(i+1), r.Run)
 				gotest.Equal(it, "none", node(it, r.Children, "TestRowsAfterAFailure", "third").Status, "run %d", i+1)
 				gotest.Equal(it, "skip", node(it, r.Children, "X_TestParked").Status, "run %d", i+1)

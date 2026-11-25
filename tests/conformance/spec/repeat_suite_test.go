@@ -18,9 +18,9 @@ func (s *SpecRepeatTestSuite) SuiteConfig() gotest.SuiteConfig {
 const repeatPkg = "../testdata/specrepeat/"
 
 // repeatRuns are the top-level nodes of the repeated suite, in order.
-func repeatRuns(doc specDoc) []specNode {
+func repeatRuns(doc specDoc) []specNode { //nolint:gocritic // hugeParam: a test helper
 	var out []specNode
-	for _, n := range doc.Packages[0].Nodes {
+	for _, n := range doc.Packages[0].Nodes { //nolint:gocritic // rangeValCopy: a few rows of a test
 		if n.Name == "TestRepeatTestSuite" {
 			out = append(out, n)
 		}
@@ -34,7 +34,7 @@ func (s *SpecRepeatTestSuite) TestAMethodThatFailsInOneRunOfThree(t *gotest.T) {
 			doc := specJSON(it, 1, repeatPkg, "-count=3")
 			runs := repeatRuns(doc)
 			gotest.Len(it, runs, 3)
-			for i, n := range runs {
+			for i, n := range runs { //nolint:gocritic // rangeValCopy: a few rows of a test
 				gotest.False(it, n.External, "run %d", i+1)
 				gotest.Equal(it, int32(i+1), n.Run)
 				gotest.Equal(it, 3, n.Runs)
@@ -50,7 +50,7 @@ func (s *SpecRepeatTestSuite) TestAMethodThatFailsInOneRunOfThree(t *gotest.T) {
 			runs := repeatRuns(doc)
 			gotest.Len(it, runs, 3)
 			var statuses []string
-			for _, n := range runs {
+			for _, n := range runs { //nolint:gocritic // rangeValCopy: a few rows of a test
 				statuses = append(statuses, node(it, n.Children, "TestFailsOnItsSecondRun").Status)
 			}
 			gotest.Equal(it, []string{"pass", "fail", "pass"}, statuses)
@@ -76,9 +76,9 @@ func (s *SpecRepeatTestSuite) TestASuiteOfBothTestPackagesRunTwice(t *gotest.T) 
 }
 
 // stdTwins are the TestFoo nodes of a replayed specstdtwin stream, in order.
-func stdTwins(doc specDoc) []specNode {
+func stdTwins(doc specDoc) []specNode { //nolint:gocritic // hugeParam: a test helper
 	var out []specNode
-	for _, n := range doc.Packages[0].Nodes {
+	for _, n := range doc.Packages[0].Nodes { //nolint:gocritic // rangeValCopy: a few rows of a test
 		if n.Name == "TestFoo" {
 			out = append(out, n)
 		}
@@ -107,7 +107,7 @@ func (s *SpecRepeatTestSuite) TestAStdlibTestOfBothTestPackages(t *gotest.T) {
 			gotest.Len(it, nodes, 4)
 			var external []bool
 			var runs []int32
-			for _, n := range nodes {
+			for _, n := range nodes { //nolint:gocritic // rangeValCopy: a few rows of a test
 				external = append(external, n.External)
 				runs = append(runs, n.Run)
 				gotest.Equal(it, 2, n.Runs)

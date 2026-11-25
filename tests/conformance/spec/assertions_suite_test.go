@@ -128,7 +128,7 @@ func (s *SpecAssertionsTestSuite) TestAGuardedAndAnExcludedSuite(t *gotest.T) {
 }
 
 // packageOf is the document's package whose path ends in name.
-func packageOf(t *gotest.T, doc specDoc, name string) specPackage {
+func packageOf(t *gotest.T, doc specDoc, name string) specPackage { //nolint:gocritic // hugeParam: a test helper
 	for _, p := range doc.Packages {
 		if strings.HasSuffix(p.Path, "/"+name) {
 			return p

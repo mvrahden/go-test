@@ -248,7 +248,7 @@ type discoverBehavior struct {
 // and the given status.
 func leaves(t *gotest.T, nodes []specNode, status string) []string {
 	out := make([]string, 0, len(nodes))
-	for _, n := range nodes {
+	for _, n := range nodes { //nolint:gocritic // rangeValCopy: a few rows of a test
 		gotest.Empty(t, n.Children, "%q has children", n.Name)
 		gotest.Equal(t, status, n.Status, "%q", n.Name)
 		out = append(out, n.Name)
@@ -257,7 +257,7 @@ func leaves(t *gotest.T, nodes []specNode, status string) []string {
 }
 
 // its is the leaves under the When of SlashesTestSuite's method.
-func its(t *gotest.T, doc specDoc, status, method, when string) []string {
+func its(t *gotest.T, doc specDoc, status, method, when string) []string { //nolint:gocritic // hugeParam: a test helper
 	gotest.Len(t, doc.Packages, 1)
 	return leaves(t, node(t, doc.Packages[0].Nodes, "TestSlashesTestSuite", method, when).Children, status)
 }
@@ -330,9 +330,9 @@ func (s *SpecSlashesTestSuite) TestTrailingSlash(t *gotest.T) {
 }
 
 // whens is the names of the Whens under SlashesTestSuite's TestLabels.
-func whens(t *gotest.T, doc specDoc) []string {
+func whens(t *gotest.T, doc specDoc) []string { //nolint:gocritic // hugeParam: a test helper
 	var out []string
-	for _, n := range node(t, doc.Packages[0].Nodes, "TestSlashesTestSuite", "TestLabels").Children {
+	for _, n := range node(t, doc.Packages[0].Nodes, "TestSlashesTestSuite", "TestLabels").Children { //nolint:gocritic // rangeValCopy: a few rows of a test
 		out = append(out, n.Name)
 	}
 	return out
@@ -366,17 +366,17 @@ func (s *SpecSlashesTestSuite) TestParallelSibling(t *gotest.T) {
 
 // twins is each TwinTestSuite node of doc, flattened to one line per node
 // below it: its path and status, behind internal or external.
-func twins(t *gotest.T, doc specDoc) []string {
+func twins(t *gotest.T, doc specDoc) []string { //nolint:gocritic // hugeParam: a test helper
 	var out []string
 	var walk func(prefix string, nodes []specNode)
 	walk = func(prefix string, nodes []specNode) {
-		for _, n := range nodes {
+		for _, n := range nodes { //nolint:gocritic // rangeValCopy: a few rows of a test
 			out = append(out, prefix+n.Name+" "+n.Status)
 			walk(prefix+n.Name+"/", n.Children)
 		}
 	}
 	gotest.Len(t, doc.Packages, 1)
-	for _, n := range doc.Packages[0].Nodes {
+	for _, n := range doc.Packages[0].Nodes { //nolint:gocritic // rangeValCopy: a few rows of a test
 		if n.Name != "TestTwinTestSuite" {
 			continue
 		}
@@ -405,9 +405,9 @@ var twinsRun = []string{
 }
 
 // suiteFlags is the External flag of each TwinTestSuite node, in order.
-func suiteFlags(doc specDoc) []bool {
+func suiteFlags(doc specDoc) []bool { //nolint:gocritic // hugeParam: a test helper
 	var out []bool
-	for _, n := range doc.Packages[0].Nodes {
+	for _, n := range doc.Packages[0].Nodes { //nolint:gocritic // rangeValCopy: a few rows of a test
 		if n.Name == "TestTwinTestSuite" {
 			out = append(out, n.External)
 		}

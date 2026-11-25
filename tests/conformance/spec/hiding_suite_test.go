@@ -25,7 +25,7 @@ const (
 // names lists every node's name, depth first.
 func names(nodes []specNode) []string {
 	var out []string
-	for _, n := range nodes {
+	for _, n := range nodes { //nolint:gocritic // rangeValCopy: a few rows of a test
 		out = append(out, n.Name)
 		out = append(out, names(n.Children)...)
 	}
