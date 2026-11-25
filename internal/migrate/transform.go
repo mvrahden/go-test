@@ -670,20 +670,33 @@ func (r *rewriter) assertionCall(call *ast.CallExpr, recv *ast.Ident) ast.Expr {
 	if err != nil {
 		return nil
 	}
-	if soft {
-		for _, uf := range r.u.files {
-			if uf.f == r.f {
-				uf.soft++
-			}
-		}
+	if _, base, _ := gotestAssertion(sel.Sel.Name); base == "FailNow" {
+		soft = false // FailNow stopped the test in testify too
 	}
 	return &ast.CallExpr{
 		Fun:      anchor(fun, call.Pos()),
 		Lparen:   call.Lparen,
-		Args:     append([]ast.Expr{r.tIdent(call.Lparen)}, newArgs...),
+		Args:     append([]ast.Expr{r.assertionT(call.Lparen, soft)}, newArgs...),
 		Ellipsis: call.Ellipsis,
 		Rparen:   call.Rparen,
 	}
+}
+
+// assertionT is the T an assertion reports to, at pos: t, or for an
+// assertion that goes on after failing t.Soft(), or gotest.NewT(t).Soft()
+// when t is a *testing.T.
+func (r *rewriter) assertionT(pos token.Pos, soft bool) ast.Expr {
+	var t ast.Expr = r.tIdent(pos)
+	if !soft {
+		return t
+	}
+	if !r.gotestT {
+		t = &ast.CallExpr{
+			Fun:    &ast.SelectorExpr{X: &ast.Ident{Name: "gotest", NamePos: pos}, Sel: &ast.Ident{Name: "NewT", NamePos: pos}},
+			Lparen: pos, Args: []ast.Expr{t}, Rparen: pos,
+		}
+	}
+	return &ast.CallExpr{Fun: &ast.SelectorExpr{X: t, Sel: &ast.Ident{Name: "Soft", NamePos: pos}}, Lparen: pos, Rparen: pos}
 }
 
 // stCalls rewrites every s.T() in body to t.T() and reports whether it

@@ -125,16 +125,16 @@ func (s *MigrateTestSuite) TestTrailingComments(t *gotest.T) {
 		out := run.files["sample/sample_test.go"]
 
 		w.It("stays on the unconverted statement before it", func(it *gotest.T) {
-			gotest.Regexp(it, `\n\ts\.NotNil\(item\{\}\) // always passes in testify\n\tgotest\.Zero\(t, item\{\}\)\n`, out)
+			gotest.Regexp(it, `\n\ts\.NotNil\(item\{\}\) // always passes in testify\n\tgotest\.Zero\(t\.Soft\(\), item\{\}\)\n`, out)
 		})
 		w.It("stays after the first argument of a call spread over lines", func(it *gotest.T) {
-			gotest.Contains(it, out, "\tgotest.Equal(t, 1, // first\n\t\t1,\n\t)\n")
+			gotest.Contains(it, out, "\tgotest.Equal(t.Soft(), 1, // first\n\t\t1,\n\t)\n")
 		})
 		w.It("stays at the end of a formatted variant", func(it *gotest.T) {
-			gotest.Contains(it, out, "\tgotest.Equal(t, 1, 1, \"n=%d\", 1) // f\n")
+			gotest.Contains(it, out, "\tgotest.Equal(t.Soft(), 1, 1, \"n=%d\", 1) // f\n")
 		})
 		w.It("stays on its line before a call whose callee is instantiated", func(it *gotest.T) {
-			gotest.Contains(it, out, "\tn := 1 // count\n\tgotest.Equal[any](t, v, n)\n")
+			gotest.Contains(it, out, "\tn := 1 // count\n\tgotest.Equal[any](t.Soft(), v, n)\n")
 		})
 		w.It("is left in place by a second migration", func(it *gotest.T) {
 			rerun(it, run)
@@ -174,15 +174,15 @@ func (s *MigrateTestSuite) TestTodoMarkers(t *gotest.T) {
 		})
 
 		w.It("converts the assertions gotest has, the suite's own included", func(it *gotest.T) {
-			gotest.Contains(it, out, "\tgotest.ElementsMatch(t, []int{1}, []int{1})\n")
-			gotest.Contains(it, out, "\tgotest.InDelta(t, 1.0, 1.0, 0.1)\n")
+			gotest.Contains(it, out, "\tgotest.ElementsMatch(t.Soft(), []int{1}, []int{1})\n")
+			gotest.Contains(it, out, "\tgotest.InDelta(t.Soft(), 1.0, 1.0, 0.1)\n")
 			gotest.Contains(it, out, "\tgotest.Regexp(t, \"a\", \"a\")\n")
-			gotest.Contains(it, out, "\tgotest.Equal(t, 2, 2)\n")
+			gotest.Contains(it, out, "\tgotest.Equal(t.Soft(), 2, 2)\n")
 		})
 
 		w.It("still converts mapped assertions", func(it *gotest.T) {
 			gotest.Contains(it, out, "gotest.NoError(t, nil)")
-			gotest.Contains(it, out, "gotest.Equal(t, 1, 1)")
+			gotest.Contains(it, out, "gotest.Equal(t.Soft(), 1, 1)")
 		})
 
 		w.It("does not annotate mapped assertions", func(it *gotest.T) {
@@ -452,10 +452,12 @@ type HelperSuite struct {
 func (s *HelperSuite) helper() {
 	s.T().Log("x")
 	s.Require().True(true)
+	s.False(false)
 }
 
 func (s *HelperSuite) check(t *testing.T) {
 	s.Require().Equal(1, 1)
+	s.Equal(2, 2)
 	s.T().Log("y")
 }
 
@@ -478,11 +480,18 @@ func (s *MigrateTestSuite) TestHelperAssertions(t *gotest.T) {
 				"\t// TODO(gotest-migrate): assertion True outside a migrated method — no t is in scope here; pass t in and rewrite as gotest.True(t, ...)\n\ts.Require().True(true)")
 			gotest.NotContains(it, out, "gotest.True(t, true)")
 		})
+		w.It("advises the soft T for an assertion that went on after failing", func(it *gotest.T) {
+			gotest.Contains(it, out,
+				"\t// TODO(gotest-migrate): assertion False outside a migrated method — no t is in scope here; pass t in and rewrite as gotest.False(t.Soft(), ...)\n\ts.False(false)")
+		})
 	})
 
 	t.When("a helper takes t *testing.T", func(w *gotest.T) {
 		w.It("rewrites its assertion against that t", func(it *gotest.T) {
 			gotest.Contains(it, out, "func (s *HelperTestSuite) check(t *testing.T) {\n\tgotest.Equal(t, 1, 1)")
+		})
+		w.It("wraps that t for an assertion that went on after failing", func(it *gotest.T) {
+			gotest.Contains(it, out, "\tgotest.Equal(t, 1, 1)\n\tgotest.Equal(gotest.NewT(t).Soft(), 2, 2)\n")
 		})
 
 		w.It("marks its s.T(), which has no t.T() to become", func(it *gotest.T) {
@@ -598,14 +607,14 @@ func (s *MigrateTestSuite) TestScopedRewrites(t *gotest.T) {
 
 		w.It("migrates the child and reports the base as a helper", func(it *gotest.T) {
 			gotest.Len(it, run.results, 2)
-			gotest.Equal(it, migrate.MigrateResult{File: run.results[0].File, OldName: "BaseSuite", NewName: "BaseSuite", Helper: true, Soft: 1}, run.results[0])
+			gotest.Equal(it, migrate.MigrateResult{File: run.results[0].File, OldName: "BaseSuite", NewName: "BaseSuite", Helper: true}, run.results[0])
 			gotest.Equal(it, "OrderTestSuite", run.results[1].NewName)
 			gotest.Zero(it, run.markers())
 		})
 
 		w.It("holds the base in a named field", func(it *gotest.T) {
 			gotest.Contains(it, out, "type BaseSuite struct {\n}\n\ntype OrderTestSuite struct {\n\tbase BaseSuite\n}")
-			gotest.Contains(it, out, "func (s *OrderTestSuite) TestOrder(t *gotest.T) {\n\tgotest.Equal(t, 1, 1)\n}")
+			gotest.Contains(it, out, "func (s *OrderTestSuite) TestOrder(t *gotest.T) {\n\tgotest.Equal(t.Soft(), 1, 1)\n}")
 			gotest.NotContains(it, out, "suite.Run")
 		})
 	})

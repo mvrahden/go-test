@@ -47,12 +47,11 @@ func runMigrate(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	if opts.DryRun {
 		verb = "Would migrate"
 	}
-	markers, suites, soft, stdlib := 0, 0, 0, 0
+	markers, suites, stdlib := 0, 0, 0
 	var lines, refused, leftover, uncompiled, unplaced, generated, ids, removed []string
 	for i := range results {
 		r := &results[i]
 		markers += r.Markers
-		soft += r.Soft
 		stdlib += r.StdlibTests
 		if r.OldID != "" {
 			ids = append(ids, "    "+r.OldID+" → "+r.NewID)
@@ -120,7 +119,7 @@ func runMigrate(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	if markers > 0 {
 		fmt.Printf("%d TODO(gotest-migrate) marker%s left; resolve them by hand\n", markers, plural(markers))
 	}
-	printNotKept(soft, stdlib, ids, removed)
+	printNotKept(stdlib, ids, removed)
 	switch {
 	case len(uncompiled) > 0:
 		return 2
@@ -149,14 +148,11 @@ func holdSignals(write func() error) error {
 
 // printNotKept prints what a migration did not keep, each line only where
 // it has something to say.
-func printNotKept(soft, stdlib int, ids, removed []string) {
-	if soft == 0 && stdlib == 0 && len(ids) == 0 && len(removed) == 0 {
+func printNotKept(stdlib int, ids, removed []string) {
+	if stdlib == 0 && len(ids) == 0 && len(removed) == 0 {
 		return
 	}
 	fmt.Println("Not kept, check by hand:")
-	if soft > 0 {
-		fmt.Printf("  assertions that let a test go on after failing and now stop it (s.X, s.Assert().X, assert.X): %d\n", soft)
-	}
 	if stdlib > 0 {
 		fmt.Printf("  stdlib tests left as they are, which gotest does not run (go test still does): %d\n", stdlib)
 	}

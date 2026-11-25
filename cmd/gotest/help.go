@@ -931,10 +931,9 @@ Exit codes:
      migration (it is left alone), or the migrated files cannot be
      written (none is: they are written all or none)
 
-After a migration the summary lists what was not kept: soft assertions
-that now stop the test, stdlib tests left (gotest does not run them), go
-test ids that changed, and base tests removed because testify never ran
-them.
+After a migration the summary lists what was not kept: stdlib tests left
+(gotest does not run them), go test ids that changed, and base tests
+removed because testify never ran them.
 
 The module must require github.com/mvrahden/go-test (go get -tool does).
 

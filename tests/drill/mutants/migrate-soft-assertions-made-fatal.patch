@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/migrate MigrateVerdicts / AssertionsThatGoOnAfterFailing / when a suite calls s\.X, s\.Assert\(\)\.X and assert\.X beside s\.Require\(\)\.X and FailNow / migrate writes the first three on t\.Soft\(\) and the others on t \(
+Expect: ^FAIL .*conformance/migrate MigrateVerdicts / AssertionsThatGoOnAfterFailing / when a suite calls s\.X, s\.Assert\(\)\.X and assert\.X beside s\.Require\(\)\.X and FailNow / the migrated test goes on past a failing soft assertion and fails \(
+Clause: when a suite calls s.X, s.Assert().X and assert.X beside s.Require().X and FailNow → migrate writes the first three on t.Soft() and the others on t
+Clause: when a suite calls s.X, s.Assert().X and assert.X beside s.Require().X and FailNow → the migrated test goes on past a failing soft assertion and fails
+--- a/internal/migrate/transform.go
++++ b/internal/migrate/transform.go
+@@ -687,7 +687,7 @@
+ // when t is a *testing.T.
+ func (r *rewriter) assertionT(pos token.Pos, soft bool) ast.Expr {
+ 	var t ast.Expr = r.tIdent(pos)
+-	if !soft {
++	if true {
+ 		return t
+ 	}
+ 	if !r.gotestT {

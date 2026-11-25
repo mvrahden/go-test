@@ -52,7 +52,7 @@ Migrate SHALL leave a suite's file unconverted under a marker giving the reason 
 - **THEN** migrate exits 2 naming the base's package and writes nothing
 
 ### Requirement: Kept verdicts
-Migrate SHALL translate a testify assertion, hook or call only where gotest gives the verdict and the guarantees testify gave. Where a mechanical translation would change what a test passes or fails on, or what runs when, migrate SHALL leave the code unconverted or marked under a `TODO(gotest-migrate)` marker that gives the reason and names the gotest way. An assertion that let the test go on after failing is translated into gotest's, which stops it, and counted in the closing summary.
+Migrate SHALL translate a testify assertion, hook or call only where gotest gives the verdict and the guarantees testify gave. Where a mechanical translation would change what a test passes or fails on, or what runs when, migrate SHALL leave the code unconverted or marked under a `TODO(gotest-migrate)` marker that gives the reason and names the gotest way. An assertion that let the test go on after failing is translated onto the soft T, `t.Soft()`, on which the test goes on too; FailNow and require's assertions stay fatal.
 
 #### Scenario: An assertion on a goroutine
 - **WHEN** an assertion runs on a goroutine a go statement starts
@@ -99,6 +99,11 @@ Migrate SHALL translate a testify assertion, hook or call only where gotest give
 - **WHEN** a suite calls FailNow or Fail with one message, WithinDuration, and Positive or Negative on an integer
 - **THEN** migrate writes gotest.Fail, gotest.TimeWithin, and gotest.Greater and gotest.Less against 0, and the result compiles
 - **AND** Fail with a second message, Positive on a float and NotPanics stay unconverted under markers giving the reason
+
+#### Scenario: Assertions that go on after failing
+- **WHEN** a suite calls s.X, s.Assert().X and assert.X beside s.Require().X and FailNow
+- **THEN** migrate writes the first three on t.Soft() and the others on t
+- **AND** the migrated test goes on past a failing soft assertion and fails
 
 #### Scenario: TearDownSuite after a SetupSuite that can stop early
 - **WHEN** a suite declares TearDownSuite and a SetupSuite that can stop early
@@ -162,9 +167,9 @@ Migrate SHALL keep a comment that trails a statement at the end of that statemen
 - **THEN** each comment stays at the end of its own statement
 
 ### Requirement: The closing summary
-After it migrates a suite, migrate SHALL say on stdout what it did not keep: the number of assertions that let a test go on after failing and now stop it, the number of stdlib tests it left in the migrated files, which gotest does not run, each go test id that changed beside its new id, and each base test it removed, at its file and line. It SHALL print none of this where there is none.
+After it migrates a suite, migrate SHALL say on stdout what it did not keep: the number of stdlib tests it left in the migrated files, which gotest does not run, each go test id that changed beside its new id, and each base test it removed, at its file and line. It SHALL print none of this where there is none.
 
 #### Scenario: What migrate did not keep
-- **WHEN** migrate converts a suite with soft assertions, under a runner of another name, beside a plain testify test
-- **THEN** the summary counts the assertions that now stop the test and the stdlib tests left, and lists the id that changed
+- **WHEN** migrate converts a suite under a runner of another name, beside a plain testify test
+- **THEN** the summary counts the stdlib tests left and lists the id that changed
 - **AND** a migration with none of these prints no such section
