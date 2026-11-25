@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -1466,4 +1467,65 @@ func (s *CanaryTestSuite) TestFailingBenchmarksReportNoResult(t *gotest.T) {
 	if _, err := os.Stat(filepath.Join(dir, "after-failnow")); err == nil {
 		t.Errorf("the statement after FailNow ran: the benchmark did not halt")
 	}
+}
+
+// Every assertion counts once for the test of the T it is given, a poll once
+// whatever its R asserts, the hooks for their method; only a leaf that ran
+// reports its count, beside the means it or a test above it declared. Under
+// --ci the passes that asserted nothing fail the run, named on stderr.
+func (s *CanaryTestSuite) TestAssertionsAreCounted(t *gotest.T) {
+	r := s.check(t, "assertcount", "--ci")
+	got := map[string]string{}
+	var vacuous *int
+	for _, line := range strings.Split(r.stream, "\n") {
+		var ev struct {
+			Action, Package, Test, Key, Value string
+			Result                            *struct{ Vacuous *int }
+		}
+		if json.Unmarshal([]byte(line), &ev) != nil {
+			continue
+		}
+		if ev.Action == "attr" {
+			got[ev.Test+" "+ev.Key] = ev.Value
+		}
+		if ev.Package == protocol.RunPackage && ev.Result != nil {
+			vacuous = ev.Result.Vacuous
+		}
+	}
+	count, by := " "+protocol.AttrAssertions, " "+protocol.AttrAssertsBy
+	want := map[string]string{
+		"TestCountTestSuite/TestEverywhere" + count:                       "6",
+		"TestCountTestSuite/TestNothing" + count:                          "0",
+		"TestCountTestSuite/TestNested/asserts_on_the_method's_T" + count: "0",
+		"TestCountTestSuite/TestNested/#0" + count:                        "1",
+		"TestCountTestSuite/TestNoRows" + count:                           "0",
+		"TestCountTestSuite/TestDeclared" + count:                         "0",
+		"TestCountTestSuite/TestDeclared" + by:                            "a raw check",
+		"TestCountTestSuite/TestDeclaredAbove/is_covered" + count:         "0",
+		"TestCountTestSuite/TestDeclaredAbove/is_covered" + by:            "a mock controller",
+		"TestHookTestSuite/TestBodyless" + count:                          "2",
+	}
+	for _, key := range slices.Sorted(maps.Keys(want)) {
+		if value, ok := got[key]; !ok || value != want[key] {
+			t.Errorf("assertcount: %s is %q (reported: %v), want %q", key, value, ok, want[key])
+		}
+	}
+	for _, key := range slices.Sorted(maps.Keys(got)) {
+		if _, ok := want[key]; !ok {
+			t.Errorf("assertcount: %s is reported, want none", key)
+		}
+	}
+	for _, test := range []string{"TestCountTestSuite/TestNothing", "TestCountTestSuite/TestNoRows", "TestCountTestSuite/TestNested/asserts_on_the_method's_T"} {
+		if !strings.Contains(r.stderr, "assertcount "+test+"\n") {
+			t.Errorf("assertcount: stderr does not name the vacuous pass %s:\n%s", test, r.stderr)
+		}
+	}
+	if vacuous == nil || *vacuous != 3 {
+		t.Errorf("assertcount: the run closed with Vacuous %v, want 3", vacuous)
+	}
+}
+
+// A test that declares an empty reason for how it asserts fails.
+func (s *CanaryTestSuite) TestAnEmptyReasonFails(t *gotest.T) {
+	s.check(t, "emptyreason")
 }
