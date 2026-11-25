@@ -124,14 +124,30 @@ type runsUnit struct {
 }
 
 type runsManifest struct {
-	Version   string            `json:"version,omitempty"`
-	GoVersion string            `json:"goVersion,omitempty"`
-	Args      []string          `json:"args"`
-	Commit    string            `json:"commit,omitempty"`
-	Dirty     *bool             `json:"dirty,omitempty"`
-	Agent     string            `json:"agent,omitempty"`
-	Build     []string          `json:"build,omitempty"`
-	Changed   *protocol.Changed `json:"changed,omitempty"`
+	Version   string       `json:"version,omitempty"`
+	GoVersion string       `json:"goVersion,omitempty"`
+	Args      []string     `json:"args"`
+	Commit    string       `json:"commit,omitempty"`
+	Dirty     *bool        `json:"dirty,omitempty"`
+	Agent     string       `json:"agent,omitempty"`
+	Build     []string     `json:"build,omitempty"`
+	Changed   *runsChanged `json:"changed,omitempty"`
+}
+
+// runsChanged is how --changed narrowed a run, keyed as spec's document
+// keys it.
+type runsChanged struct {
+	Ran       int  `json:"ran"`
+	Unchanged int  `json:"unchanged"`
+	NoRecord  bool `json:"noRecord,omitempty"`
+}
+
+// changedOf is c as the listing prints it, nil for a run not narrowed.
+func changedOf(c *protocol.Changed) *runsChanged {
+	if c == nil {
+		return nil
+	}
+	return &runsChanged{Ran: c.Ran, Unchanged: c.Unchanged, NoRecord: c.NoRecord}
 }
 
 // runsFreshness counts a record's packages by whether their verdict still
@@ -148,7 +164,7 @@ func entryOf(k *gotestrunner.KeptRun, fresh map[string]map[string]string) runsEn
 	m := r.Manifest
 	e := runsEntry{
 		ID: k.ID, Recorded: r.Time, Imported: r.Imported, EventsFile: r.EventsFile,
-		Manifest: runsManifest{Version: m.Version, GoVersion: m.GoVersion, Args: m.Args, Commit: m.Commit, Dirty: m.Dirty, Agent: m.Agent, Build: m.Build, Changed: m.Changed},
+		Manifest: runsManifest{Version: m.Version, GoVersion: m.GoVersion, Args: m.Args, Commit: m.Commit, Dirty: m.Dirty, Agent: m.Agent, Build: m.Build, Changed: changedOf(m.Changed)},
 		Result: runsResult{
 			ExitCode: r.Result.ExitCode, NotRun: r.Result.NotRun, Vacuous: r.Result.Vacuous,
 			Packages: runsTally(r.Result.Packages), Tests: runsTally(r.Result.Tests),

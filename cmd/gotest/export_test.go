@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"io"
 	"time"
 
@@ -328,3 +329,9 @@ func ExportAgentOutput(ownArgs []string, env map[string]string) (bool, string, e
 }
 
 var ExportRerunCommand = rerunCommand
+
+// ExportRunsEntryJSON is one run of the runs listing as JSON.
+func ExportRunsEntryJSON(k *gotestrunner.KeptRun) string {
+	data, _ := json.Marshal(entryOf(k, nil))
+	return string(data)
+}
