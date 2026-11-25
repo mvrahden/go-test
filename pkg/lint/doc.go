@@ -55,4 +55,8 @@
 // Under golangci-lint, //nolint:gotestlint silences the whole linter and
 // //nolint:<rule> one of its rules; nolintlint does not know the rule ids,
 // so tell it about them (allow-unused, or its exclusions) where it runs.
+//
+// Every driver reads a nolint comment the same way: one reaching a gotest
+// rule gives its reason after " //" (//nolint:<rule> // <reason>), or the
+// nolint-reason rule reports it. Only gotest lint -suppressions lists them.
 package lint
