@@ -1,3 +1,4 @@
 package e2epkg
 
-func HelloWorld() {}
+// HelloWorld greets.
+func HelloWorld() string { return "Hello, World" }

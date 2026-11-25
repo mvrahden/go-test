@@ -141,9 +141,7 @@ func (s *SkillCommandsTestSuite) TestTheVersionCheckRuns(t *gotest.T) {
 		for i, line := range lines {
 			stdout, stderr, exit := s.sh(w, line, "GOPROXY=off")
 			w.It(fmt.Sprintf("line %d runs, or only its lookup is refused offline", i+1), func(it *gotest.T) {
-				if exit != 0 {
-					gotest.Contains(it, stderr, "GOPROXY=off", "%s", shown(line, stdout, stderr, exit))
-				}
+				gotest.True(it, exit == 0 || strings.Contains(stderr, "GOPROXY=off"), "%s", shown(line, stdout, stderr, exit))
 			})
 			if i == 1 {
 				w.It("line 2 prints the module's go version", func(it *gotest.T) {

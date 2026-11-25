@@ -11,7 +11,7 @@ func (s *NamesTestSuite) TestLabels(t *gotest.T) {
 		w.It("is told to end its name in TestSuite", func(it *gotest.T) {
 			gotest.Fail(it, "fails on purpose")
 		})
-		w.It("is told to bind a DBFixture", func(it *gotest.T) {})
+		w.It("is told to bind a DBFixture", func(it *gotest.T) { gotest.NotEmpty(it, it.Name()) })
 	})
 }
 

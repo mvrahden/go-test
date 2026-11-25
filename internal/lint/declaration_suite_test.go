@@ -23,6 +23,7 @@ func (s *DeclarationRulesTestSuite) SuiteConfig() gotest.SuiteConfig {
 func (s *DeclarationRulesTestSuite) TestSuiteDeclaration(t *gotest.T) {
 	t.When("a suite or a bound fixture is declared inside a type block", func(w *gotest.T) {
 		w.It("is reported at its declaration and moved into its own, doc comment kept", func(it *gotest.T) {
+			it.AssertsBy(byAnalysistest)
 			analysistest.RunWithSuggestedFixes(it.T(), analysistest.TestData(), lint.Analyzer, "withdeclaration")
 		})
 		w.It("leaves source that type-checks", func(it *gotest.T) {
@@ -34,6 +35,7 @@ func (s *DeclarationRulesTestSuite) TestSuiteDeclaration(t *gotest.T) {
 func (s *DeclarationRulesTestSuite) TestNoEmbedding(t *gotest.T) {
 	t.When("a suite or a bound fixture embeds a type or holds a suite", func(w *gotest.T) {
 		w.It("reports each such field with the alternative, and no plain helper", func(it *gotest.T) {
+			it.AssertsBy(byAnalysistest)
 			analysistest.Run(it.T(), analysistest.TestData(), lint.Analyzer, "withembedding")
 		})
 	})
@@ -42,6 +44,7 @@ func (s *DeclarationRulesTestSuite) TestNoEmbedding(t *gotest.T) {
 func (s *DeclarationRulesTestSuite) TestFixtureHookCall(t *gotest.T) {
 	t.When("a suite or fixture method calls a lifecycle hook", func(w *gotest.T) {
 		w.It("reports a hook of a bound fixture or of its own, and no other call", func(it *gotest.T) {
+			it.AssertsBy(byAnalysistest)
 			analysistest.Run(it.T(), analysistest.TestData(), lint.Analyzer, "withhookcall")
 		})
 	})
@@ -50,16 +53,19 @@ func (s *DeclarationRulesTestSuite) TestFixtureHookCall(t *gotest.T) {
 func (s *DeclarationRulesTestSuite) TestDroppedCase(t *gotest.T) {
 	t.When("a test file declares a case no suite runs", func(w *gotest.T) {
 		w.It("reports it, and no helper the package calls or hands to an interface holding the case, an external test spells, or a non-test file declares", func(it *gotest.T) {
+			it.AssertsBy(byAnalysistest)
 			analysistest.Run(it.T(), analysistest.TestData(), lint.Analyzer, "withdroppedcase")
 		})
 	})
 	t.When("the driver hands the analyzer one test package of a directory that has two", func(w *gotest.T) {
 		w.It("reports none of its cases, leaving them to the generator", func(it *gotest.T) {
+			it.AssertsBy(byAnalysistest)
 			analysistest.Run(it.T(), analysistest.TestData(), lint.Analyzer, "withdroppedcaseext")
 		})
 	})
 	t.When("the driver hands the analyzer a package whose only caller or alias sits in a file the build constraints leave out", func(w *gotest.T) {
 		w.It("reports neither the helper nor the generic suite, as the generator runs them", func(it *gotest.T) {
+			it.AssertsBy(byAnalysistest)
 			analysistest.Run(it.T(), analysistest.TestData(), lint.Analyzer, "withdroppedcasegated")
 		})
 	})

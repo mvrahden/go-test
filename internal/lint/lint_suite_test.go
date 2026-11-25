@@ -12,6 +12,10 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
+// byAnalysistest is what a test that hands T() to analysistest declares:
+// analysistest fails it on a diagnostic its fixture does not declare.
+const byAnalysistest = "analysistest, given T(), fails it on a diagnostic its fixture does not declare"
+
 // LintTestSuite tests the gotest lint analyzer rules and nolint directive parsing.
 type LintTestSuite struct{}
 
@@ -65,6 +69,7 @@ var rewriteFixtures = []string{
 func (s *LintTestSuite) TestDiagnostics(t *gotest.T) {
 	t.When("every rule's fixture package", func(w *gotest.T) {
 		w.It("reports exactly the diagnostics its want comments declare", func(it *gotest.T) {
+			it.AssertsBy(byAnalysistest)
 			analysistest.Run(it.T(), analysistest.TestData(), lint.Analyzer, diagnosticFixtures...)
 		})
 	})
@@ -73,6 +78,7 @@ func (s *LintTestSuite) TestDiagnostics(t *gotest.T) {
 func (s *LintTestSuite) TestSuggestedFixes(t *gotest.T) {
 	t.When("a rule that offers a rewrite", func(w *gotest.T) {
 		w.It("produces the fix recorded in the golden file", func(it *gotest.T) {
+			it.AssertsBy(byAnalysistest)
 			analysistest.RunWithSuggestedFixes(it.T(), analysistest.TestData(), lint.Analyzer, rewriteFixtures...)
 		})
 	})
@@ -245,6 +251,7 @@ func (s *SkippedStyleTestSuite) TestSkipSilencesExpressivenessRule(t *gotest.T) 
 
 	t.When("skip-fail-guard is set", func(w *gotest.T) {
 		w.It("reports nothing for fail-guard findings", func(it *gotest.T) {
+			it.AssertsBy(byAnalysistest)
 			analysistest.Run(it.T(), testdata, lint.Analyzer, "withskippedstyle")
 		})
 	})
@@ -262,6 +269,7 @@ func (s *SkippedEscapeTestSuite) TestSkippedRuleReleasesClaims(t *gotest.T) {
 
 	t.When("skip-t-escape is set", func(w *gotest.T) {
 		w.It("lets fail-guard take over escaped halting guards", func(it *gotest.T) {
+			it.AssertsBy(byAnalysistest)
 			analysistest.Run(it.T(), testdata, lint.Analyzer, "withskippedtescape")
 		})
 	})
@@ -279,6 +287,7 @@ func (s *DisableNolintTestSuite) TestNolintDirectivesIgnored(t *gotest.T) {
 
 	t.When("disable-nolint is set", func(w *gotest.T) {
 		w.It("reports all diagnostics regardless of nolint directives", func(it *gotest.T) {
+			it.AssertsBy(byAnalysistest)
 			analysistest.Run(it.T(), testdata, lint.Analyzer, "withdisablednolint")
 		})
 	})
@@ -294,6 +303,7 @@ func (s *NolintAllowTestSuite) AfterEach(_ *gotest.T)  { lint.ExportSetNolintAll
 func (s *NolintAllowTestSuite) TestListedLinters(t *gotest.T) {
 	t.When("nolint-allow lists a linter", func(w *gotest.T) {
 		w.It("a nolint comment naming it is no finding, and one naming another still is", func(it *gotest.T) {
+			it.AssertsBy(byAnalysistest)
 			analysistest.Run(it.T(), analysistest.TestData(), lint.Analyzer, "withnolintallow")
 		})
 	})
