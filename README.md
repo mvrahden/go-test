@@ -340,6 +340,16 @@ gotest spec --input=events.json --declared ./...
 gotest spec --input=events.json --hide=pass
 ```
 
+### Scenarios from OpenSpec
+
+A repository that states its behavior as [OpenSpec](https://github.com/Fission-AI/OpenSpec) scenarios binds them to its suites by text: a scenario's WHEN is a `When`'s label and each of its THEN and AND clauses an `It`'s label directly under it, with no marker in the test and no file to commit. `gotest scenarios` reads `specs/` and `openspec/specs/`, reports every scenario no suite states and every clause two tests could claim, and with `--verify` or a saved stream judges each bound scenario verified, failing, not run or vacuous ([Binding by text](specs/scenarios/spec.md#requirement-binding-by-text), [Ambiguity](specs/scenarios/spec.md#requirement-ambiguity), [Evidence](specs/scenarios/spec.md#requirement-evidence)):
+
+```bash
+gotest scenarios                          # which scenarios the suites state, read from source
+gotest scenarios --verify --format=md     # run what is bound; a table per capability for a pull request
+gotest scenarios --input=events.json --fail-on=unbound,failing,ambiguous
+```
+
 ## Isolation
 
 Each suite runs in its own process with zero shared state.
@@ -987,6 +997,7 @@ lint:
 | `bench.baseline` | path | `--against`, `--save=` | Baseline `gotest bench` compares against and a bare `--save=` writes |
 | `bench.gate` | float | `--gate` | Regression percentage that fails a bench run (0 disables) |
 | `fuzz.harvest` | bool | `--no-harvest` | Seed harvesting from table tests (default: true) |
+| `scenarios.specs` | list | `--specs` | Spec files and directories `gotest scenarios` reads, relative to the module root (default: `specs`, `openspec/specs`) |
 
 ## Test Selection
 
@@ -1119,6 +1130,7 @@ gotest scaffold ./pkg/user.Svc # generate suite skeleton from type
 gotest lint ./...              # static analysis for test suites
 gotest audit --base=origin/main  # what a change did to the suites, and what got weaker
 gotest audit --base=origin/main --run  # and what a run of what changed proved
+gotest scenarios --verify      # OpenSpec scenarios bound to When/It by text, judged by a run
 gotest refactor toggle-focus user_test.go UserTestSuite  # toggle an F_ prefix on a suite (or Suite.Method)
 gotest skill install           # install the agent skill matching this version
 gotest hook pre-shell          # answer a coding agent's hook event on stdin (the plugin wires it)

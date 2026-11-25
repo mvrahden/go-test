@@ -77,6 +77,13 @@ the change meant, said in your report, or a mistake to undo. Add `--run` to
 run what changed: each behavior then shows its verdict, and the changed
 production lines no test executed are listed.
 
+When the repository keeps OpenSpec scenarios (`specs/` or `openspec/specs/`),
+bind each one you implement by its text (v1.42+): a `t.When` whose label is
+the scenario's WHEN and, directly under it, a `t.It` per THEN and AND,
+copied word for word. `go tool gotest scenarios --verify` then names every
+scenario no suite states, every clause two tests claim, and the verdict of
+each bound one; rewording a scenario means rewording its labels too.
+
 ## The write loop
 
 Write → lint → both runners → fix:
