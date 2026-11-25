@@ -97,6 +97,13 @@ var witnesses = []witness{
 	{file: "reference/cli.md", quote: "incl. every subtest name", label: "v1.42+", path: "internal/protocol/manifest.go", literal: "RunPackage"},
 	{file: "SKILL.md", quote: "Write the reason", label: "v1.42+", path: "internal/lint/lint.go", literal: "nolint-reason"},
 	{file: "reference/cli.md", quote: "its reason, as JSON", label: "v1.42+", path: "cmd/gotest/lint.go", literal: "suppressions"},
+	{file: "SKILL.md", quote: "hand the independent checks `t.Soft()`", label: "v1.42+", path: "pkg/gotest/t.go", literal: "func (t *T) Soft() *T"},
+	{file: "reference/api.md", quote: "unless given a soft `T`", label: "v1.42+", path: "pkg/gotest/t.go", literal: "func (t *T) Soft() *T"},
+	{file: "reference/api.md", quote: "### Soft assertions", label: "v1.42+", path: "pkg/gotest/t.go", literal: "func (t *T) Soft() *T"},
+	{file: "reference/api.md", quote: "assertions given it report and go on", label: "v1.42+", path: "pkg/gotest/t.go", literal: "func (t *T) Soft() *T"},
+	{file: "reference/api.md", quote: "and its `t` is soft", label: "v1.42+", path: "pkg/gotest/t.go", literal: "func (t *T) Soft() *T"},
+	{file: "reference/assertions.md", quote: "is the exception that goes on", label: "v1.42+", path: "pkg/gotest/t.go", literal: "func (t *T) Soft() *T"},
+	{file: "reference/assertions.md", quote: "so every row runs", label: "v1.42+", path: "pkg/gotest/t.go", literal: "func (t *T) Soft() *T"},
 }
 
 var (
