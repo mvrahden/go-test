@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lifecycle .* / the nested run takes the scope its parent holds and passes without waiting \(
+Clause: when an Exclusive suite runs gotest on an Exclusive suite of its module, under the same cache → the nested run takes the scope its parent holds and passes without waiting
+--- a/internal/gotestrunner/exclusivelock.go
++++ b/internal/gotestrunner/exclusivelock.go
+@@ -136,7 +136,7 @@
+ 			return nil, err
+ 		}
+ 		path := exclusiveLockPath(l.root, k)
+-		if l.inherited[path] {
++		if l.inherited[path] && path == "" {
+ 			continue
+ 		}
+ 		unlock, err := l.take(ctx, k, path)

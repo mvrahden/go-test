@@ -371,6 +371,15 @@ shards of one run do not add up to every mutant exactly once.
 | `group-bulk-one-at-a-time` | a later group runs its suites one after another | lifecycle conformance: two 1s e2e suites do not overlap |
 | `group-exclusive-in-the-bulk` | a named group's Exclusive suites run beside its other suites | lifecycle conformance: the e2e Exclusive suite starts before the others end |
 | `group-fixture-up-front` | every shared fixture starts up front, a later group's included | lifecycle conformance: the e2e fixture is up before the default group ends |
+| `exclusive-wait-unsaid` | a run that waits for another run's exclusive scope says nothing of it | lifecycle conformance: the waiting run's stderr has no wait line naming the holder's pid |
+| `exclusive-lock-ignored` | no run ever takes an exclusive scope's lock | lifecycle conformance: the second run's Exclusive suite starts while the first run's holds |
+| `exclusive-group-shares-the-default` | a named group's lock is the default group's | lifecycle conformance: the run's default Exclusive suite waits for another run's e2e group |
+| `exclusive-scope-held-through-the-run` | a run keeps a scope's lock until it ends, not until the scope ends | lifecycle conformance: a third run's Exclusive suite waits while the second waits for e2e |
+| `exclusive-group-unheld` | a named group takes no lock across runs | lifecycle conformance: the second run's e2e suite starts while the first run's holds |
+| `exclusive-wait-ignores-stop` | a wait for another run's lock outlasts a stop | lifecycle conformance: the interrupted run does not exit 130 while the other run holds |
+| `exclusive-timeout-unnamed` | a `--timeout` that passes during a wait does not say the run waited | lifecycle conformance: the failure lacks "waited for another gotest run" |
+| `exclusive-off-switch-ignored` | `GOTEST_EXCLUSIVE_LOCK=0` leaves the lock on | lifecycle conformance: the run with the lock off waits for the other run |
+| `exclusive-held-not-inherited` | a run a suite starts ignores the locks its parent holds for it | lifecycle conformance: the nested run waits for its parent until the suite's budget ends |
 | `teardown-error-dropped-after-setup-failure` | a shared fixture's `AfterAll` that failed while a sibling's setup failure claimed the process's exit status passes unreported | fixtures conformance: the run fails on the teardown as well, reporting that `AfterAll`'s error |
 | `shared-teardown-reads-stderr` | a line a shared fixture writes that reads like an `AfterAll` failure fails the teardown | fixtures conformance: the run passes |
 | `teardown-reports-dropped-from-the-verdict` | a teardown error goes out without the `AfterAll` reports that say why | teardown verdict unit test: a teardown error comes back without the reports |

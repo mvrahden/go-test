@@ -1,7 +1,7 @@
 # Lifecycle Specification
 
 ## Purpose
-How a suite's tests end, the hooks and the body going wrong, FailFast, panics among parallel methods and in benchmarks, the rows of an Each table, the goroutines gotest.Go starts, a panic ahead of AfterEach included, how a run stopped, cut short or timed out tears its shared fixtures down, the order ExclusiveGroups run suites in, and what the run reports about them when they do.
+How a suite's tests end, the hooks and the body going wrong, FailFast, panics among parallel methods and in benchmarks, the rows of an Each table, the goroutines gotest.Go starts, a panic ahead of AfterEach included, how a run stopped, cut short or timed out tears its shared fixtures down, the order ExclusiveGroups run suites in, how runs of one module take turns at them, and what the run reports about them when they do.
 
 ## Requirements
 
@@ -306,6 +306,42 @@ A run stopped while a group runs SHALL skip every suite not started, the later g
 - **WHEN** a run is stopped while a suite of the e2e group runs
 - **THEN** skips the later group's suites with the reason run stopping
 - **AND** starts none of the later group's fixtures, releases the group's and leaves no fixture process behind
+
+### Requirement: Exclusive across runs
+Runs of one module on one machine, from one checkout or several, SHALL take turns at an exclusive scope: a named ExclusiveGroup for its whole run, the default group for its Exclusive suites; runs of other modules SHALL not wait for each other. A run that finds a scope held SHALL say so once on stderr, naming the holder's pid, and wait outside every suite's budget and the -json stream, holding no other scope meanwhile.
+
+#### Scenario: Two runs of one module
+- **WHEN** a run reaches its Exclusive suites while another run of the module runs its own
+- **THEN** says once on stderr that it waits, naming the other run's pid, and nothing of it in the -json stream
+- **AND** starts its Exclusive suite only once the other run's has ended
+
+#### Scenario: A run waiting for a group
+- **WHEN** a run reaches group e2e while another run of the module runs that group
+- **THEN** runs its default group's Exclusive suite without waiting
+- **AND** holds no scope while it waits, so a third run's Exclusive suite runs at once
+- **AND** starts its e2e suite only once the other run's has ended
+
+### Requirement: A wait for another run
+A run waiting for another run's exclusive scope SHALL end the wait at a stop, skipping the suites not started with the reason run stopping, and at its --timeout, failing with a message that says it waited.
+
+#### Scenario: Stopped while it waits
+- **WHEN** a run waiting for another run's exclusive scope is interrupted
+- **THEN** exits 130, skipping its Exclusive suite with the reason run stopping
+
+#### Scenario: Its timeout passes while it waits
+- **WHEN** a run's --timeout passes while it waits for another run's exclusive scope
+- **THEN** fails, saying the timeout passed while its exclusive suites waited for another gotest run
+
+### Requirement: Runs that do not wait
+A run SHALL not wait for another run when GOTEST_EXCLUSIVE_LOCK=0 is set for it, nor for the run whose suite started it: a gotest run a suite starts while its run holds a scope SHALL take that scope as its own, so a suite never waits for a run that waits for it.
+
+#### Scenario: The lock turned off
+- **WHEN** a run with GOTEST_EXCLUSIVE_LOCK=0 reaches its Exclusive suites while another run of the module runs its own
+- **THEN** runs its Exclusive suite at once
+
+#### Scenario: A run an Exclusive suite starts
+- **WHEN** an Exclusive suite runs gotest on an Exclusive suite of its module, under the same cache
+- **THEN** the nested run takes the scope its parent holds and passes without waiting
 
 ### Requirement: Stopping a run
 A run interrupted while a method holds SHALL exit 130 when gotest runs directly, end the holding method's context, skip the methods that have not started with the reason run stopping, and run AfterAll before the fixture is released; a method running when the stop came SHALL say so. Under the gotest runner the suite's process then ends with its tests' own status, and the -json stream ends with a failed run naming the suites it stopped; under plain go test it ends by the Ctrl-C that stopped it.

@@ -160,6 +160,8 @@ func printUsageEnvironment() {
   GOTEST_AGENT=0          Turn agent output off where an agent is detected
                           (1 turns it on anywhere)
   GOTEST_CACHE_DIR=<dir>  Override the cache location (default: ~/.cache/gotest)
+  GOTEST_EXCLUSIVE_LOCK=0 Let this run's Exclusive suites and groups run while
+                          another gotest run of the module runs its own
   GOTEST_SLOW_BUILD_THRESHOLD=<duration>
                           Report a build still running after this long
                           (default: 15s)

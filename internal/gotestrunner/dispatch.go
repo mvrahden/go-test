@@ -63,6 +63,8 @@ type streamRun struct {
 	ledger    *fixtureLedger
 	releaser  *fixtureReleaser
 	clock     groupClock
+	locks     *crossRunLocks
+	holds     map[string]*scopeHold // by group: what a scope holds across runs
 
 	cfgCtx        context.Context // the pipeline's: its stop and deadline decide the run's verdict
 	releaseCancel context.CancelFunc
@@ -142,6 +144,15 @@ func (r *streamRun) runSuite(t SuiteTarget, idx int, mode suiteMode, held chan s
 			return
 		}
 	}
+	// The scope's hold is taken before the suite's budget starts: a wait for
+	// another run is charged to no suite.
+	if holdsFor(&t) {
+		if r.holds[t.Group].take(r.ctx) != nil {
+			stopped()
+			return
+		}
+		env = r.locks.withHeld(env)
+	}
 	r.clock.run(t.Group, func() {
 		traceSuite("suite-start", &t, keys)
 		runRecorded(r.ctx, r.collector, t.Package, idx, t, env, r.collector.UsesTest2JSON())
@@ -201,7 +212,18 @@ func newStreamRun(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 	}
 
 	r.ctx, r.cancel = context.WithCancel(ctx)
-	r.fixtures = startFixtureSession(ctx, r.ctx, r.cancel, overlay.WorkDir, r.win, setupTimeout, pf.BuildFlags)
+	r.locks = newCrossRunLocks(os.Stderr)
+	r.holds = map[string]*scopeHold{}
+	for i, h := range planScopeHolds(r.locks, r.scopes) {
+		r.holds[r.scopes[i].Group] = h
+	}
+	// A named group's fixtures that start with the compile are part of its
+	// scope: they start once the group is held.
+	var beforeFixtures func(context.Context) error
+	if r.streamedGroup != "" && len(r.win.Bulk) > 0 {
+		beforeFixtures = r.holds[r.streamedGroup].take
+	}
+	r.fixtures = startFixtureSession(ctx, r.ctx, r.cancel, overlay.WorkDir, r.win, setupTimeout, pf.BuildFlags, beforeFixtures)
 
 	// Releases go to a process whose up-front phase ended.
 	releaseCtx, releaseCancel := context.WithCancel(r.ctx)
@@ -403,8 +425,14 @@ func (r *streamRun) runScopes(held map[string]*scopeQueue) {
 		if q == nil {
 			q = &scopeQueue{}
 		}
+		hold := r.holds[sc.Group]
 		if n > 0 {
 			bulk := sortDeferred(q.bulk)
+			if len(bulk) > 0 {
+				// Its fixtures start once the group is held; a stop
+				// meanwhile leaves its suites to be stopped.
+				_ = hold.take(r.ctx)
+			}
 			r.startFor(bulk, "group "+sc.Group)
 			var scopeWg sync.WaitGroup
 			for i := range bulk {
@@ -423,6 +451,9 @@ func (r *streamRun) runScopes(held map[string]*scopeQueue) {
 			}
 		}
 		tail := sortDeferred(q.tail)
+		if len(tail) > 0 {
+			_ = hold.take(r.ctx)
+		}
 		for i := range tail {
 			d := &tail[i]
 			r.startFor(tail[i:i+1], "exclusive tail")
@@ -434,8 +465,16 @@ func (r *streamRun) runScopes(held map[string]*scopeQueue) {
 			// slot, which needs none of what it frees.
 			r.done(&d.t)
 		}
+		hold.done()
 	}
 	r.allIn()
+}
+
+// releaseHolds releases every scope a stop left held.
+func (r *streamRun) releaseHolds() {
+	for _, h := range r.holds {
+		h.done()
+	}
 }
 
 // finish releases the fixtures and turns the collected verdicts into the
@@ -473,7 +512,7 @@ func (r *streamRun) finish() PipelineResult {
 		if r.fixtures.failedSetup() && result.ExitCode == 0 {
 			result.ExitCode = 1
 		}
-		applyDeadlineFailure(c, &result, r.cfg, dispatchErr, nil)
+		applyDeadlineFailure(c, &result, r.cfg, dispatchErr, nil, r.locks.cutWait())
 	} else {
 		c.Finalize()
 		exitCode := exitCodeAfterDispatch(c.WorstExitCode(), dispatchErr)
@@ -484,7 +523,7 @@ func (r *streamRun) finish() PipelineResult {
 		exitCode = c.judgeVacuous(r.cfg.CI, exitCode)
 		running := c.bookDeadline(dispatchErr)
 		result = PipelineResult{ExitCode: exitCode, Groups: r.clock.runs()}
-		applyDeadlineFailure(c, &result, r.cfg, dispatchErr, running)
+		applyDeadlineFailure(c, &result, r.cfg, dispatchErr, running, r.locks.cutWait())
 		applyInterrupt(c, &result, dispatchErr)
 	}
 	applySetupFailure(c, &result, setupErr)

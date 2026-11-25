@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lifecycle .* / says once on stderr that it waits, naming the other run's pid, and nothing of it in the -json stream \(
+Clause: when a run reaches its Exclusive suites while another run of the module runs its own → says once on stderr that it waits, naming the other run's pid, and nothing of it in the -json stream
+--- a/internal/gotestrunner/exclusivelock.go
++++ b/internal/gotestrunner/exclusivelock.go
+@@ -168,7 +168,7 @@
+ 		if h := readHolder(path); h != nil {
+ 			msg += " (" + h.String() + ")"
+ 		}
+-		fmt.Fprintln(l.stderr, msg)
++		_ = msg
+ 		if unlock, err = waitLockFile(ctx, path); err != nil {
+ 			return nil, err
+ 		}

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lifecycle .* / runs its Exclusive suite at once \(
+Clause: when a run with GOTEST_EXCLUSIVE_LOCK=0 reaches its Exclusive suites while another run of the module runs its own → runs its Exclusive suite at once
+--- a/internal/gotestrunner/exclusivelock.go
++++ b/internal/gotestrunner/exclusivelock.go
+@@ -83,7 +83,7 @@
+ // newCrossRunLocks reads the switch and what a parent run holds.
+ func newCrossRunLocks(stderr io.Writer) *crossRunLocks {
+ 	l := &crossRunLocks{stderr: stderr, inherited: map[string]bool{}}
+-	if os.Getenv(protocol.EnvExclusiveLock) == "0" {
++	if os.Getenv(protocol.EnvExclusiveLock) == "off" {
+ 		return l
+ 	}
+ 	if root, err := cacheRoot(); err == nil {

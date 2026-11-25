@@ -1,0 +1,10 @@
+Expect: ^FAIL .*conformance/lifecycle .* / starts its e2e suite only once the other run's has ended \(
+Clause: when a run reaches group e2e while another run of the module runs that group → starts its e2e suite only once the other run's has ended
+--- a/internal/gotestrunner/exclusivelock.go
++++ b/internal/gotestrunner/exclusivelock.go
+@@ -312,4 +312,4 @@
+ }
+ 
+ // holdsFor reports whether t runs under its scope's hold.
+-func holdsFor(t *SuiteTarget) bool { return t.Group != "" || t.Exclusive }
++func holdsFor(t *SuiteTarget) bool { return t.Exclusive }

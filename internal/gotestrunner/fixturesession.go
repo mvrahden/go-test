@@ -42,7 +42,8 @@ type fixtureSession struct {
 // startFixtureSession starts the up-front fixtures of win beside the
 // compile. ctx bounds the process; streamCtx ends the wait for setup.
 // cancelStream is called when the process cannot start because ctx ended.
-func startFixtureSession(ctx, streamCtx context.Context, cancelStream context.CancelFunc, workDir string, win fixtureWindows, setupTimeout time.Duration, buildFlags []string) *fixtureSession { //nolint:gocritic // hugeParam: once per run
+// before, when set, runs ahead of the start; its error is the stream's end.
+func startFixtureSession(ctx, streamCtx context.Context, cancelStream context.CancelFunc, workDir string, win fixtureWindows, setupTimeout time.Duration, buildFlags []string, before func(context.Context) error) *fixtureSession { //nolint:gocritic // hugeParam: once per run
 	f := &fixtureSession{
 		started: make(chan struct{}),
 		over:    make(chan struct{}),
@@ -64,11 +65,16 @@ func startFixtureSession(ctx, streamCtx context.Context, cancelStream context.Ca
 		// is the one owner of shutdown, and it runs only after every suite
 		// has stopped. The pipeline ctx stays attached as the safety net so
 		// an abnormal runner death still releases the process group.
-		traceDispatch(dispatchEvent{Kind: "up-front", Keys: sortedKeys(win.Bulk)})
-		f.proc, err = StartSharedFixtures(ctx, workDir, win.Fixtures, setupTimeout, buildFlags...)
+		if before != nil {
+			err = before(streamCtx)
+		}
+		if err == nil {
+			traceDispatch(dispatchEvent{Kind: "up-front", Keys: sortedKeys(win.Bulk)})
+			f.proc, err = StartSharedFixtures(ctx, workDir, win.Fixtures, setupTimeout, buildFlags...)
+		}
 		if err != nil {
 			f.startErr = err
-			if ctx.Err() == nil {
+			if ctx.Err() == nil && streamCtx.Err() == nil {
 				f.fail(fmt.Errorf("shared fixture setup failed: %w", err))
 			} else {
 				f.failed.Store(true)

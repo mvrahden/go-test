@@ -214,13 +214,17 @@ func applyFixtureFailure(c *OutputCollector, result *PipelineResult, err error) 
 // applyDeadlineFailure fails a run whose deadline expired before its last
 // verdict, naming the units it cut short. With none to name, the failure is
 // booked as a synthetic package so the reason still reaches every renderer.
-func applyDeadlineFailure(c *OutputCollector, result *PipelineResult, cfg PipelineConfig, dispatchErr error, running []CensusCase) { //nolint:gocritic // hugeParam: stable API
+// waiting names the scope a wait for another run was cut short for, "" for none.
+func applyDeadlineFailure(c *OutputCollector, result *PipelineResult, cfg PipelineConfig, dispatchErr error, running []CensusCase, waiting string) { //nolint:gocritic // hugeParam: stable API
 	if !errors.Is(dispatchErr, context.DeadlineExceeded) {
 		return
 	}
 	msg := "run deadline exceeded"
 	if cfg.GlobalTimeout > 0 {
 		msg = fmt.Sprintf("global --timeout exceeded after %v", cfg.GlobalTimeout)
+	}
+	if waiting != "" {
+		msg += " while " + waiting + " waited for another gotest run"
 	}
 	if len(running) == 0 {
 		// No method was left running: name the suites the deadline stopped.
@@ -490,7 +494,7 @@ func runBench(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 
 	if prepareErr := ctx.Err(); prepareErr != nil {
 		result := PipelineResult{ExitCode: exitCodeAfterDispatch(0, prepareErr)}
-		applyDeadlineFailure(collector, &result, cfg, prepareErr, nil)
+		applyDeadlineFailure(collector, &result, cfg, prepareErr, nil, "")
 		return finish(result, nil), nil
 	}
 
@@ -625,7 +629,7 @@ func runBench(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 	exitCode := collector.takeCensus(cfg, overlay.Declared, exitCodeAfterDispatch(collector.WorstExitCode(), dispatchErr), dispatchErr)
 	running := collector.bookDeadline(dispatchErr)
 	result := PipelineResult{ExitCode: exitCode}
-	applyDeadlineFailure(collector, &result, cfg, dispatchErr, running)
+	applyDeadlineFailure(collector, &result, cfg, dispatchErr, running, "")
 	applyInterrupt(collector, &result, dispatchErr)
 	return finish(result, errors.Join(closeErrs...)), nil
 }
@@ -692,6 +696,7 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 	compiled, span := spanOf(CompilePackagesStream(r.ctx, r.bookUnbuilt(), overlay.OverlayFlag, link, overlay.WorkDir, binaryCacheDir(overlay.BinaryCacheRoot, link), cfg.CompileParallel), time.Now)
 	held := r.intake(compiled)
 	r.runScopes(held)
+	r.releaseHolds()
 	result := r.finish()
 	result.CompileSpan = span()
 	return result, nil

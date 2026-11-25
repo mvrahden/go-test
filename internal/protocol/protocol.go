@@ -18,6 +18,12 @@ const (
 	// EnvCI is; unset, a detected agent turns it on.
 	EnvAgentOutput = "GOTEST_AGENT"
 	EnvCacheDir    = "GOTEST_CACHE_DIR"
+	// EnvExclusiveLock at 0 lets a run's exclusive scopes overlap another
+	// run's; set otherwise or unset, runs of one module take turns.
+	EnvExclusiveLock = "GOTEST_EXCLUSIVE_LOCK"
+	// EnvExclusiveHeld lists the lock files the run that started a process
+	// holds for it, so a gotest run it starts takes them as its own.
+	EnvExclusiveHeld = "GOTEST_EXCLUSIVE_HELD"
 	// EnvSlowBuildThreshold is how long a build runs, as a Go duration,
 	// before the CLI says it is still building.
 	EnvSlowBuildThreshold = "GOTEST_SLOW_BUILD_THRESHOLD"
