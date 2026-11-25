@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/speccatalog"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -16,12 +17,25 @@ import (
 // names the check that must catch it and what runs to judge it. A mutant the
 // README does not mention is a guard nobody knows exists; a row without a
 // patch guards nothing.
-type DrillCatalogTestSuite struct{}
-
-// SuiteConfig: Parallel, as its methods only read files.
-func (s *DrillCatalogTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true}
+type DrillCatalogTestSuite struct {
+	reading speccatalog.Reading
 }
+
+// SuiteConfig: Parallel, as its methods only read. Setup builds the CLI and
+// runs it twice at once: just over 30s on a cold Windows.
+func (s *DrillCatalogTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Parallel: true, SetupTimeout: 45 * time.Second}
+}
+
+// BeforeAll reads the conformance suites as the drill's planner does.
+func (s *DrillCatalogTestSuite) BeforeAll(t *gotest.T) {
+	root, err := filepath.Abs(filepath.Join("..", ".."))
+	gotest.NoError(t, err)
+	s.reading, err = speccatalog.Read(t.Context(), root)
+	gotest.NoError(t, err)
+}
+
+func (s *DrillCatalogTestSuite) AfterAll(t *gotest.T) {}
 
 // catalogRowRe matches a table row whose first cell is a backticked mutant name.
 var catalogRowRe = regexp.MustCompile("(?m)^\\| `([a-z0-9-]+)` \\|")
@@ -63,12 +77,10 @@ func (s *DrillCatalogTestSuite) TestEveryMutantIsCatalogued(t *gotest.T) {
 		w.It("is judged by runs naming only clauses the specs state and tests their packages declare", func(it *gotest.T) {
 			specs, err := speccatalog.LoadSpecs(root)
 			gotest.NoError(it, err)
-			catalog, err := os.ReadFile(filepath.Join(root, speccatalog.JSONPath))
-			gotest.NoError(it, err)
 			for _, f := range patchFiles {
 				data, err := os.ReadFile(f)
 				gotest.NoError(it, err)
-				runs, problems := speccatalog.JudgeRuns(specs, catalog, data)
+				runs, problems := speccatalog.JudgeRuns(specs, &s.reading, data)
 				for _, r := range runs {
 					_, declared, err := r.Alone(root)
 					gotest.NoError(it, err)

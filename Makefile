@@ -1,4 +1,4 @@
-.PHONY: ci test lint build vet vuln fmt-check golangci-lint golangci-version checks drill catalog extension-test extension-contract extension-package spec-validate runtime-compat runtime-api runtime-floor release-check workflow-lint drill-check coverage-total lint-plugin
+.PHONY: ci test lint build vet vuln fmt-check golangci-lint golangci-version checks drill scenarios extension-test extension-contract extension-package spec-validate runtime-compat runtime-api runtime-floor release-check workflow-lint drill-check coverage-total lint-plugin
 
 # Must ship x/tools >= v0.46.0, the first that reads Go 1.27 export data.
 # Move it with the Go version the workflows test.
@@ -42,8 +42,10 @@ coverage-total:
 	GOCOVERDIR="$(COVER_DIR)/data" go run ./cmd/gotest spec --parallel=$(GATE_PARALLEL) --timeout=$(GATE_TIMEOUT) ./... ./examples/... -race -coverprofile="$(COVER_DIR)/suites.out"
 	bash .github/scripts/coverage-total.sh "$(COVER_DIR)/suites.out" "$(COVER_DIR)/data" $(GATE_MIN_TOTAL_COVERAGE) github.com/mvrahden/go-test/cmd/... github.com/mvrahden/go-test/internal/... github.com/mvrahden/go-test/pkg/...
 
-catalog:
-	go run ./internal/speccatalog/render
+# The suites that hold specs/, tests/conformance and the drill's Clause:
+# lines to one another, gotest scenarios' binding among them.
+scenarios:
+	go run ./cmd/gotest ./tests/conventions -run '^(TestSpecBindingTestSuite|TestDrillCatalogTestSuite|TestUnmutatedClausesTestSuite)$$'
 
 # The OpenSpec CLI only reads openspec/specs, so the link lives in a temp copy.
 spec-validate:

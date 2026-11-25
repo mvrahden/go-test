@@ -183,6 +183,13 @@ func (s *SpecTestSuite) TestShape(t *gotest.T) {
 			gotest.Equal(it, []string{`specs/cli/spec.md:8: requirement "Version": text has 509 characters, at most 500`}, spec.Problems())
 		})
 	})
+	t.When("two scenarios of a spec share a WHEN", func(w *gotest.T) {
+		twice := sampleSpec + "\n#### Scenario: Again\n- **WHEN** the version subcommand runs\n- **THEN** prints a newline\n"
+		spec := speccatalog.ParseSpec("cli", "specs/cli/spec.md", []byte(twice))
+		w.It("names the second with the line of the first", func(it *gotest.T) {
+			gotest.Equal(it, []string{`specs/cli/spec.md:33: scenario "Again": WHEN "the version subcommand runs" is already the WHEN of the scenario at line 11`}, spec.Problems())
+		})
+	})
 	t.When("a spec has no requirement", func(w *gotest.T) {
 		bare := "# Bare Specification\n\n## Purpose\nA purpose long enough to pass the fifty character floor.\n\n## Requirements\n"
 		spec := speccatalog.ParseSpec("bare", "specs/bare/spec.md", []byte(bare))
@@ -231,29 +238,15 @@ func (s *SpecTestSuite) TestFences(t *gotest.T) {
 	})
 }
 
-func (s *SpecTestSuite) TestAFailedRenderNamesItsExitStatus(t *gotest.T) {
+func (s *SpecTestSuite) TestAFailedReadingNamesItsExitStatus(t *gotest.T) {
 	t.When("spec --static ends by a Windows termination status", func(w *gotest.T) {
 		w.It("names the status in hex with its name", func(it *gotest.T) {
-			gotest.ErrorContains(it, speccatalog.ExportStaticExitError(3221225786, "boom"), "spec --static exited 0xC000013A (STATUS_CONTROL_C_EXIT):\nboom")
+			gotest.ErrorContains(it, speccatalog.ExportExitError("spec", 3221225786, "boom"), "gotest spec exited 0xC000013A (STATUS_CONTROL_C_EXIT):\nboom")
 		})
 	})
-	t.When("spec --static exits with a code of its own", func(w *gotest.T) {
+	t.When("scenarios exits with a code of its own", func(w *gotest.T) {
 		w.It("names the code in decimal", func(it *gotest.T) {
-			gotest.ErrorContains(it, speccatalog.ExportStaticExitError(2, "boom"), "spec --static exited 2:\nboom")
-		})
-	})
-}
-
-func (s *SpecTestSuite) TestTheCommittedDocument(t *gotest.T) {
-	raw := `{"version":"v1.37.0 (abc)","packages":[{"path":"a","dir":"/home/x/a","nodes":[]},{"path":"b","dir":"/home/x/b","nodes":[]}]}`
-	t.When("spec --static names its version and the directory each package was read from", func(w *gotest.T) {
-		out, err := speccatalog.ExportCommitted([]byte(raw))
-		w.It("keeps neither, since the catalog describes behavior, not the host that rendered it", func(it *gotest.T) {
-			gotest.NoError(it, err)
-			gotest.NotContains(it, string(out), `"version"`)
-			gotest.NotContains(it, string(out), `"dir"`)
-			gotest.Contains(it, string(out), `"path": "a"`)
-			gotest.Contains(it, string(out), `"path": "b"`)
+			gotest.ErrorContains(it, speccatalog.ExportExitError("scenarios", 2, "boom"), "gotest scenarios exited 2:\nboom")
 		})
 	})
 }
