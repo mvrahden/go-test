@@ -1283,6 +1283,8 @@ guard:
    mode that writes the stream without any of them wiring it. The declared
    set comes from the AST through `gotestast`, the same source `discover`
    uses; the executed set is every `Suite/Method` pair with a terminal action.
+   A text run writes no stream, so it counts a suite as run when its binary
+   printed its result line, and holds its declared units to that.
    It is exit 2, not 1, because a dropped test is not a failed test but a
    run that cannot be believed, the same code an uncompilable package gets.
    Only green runs are censused: a red run is already not a false green.
