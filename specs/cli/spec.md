@@ -684,6 +684,64 @@ A run SHALL execute every suite it selects, whether or not anything changed sinc
 - **WHEN** a package is run twice with nothing changed in between
 - **THEN** the second run executes its tests again and marks nothing cached
 
+### Requirement: Agent output
+A text run SHALL print for a coding agent when --agent is given, else when GOTEST_AGENT turns it on, else when the run's manifest would name an agent; --agent=false and GOTEST_AGENT=0 SHALL turn it off whatever is detected. It SHALL say so first on stderr, naming what turned it on and how to turn it off, print on stdout only the output of what failed, whole, and then the closing line, and exit as the text run does.
+
+#### Scenario: A failing run under an agent
+- **WHEN** a text run of a failing and a passing package is made under CLAUDECODE=1
+- **THEN** prints on stdout the failing method's output and no line of the passing package
+- **AND** ends stdout with the closing line naming FAIL, exit 1, the tests counted and the command that reruns the failures
+- **AND** says first on stderr that agent output is on under CLAUDECODE=1 and that GOTEST_AGENT=0 turns it off
+
+#### Scenario: Agent output turned off
+- **WHEN** a text run under CLAUDECODE=1 is given --agent=false, or GOTEST_AGENT=0
+- **THEN** prints go test's text, the passing package's ok line included, and no word of agent output
+
+#### Scenario: Agent output asked for
+- **WHEN** a text run with no agent variable is given --agent, or GOTEST_AGENT=1
+- **THEN** prints no ok line and ends stdout with the closing line
+
+### Requirement: The closing line
+A text run that reaches its packages SHALL end with one line: `gotest:`; PASS for exit 0 with a test passed, or in a plain text run a package, EMPTY for exit 0 with none, else FAIL; `exit` and the code; under agent output the tests passed, failed, skipped and not run, else the tests not run if any; the packages passed, failed and skipped; after an agent's failed run, `rerun:` and the command. It SHALL be the last line of stdout under agent output, else of stderr before --debug's phases.
+
+#### Scenario: A passing text run
+- **WHEN** a text run of a passing package ends
+- **THEN** prints on stdout go test's text alone
+- **AND** ends stderr with the closing line naming PASS, exit 0 and 1 package passed
+
+### Requirement: The census in a text run
+A text run SHALL take the census of a -json run, under its rules: a suite whose binary exits 0 without its result line, as under a TestMain that never calls m.Run or an -exec that never starts it, ran none of its declared units, and the run SHALL exit 2, naming each on stderr as -json does. No run's census SHALL judge a run given -count=0 or -h after -args, and a --failed run's SHALL judge only the units it reruns.
+
+#### Scenario: A suite binary that never runs its tests
+- **WHEN** a text run's suite binary exits 0 having run nothing, under a TestMain that never calls m.Run or under -exec true
+- **THEN** fails with exit 2, naming on stderr the suite's declared test as never ran
+- **AND** the closing line counts 1 test not run
+
+#### Scenario: A run given -count=0
+- **WHEN** a text or a -json run is given -count=0
+- **THEN** passes, noting that the census was skipped
+
+### Requirement: A run's record
+A test run, a -json run, spec and summary SHALL record, when they run their packages, their manifest, their result and the units they failed in `runs/<key>/last.json` under the gotest cache, the key a hash of the working directory, replacing the record before it and writing nothing into the module.
+
+#### Scenario: The record of a failing run
+- **WHEN** a text run of a failing package ends
+- **THEN** its record names the failing method and exit code 1
+- **AND** the module holds no file it did not hold before
+
+### Requirement: Rerunning what failed
+--failed SHALL rerun only what the last run in the working directory failed by its record: each failed method, a suite or fuzz target that failed without a failed method, and a package that failed whole, of the packages given, else of the record's, in a text or -json run, spec or summary. It SHALL refuse -run and -list, and SHALL run nothing and exit 2, saying why on stderr, without a record, after a run that failed nothing and when no package given failed.
+
+#### Scenario: Rerunning a failed method
+- **WHEN** --failed follows a run in which one method of a suite failed and one passed, beside a passing package
+- **THEN** runs only the failed method and exits 1
+- **AND** -json --failed streams the failed method's verdict and no other method's
+- **AND** spec --failed renders the failed method and no other
+
+#### Scenario: Nothing to rerun
+- **WHEN** --failed is given without a record, after a run that failed nothing, or with a package that did not fail
+- **THEN** runs nothing and exits 2, saying why on stderr
+
 ### Requirement: An agent's hook events
 `gotest hook <event>` SHALL read a coding agent's hook event as JSON on stdin and never block the agent: it SHALL exit 0, writing nothing or one JSON object whose hookSpecificOutput carries additionalContext and no permission decision, and SHALL exit 1, never 2, on an event it does not know. The stop event SHALL write nothing.
 
