@@ -1519,6 +1519,7 @@ func (s *CanaryTestSuite) TestAssertionsAreCounted(t *gotest.T) {
 		"TestCountTestSuite/TestNested/asserts_on_the_method's_T" + count: "0",
 		"TestCountTestSuite/TestNested/#0" + count:                        "1",
 		"TestCountTestSuite/TestNoRows" + count:                           "0",
+		"TestCountTestSuite/TestRaw" + count:                              "0",
 		"TestCountTestSuite/TestDeclared" + count:                         "0",
 		"TestCountTestSuite/TestDeclared" + by:                            "a raw check",
 		"TestCountTestSuite/TestDeclaredAbove/is_covered" + count:         "0",
@@ -1542,6 +1543,36 @@ func (s *CanaryTestSuite) TestAssertionsAreCounted(t *gotest.T) {
 	}
 	if vacuous == nil || *vacuous != 3 {
 		t.Errorf("assertcount: the run closed with Vacuous %v, want 3", vacuous)
+	}
+}
+
+// testing prints the counts only under -v; a text run without it reads
+// them from the file the runtime writes, and judges as the stream does.
+func (s *CanaryTestSuite) TestATextRunReadsTheCounts(t *gotest.T) {
+	t.AssertsBy(rawCheck)
+	cmd := exec.Command(s.binary, "--agent=false", "--ci", "./testdata/assertcount/") //nolint:gosec // G204: controlled binary with fixed args
+	cmd.Env = childEnv(t.TempDir())
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	err := cmd.Run()
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) || exitErr.ExitCode() != 1 {
+		t.Errorf("assertcount text: the run ended with %v, want exit 1\nstderr:\n%s", err, stderr.String())
+	}
+	var named []string
+	for line := range strings.Lines(stderr.String()) {
+		if _, test, ok := strings.Cut(strings.TrimSpace(line), "assertcount "); ok && strings.HasPrefix(line, "  ") {
+			named = append(named, test)
+		}
+	}
+	want := []string{"TestCountTestSuite/TestNothing", "TestCountTestSuite/TestNested/asserts_on_the_method's_T", "TestCountTestSuite/TestNoRows"}
+	slices.Sort(named)
+	slices.Sort(want)
+	if !slices.Equal(named, want) {
+		t.Errorf("assertcount text: stderr names the vacuous passes %q, want %q:\n%s", named, want, stderr.String())
+	}
+	if strings.Contains(stdout.String(), "ATTR") {
+		t.Errorf("assertcount text: stdout carries the attributes:\n%s", stdout.String())
 	}
 }
 

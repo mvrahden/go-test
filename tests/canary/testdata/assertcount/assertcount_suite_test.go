@@ -1,9 +1,11 @@
 // Package assertcount passes leaves whose assertion counts the canary reads
 // from the raw stream: one per call wherever it is made, none for a poll's
 // R, none reported by an interior or a skipped test, and a declared means.
+// A test that ran a subtest through t.T().Run is no vacuous leaf.
 package assertcount
 
 import (
+	"testing"
 	"time"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -30,6 +32,10 @@ func (s *CountTestSuite) TestNested(t *gotest.T) {
 	for row := range gotest.Each(t, []int{1}) {
 		gotest.True(row, true)
 	}
+}
+
+func (s *CountTestSuite) TestRaw(t *gotest.T) {
+	t.T().Run("sub", func(tt *testing.T) {})
 }
 
 func (s *CountTestSuite) TestNoRows(t *gotest.T) {

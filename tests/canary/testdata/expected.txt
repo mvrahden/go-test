@@ -293,6 +293,8 @@ assertcount pass TestCountTestSuite/TestNested/#0
 assertcount pass TestCountTestSuite/TestNested/asserts_on_the_method's_T
 assertcount pass TestCountTestSuite/TestNoRows
 assertcount pass TestCountTestSuite/TestNothing
+assertcount pass TestCountTestSuite/TestRaw
+assertcount pass TestCountTestSuite/TestRaw/sub
 assertcount pass TestHookTestSuite
 assertcount pass TestHookTestSuite/TestBodyless
 assertcount skip TestCountTestSuite/TestSkipped
