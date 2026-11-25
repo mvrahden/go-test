@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterSuppressions / List / when lint -suppressions runs over a package with nolint comments / prints one document opening with version that lists each comment reaching a rule of lint's once, sorted by file and position, with its module, module-relative file, rules and reason, and exits 0 \(
+Clause: when lint -suppressions runs over a package with nolint comments → prints one document opening with version that lists each comment reaching a rule of lint's once, sorted by file and position, with its module, module-relative file, rules and reason, and exits 0
+--- a/internal/lint/run.go
++++ b/internal/lint/run.go
+@@ -155,7 +155,7 @@
+ 	slices.SortFunc(res.Suppressions, func(a, b Suppression) int {
+ 		return cmp.Or(
+ 			cmp.Compare(a.Module, b.Module),
+-			cmp.Compare(a.File, b.File),
++			cmp.Compare(b.File, a.File),
+ 			cmp.Compare(a.Line, b.Line),
+ 			cmp.Compare(a.Col, b.Col),
+ 		)

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterSuppressions / List / when lint -suppressions is given with -json or -fix / lint refuses the pair with exit 2, naming the other flag \(
+Clause: when lint -suppressions is given with -json or -fix → lint refuses the pair with exit 2, naming the other flag
+--- a/cmd/gotest/lint.go
++++ b/cmd/gotest/lint.go
+@@ -248,7 +248,7 @@
+ 		}
+ 		return 0, true
+ 	}
+-	if other := a.beside(); a.supp && other != "" {
++	if other := a.beside(); a.supp && other == "-" {
+ 		fmt.Fprintf(stderr, "FAIL: -suppressions prints its own document; it does not take %s\n", other)
+ 		return 2, true
+ 	}

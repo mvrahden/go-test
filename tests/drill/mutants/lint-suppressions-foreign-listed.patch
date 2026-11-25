@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterSuppressions / List / when lint -suppressions runs over a package with nolint comments / leaves out a comment naming only another linter's rule, and prints nothing on stderr \(
+Clause: when lint -suppressions runs over a package with nolint comments → leaves out a comment naming only another linter's rule, and prints nothing on stderr
+--- a/internal/lint/nolint.go
++++ b/internal/lint/nolint.go
+@@ -100,7 +100,7 @@
+ 		for _, cg := range file.Comments {
+ 			for _, c := range cg.List {
+ 				ids, reason, ok := nolintIDs(c.Text)
+-				if !ok || !reachesGotest(ids) {
++				if !ok {
+ 					continue
+ 				}
+ 				rules := slices.Clone(ids)

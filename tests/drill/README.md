@@ -834,6 +834,14 @@ shards of one run do not add up to every mutant exactly once.
 | `lint-erg-unknown-nolint-silent` | a nolint comment naming an unknown rule is never reported | conformance: the lint It for an unknown rule finds no `nolint-unknown` finding |
 | `lint-erg-unknown-nolint-suppressible` | the unknown-rule finding goes through nolint suppression | conformance: the lint It for `nolint:all,not-a-rule` finds the comment silencing its own finding |
 | `lint-erg-foreign-nolint-unknown` | a golangci-lint linter's id counts as an unknown rule | conformance: the lint It for another linter's rule finds a `nolint-unknown` finding |
+| `lint-nolint-reason-silent` | a nolint comment without a reason is never reported | conformance: the lint It for a comment without a reason finds no `nolint-reason` finding |
+| `lint-nolint-reason-suppressible` | the `nolint-reason` finding goes through nolint suppression | conformance: the lint It for `nolint:nolint-reason,stdlib-test` finds the comment silencing its own finding |
+| `lint-nolint-reason-unread` | the reason after a nolint comment's rules is dropped | conformance: the lint It for a reason after the rules finds `nolint-reason` findings on reasoned comments |
+| `lint-nolint-reason-foreign` | a comment naming only another linter's rule needs a reason too | conformance: the lint It for another linter's comment finds a `nolint-reason` finding |
+| `lint-suppressions-unsorted` | `-suppressions` sorts files in reverse | conformance: the lint It for the list finds `nolint_test.go` before `a_test.go` |
+| `lint-suppressions-never-used` | `-suppressions` marks no comment as having suppressed a finding | conformance: the lint It for `suppressed` finds every entry false |
+| `lint-suppressions-foreign-listed` | `-suppressions` lists a comment naming only another linter's rule | conformance: the lint It for foreign comments finds the `gosec` comment listed |
+| `lint-suppressions-beside-accepted` | `-suppressions` takes `-json` and `-fix` beside it | conformance: the lint It for the pair sees exit 0, not 2 |
 | `lint-erg-generated-untracked-reported` | `generated-file` reports a generated file git does not track | conformance: the lint It for an untracked generated file finds it reported |
 | `lint-erg-git-failure-reads-as-outside` | `generated-file` reads every git failure as lying outside a repository | conformance: the lint It for an unreadable repository finds the plain checked-in finding |
 | `lint-erg-generated-tracked-dropped` | `generated-file` treats every file in a git repository as untracked | conformance: the lint It for a staged generated file finds no finding |
