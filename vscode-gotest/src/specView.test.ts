@@ -135,6 +135,55 @@ describe("sourceOf", () => {
   });
 });
 
+describe("buildSpecBody freshness", () => {
+  const pkg = (p: string): SpecPackage => ({
+    path: p,
+    status: "pass",
+    duration: 0,
+    nodes: [node("TestATestSuite", "pass", [node("x", "pass")])],
+  });
+  const render = (
+    pkgs: SpecPackage[],
+    fresh: Record<string, "current" | "stale" | "unknown">,
+  ) =>
+    buildSpecBody({ packages: pkgs, stats: stats() }, ["m"], {
+      dirOf: () => undefined,
+      freshnessOf: (p) => fresh[p],
+    });
+
+  it("dims a stale package's rows under its label and counts it in the header", () => {
+    const html = render([pkg("m/a"), pkg("m/b")], {
+      "m/a": "stale",
+      "m/b": "current",
+    });
+    expect(html).toMatch(/<details class="pkg-section stale" open>/);
+    expect(html).toMatch(
+      /<summary class="pkg-header">a[^]*stale: inputs changed since the run<\/span><\/summary>/,
+    );
+    expect(html).toMatch(
+      /<details class="pkg-section" open>\s*<summary class="pkg-header">b/,
+    );
+    expect(html).toContain(
+      '<div class="stale-headline" role="status">1 of 2 packages stale: their inputs changed since the run</div>',
+    );
+  });
+
+  it("shows an unknown package's freshness only in a tooltip", () => {
+    const html = render([pkg("m/a"), pkg("m/b")], { "m/a": "unknown" });
+    expect(html).not.toContain("stale");
+    expect(html).toMatch(/class="fresh-unknown" title="Freshness unknown/);
+  });
+
+  it("marks a lone package's tree stale", () => {
+    const html = buildSpecBody({ packages: [pkg("m/a")], stats: stats() }, [], {
+      dirOf: () => undefined,
+      freshnessOf: () => "stale",
+    });
+    expect(html).toContain('<div class="pkg-body stale">');
+    expect(html).toContain("stale: inputs changed since the run");
+  });
+});
+
 describe("buildSpecBody", () => {
   it("shows a branch with the status the CLI gave it, deriving none from its children", () => {
     const html = body([

@@ -345,6 +345,7 @@ export function activate(context: vscode.ExtensionContext): void {
     outputChannel,
     active,
     controller,
+    (folder) => specView.sourceChanged(folder),
   );
 
   context.subscriptions.push(
@@ -956,7 +957,13 @@ export function setupFileWatchers(
   outputChannel: vscode.LogOutputChannel,
   active: ActiveFolders,
   controller: GoTestController,
+  // A file a package's input hash covers changed in the folder.
+  inputsChanged?: (folder: string) => void,
 ): vscode.Disposable[] {
+  const noteInputs = (uri: vscode.Uri) => {
+    const folder = vscode.workspace.getWorkspaceFolder(uri);
+    if (folder) inputsChanged?.(folder.uri.fsPath);
+  };
   const coverOnSaveTimers = new Map<string, ReturnType<typeof setTimeout>>();
   const triggerCoverOnSave = (importPath: string, uri: vscode.Uri) => {
     const folder = vscode.workspace.getWorkspaceFolder(uri);
@@ -978,6 +985,7 @@ export function setupFileWatchers(
   const testWatcher = vscode.workspace.createFileSystemWatcher("**/*_test.go");
   const onFileChange = (uri: vscode.Uri) => {
     staleOnChange(uri.fsPath, cache, controller);
+    noteInputs(uri);
     const folder = vscode.workspace.getWorkspaceFolder(uri);
     if (!folder) return;
     const wsDir = folder.uri.fsPath;
@@ -999,6 +1007,7 @@ export function setupFileWatchers(
   };
   const onFileDelete = (uri: vscode.Uri) => {
     staleOnChange(uri.fsPath, cache, controller);
+    noteInputs(uri);
     const discoverOnSave =
       vscode.workspace
         .getConfiguration("gotest")
@@ -1016,6 +1025,7 @@ export function setupFileWatchers(
   const onSourceChange = (uri: vscode.Uri) => {
     if (uri.fsPath.endsWith("_test.go")) return;
     staleOnChange(uri.fsPath, cache, controller);
+    noteInputs(uri);
     const importPath = cache.resolveFileToPackage(uri.fsPath);
     if (!importPath) return;
 
@@ -1034,6 +1044,7 @@ export function setupFileWatchers(
     "**/{go.mod,go.work}",
   );
   const onModuleFile = (uri: vscode.Uri) => {
+    noteInputs(uri);
     const folder = vscode.workspace.getWorkspaceFolder(uri);
     if (!folder) return;
     const dir = folder.uri.fsPath;
@@ -1061,7 +1072,15 @@ export function setupFileWatchers(
     );
   };
 
+  // Testdata is hashed too; it only asks the Spec View again.
+  const testdataWatcher =
+    vscode.workspace.createFileSystemWatcher("**/testdata/**");
+
   return [
+    testdataWatcher,
+    testdataWatcher.onDidChange(noteInputs),
+    testdataWatcher.onDidCreate(noteInputs),
+    testdataWatcher.onDidDelete(noteInputs),
     moduleWatcher,
     moduleWatcher.onDidChange(onModuleFile),
     moduleWatcher.onDidCreate(onModuleFile),

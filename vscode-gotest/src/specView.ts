@@ -1,7 +1,12 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
 import { existsSync } from "node:fs";
-import { buildCliCommand, offerCliUpgrade, stripGoRunExitEcho } from "./cli.js";
+import {
+  buildCliCommand,
+  hasRuns,
+  offerCliUpgrade,
+  stripGoRunExitEcho,
+} from "./cli.js";
 import { specRenderTimeoutSeconds } from "./config.js";
 import { ManagedChild } from "./managedChild.js";
 import { readModulePath } from "./gomod.js";
@@ -10,6 +15,14 @@ import { SpecStore, type RunPiece } from "./specStore.js";
 import type { DiscoveryCache } from "./discovery.js";
 import type { ChangeScope } from "./changeScope.js";
 import { buildChangeBody, CHANGE_CSS } from "./changeView.js";
+import {
+  CHECK_FRESH_ARGS,
+  parseFreshness,
+  STALE_LABEL,
+  UNKNOWN_TITLE,
+  staleHeadline,
+  type Freshness,
+} from "./freshness.js";
 import {
   EXTERNAL_ID,
   externalInstance,
@@ -23,6 +36,9 @@ import {
 const RUNS_FILE = "specRuns.json";
 // 2: lines are kept per suite instance and in the order they were merged.
 const RUNS_VERSION = 2;
+
+// How long a burst of file changes settles before freshness is asked again.
+const FRESH_DEBOUNCE_MS = 750;
 
 // What the panel's node buttons do, given Test Explorer item ids.
 const GITHUB_COMMENT_LIMIT = 65536;
@@ -73,6 +89,17 @@ export class SpecViewPanel implements vscode.Disposable {
   private readonly hidden = new Set<string>();
   private scope: Scope = "spec";
   private change: ChangeScope | undefined;
+  // Per source on show ("" for the workspace's runs), each package's
+  // freshness as the CLI last judged it.
+  private readonly freshness = new Map<string, Map<string, Freshness>>();
+  // Folders whose freshness is to be asked again, the timer that gathers a
+  // burst of changes, and the check running per folder.
+  private readonly freshPending = new Set<string>();
+  private freshTimer: ReturnType<typeof setTimeout> | undefined;
+  private readonly freshChecks = new Map<
+    string,
+    { child?: ManagedChild; gen: number }
+  >();
 
   // patternsFor names the packages a folder's discovery reads; the CLI lays
   // the folder's runs over what their source declares. Without it, or for a
@@ -288,6 +315,7 @@ export class SpecViewPanel implements vscode.Disposable {
       (e) => {
         if (!e.webviewPanel.visible) return;
         if (this.scope === "change") this.change?.ensure();
+        this.checkFreshSoon([], 0);
         if (this.stale && this.autoRefresh()) void this.render();
       },
       null,
@@ -358,6 +386,7 @@ export class SpecViewPanel implements vscode.Disposable {
       this.draw();
       if (this.scope === "change") this.change?.ensure();
       else if (this.stale) void this.render();
+      else this.checkFreshSoon([], 0);
     } else if (msg.type === "change") {
       void this.change?.act(msg);
     } else if (msg.type === "clearResults") {
@@ -394,6 +423,7 @@ export class SpecViewPanel implements vscode.Disposable {
     this.lastSpecData = undefined;
     this.runs.clear();
     this.imports.clear();
+    this.freshness.clear();
     this.selected = undefined;
     this.stale = false;
     this.renderError = undefined;
@@ -407,8 +437,10 @@ export class SpecViewPanel implements vscode.Disposable {
   // result: every package seen, each test with its newest verdict.
   async refresh(pieces: RunPiece | RunPiece[]): Promise<void> {
     const list = Array.isArray(pieces) ? pieces : [pieces];
+    // What a run just judged is the tree's until the CLI says otherwise.
+    const own = this.freshness.get("");
     for (const piece of list) {
-      this.runs.merge(piece);
+      for (const pkg of this.runs.merge(piece)) own?.delete(pkg);
     }
     this.change?.runFinished(
       list.map((p) => p.folder),
@@ -431,9 +463,90 @@ export class SpecViewPanel implements vscode.Disposable {
     const runs = new SpecStore();
     runs.merge(piece);
     this.imports.set(id, { label, runs });
+    this.freshness.delete(id);
     this.selected = id;
     this.stale = true;
     await this.show();
+  }
+
+  // sourceChanged asks again, once a burst of edits settles, whether the
+  // verdicts the panel shows for folder still belong to its tree.
+  sourceChanged(folder: string): void {
+    if (!this.renderFolders().includes(folder)) return;
+    this.checkFreshSoon([folder], FRESH_DEBOUNCE_MS);
+  }
+
+  private freshnessOf(pkg: string): Freshness | undefined {
+    return this.freshness.get(this.selected ?? "")?.get(pkg);
+  }
+
+  // checkFreshSoon gathers folders and checks them after delay, while the
+  // panel is on show; a hidden panel checks when it is seen again.
+  private checkFreshSoon(folders: string[], delay: number): void {
+    for (const f of folders) this.freshPending.add(f);
+    if (this.freshPending.size === 0) return;
+    clearTimeout(this.freshTimer);
+    this.freshTimer = setTimeout(() => {
+      this.freshTimer = undefined;
+      if (!this.isVisible() || this.scope !== "spec") return;
+      const due = Array.from(this.freshPending);
+      this.freshPending.clear();
+      for (const folder of due) void this.checkFresh(folder);
+    }, delay);
+  }
+
+  // checkFresh has the folder's CLI judge the shown stream's packages
+  // against the working tree. A newer check stops the one it supersedes.
+  private async checkFresh(folder: string): Promise<void> {
+    const prev = this.freshChecks.get(folder);
+    const gen = (prev?.gen ?? 0) + 1;
+    void prev?.child?.terminate("prompt");
+    const slot: { child?: ManagedChild; gen: number } = { gen };
+    this.freshChecks.set(folder, slot);
+    const source = this.selected ?? "";
+    const stream = this.currentRuns().compose(folder);
+    if (!stream) return;
+    if (!(await hasRuns(folder, this.outputChannel))) return;
+    if (this.freshChecks.get(folder) !== slot) return;
+    let cmd;
+    try {
+      cmd = await buildCliCommand(CHECK_FRESH_ARGS, folder, this.outputChannel);
+    } catch {
+      return;
+    }
+    if (this.freshChecks.get(folder) !== slot) return;
+    const mc = new ManagedChild(cmd.bin, cmd.args, {
+      cwd: folder,
+      kind: "spec",
+    });
+    slot.child = mc;
+    let stdout = "";
+    mc.child.stdout?.on("data", (c: string) => (stdout += c));
+    mc.child.stderr?.on("data", () => {});
+    mc.child.on("error", () => {});
+    mc.child.stdin?.on("error", () => {});
+    mc.child.stdin?.end(stream);
+    const budget = setTimeout(
+      () => void mc.terminate("prompt"),
+      specRenderTimeoutSeconds(folder) * 1000,
+    );
+    try {
+      await mc.exited;
+    } finally {
+      clearTimeout(budget);
+      mc.dispose();
+    }
+    if (this.freshChecks.get(folder) !== slot) return;
+    slot.child = undefined;
+    const judged = parseFreshness(stdout);
+    if (!judged || (this.selected ?? "") !== source) return;
+    let kept = this.freshness.get(source);
+    if (!kept) {
+      kept = new Map();
+      this.freshness.set(source, kept);
+    }
+    for (const [pkg, f] of judged) kept.set(pkg, f);
+    if (this.scope === "spec") this.draw();
   }
 
   private select(id: string | undefined): void {
@@ -491,6 +604,7 @@ export class SpecViewPanel implements vscode.Disposable {
       this.renderError = undefined;
       await this.resolveModulePaths();
       this.draw();
+      this.checkFreshSoon(this.renderFolders(), 0);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       this.outputChannel.error(`[specView] ${message}`);
@@ -629,6 +743,9 @@ export class SpecViewPanel implements vscode.Disposable {
   }
 
   dispose(): void {
+    clearTimeout(this.freshTimer);
+    for (const c of this.freshChecks.values())
+      void c.child?.terminate("prompt");
     this.change?.dispose();
     this.panel?.dispose();
     for (const d of this.disposables) {
@@ -668,6 +785,7 @@ export class SpecViewPanel implements vscode.Disposable {
                 return dir === undefined || unran.has(dir);
               },
               now: Date.now(),
+              freshnessOf: (pkgPath) => this.freshnessOf(pkgPath),
             },
             this.sourcesForToolbar(),
             this.hidden,
@@ -983,6 +1101,25 @@ interface RenderEnv {
   // A package of a folder nothing ran in: its rows are what source declares.
   neverRan?: (pkgPath: string) => boolean;
   now?: number;
+  // Whether a package's verdict still belongs to the working tree, as the
+  // CLI judged it; undefined before it has.
+  freshnessOf?: (pkgPath: string) => Freshness | undefined;
+}
+
+// staleClass is " stale" for a package the CLI judged stale.
+function staleClass(pkgPath: string, env: RenderEnv): string {
+  return env.freshnessOf?.(pkgPath) === "stale" ? " stale" : "";
+}
+
+// freshHtml is what a package's header says of its freshness: a stale one
+// its label; an unknown one only a tooltip.
+function freshHtml(pkgPath: string, env: RenderEnv): string {
+  const f = env.freshnessOf?.(pkgPath);
+  if (f === "stale")
+    return ` <span class="tag stale" title="The CLI hashed this package's inputs now and they differ from the run's">${escapeHtml(STALE_LABEL)}</span>`;
+  if (f === "unknown")
+    return ` <span class="fresh-unknown" title="${escapeAttr(UNKNOWN_TITLE)}">·</span>`;
+  return "";
 }
 
 // formatRanAt is a run's local time: HH:MM on the day of now, with the date
@@ -1044,14 +1181,19 @@ export function buildSpecBody(
   if (groups.length === 1 && groups[0].entries.length === 1) {
     const pkg = groups[0].entries[0].pkg;
     const ranAt = ranAtText(pkg.path, env);
+    const fresh = freshHtml(pkg.path, env);
     tree =
-      (ranAt ? `<div class="ran-at-line">${escapeHtml(ranAt)}</div>` : "") +
+      (ranAt || fresh
+        ? `<div class="ran-at-line">${escapeHtml(ranAt ?? "")}${fresh}</div>`
+        : "") +
+      `<div class="pkg-body${staleClass(pkg.path, env)}">` +
       buildPackageFailureHtml(pkg, env) +
       pkg.nodes
         .map((n, i) =>
           buildNodeHtml(n, null, nodeCtx(env, pkg), [i], [pkg.path]),
         )
-        .join("");
+        .join("") +
+      `</div>`;
   } else if (groups.length === 1) {
     tree = groups[0].entries
       .map((e) => buildPackageSectionHtml(e.displayPath, e.pkg, env))
@@ -1060,9 +1202,19 @@ export function buildSpecBody(
     tree = groups.map((g) => buildModuleSectionHtml(g, env)).join("");
   }
   const summary = buildSummary(data.stats, data.groups);
+  const stale = env.freshnessOf
+    ? staleHeadline(
+        data.packages.map((p) => p.path),
+        env.freshnessOf,
+      )
+    : undefined;
+  const staleLine = stale
+    ? `<div class="stale-headline" role="status">${escapeHtml(stale)}</div>`
+    : "";
   return `<div class="spec-container">
   ${toolbar}
   ${buildProvenanceHtml(data)}
+  ${staleLine}
   <div class="spec-tree" id="spec-tree">${tree}</div>
   ${summary}
 </div>`;
@@ -1243,8 +1395,8 @@ function buildPackageSectionHtml(
   const nodes = pkg.nodes
     .map((n, i) => buildNodeHtml(n, null, nodeCtx(env, pkg), [i], [pkg.path]))
     .join("");
-  return `<details class="pkg-section" open>
-  <summary class="pkg-header">${escapeHtml(displayPath)}${statsHtml(pkg.stats)}${ranAtHtml(pkg.path, env)}</summary>
+  return `<details class="pkg-section${staleClass(pkg.path, env)}" open>
+  <summary class="pkg-header">${escapeHtml(displayPath)}${statsHtml(pkg.stats)}${ranAtHtml(pkg.path, env)}${freshHtml(pkg.path, env)}</summary>
   ${failure}${nodes}
 </details>`;
 }
@@ -1311,8 +1463,11 @@ function buildModuleSectionHtml(group: ModuleGroup, env: RenderEnv): string {
           .join("");
   if (!inner) return "";
   const stats = addStats(group.entries.map((e) => e.pkg.stats));
-  return `<details class="module-section" open>
-  <summary class="module-header">${escapeHtml(group.modulePath || "unknown")}${statsHtml(stats)}</summary>
+  const lone = group.entries.length === 1 ? only.path : undefined;
+  const cls = lone ? staleClass(lone, env) : "";
+  const fresh = lone ? freshHtml(lone, env) : "";
+  return `<details class="module-section${cls}" open>
+  <summary class="module-header">${escapeHtml(group.modulePath || "unknown")}${statsHtml(stats)}${fresh}</summary>
   ${inner}
 </details>`;
 }
@@ -2037,6 +2192,14 @@ summary.node:hover > .node-actions,
 .provenance { padding: 4px 12px; border-bottom: 1px solid var(--vscode-panel-border); flex-shrink: 0; }
 .provenance-line { color: var(--vscode-descriptionForeground); font-size: 0.85em; overflow-wrap: anywhere; }
 .summary-group { display: block; }
+
+/* Verdicts whose inputs changed since the run */
+.tag.stale { color: var(--vscode-testing-iconSkipped); font-weight: normal; }
+.fresh-unknown { color: var(--vscode-descriptionForeground); margin-left: 6px; cursor: help; }
+.pkg-body.stale,
+details.pkg-section.stale > :not(summary),
+details.module-section.stale > :not(summary) { opacity: 0.55; }
+.stale-headline { padding: 4px 12px; font-size: 0.85em; color: var(--vscode-testing-iconSkipped); border-bottom: 1px solid var(--vscode-panel-border); flex-shrink: 0; }
 
 /* Filter hiding */
 .search-hidden { display: none; }

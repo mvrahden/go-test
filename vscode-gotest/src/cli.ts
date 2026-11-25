@@ -46,6 +46,11 @@ export const MIN_CLI_VERSION = "v1.39.0";
 // the upgrade advice names. Below it the rest of the extension still works.
 export const AUDIT_CLI_VERSION = "v1.42.0";
 
+// Run records (`gotest runs`), --changed and spec's --check-fresh come with
+// the same release; a CLI that lists `runs` among its commands has all three.
+export const RUNS_CLI_VERSION = "v1.42.0";
+export const RUNS_COMMAND = "runs";
+
 export interface CliCommand {
   bin: string;
   args: string[];
@@ -956,8 +961,42 @@ export function scopedConfig(
   return vscode.workspace.getConfiguration("gotest", scope);
 }
 
+// What each folder's CLI said it can do, asked once until the CLI is
+// resolved afresh.
+const capabilityMemo = new Map<string, Promise<CliCapabilities | undefined>>();
+
+// folderCapabilities is queryCliCapabilities asked once per folder. A query
+// that throws is forgotten, so the next call asks again.
+export function folderCapabilities(
+  workspaceDir: string,
+  log?: vscode.LogOutputChannel,
+): Promise<CliCapabilities | undefined> {
+  let p = capabilityMemo.get(workspaceDir);
+  if (!p) {
+    p = queryCliCapabilities(workspaceDir, log);
+    capabilityMemo.set(workspaceDir, p);
+    p.catch(() => capabilityMemo.delete(workspaceDir));
+  }
+  return p;
+}
+
+// hasRuns says whether a folder's CLI records runs, so --changed and
+// --check-fresh are there too.
+export async function hasRuns(
+  workspaceDir: string,
+  log?: vscode.LogOutputChannel,
+): Promise<boolean> {
+  try {
+    const caps = await folderCapabilities(workspaceDir, log);
+    return !!caps?.json && caps.commands.includes(RUNS_COMMAND);
+  } catch {
+    return false;
+  }
+}
+
 export function clearBinaryCache(): void {
   clearGoBinaryCache();
+  capabilityMemo.clear();
   versionWarningShown = false;
   suggestedRoots.clear();
 }
