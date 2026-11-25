@@ -81,6 +81,9 @@ interface LiveEvent {
   Test?: string;
   Output?: string;
   RunLevel?: boolean;
+  // The run's own start and verdict carry these.
+  Manifest?: { Args?: string[] };
+  Result?: { ExitCode: number };
 }
 
 // A live `gotest -json` run, times and durations masked as "<d>".
@@ -687,8 +690,24 @@ describe("recorded live runs", () => {
       expect(parseTestEvents(stream)).toHaveLength(recorded.events.length);
     });
 
-    it("marks no event as the run's own", () => {
-      expect(recorded.events.filter((e) => "RunLevel" in e)).toEqual([]);
+    it("marks no event as the run's own but its start and its verdict", () => {
+      expect(
+        recorded.events.filter(
+          (e) => e.Package !== "gotest run" && "RunLevel" in e,
+        ),
+      ).toEqual([]);
+    });
+
+    it("opens with the run's manifest and ends with its result", () => {
+      const first = recorded.events[0];
+      const last = recorded.events.at(-1);
+      expect(first?.Package).toBe("gotest run");
+      expect(first?.Action).toBe("start");
+      expect(first?.RunLevel).toBe(true);
+      expect(first?.Manifest?.Args?.[0]).toBe("-json");
+      expect(last?.Package).toBe("gotest run");
+      expect(last?.Action).toBe("pass");
+      expect(last?.Result?.ExitCode).toBe(recorded.exitCode);
     });
   });
 
@@ -737,7 +756,10 @@ describe("recorded live runs", () => {
       expect(suite.length).toBeGreaterThan(0);
       expect(
         recorded.events.filter(
-          (e) => e.Package !== "shared fixtures" && "RunLevel" in e,
+          (e) =>
+            e.Package !== "shared fixtures" &&
+            e.Package !== "gotest run" &&
+            "RunLevel" in e,
         ),
       ).toEqual([]);
     });

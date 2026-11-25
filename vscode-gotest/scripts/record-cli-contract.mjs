@@ -29,7 +29,8 @@
 // what a run writes: the -json stream's shape (one start per package before
 // its other events, the verdicts of packages it runs nothing in) and a run
 // whose patterns match no package. One more runs a module the script writes,
-// whose shared fixture never comes up. Times and durations are masked.
+// whose shared fixture never comes up. Times and durations are masked, and
+// so are the Go, the checkout and the agent the run's manifest names.
 //
 // The `outputs` cases pin the other documents the extension reads: the
 // `discover` payload, the `bench --json` report, the cover profile a run
@@ -240,7 +241,8 @@ const LIVE = {
   ],
 };
 
-// mask drops what changes from run to run: times and durations.
+// mask drops what changes from run to run: times and durations, and the
+// host facts the run's manifest names: the Go, the checkout and the agent.
 function mask(stdout) {
   return stdout
     .split("\n")
@@ -249,6 +251,12 @@ function mask(stdout) {
       const ev = JSON.parse(line);
       delete ev.Time;
       if ("Elapsed" in ev) ev.Elapsed = 0;
+      if (ev.Manifest) {
+        if ("GoVersion" in ev.Manifest) ev.Manifest.GoVersion = "<go>";
+        if ("Commit" in ev.Manifest) ev.Manifest.Commit = "<commit>";
+        if ("Dirty" in ev.Manifest) ev.Manifest.Dirty = "<dirty>";
+        delete ev.Manifest.Agent;
+      }
       if (typeof ev.Output === "string") {
         ev.Output = ev.Output.replace(/\d+\.\d+s\b/g, "<d>s");
       }
