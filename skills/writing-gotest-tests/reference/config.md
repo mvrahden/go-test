@@ -89,6 +89,17 @@ the tail, one only the bulk needed is torn down before it, and one only
 the tail needs starts there. Exclusive is not a serialization tool for
 shared mutable state; use non-parallel suites for that.
 
+Runs of one module on one machine, from one checkout or several
+worktrees, take turns at their exclusive scopes (v1.42+): the default
+group's `Exclusive` suites, and each named group for its whole run. A run
+that finds one held says once on stderr which run holds it, by pid, and
+waits; the wait counts against no suite's budget, and a stop or the run's
+`--timeout` ends it. Runs of other modules never wait for each other, and
+a gotest run started by a suite under a held scope takes that scope as its
+own. `GOTEST_EXCLUSIVE_LOCK=0` turns the turn-taking off for a run whose
+exclusive suites need only their own run to themselves
+([Exclusive across runs](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-exclusive-across-runs)).
+
 ## Exclusive groups (v1.36+)
 
 `SuiteConfig{ExclusiveGroup: "e2e"}` puts a suite in a named group: the

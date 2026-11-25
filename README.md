@@ -948,6 +948,7 @@ Start from a preset to override its durations (`cfg := gotest.IntegrationSuiteCo
 `Exclusive: true` schedules the suite's process strictly alone: after every non-exclusive suite has finished, one exclusive suite at a time, in deterministic order.
 Use it for suites whose verdicts depend on wall-clock behavior or contended resources (timing budgets, containers, ports, heavy child builds) — a budget verdict taken on a saturated machine is not a verdict you can act on.
 Like `Parallel`, it is resolved statically by the generator and affects scheduling only.
+Two runs of one module on one machine, such as two agents in sibling worktrees, take turns at their Exclusive suites and at each named group; a run that has to wait says so once on stderr, and `GOTEST_EXCLUSIVE_LOCK=0` turns this off ([Exclusive across runs](specs/lifecycle/spec.md#requirement-exclusive-across-runs)).
 
 `ExclusiveGroup: "e2e"` puts the suite in a named group that runs apart from every other suite, its members in parallel among themselves: the default group runs first, then each named group by name, and `Exclusive` then means alone within the group ([Exclusive groups](specs/lifecycle/spec.md#requirement-exclusive-groups)).
 A shared fixture only the group reads starts when the group starts and is released at its last use; a group that runs first, such as the one `--group` selects, starts it beside compilation, as the default group does.
