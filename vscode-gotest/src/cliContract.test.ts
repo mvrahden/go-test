@@ -111,6 +111,30 @@ interface LiveRun {
   events: LiveEvent[];
 }
 
+// Interleaved streams replayed beside their burst twins, and a --live run
+// recorded per suite: the order across suites is the scheduler's.
+interface StreamCases {
+  replays: Record<
+    string,
+    Record<
+      "gating" | "renderOnly",
+      { exitCode: number | null; stdoutMatchesBurst: boolean }
+    >
+  >;
+  run: {
+    args: string[];
+    exitCode: number | null;
+    stderr: string;
+    heldWhileBothSuitesRan: boolean;
+    packageStartsFirst: boolean;
+    packageVerdictAfterItsSuites: boolean;
+    eventsFileMatchesStdout: boolean;
+    renderMatchesBurst: boolean;
+    package: LiveEvent[];
+    suites: Record<string, LiveEvent[]>;
+  };
+}
+
 // A `gotest lint -json` run, its paths masked to "<fixtures>".
 interface LintRun {
   args: string[];
@@ -201,6 +225,7 @@ const golden = JSON.parse(
   cases: Record<string, ContractCase>;
   spec: Record<string, SpecRun>;
   live: Record<string, LiveRun>;
+  stream: StreamCases;
   outputs: Record<string, OutputRun>;
   lint: Record<string, LintRun>;
   audit: Record<string, AuditRun>;
@@ -829,6 +854,73 @@ function promotedSeeds(stdout: string) {
     .map(parsePromotedSeed)
     .filter((v) => v !== undefined);
 }
+
+describe("recorded interleaved streams", () => {
+  it("replays every interleaved stream as its burst twin renders", () => {
+    expect(Object.keys(golden.stream.replays).sort()).toEqual([
+      "crash",
+      "packages",
+      "suites",
+      "timeout",
+    ]);
+    for (const [name, variants] of Object.entries(golden.stream.replays)) {
+      expect(variants.gating.stdoutMatchesBurst, name).toBe(true);
+      expect(variants.renderOnly.stdoutMatchesBurst, name).toBe(true);
+      expect(variants.renderOnly.exitCode, name).toBe(0);
+    }
+  });
+
+  describe("a --live run whose two suites hold", () => {
+    const run = golden.stream.run;
+
+    it("wrote both suites' first passes while both still ran", () => {
+      expect(run.args).toContain("--live");
+      expect(run.exitCode).toBe(0);
+      expect(run.stderr).toBe("");
+      expect(run.heldWhileBothSuitesRan).toBe(true);
+    });
+
+    it("opens the package with its start and judges it after its suites", () => {
+      expect(run.packageStartsFirst).toBe(true);
+      expect(run.packageVerdictAfterItsSuites).toBe(true);
+      expect(run.package.map((e) => e.Action)).toEqual([
+        "start",
+        "output",
+        "pass",
+      ]);
+    });
+
+    it("writes each test's run first and its verdict last, once", () => {
+      expect(Object.keys(run.suites)).toEqual([
+        "TestFirstTestSuite",
+        "TestSecondTestSuite",
+      ]);
+      for (const events of Object.values(run.suites)) {
+        const byTest = new Map<string, string[]>();
+        for (const e of events) {
+          byTest.set(e.Test!, [...(byTest.get(e.Test!) ?? []), e.Action]);
+        }
+        for (const [test, actions] of byTest) {
+          expect(actions[0], test).toBe("run");
+          expect(actions.at(-1), test).toBe("pass");
+          expect(
+            actions.filter((a) => a === "run"),
+            test,
+          ).toHaveLength(1);
+          expect(
+            actions.filter((a) => a === "pass"),
+            test,
+          ).toHaveLength(1);
+        }
+      }
+    });
+
+    it("saves the events file as stdout and renders as its burst would", () => {
+      expect(run.eventsFileMatchesStdout).toBe(true);
+      expect(run.renderMatchesBurst).toBe(true);
+    });
+  });
+});
 
 describe("recorded outputs", () => {
   it("records exactly the stated outputs", () => {

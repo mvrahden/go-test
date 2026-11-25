@@ -2,7 +2,8 @@
   "note": [
     "Recorded contract of `gotest spec --input=- --format=json`, of its",
     "--declared and --hide forms (`spec`), of live `gotest -json` runs",
-    "(`live`), of the other documents the extension reads (`outputs`), and",
+    "(`live`), of interleaved streams and a --live run (`stream`), of the",
+    "other documents the extension reads (`outputs`), and",
     "of `gotest lint -json` and `gotest lint -rules -json` (`lint`), and",
     "of `gotest audit` over the conformance suite's base and head (`audit`),",
     "and of `gotest runs`, --check-fresh and --changed over a staged module (`runs`).",
@@ -2174,6 +2175,339 @@
           {
             "path": "shared fixtures",
             "runLevel": true
+          }
+        ]
+      }
+    }
+  },
+  "stream": {
+    "replays": {
+      "crash": {
+        "gating": {
+          "exitCode": 1,
+          "stdoutMatchesBurst": true
+        },
+        "renderOnly": {
+          "exitCode": 0,
+          "stdoutMatchesBurst": true
+        }
+      },
+      "packages": {
+        "gating": {
+          "exitCode": 1,
+          "stdoutMatchesBurst": true
+        },
+        "renderOnly": {
+          "exitCode": 0,
+          "stdoutMatchesBurst": true
+        }
+      },
+      "suites": {
+        "gating": {
+          "exitCode": 1,
+          "stdoutMatchesBurst": true
+        },
+        "renderOnly": {
+          "exitCode": 0,
+          "stdoutMatchesBurst": true
+        }
+      },
+      "timeout": {
+        "gating": {
+          "exitCode": 1,
+          "stdoutMatchesBurst": true
+        },
+        "renderOnly": {
+          "exitCode": 0,
+          "stdoutMatchesBurst": true
+        }
+      }
+    },
+    "run": {
+      "args": [
+        "-json",
+        "--live",
+        "./tests/conformance/testdata/clilive/"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "heldWhileBothSuitesRan": true,
+      "packageStartsFirst": true,
+      "packageVerdictAfterItsSuites": true,
+      "eventsFileMatchesStdout": true,
+      "renderMatchesBurst": true,
+      "package": [
+        {
+          "Action": "start",
+          "Package": "github.com/mvrahden/go-test/tests/conformance/testdata/clilive"
+        },
+        {
+          "Action": "output",
+          "Output": "ok  \tgithub.com/mvrahden/go-test/tests/conformance/testdata/clilive\t<d>s\n",
+          "Package": "github.com/mvrahden/go-test/tests/conformance/testdata/clilive"
+        },
+        {
+          "Action": "pass",
+          "Elapsed": 0,
+          "Package": "github.com/mvrahden/go-test/tests/conformance/testdata/clilive",
+          "InputHash": "<hash>"
+        }
+      ],
+      "suites": {
+        "TestFirstTestSuite": [
+          {
+            "Action": "run",
+            "Package": "github.com/mvrahden/go-test/tests/conformance/testdata/clilive",
+            "Test": "TestFirstTestSuite",
+            "Gotest": {
+              "Subtest": "TestFirstTestSuite"
+            }
+          },
+          {
+            "Action": "output",
+            "Package": "github.com/mvrahden/go-test/tests/conformance/testdata/clilive",
+            "Test": "TestFirstTestSuite",
+            "Output": "=== RUN   TestFirstTestSuite\n",
+            "OutputType": "frame"
+          },
+          {
+            "Action": "run",
+            "Package": "github.com/mvrahden/go-test/tests/conformance/testdata/clilive",
+            "Test": "TestFirstTestSuite/TestAPasses",
+            "Gotest": {
+              "Subtest": "TestAPasses"
+            }
+          },
+          {
+            "Action": "output",
+            "Package": "github.com/mvrahden/go-test/tests/conformance/testdata/clilive",
+            "Test": "TestFirstTestSuite/TestAPasses",
+            "Output": "=== RUN   TestFirstTestSuite/TestAPasses\n",
+            "OutputType": "frame"
+          },
+          {
+            "Action": "attr",
+            "Package": "github.com/mvrahden/go-test/tests/conformance/testdata/clilive",
+            "Test": "TestFirstTestSuite/TestAPasses",
+            "Key": "gotest.assertions",
+            "Value": "1"
+          },
+          {
+            "Action": "output",
+            "Package": "github.com/mvrahden/go-test/tests/conformance/testdata/clilive",
+            "Test": "TestFirstTestSuite/TestAPasses",
+            "Output": "=== ATTR  TestFirstTestSuite/TestAPasses gotest.assertions 1\n",
+            "OutputType": "frame"
+          },
+          {
+            "Action": "output",
+            "Package": "github.com/mvrahden/go-test/tests/conformance/testdata/clilive",
+            "Test": "TestFirstTestSuite/TestAPasses",
+            "Output": "--- PASS: TestFirstTestSuite/TestAPasses (<d>s)\n",
+            "OutputType": "frame"
+          },
+          {
+            "Action": "pass",
+            "Package": "github.com/mvrahden/go-test/tests/conformance/testdata/clilive",
+            "Test": "TestFirstTestSuite/TestAPasses",
+            "Elapsed": 0
+          },
+          {
+            "Action": "run",
+            "Package": "github.com/mvrahden/go-test/tests/conformance/testdata/clilive",
+            "Test": "TestFirstTestSuite/TestBHolds",
+            "Gotest": {
+              "Subtest": "TestBHolds"
+            }
+          },
+          {
+            "Action": "output",
+            "Package": "github.com/mvrahden/go-test/tests/conformance/testdata/clilive",
+            "Test": "TestFirstTestSuite/TestBHolds",
+            "Output": "=== RUN   TestFirstTestSuite/TestBHolds\n",
+            "OutputType": "frame"
+          },
+          {
+            "Action": "attr",
+            "Package": "github.com/mvrahden/go-test/tests/conformance/testdata/clilive",
+            "Test": "TestFirstTestSuite/TestBHolds",
+            "Key": "gotest.asserts-by",
+            "Value": "released by the run under test"
+          },
+          {
+            "Action": "output",
+            "Package": "github.com/mvrahden/go-test/tests/conformance/testdata/clilive",
+            "Test": "TestFirstTestSuite/TestBHolds",
+            "Output": "=== ATTR  TestFirstTestSuite/TestBHolds gotest.asserts-by released by the run under test\n",
+            "OutputType": "frame"
+          },
+          {
+            "Action": "attr",
+            "Package": "github.com/mvrahden/go-test/tests/conformance/testdata/clilive",
+            "Test": "TestFirstTestSuite/TestBHolds",
+            "Key": "gotest.assertions",
+            "Value": "0"
+          },
+          {
+            "Action": "output",
+            "Package": "github.com/mvrahden/go-test/tests/conformance/testdata/clilive",
+            "Test": "TestFirstTestSuite/TestBHolds",
+            "Output": "=== ATTR  TestFirstTestSuite/TestBHolds gotest.assertions 0\n",
+            "OutputType": "frame"
+          },
+          {
+            "Action": "output",
+            "Package": "github.com/mvrahden/go-test/tests/conformance/testdata/clilive",
+            "Test": "TestFirstTestSuite/TestBHolds",
+            "Output": "--- PASS: TestFirstTestSuite/TestBHolds (<d>s)\n",
+            "OutputType": "frame"
+          },
+          {
+            "Action": "pass",
+            "Package": "github.com/mvrahden/go-test/tests/conformance/testdata/clilive",
+            "Test": "TestFirstTestSuite/TestBHolds",
+            "Elapsed": 0
+          },
+          {
+            "Action": "output",
+            "Package": "github.com/mvrahden/go-test/tests/conformance/testdata/clilive",
+            "Test": "TestFirstTestSuite",
+            "Output": "--- PASS: TestFirstTestSuite (<d>s)\n",
+            "OutputType": "frame"
+          },
+          {
+            "Action": "pass",
+            "Package": "github.com/mvrahden/go-test/tests/conformance/testdata/clilive",
+            "Test": "TestFirstTestSuite",
+            "Elapsed": 0
+          }
+        ],
+        "TestSecondTestSuite": [
+          {
+            "Action": "run",
+            "Package": "github.com/mvrahden/go-test/tests/conformance/testdata/clilive",
+            "Test": "TestSecondTestSuite",
+            "Gotest": {
+              "Subtest": "TestSecondTestSuite"
+            }
+          },
+          {
+            "Action": "output",
+            "Package": "github.com/mvrahden/go-test/tests/conformance/testdata/clilive",
+            "Test": "TestSecondTestSuite",
+            "Output": "=== RUN   TestSecondTestSuite\n",
+            "OutputType": "frame"
+          },
+          {
+            "Action": "run",
+            "Package": "github.com/mvrahden/go-test/tests/conformance/testdata/clilive",
+            "Test": "TestSecondTestSuite/TestAPasses",
+            "Gotest": {
+              "Subtest": "TestAPasses"
+            }
+          },
+          {
+            "Action": "output",
+            "Package": "github.com/mvrahden/go-test/tests/conformance/testdata/clilive",
+            "Test": "TestSecondTestSuite/TestAPasses",
+            "Output": "=== RUN   TestSecondTestSuite/TestAPasses\n",
+            "OutputType": "frame"
+          },
+          {
+            "Action": "attr",
+            "Package": "github.com/mvrahden/go-test/tests/conformance/testdata/clilive",
+            "Test": "TestSecondTestSuite/TestAPasses",
+            "Key": "gotest.assertions",
+            "Value": "1"
+          },
+          {
+            "Action": "output",
+            "Package": "github.com/mvrahden/go-test/tests/conformance/testdata/clilive",
+            "Test": "TestSecondTestSuite/TestAPasses",
+            "Output": "=== ATTR  TestSecondTestSuite/TestAPasses gotest.assertions 1\n",
+            "OutputType": "frame"
+          },
+          {
+            "Action": "output",
+            "Package": "github.com/mvrahden/go-test/tests/conformance/testdata/clilive",
+            "Test": "TestSecondTestSuite/TestAPasses",
+            "Output": "--- PASS: TestSecondTestSuite/TestAPasses (<d>s)\n",
+            "OutputType": "frame"
+          },
+          {
+            "Action": "pass",
+            "Package": "github.com/mvrahden/go-test/tests/conformance/testdata/clilive",
+            "Test": "TestSecondTestSuite/TestAPasses",
+            "Elapsed": 0
+          },
+          {
+            "Action": "run",
+            "Package": "github.com/mvrahden/go-test/tests/conformance/testdata/clilive",
+            "Test": "TestSecondTestSuite/TestBHolds",
+            "Gotest": {
+              "Subtest": "TestBHolds"
+            }
+          },
+          {
+            "Action": "output",
+            "Package": "github.com/mvrahden/go-test/tests/conformance/testdata/clilive",
+            "Test": "TestSecondTestSuite/TestBHolds",
+            "Output": "=== RUN   TestSecondTestSuite/TestBHolds\n",
+            "OutputType": "frame"
+          },
+          {
+            "Action": "attr",
+            "Package": "github.com/mvrahden/go-test/tests/conformance/testdata/clilive",
+            "Test": "TestSecondTestSuite/TestBHolds",
+            "Key": "gotest.asserts-by",
+            "Value": "released by the run under test"
+          },
+          {
+            "Action": "output",
+            "Package": "github.com/mvrahden/go-test/tests/conformance/testdata/clilive",
+            "Test": "TestSecondTestSuite/TestBHolds",
+            "Output": "=== ATTR  TestSecondTestSuite/TestBHolds gotest.asserts-by released by the run under test\n",
+            "OutputType": "frame"
+          },
+          {
+            "Action": "attr",
+            "Package": "github.com/mvrahden/go-test/tests/conformance/testdata/clilive",
+            "Test": "TestSecondTestSuite/TestBHolds",
+            "Key": "gotest.assertions",
+            "Value": "0"
+          },
+          {
+            "Action": "output",
+            "Package": "github.com/mvrahden/go-test/tests/conformance/testdata/clilive",
+            "Test": "TestSecondTestSuite/TestBHolds",
+            "Output": "=== ATTR  TestSecondTestSuite/TestBHolds gotest.assertions 0\n",
+            "OutputType": "frame"
+          },
+          {
+            "Action": "output",
+            "Package": "github.com/mvrahden/go-test/tests/conformance/testdata/clilive",
+            "Test": "TestSecondTestSuite/TestBHolds",
+            "Output": "--- PASS: TestSecondTestSuite/TestBHolds (<d>s)\n",
+            "OutputType": "frame"
+          },
+          {
+            "Action": "pass",
+            "Package": "github.com/mvrahden/go-test/tests/conformance/testdata/clilive",
+            "Test": "TestSecondTestSuite/TestBHolds",
+            "Elapsed": 0
+          },
+          {
+            "Action": "output",
+            "Package": "github.com/mvrahden/go-test/tests/conformance/testdata/clilive",
+            "Test": "TestSecondTestSuite",
+            "Output": "--- PASS: TestSecondTestSuite (<d>s)\n",
+            "OutputType": "frame"
+          },
+          {
+            "Action": "pass",
+            "Package": "github.com/mvrahden/go-test/tests/conformance/testdata/clilive",
+            "Test": "TestSecondTestSuite",
+            "Elapsed": 0
           }
         ]
       }

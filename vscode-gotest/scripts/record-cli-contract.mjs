@@ -297,6 +297,155 @@ for (const [name, args] of Object.entries(LIVE)) {
   };
 }
 
+// The `stream` cases pin what an interleaved stream is to the CLI. Each
+// testdata/live stream holds the events of its burst twin, the suites
+// interleaved as a live run writes them, and must render as the twin does.
+// A real --live run of the conformance suite's clilive package, whose two
+// suites hold until the script releases them, is recorded per suite: the
+// order across suites is the scheduler's, each suite's own is the contract.
+const liveDir = path.join(testdataDir, "live");
+const stream = { replays: {}, run: null };
+for (const file of readdirSync(liveDir).sort()) {
+  if (!file.endsWith("-live.jsonl")) continue;
+  const name = file.replace(/-live\.jsonl$/, "");
+  const live = readFileSync(path.join(liveDir, file), "utf-8");
+  const burst = readFileSync(
+    path.join(liveDir, `${name}-burst.jsonl`),
+    "utf-8",
+  );
+  stream.replays[name] = {};
+  for (const [variant, args] of Object.entries(VARIANTS)) {
+    const a = await run(bin, args, live);
+    const b = await run(bin, args, burst);
+    stream.replays[name][variant] = {
+      exitCode: a.exitCode,
+      stdoutMatchesBurst: a.stdout === b.stdout && a.exitCode === b.exitCode,
+    };
+  }
+}
+
+// runHeld runs args with clilive's suites holding until both have passed
+// their first method, then releases them. held says both first passes were
+// on stdout while neither suite had ended.
+async function runHeld(args) {
+  const release = tempDir("gotest-contract-release-");
+  const events = path.join(release, "events.jsonl");
+  const child = spawn(bin, [`--events-file=${events}`, ...args], {
+    cwd: repoRoot,
+    env: {
+      ...outputEnv({ LIVE_RELEASE_DIR: release }),
+      GOTEST_LIVE: "",
+    },
+  });
+  current = child;
+  let stdout = "";
+  let stderr = "";
+  let held;
+  const firstPasses = (text) =>
+    ["TestFirstTestSuite", "TestSecondTestSuite"].every((s) =>
+      text.includes(
+        `"Action":"pass","Package":"${livePkg}","Test":"${s}/TestAPasses"`,
+      ),
+    );
+  const ended = (text) =>
+    /"Action":"(pass|fail)","Package":"[^"]*","Test":"Test[A-Za-z]+Suite"/.test(
+      text,
+    );
+  const free = () => {
+    for (const name of ["first", "second"])
+      writeFileSync(path.join(release, name), "");
+  };
+  // A run that never shows both passes is released anyway, and says so.
+  const giveUp = setTimeout(() => {
+    held ??= false;
+    free();
+  }, 120_000);
+  child.stdout.setEncoding("utf-8").on("data", (d) => {
+    stdout += d;
+    if (held === undefined && firstPasses(stdout)) {
+      held = !ended(stdout);
+      free();
+    }
+  });
+  child.stderr.setEncoding("utf-8").on("data", (d) => (stderr += d));
+  child.stdin.end();
+  const status = await new Promise((resolve, reject) => {
+    child.on("error", reject);
+    child.on("close", resolve);
+  });
+  clearTimeout(giveUp);
+  current = undefined;
+  return {
+    status,
+    stdout,
+    stderr,
+    held: held ?? false,
+    file: readFileSync(events, "utf-8"),
+  };
+}
+
+const livePkg =
+  "github.com/mvrahden/go-test/tests/conformance/testdata/clilive";
+const liveArgs = ["-json", "--live", "./tests/conformance/testdata/clilive/"];
+// Built and warmed first, so the held run compiles nothing while it waits.
+await run(bin, ["-json", "./tests/conformance/testdata/clilive/"], "", {
+  env: outputEnv(),
+});
+{
+  const r = await runHeld(liveArgs);
+  const events = mask(r.stdout);
+  const rootOf = (ev) => (ev.Test ?? "").split("/")[0];
+  const suites = {};
+  for (const ev of events) {
+    if (!ev.Test) continue;
+    (suites[rootOf(ev)] ??= []).push(ev);
+  }
+  const own = events.filter((ev) => !ev.Test && ev.Package === livePkg);
+  const lastSuite = Math.max(...events.map((ev, i) => (ev.Test ? i : -1)));
+  const verdict = events.findIndex(
+    (ev) =>
+      !ev.Test &&
+      ev.Package === livePkg &&
+      (ev.Action === "pass" || ev.Action === "fail"),
+  );
+  // The same events, each suite whole, as a run without --live writes them.
+  const lines = r.stdout.split("\n").filter((l) => l.trim() !== "");
+  const regrouped = [
+    ...lines.filter(
+      (l) => !JSON.parse(l).Test && JSON.parse(l).Action === "start",
+    ),
+    ...Object.keys(suites)
+      .sort()
+      .flatMap((s) => lines.filter((l) => rootOf(JSON.parse(l)) === s)),
+    ...lines.filter(
+      (l) => !JSON.parse(l).Test && JSON.parse(l).Action !== "start",
+    ),
+  ];
+  const render = (text) => run(bin, VARIANTS.renderOnly, text);
+  const asLive = await render(r.stdout);
+  const asBurst = await render(regrouped.join("\n") + "\n");
+  stream.run = {
+    args: liveArgs,
+    exitCode: r.status,
+    stderr: r.stderr,
+    heldWhileBothSuitesRan: r.held,
+    packageStartsFirst:
+      own[0]?.Action === "start" &&
+      events.findIndex((ev) => ev.Package === livePkg) ===
+        events.findIndex((ev) => ev === own[0]),
+    packageVerdictAfterItsSuites: verdict > lastSuite,
+    eventsFileMatchesStdout: r.file === r.stdout,
+    renderMatchesBurst:
+      asLive.exitCode === asBurst.exitCode && asLive.stdout === asBurst.stdout,
+    package: own,
+    suites: Object.fromEntries(
+      Object.keys(suites)
+        .sort()
+        .map((s) => [s, suites[s]]),
+    ),
+  };
+}
+
 // The environment of the outputs cases: no CI or agent variables, which
 // change what the CLI writes, and no slow-build notice on a slow machine.
 function outputEnv(extra = {}) {
@@ -1010,7 +1159,8 @@ const golden = {
   note: [
     "Recorded contract of `gotest spec --input=- --format=json`, of its",
     "--declared and --hide forms (`spec`), of live `gotest -json` runs",
-    "(`live`), of the other documents the extension reads (`outputs`), and",
+    "(`live`), of interleaved streams and a --live run (`stream`), of the",
+    "other documents the extension reads (`outputs`), and",
     "of `gotest lint -json` and `gotest lint -rules -json` (`lint`), and",
     "of `gotest audit` over the conformance suite's base and head (`audit`),",
     "and of `gotest runs`, --check-fresh and --changed over a staged module (`runs`).",
@@ -1020,6 +1170,7 @@ const golden = {
   cases,
   spec,
   live,
+  stream,
   outputs,
   lint,
   audit,
