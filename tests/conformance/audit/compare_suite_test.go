@@ -124,12 +124,26 @@ func (s *AuditCompareTestSuite) TestWhatGotWeaker(t *gotest.T) {
 			doc := readDoc(it, s.json.Stdout)
 			var got []string
 			for _, f := range findings(&doc, false) {
-				gotest.Equal(it, "changed", f.Class)
+				if f.Class != "changed" {
+					continue
+				}
 				gotest.Regexp(it, `^[0-9a-f]{16}$`, f.Head)
 				gotest.NotEqual(it, f.Base, f.Head)
 				got = append(got, f.Subject)
 			}
 			gotest.Equal(it, []string{"Cart / Add / when one number is negative / returns the difference", "Cart / Rounds"}, got)
+		})
+	})
+	t.When("a suppression keeps its file and rules and gives a new reason", func(w *gotest.T) {
+		w.It("lists it as an informational suppression finding naming both comments", func(it *gotest.T) {
+			doc := readDoc(it, s.json.Stdout)
+			var got []finding
+			for _, f := range findings(&doc, false) {
+				if f.Class == "suppression" {
+					got = append(got, f)
+				}
+			}
+			gotest.Equal(it, []finding{{"suppression", "shop/plain_test.go", "//nolint:stdlib-test", "//nolint:stdlib-test // a plain stdlib test"}}, got)
 		})
 	})
 	t.When("a suppression moves to another line with its rules and reason", func(w *gotest.T) {
@@ -147,7 +161,7 @@ func (s *AuditCompareTestSuite) TestTheAuditDocument(t *gotest.T) {
 		w.It("prints one document opening with version and schema that holds base, head, summary, findings, behaviors and empty evidence and unproven lists", func(it *gotest.T) {
 			gotest.Equal(it, 0, s.json.Exit, "stderr: %s", s.json.Stderr)
 			gotest.Regexp(it, `^\{"version":"[^"]+","schema":1,"base":\{`, s.json.Stdout)
-			for _, key := range []string{`"head":{`, `"summary":{"weakenings":13,"informational":2,`, `"findings":[{`, `"behaviors":[{`, `"evidence":[]`, `"unproven":[]`} {
+			for _, key := range []string{`"head":{`, `"summary":{"weakenings":13,"informational":3,`, `"findings":[{`, `"behaviors":[{`, `"evidence":[]`, `"unproven":[]`} {
 				gotest.Contains(it, s.json.Stdout, key)
 			}
 			gotest.Equal(it, 1, strings.Count(s.json.Stdout, "\n"))

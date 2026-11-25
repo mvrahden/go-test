@@ -30,7 +30,7 @@ How `gotest audit` records the test estate a tree declares without running it, h
 - **THEN** lists both as removed and the new one as added
 
 ### Requirement: What got weaker
-The audit SHALL list, as a finding of its class with its subject and its base and head value, each fact that weakens the estate: a removed behavior, an `X_` or `F_` the head adds, a guard added, a budget raised or `NoDeadline` set, a suppression added (matched by module, file, rules and reason, not line), a snapshot file rewritten or deleted, fewer assertions or an `AssertsBy` added; a changed body SHALL be listed apart, as information.
+The audit SHALL list, as a finding of its class with its subject and its base and head value, each fact that weakens the estate: a removed behavior, an `X_` or `F_` the head adds, a guard added, a budget raised or `NoDeadline` set, a suppression added (matched by module, file, rules and reason, not line), a snapshot rewritten or deleted, fewer assertions or an `AssertsBy` added; a changed body, and a suppression that only changed its reason, SHALL be listed apart, as information.
 
 #### Scenario: A head that weakens the estate
 - **WHEN** the head removes a test, excludes one, focuses one, adds a guard, raises a budget, sets NoDeadline, adds a suppression, rewrites and deletes a snapshot, drops an assertion and adds AssertsBy
@@ -40,6 +40,10 @@ The audit SHALL list, as a finding of its class with its subject and its base an
 #### Scenario: A suppression that moved
 - **WHEN** a suppression moves to another line with its rules and reason
 - **THEN** lists no suppression finding for it
+
+#### Scenario: A suppression with a new reason
+- **WHEN** a suppression keeps its file and rules and gives a new reason
+- **THEN** lists it as an informational suppression finding naming both comments
 
 ### Requirement: The audit document
 With `--format=json` the audit SHALL print one document opening with `version` and `schema` that holds both records' provenance, a summary of counts, the findings, the behaviors and the `evidence` and `unproven` lists, empty in this version. The default text format SHALL print the weakenings before the behaviors and end with one `gotest audit:` closing line; `--format=md` SHALL write the same document as Markdown.

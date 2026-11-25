@@ -38,7 +38,8 @@ type Side struct {
 type Summary struct {
 	Weakenings    int `json:"weakenings"`
 	Informational int `json:"informational"`
-	// Classes counts the findings of each class that has any.
+	// Classes counts, per class that has any, the findings --fail-on
+	// judges: the weakenings and the changed bodies.
 	Classes    map[string]int `json:"classes"`
 	Added      int            `json:"added"`
 	Removed    int            `json:"removed"`
@@ -97,7 +98,8 @@ var Classes = []string{
 	ClassSuppression, ClassSnapshot, ClassAssertions, ClassAssertsBy, ClassChanged,
 }
 
-// Weakens reports whether a class is a weakening, not information.
+// Weakens reports whether a class is a weakening, not information. A
+// suppression that only changed its reason is information of its class.
 func Weakens(class string) bool { return class != ClassChanged }
 
 // Finding is one fact of a class: what it is about and its value on each

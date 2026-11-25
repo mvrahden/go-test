@@ -111,6 +111,7 @@ func (s *AuditRecordTestSuite) TestTheTreeRecord(t *gotest.T) {
 				supps = append(supps, supp{sp.File, sp.Line, strings.Join(sp.Rules, ","), sp.Reason})
 			}
 			gotest.Equal(it, []supp{
+				{"shop/plain_test.go", 5, "stdlib-test", "a plain stdlib test"},
 				{"shop/stock_suite_test.go", 48, "stdlib-test", "kept for go test"},
 				{"shop/stock_suite_test.go", 55, "stdlib-test", "a second stdlib test"},
 			}, supps)

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditCompare / WhatGotWeaker / when a suppression keeps its file and rules and gives a new reason / lists it as an informational suppression finding naming both comments \(
+Clause: when a suppression keeps its file and rules and gives a new reason → lists it as an informational suppression finding naming both comments
+--- a/internal/gotestaudit/compare.go
++++ b/internal/gotestaudit/compare.go
+@@ -263,7 +263,7 @@
+ 	}
+ 	for _, s := range added {
+ 		loc := Location{File: s.File, Line: s.Line, EndLine: s.Line}
+-		if was := left[rules(s)]; len(was) == 1 && addedRules[rules(s)] == 1 {
++		if was := left[rules(s)]; len(was) == -1 && addedRules[rules(s)] == 1 {
+ 			c.doc.Findings = append(c.doc.Findings, Finding{Class: ClassSuppression, Subject: s.File, Base: suppressionText(was[0]), Head: suppressionText(s), Location: &loc})
+ 			continue
+ 		}

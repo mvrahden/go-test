@@ -226,26 +226,48 @@ func (c *collector) marked(n *node) {
 }
 
 // suppressions finds each comment the head adds, matched by module, file,
-// rules and reason, so one that only moved is no finding.
+// rules and reason, so one that only moved is no finding. Where one comment
+// of each side is left with the same file and rules, it only changed its
+// reason: information, not a weakening.
 func (c *collector) suppressions(base, head *Record) {
 	if unread(base, "suppressions") || unread(head, "suppressions") {
 		c.doc.Incomplete = append(c.doc.Incomplete, "suppressions: a record could not list them")
 		return
 	}
-	key := func(s *Suppression) string {
-		return s.Module + "\x00" + s.File + "\x00" + strings.Join(s.Rules, ",") + "\x00" + s.Reason
-	}
+	rules := func(s *Suppression) string { return s.Module + "\x00" + s.File + "\x00" + strings.Join(s.Rules, ",") }
+	key := func(s *Suppression) string { return rules(s) + "\x00" + s.Reason }
 	have := map[string]int{}
 	for i := range base.Suppressions {
 		have[key(&base.Suppressions[i])]++
 	}
+	var added []*Suppression
 	for i := range head.Suppressions {
 		s := &head.Suppressions[i]
 		if k := key(s); have[k] > 0 {
 			have[k]--
 			continue
 		}
-		c.find(ClassSuppression, "", s.File, "", suppressionText(s), Location{File: s.File, Line: s.Line, EndLine: s.Line})
+		added = append(added, s)
+	}
+	left := map[string][]*Suppression{}
+	for i := range base.Suppressions {
+		s := &base.Suppressions[i]
+		if k := key(s); have[k] > 0 {
+			have[k]--
+			left[rules(s)] = append(left[rules(s)], s)
+		}
+	}
+	addedRules := map[string]int{}
+	for _, s := range added {
+		addedRules[rules(s)]++
+	}
+	for _, s := range added {
+		loc := Location{File: s.File, Line: s.Line, EndLine: s.Line}
+		if was := left[rules(s)]; len(was) == 1 && addedRules[rules(s)] == 1 {
+			c.doc.Findings = append(c.doc.Findings, Finding{Class: ClassSuppression, Subject: s.File, Base: suppressionText(was[0]), Head: suppressionText(s), Location: &loc})
+			continue
+		}
+		c.find(ClassSuppression, "", s.File, "", suppressionText(s), loc)
 	}
 }
 
@@ -300,7 +322,9 @@ func (d *Document) finish() {
 	})
 	d.Summary = Summary{Classes: map[string]int{}, Incomplete: len(d.Incomplete)}
 	for _, f := range d.Findings {
-		d.Summary.Classes[f.Class]++
+		if f.Weakens || f.Class == ClassChanged {
+			d.Summary.Classes[f.Class]++
+		}
 		if f.Weakens {
 			d.Summary.Weakenings++
 		} else {

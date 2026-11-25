@@ -2,7 +2,7 @@ Expect: ^FAIL .*conformance/audit AuditCompare / TheAuditDocument / when audit c
 Clause: when audit compares two records with --format=md → writes a heading, a table of the weakenings and a table of the behaviors
 --- a/internal/gotestaudit/render.go
 +++ b/internal/gotestaudit/render.go
-@@ -191,7 +191,7 @@
+@@ -203,7 +203,7 @@
  	}
  	fmt.Fprintf(w, "### Audit: %s\n\n", head)
  	fmt.Fprintf(w, "Base %s → head %s\n", gotestspec.EscapeLabel(sideText(&d.Base)), gotestspec.EscapeLabel(sideText(&d.Head)))

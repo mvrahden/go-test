@@ -104,7 +104,7 @@ func (s *AuditGitBaseTestSuite) TestABaseFromGit(t *gotest.T) {
 			}
 			gotest.Equal(it, lists(s.viaFiles.Stdout), lists(s.viaGit.Stdout))
 			doc := readDoc(it, s.viaGit.Stdout)
-			gotest.Len(it, doc.Findings, 15)
+			gotest.Len(it, doc.Findings, 16)
 			gotest.Equal(it, "HEAD", doc.Base.Ref)
 			gotest.Equal(it, strings.TrimSpace(git(it, s.checkout, "rev-parse", "--short", "HEAD")), doc.Base.Commit)
 		})

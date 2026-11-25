@@ -1095,6 +1095,7 @@ shards of one run do not add up to every mutant exactly once.
 | `audit-guard-unfound` | a guard the head adds is no finding | audit conformance: the weakenings It misses the guard finding |
 | `audit-changed-counted-as-a-weakening` | a changed body is a weakening | audit conformance: the informational It finds no informational finding |
 | `audit-suppression-matched-by-line` | suppressions are matched by line too, so one that moved is added | audit conformance: the moved-suppression It finds the moved comment |
+| `audit-reworded-suppression-weakens` | a suppression that only changed its reason is a suppression added | audit conformance: the new-reason It finds no informational suppression |
 | `audit-evidence-null` | the document's evidence is null instead of an empty list | audit conformance: the JSON It finds no `"evidence":[]` |
 | `audit-text-behaviors-first` | the text format leaves the behaviors out | audit conformance: the text It finds no behaviors line |
 | `audit-markdown-weakenings-untabled` | the Markdown leaves the weakenings' table out | audit conformance: the Markdown It finds no weakenings table |

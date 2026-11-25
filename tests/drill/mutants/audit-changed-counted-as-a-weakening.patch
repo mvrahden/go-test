@@ -2,10 +2,10 @@ Expect: ^FAIL .*conformance/audit AuditCompare / WhatGotWeaker / when the head r
 Clause: when the head removes a test, excludes one, focuses one, adds a guard, raises a budget, sets NoDeadline, adds a suppression, rewrites and deletes a snapshot, drops an assertion and adds AssertsBy → lists each changed body as an informational finding, apart from the weakenings
 --- a/internal/gotestaudit/document.go
 +++ b/internal/gotestaudit/document.go
-@@ -98,7 +98,7 @@
- }
+@@ -100,7 +100,7 @@
  
- // Weakens reports whether a class is a weakening, not information.
+ // Weakens reports whether a class is a weakening, not information. A
+ // suppression that only changed its reason is information of its class.
 -func Weakens(class string) bool { return class != ClassChanged }
 +func Weakens(class string) bool { return class != "" }
  

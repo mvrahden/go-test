@@ -40,7 +40,7 @@ func RenderText(w io.Writer, d *Document, v Verdict) {
 	for _, list := range []struct {
 		title string
 		items []string
-	}{{"not compared", d.Incomplete}, {"notes", d.Notes}} {
+	}{{"information", information(d)}, {"not compared", d.Incomplete}, {"notes", d.Notes}} {
 		if len(list.items) == 0 {
 			continue
 		}
@@ -51,6 +51,18 @@ func RenderText(w io.Writer, d *Document, v Verdict) {
 	}
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, ClosingLine(d, v))
+}
+
+// information are the informational findings the behaviors do not show
+// already, one line each.
+func information(d *Document) []string {
+	var out []string
+	for _, f := range d.Findings {
+		if !f.Weakens && f.Class != ClassChanged {
+			out = append(out, fmt.Sprintf("%-11s  %s", f.Class, findingText(d, &f)))
+		}
+	}
+	return out
 }
 
 // ClosingLine is the text format's last line:
@@ -213,7 +225,7 @@ func RenderMarkdown(w io.Writer, d *Document, v Verdict) {
 	for _, list := range []struct {
 		title string
 		items []string
-	}{{"Not compared", d.Incomplete}, {"Notes", d.Notes}} {
+	}{{"Information", information(d)}, {"Not compared", d.Incomplete}, {"Notes", d.Notes}} {
 		if len(list.items) == 0 {
 			continue
 		}
