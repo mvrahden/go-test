@@ -281,6 +281,9 @@ func (a *auditArgs) mutationContext() (context.Context, func()) {
 	return ctx, func() { cancel(); stop() }
 }
 
+// mutantRunner is the CLI a mutant's suites run through: this one.
+var mutantRunner = os.Executable
+
 // mutantJudge runs one mutant's suites through this CLI's runner.
 type mutantJudge struct {
 	a        *auditArgs
@@ -384,7 +387,7 @@ func (j *mutantJudge) runSuites(ctx context.Context, id int, suites []*suiteRun,
 		names = appendOnce(names, regexp.QuoteMeta(s.name))
 		pkgs = appendOnce(pkgs, s.pkg)
 	}
-	exe, err := os.Executable()
+	exe, err := mutantRunner()
 	if err != nil {
 		return -1
 	}
