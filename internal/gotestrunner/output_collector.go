@@ -599,7 +599,7 @@ func (c *OutputCollector) jsonTarget() io.Writer {
 		}
 		c.starts = &startWriter{w: w, started: map[string]bool{}, gate: c.gate, runLevel: c.runLevel}
 		if c.manifest != nil {
-			c.starts.open(*c.manifest)
+			c.starts.open(c.manifest)
 		}
 		if c.gate == &exitGate {
 			liveStream.Store(c.starts)

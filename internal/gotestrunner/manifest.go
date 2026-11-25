@@ -44,11 +44,11 @@ func (r *runTally) count(pkg, test, action string) {
 
 // open writes the stream's first event, the run's start carrying m, and
 // starts the tally.
-func (s *startWriter) open(m protocol.Manifest) {
+func (s *startWriter) open(m *protocol.Manifest) {
 	now := time.Now()
 	s.run = &runTally{opened: now, packages: map[string]string{}}
 	s.runLevel[protocol.RunPackage] = true
-	data, _ := json.Marshal(runEvent{Time: now, Action: "start", Package: protocol.RunPackage, RunLevel: true, Manifest: &m})
+	data, _ := json.Marshal(runEvent{Time: now, Action: "start", Package: protocol.RunPackage, RunLevel: true, Manifest: m})
 	_, _ = s.Write(append(data, '\n'))
 }
 

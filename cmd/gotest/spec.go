@@ -216,7 +216,7 @@ func runOptions(events []gotestspec.TestEvent, code *int) []gotestspec.RenderOpt
 		c := *code
 		run.ExitCode = &c
 	}
-	return []gotestspec.RenderOption{gotestspec.WithRun(run)}
+	return []gotestspec.RenderOption{gotestspec.WithRun(&run)}
 }
 
 // renderSpec renders tree in format, under the view's options; live says

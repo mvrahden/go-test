@@ -11,8 +11,8 @@ type RunInfo struct {
 }
 
 // WithRun names the run a document renders.
-func WithRun(r RunInfo) RenderOption {
-	return func(c *renderConfig) { c.run = &r }
+func WithRun(r *RunInfo) RenderOption {
+	return func(c *renderConfig) { c.run = r }
 }
 
 // isRunEvent reports an event of the run's own package.
