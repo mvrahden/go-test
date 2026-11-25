@@ -246,8 +246,9 @@ func runText(inv Invocation, own OwnFlags, goTestArgs []string, jsonMode bool, a
 		}
 	}
 	gotestrunner.EndRun(code)
-	if !jsonMode && agent == nil && result != nil {
-		// stdout stays go test's text; the verdict closes stderr.
+	if !jsonMode && agent == nil && result != nil && result.Judged != nil {
+		// stdout stays go test's text; the verdict closes stderr. A -list
+		// run judges nothing.
 		fmt.Fprintln(os.Stderr, gotestrunner.ClosingOf(result.Judged, code, false))
 	}
 	if phases != "" {
