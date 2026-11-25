@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* stop_hook_active set, outside a git checkout, or in a module without gotest / exits 0 and writes nothing \(
+Clause: when an agent ends its turn with stop_hook_active set, outside a git checkout, or in a module without gotest → exits 0 and writes nothing
+--- a/cmd/gotest/hookstop.go
++++ b/cmd/gotest/hookstop.go
+@@ -43,7 +43,7 @@
+ // to continue; "" when there are none, when a stop hook already continued
+ // the turn, and on any failure.
+ func stopReason(in hookInput) string {
+-	if in.StopHookActive || in.Cwd == "" {
++	if in.Cwd == "" {
+ 		return ""
+ 	}
+ 	mod := findModule(in.Cwd)

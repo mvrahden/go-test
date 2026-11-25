@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* the agent ends its turn again with the same weakenings / exits 0 and writes nothing \(
+Clause: when the agent ends its turn again with the same weakenings → exits 0 and writes nothing
+--- a/cmd/gotest/hookstop.go
++++ b/cmd/gotest/hookstop.go
+@@ -77,7 +77,7 @@
+ 		if !f.Weakens || slices.Contains(standing, f.ID) {
+ 			continue
+ 		}
+-		if !slices.Contains(state.Reported, f.ID) {
++		if true {
+ 			fresh = append(fresh, f)
+ 		}
+ 		standing = append(standing, f.ID)

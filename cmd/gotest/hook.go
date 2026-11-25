@@ -38,9 +38,10 @@ const hookNoteLines = 40
 
 // hookInput is the part of an agent's hook event gotest reads.
 type hookInput struct {
-	HookEventName string `json:"hook_event_name"`
-	Cwd           string `json:"cwd"`
-	ToolInput     struct {
+	HookEventName  string `json:"hook_event_name"`
+	Cwd            string `json:"cwd"`
+	StopHookActive bool   `json:"stop_hook_active"`
+	ToolInput      struct {
 		FilePath string `json:"file_path"`
 		Command  string `json:"command"`
 	} `json:"tool_input"`
@@ -56,7 +57,8 @@ type hookOutput struct {
 }
 
 // runHook answers one agent hook event. It never exits 2, which agents
-// read as a block: a usage or input error exits 1.
+// read as a block: a usage or input error exits 1. Only the stop event
+// answers with a decision, one that continues the agent's turn.
 func runHook(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) != 1 {
 		fmt.Fprintln(stderr, "usage: gotest hook post-edit|pre-shell|stop < event.json")
@@ -84,6 +86,12 @@ func runHook(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	var note string
 	switch args[0] {
+	case "stop":
+		reason := stopReason(in)
+		if reason == "" {
+			return 0
+		}
+		return writeHookJSON(stdout, stderr, hookDecision{Decision: "block", Reason: reason})
 	case "post-edit":
 		note = postEditNote(in)
 	case "pre-shell":
@@ -95,9 +103,14 @@ func runHook(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if in.HookEventName != "" {
 		event = in.HookEventName
 	}
+	return writeHookJSON(stdout, stderr, hookOutput{HookSpecificOutput: hookContext{HookEventName: event, AdditionalContext: note}})
+}
+
+// writeHookJSON writes a hook's answer as one JSON object.
+func writeHookJSON(stdout, stderr io.Writer, answer any) int {
 	enc := json.NewEncoder(stdout)
 	enc.SetEscapeHTML(false)
-	if err := enc.Encode(hookOutput{HookSpecificOutput: hookContext{HookEventName: event, AdditionalContext: note}}); err != nil {
+	if err := enc.Encode(answer); err != nil {
 		fmt.Fprintf(stderr, "FAIL: %v\n", err)
 		return 1
 	}
@@ -500,17 +513,23 @@ Usage:
   gotest hook <event> < event.json
 
 Reads the agent's hook event as JSON on stdin. When there is something to
-say, writes one JSON object whose hookSpecificOutput carries
-additionalContext for the agent, and no permission decision; otherwise
-writes nothing. Exits 0, or 1 on an unknown event or input that is not JSON;
-never 2, which agents read as a block.
+say, writes one JSON object: for post-edit and pre-shell, hookSpecificOutput
+carries additionalContext for the agent, and no permission decision; for
+stop, decision "block" with a reason, which continues the agent's turn.
+Otherwise writes nothing. Exits 0, or 1 on an unknown event or input that
+is not JSON; never 2, which agents read as a block.
 
 Events:
   post-edit   After a file edit: for a _test.go file in a module that uses
               gotest, the lint findings of its package
   pre-shell   Before a shell command: for go test over packages that declare
               gotest suites, a note naming the gotest command that runs them
-  stop        When the agent stops: nothing yet
+  stop        When the agent ends its turn, in a git checkout of a module
+              that uses gotest: the weakenings gotest audit finds in the
+              working tree against the merge base of HEAD and origin's
+              default branch, else HEAD, each reported once per checkout.
+              Nothing when stop_hook_active is set, or when the audit fails
+              or takes longer than 20s
 
 The gotest plugin for Claude Code wires these events.
 `)

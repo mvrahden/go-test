@@ -1049,7 +1049,11 @@ shards of one run do not add up to every mutant exactly once.
 | `test-variants-built-for-export-data` | the package loader asks for types in its listing with tests, so go list builds every test variant and test main | pkgload: the load with tests asks for types |
 | `run-books-a-cached-result` | a suite that ran before is booked passed without running again | cli conformance: a package run twice runs its tests again and marks nothing cached |
 | `hook-unknown-event-exits-0` | `gotest hook` answers an event it does not know with exit 0 | cli conformance: an unknown hook event exits 1 and names the events |
-| `hook-stop-writes-a-note` | the stop hook event writes a note | cli conformance: the stop event exits 0 and writes nothing |
+| `hook-stop-audits-against-head` | `gotest hook stop` audits against HEAD where origin names a default branch | cli conformance: the stop reason does not name the merge base with origin/main |
+| `hook-stop-lists-information` | `gotest hook stop` lists a changed body among the weakenings | cli conformance: the stop reason names the changed `TestMultiplies` |
+| `hook-stop-reports-again` | `gotest hook stop` forgets what it reported | cli conformance: the second end of the turn blocks again |
+| `hook-stop-without-default-audits-the-parent` | without a default branch, `gotest hook stop` audits against HEAD's parent | cli conformance: the stop reason lists the committed removal of `TestSubtracts` |
+| `hook-stop-ignores-stop-hook-active` | `gotest hook stop` blocks a turn a stop hook already continued | cli conformance: the end of a turn with `stop_hook_active` set writes a decision |
 | `hook-lint-findings-dropped` | `gotest hook post-edit` drops the findings lint reports | cli conformance: an edited test file with a finding gets it as additional context |
 | `hook-lints-any-go-file` | `gotest hook post-edit` lints the package of any edited `.go` file, not only of a test file | cli conformance: an edited file that is not a test gets no answer |
 | `hook-note-keeps-go-test` | the `pre-shell` note gives the command line with `go test` left in it | cli conformance: the note's command line runs gotest in place of go test |

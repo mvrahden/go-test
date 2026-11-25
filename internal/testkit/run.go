@@ -105,6 +105,11 @@ func RunCLIWithInput(ctx context.Context, dir, input string, args ...string) (Ru
 	return runCLI(context.WithValue(ctx, stdinKey{}, input), dir, "", nil, args...)
 }
 
+// RunCLIWithInputEnv is RunCLIWithInput with RunCLIWithEnv's extra pairs.
+func RunCLIWithInputEnv(ctx context.Context, dir, input string, env []string, args ...string) (Run, error) {
+	return runCLI(context.WithValue(ctx, stdinKey{}, input), dir, "", env, args...)
+}
+
 func runCLI(ctx context.Context, dir, markerDir string, extraEnv []string, args ...string) (Run, error) {
 	binary, err := cli(ctx)
 	if err != nil {

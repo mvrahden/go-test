@@ -784,14 +784,30 @@ A test run, a -json run, spec and summary SHALL record, when they run their pack
 - **THEN** runs nothing and exits 2, saying why on stderr
 
 ### Requirement: An agent's hook events
-`gotest hook <event>` SHALL read a coding agent's hook event as JSON on stdin and never block the agent: it SHALL exit 0, writing nothing or one JSON object whose hookSpecificOutput carries additionalContext and no permission decision, and SHALL exit 1, never 2, on an event it does not know. The stop event SHALL write nothing.
+`gotest hook <event>` SHALL read a coding agent's hook event as JSON on stdin and never deny the agent a tool: it SHALL exit 0, writing nothing or one JSON object, for post-edit and pre-shell one whose hookSpecificOutput carries additionalContext and no permission decision, and SHALL exit 1, never 2, on an event it does not know.
 
 #### Scenario: An event gotest hook does not know
 - **WHEN** gotest hook runs an event it does not know
 - **THEN** exits 1 and names the events it takes on stderr
 
-#### Scenario: The stop event
-- **WHEN** gotest hook runs the stop event
+### Requirement: Weakenings at the end of an agent's turn
+In a git checkout of a module that uses gotest, `gotest hook stop` SHALL audit the working tree, running no test, against the merge base of HEAD and origin's default branch, else HEAD, and write a block decision whose reason lists each weakening not reported for the checkout before. It SHALL write nothing when stop_hook_active is set, for information, outside such a module or a checkout, and when the audit fails or takes over 20 seconds.
+
+#### Scenario: A turn that weakened the estate
+- **WHEN** an agent ends its turn in a checkout whose commits and uncommitted changes since the merge base with origin's default branch remove and exclude tests and change a body
+- **THEN** exits 0 with a block decision whose reason lists the removed and the excluded test with class, subject, values and location, and asks to undo each or state it to the user
+- **AND** lists no changed body
+
+#### Scenario: A weakening reported before
+- **WHEN** the agent ends its turn again with the same weakenings
+- **THEN** exits 0 and writes nothing
+
+#### Scenario: A checkout without a default branch
+- **WHEN** an agent ends its turn in a checkout whose origin names no default branch
+- **THEN** lists only the weakenings against HEAD
+
+#### Scenario: A turn the hook does not judge
+- **WHEN** an agent ends its turn with stop_hook_active set, outside a git checkout, or in a module without gotest
 - **THEN** exits 0 and writes nothing
 
 ### Requirement: Lint findings after an agent's edit
