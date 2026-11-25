@@ -683,3 +683,92 @@ describe("buildChangeModel", () => {
     expect(buildChangeModel(doc()).headBranch).toBe("feat/x");
   });
 });
+
+describe("a document that links its rows to evidence", () => {
+  const place = (path: string[], line: number) => ({
+    file: "shop/cart_test.go",
+    line,
+    endLine: line,
+    path,
+  });
+
+  it("finds a row's evidence by the id it names, and takes the CLI's mark", () => {
+    // The labels do not match: only the id links them.
+    const linked = ev({
+      id: "e1",
+      path: ["Other", "Name"],
+      mark: "pass 7*",
+      module: "mod",
+      location: { file: "shop/cart_test.go", line: 40, endLine: 44 },
+      needsDecision: true,
+      why: ["stale"],
+    });
+    const d = doc({
+      streams: [current],
+      evidence: [linked],
+      findings: [
+        finding({
+          class: "assertions",
+          subject: "Cart / Add",
+          headLocation: { file: "shop/cart_test.go", line: 40, endLine: 44 },
+          evidence: "e1",
+        }),
+      ],
+      behaviors: [
+        {
+          change: "changed",
+          kind: "it",
+          package: "mod/shop",
+          module: "mod",
+          head: place(["Cart", "Add"], 40),
+          evidence: "e1",
+        },
+      ],
+    });
+    const m = buildChangeModel(d);
+    const row = m.open.find((g) => g.tag === "assertions")!.rows[0];
+    expect(row.mark?.text).toBe("pass 7*");
+    expect(m.behaviors[0].suites[0].rows[0].mark?.text).toBe("pass 7*");
+    // The evidence row's own decision opens where the head declares it.
+    const own = m.open.find((g) => g.tag === "pass 7*")!.rows[0];
+    expect(own.target).toEqual({
+      module: "mod",
+      head: { file: "shop/cart_test.go", line: 40, endLine: 44 },
+    });
+  });
+
+  it("gives a row without an evidence id none, though its labels match one", () => {
+    const d = doc({
+      streams: [current],
+      evidence: [ev({ id: "e1", mark: "pass 1" })],
+      behaviors: [
+        {
+          change: "added",
+          kind: "it",
+          package: "mod/shop",
+          head: place(["Cart", "Add"], 40),
+        },
+      ],
+    });
+    expect(
+      buildChangeModel(d).behaviors[0].suites[0].rows[0].mark,
+    ).toBeUndefined();
+  });
+
+  it("lists the behaviors in the order the CLI gives", () => {
+    const b = (name: string, order: number) => ({
+      change: "added",
+      kind: "it",
+      package: "mod/shop",
+      head: place(["Cart", name], 1),
+      order,
+    });
+    const m = buildChangeModel(
+      doc({ behaviors: [b("second", 1), b("first", 0)] }),
+    );
+    expect(m.behaviors[0].suites[0].rows.map((r) => [r.text, r.key])).toEqual([
+      ["first", "b:1"],
+      ["second", "b:0"],
+    ]);
+  });
+});

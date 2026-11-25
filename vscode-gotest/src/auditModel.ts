@@ -61,6 +61,8 @@ export interface AuditFinding extends Selector {
   baseLocation?: AuditLocation;
   headLocation?: AuditLocation;
   runtime?: { base: number | null; head: number | null };
+  // The id of the evidence row that judges the finding's behavior.
+  evidence?: string;
 }
 
 export interface AuditPlace extends AuditLocation {
@@ -74,6 +76,11 @@ export interface AuditChange extends Selector {
   base?: AuditPlace;
   head?: AuditPlace;
   behaviors?: number;
+  module?: string;
+  // The id of the evidence row that judges the behavior.
+  evidence?: string;
+  // The behavior's place in the CLI's text list.
+  order?: number;
 }
 
 export interface StreamRun {
@@ -124,6 +131,11 @@ export interface AuditEvidence extends Selector {
   needsDecision: boolean;
   source?: string;
   commit?: string;
+  module?: string;
+  // Where the head declares the behavior, relative to its module.
+  location?: AuditLocation;
+  // The CLI's own mark for the row, as its text writes it.
+  mark?: string;
 }
 
 export interface AuditCoverage {
@@ -241,8 +253,9 @@ export function moduleOf(
 export function shortPackage(
   doc: Pick<AuditDocument, "modules">,
   pkg: string,
+  module?: string,
 ): string {
-  const m = moduleOf(doc, pkg);
+  const m = module ?? moduleOf(doc, pkg);
   if (!m) return pkg;
   if (pkg === m) return ".";
   return "./" + pkg.slice(m.length + 1);
@@ -273,6 +286,15 @@ function whereText(loc: AuditLocation | undefined): string {
 // verdict, the assertions a passing leaf made, and * for a stale stream.
 export function markOf(e: AuditEvidence | undefined): string {
   if (!e) return "";
+  if (typeof e.mark === "string") return e.mark;
+  return legacyMark(e);
+}
+
+// --- For a document without the link fields (evidence, module, mark,
+// order): what the CLI's text does, re-derived. Delete once every CLI the
+// extension reads writes them.
+
+function legacyMark(e: AuditEvidence): string {
   let m = e.verdict;
   if (e.verdict === "fail") m = "FAIL";
   else if (e.verdict === "pass" && e.vacuous) m = "vacuous";
@@ -282,6 +304,53 @@ export function markOf(e: AuditEvidence | undefined): string {
     m = `pass ${e.assertions}`;
   if (e.stream !== undefined && !e.current) m += "*";
   return m;
+}
+
+// legacyLinks finds a row's evidence as the CLI's text finds it: by package
+// and labels; a finding's subject is its head labels joined.
+function legacyLinks(doc: AuditDocument): {
+  finding: (f: AuditFinding) => AuditEvidence | undefined;
+  behavior: (c: AuditChange) => AuditEvidence | undefined;
+} {
+  const ev = new Map<string, AuditEvidence>();
+  const bySubject = new Map<string, AuditEvidence>();
+  for (const e of doc.evidence) {
+    ev.set(pathKey(e.package, e.path), e);
+    bySubject.set(pathKey(e.package, [e.path.join(" / ")]), e);
+  }
+  return {
+    finding: (f) =>
+      f.package && f.headLocation
+        ? bySubject.get(pathKey(f.package, [f.subject]))
+        : undefined,
+    behavior: (c) =>
+      c.head ? ev.get(pathKey(c.package, c.head.path)) : undefined,
+  };
+}
+
+// --- End of the fallback.
+
+// hasLinks says the document links rows to evidence itself: every evidence
+// row of such a document carries its mark.
+function hasLinks(doc: AuditDocument): boolean {
+  return doc.evidence.some((e) => typeof e.mark === "string");
+}
+
+// linksOf finds each row's evidence row, by the id the row names.
+function linksOf(doc: AuditDocument): ReturnType<typeof legacyLinks> {
+  if (!hasLinks(doc)) return legacyLinks(doc);
+  const byId = new Map(doc.evidence.map((e) => [e.id, e]));
+  return {
+    finding: (f) => (f.evidence ? byId.get(f.evidence) : undefined),
+    behavior: (c) => (c.evidence ? byId.get(c.evidence) : undefined),
+  };
+}
+
+// behaviorOrder lists the behaviors' indexes in the CLI's text order.
+function behaviorOrder(doc: AuditDocument): number[] {
+  const idx = doc.behaviors.map((_, i) => i);
+  if (!doc.behaviors.every((c) => typeof c.order === "number")) return idx;
+  return idx.sort((a, b) => doc.behaviors[a].order! - doc.behaviors[b].order!);
 }
 
 export type Tone = "fail" | "warn" | "info" | "pass" | "none";
@@ -472,7 +541,11 @@ function findingTarget(f: AuditFinding): Target | undefined {
 
 function placeTarget(doc: AuditDocument, c: AuditChange): Target | undefined {
   if (!c.head && !c.base) return undefined;
-  return { module: moduleOf(doc, c.package), base: c.base, head: c.head };
+  return {
+    module: c.module ?? moduleOf(doc, c.package),
+    base: c.base,
+    head: c.head,
+  };
 }
 
 // runTarget is what a row runs: its selector, when the head has the test.
@@ -532,18 +605,8 @@ export function buildChangeModel(
   doc: AuditDocument,
   accepted: (key: string) => boolean = () => false,
 ): ChangeModel {
-  // A row's evidence, found as the CLI's text finds it: by package and labels.
-  // A finding's subject is its head labels joined as the CLI joins them.
-  const ev = new Map<string, AuditEvidence>();
-  const bySubject = new Map<string, AuditEvidence>();
-  for (const e of doc.evidence) {
-    ev.set(pathKey(e.package, e.path), e);
-    bySubject.set(pathKey(e.package, [e.path.join(" / ")]), e);
-  }
-  const findingEvidence = (f: AuditFinding) =>
-    f.package && f.headLocation
-      ? bySubject.get(pathKey(f.package, [f.subject]))
-      : undefined;
+  const links = linksOf(doc);
+  const findingEvidence = links.finding;
 
   const rows: DecisionRow[] = [];
   for (const f of doc.findings) {
@@ -552,7 +615,7 @@ export function buildChangeModel(
       key: f.id,
       tag: f.class,
       tone: findingTone(f),
-      pkg: f.package ? shortPackage(doc, f.package) : undefined,
+      pkg: f.package ? shortPackage(doc, f.package, f.module) : undefined,
       labels: f.subject.split(" / "),
       fact: f.class === "removed" ? f.base : valueText(f),
       where: whereText(f.location),
@@ -569,11 +632,12 @@ export function buildChangeModel(
       key: e.id,
       tag: mark.text,
       tone: e.verdict === "fail" ? "fail" : "warn",
-      pkg: shortPackage(doc, e.package),
+      pkg: shortPackage(doc, e.package, e.module),
       labels: e.path,
       fact: (e.why ?? []).join(", "),
       where: "",
       mark,
+      target: e.location ? { module: e.module, head: e.location } : undefined,
       runs: runTarget(e.package, e, true),
       accepted: accepted(e.id),
     });
@@ -593,8 +657,9 @@ export function buildChangeModel(
   const acceptedRows = rows.filter((r) => r.accepted);
 
   const behaviors: PackageGroup[] = [];
-  for (const [i, c] of doc.behaviors.entries()) {
-    const pkg = shortPackage(doc, c.package);
+  for (const i of behaviorOrder(doc)) {
+    const c = doc.behaviors[i];
+    const pkg = shortPackage(doc, c.package, c.module);
     const suite = (c.head ?? c.base)?.path[0] ?? "";
     let pg = behaviors.find((g) => g.pkg === pkg);
     if (!pg) {
@@ -613,9 +678,7 @@ export function buildChangeModel(
       kind: c.kind,
       text: behaviorText(c),
       where: behaviorWhere(c),
-      mark: c.head
-        ? markFor(doc, ev.get(pathKey(c.package, c.head.path)))
-        : undefined,
+      mark: markFor(doc, links.behavior(c)),
       target: placeTarget(doc, c),
       runs: runTarget(c.package, c, !!c.head),
     });
@@ -703,7 +766,7 @@ function unprovenOf(doc: AuditDocument): ChangeModel["unproven"] {
   const files = doc.unproven.map((u, i) => ({
     key: `u:${i}`,
     file: u.file,
-    pkg: shortPackage(doc, u.package),
+    pkg: shortPackage(doc, u.package, u.module),
     coverage: u.coverage,
     counts: u.coverage ? `${u.unexecuted} of ${u.changed}` : "",
     ranges: u.ranges.map((r, j) => ({
@@ -718,7 +781,7 @@ function unprovenOf(doc: AuditDocument): ChangeModel["unproven"] {
 export function findingLine(doc: AuditDocument, f: AuditFinding): string {
   const loc = whereText(f.location);
   if (!f.package) return `${loc || f.subject} ${valueText(f)}`;
-  const text = `${shortPackage(doc, f.package)} ${f.subject}`;
+  const text = `${shortPackage(doc, f.package, f.module)} ${f.subject}`;
   if (f.class === "removed") return `${text} (${f.base}, ${loc})`;
   return `${text}: ${valueText(f)} (${loc})`;
 }
