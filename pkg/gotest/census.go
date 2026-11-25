@@ -27,13 +27,11 @@ var (
 )
 
 // openCensus counts the assertions of tt until it ends, then reports them
-// as tt's attributes unless tt opened a subtest or was skipped. A census
-// opened below parent takes the reason parent declared.
-func openCensus(tt *testing.T, parent *census) *census {
+// as tt's attributes unless tt opened a subtest or was skipped. by is the
+// reason the test above declared, nil for none.
+func openCensus(tt *testing.T, by *string) *census {
 	c := &census{}
-	if parent != nil {
-		c.by.Store(parent.by.Load())
-	}
+	c.by.Store(by)
 	censuses.Store(tt, c)
 	openCensuses.Add(1)
 	tt.Cleanup(func() {
@@ -105,5 +103,15 @@ func (t *T) AssertsBy(reason string) {
 	}
 	if c := t.census(); c != nil {
 		c.by.Store(&reason)
+		return
 	}
+	t.by = &reason // a T whose test counts nothing still hands it down
+}
+
+// declared is the reason t's test declared, nil for none.
+func (t *T) declared() *string {
+	if c := t.census(); c != nil {
+		return c.by.Load()
+	}
+	return t.by
 }

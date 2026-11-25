@@ -28,6 +28,8 @@ type T struct {
 	soft bool
 	// c counts the assertions of t's test; nil when it counts none.
 	c *census
+	// by is the reason AssertsBy declared on a T whose test counts none.
+	by *string
 }
 
 // T returns the underlying *testing.T. It is nil when a suite hook runs under
@@ -72,7 +74,7 @@ func NewTWithDeadline[TB *testing.T | *T](t TB, timeout time.Duration) *T {
 	}
 	ctx, cancel := context.WithTimeout(base.Context(), timeout)
 	base.testingTB().Cleanup(cancel)
-	return &T{t: base.t, tb: base.tb, ctx: ctx, soft: base.soft, c: base.census()}
+	return &T{t: base.t, tb: base.tb, ctx: ctx, soft: base.soft, c: base.census(), by: base.by}
 }
 
 // NewTWithContext wraps t, overriding what [T.Context] reports. Use it when the
@@ -161,9 +163,9 @@ func (t *T) It(description string, testFn func(it *T)) {
 		panic("gotest: It/When are unavailable in benchmark/fuzz lifecycle hooks")
 	}
 	t.opens()
-	parent := t.census()
+	by := t.declared()
 	t.t.Run(description, func(tt *testing.T) {
-		openCensus(tt, parent)
+		openCensus(tt, by)
 		execTestFn(testFn, t.sub(tt))
 	})
 }
@@ -177,9 +179,9 @@ func (t *T) When(description string, fn func(w *T)) {
 		panic("gotest: It/When are unavailable in benchmark/fuzz lifecycle hooks")
 	}
 	t.opens()
-	parent := t.census()
+	by := t.declared()
 	t.t.Run(description, func(tt *testing.T) {
-		openCensus(tt, parent)
+		openCensus(tt, by)
 		execTestFn(fn, t.sub(tt))
 	})
 }

@@ -41,10 +41,10 @@ func eachRun[E any](parent *T, name string, entry E, yield func(*T, E) bool) boo
 	finished := make(chan struct{})
 
 	parent.opens()
-	counted := parent.census()
+	by := parent.declared()
 	go func() {
 		parent.t.Run(name, func(tt *testing.T) {
-			openCensus(tt, counted)
+			openCensus(tt, by)
 			ready <- tt
 			<-done
 		})
