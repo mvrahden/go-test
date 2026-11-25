@@ -160,6 +160,19 @@ Given a coverage profile, `--coverage` or the one `--run` measured, and the chan
 - **WHEN** audit --base with --coverage runs in a checkout with uncommitted and untracked production files
 - **THEN** takes the changed lines from the commit to the files on disk, every line of an untracked file included
 
+### Requirement: Coverage of the binaries a test starts
+When `gotest audit --run` measures coverage it SHALL give the run a `GOCOVERDIR` under its own directory and count, beside the test binaries' profiles, what each binary built with `go build -cover` that a test starts wrote there. A file only binaries built without it execute SHALL read as without coverage data, and where no binary wrote any a note SHALL say how one counts. Nothing SHALL be written into the module, and the directory SHALL go with the run's.
+
+#### Scenario: A test that starts a binary built with -cover
+- **WHEN** audit --run runs a test that starts a binary built with go build -cover
+- **THEN** lists, of the changed lines that binary's packages hold, only those it did not execute
+- **AND** leaves the module as it was and no directory of the run behind
+
+#### Scenario: Binaries built without -cover
+- **WHEN** audit --run runs only tests that start binaries built without -cover
+- **THEN** lists the changed files only those binaries execute as without coverage data
+- **AND** notes that a binary a test starts counts when built with go build -cover
+
 ### Requirement: Proof in the policy
 `--fail-on` SHALL take the proof classes `failing`, `not-run`, `vacuous`, `stale` and `unproven`, and `proof` for the five; `all` SHALL stay every weakening, without them, for they judge the evidence given, not the change. A proof class with nothing to judge SHALL be refused with exit 2. The closing line SHALL count the evidence and the unproven lines.
 
@@ -218,12 +231,17 @@ In the JSON document a finding and a behavior SHALL name, as `evidence`, the id 
 - **AND** finds on each behavior its place in the text format's list of behaviors
 
 ### Requirement: A stopped audit run
-`gotest audit --run --control=stdin` SHALL hand its standard input to the run it makes, which stops on a stop line or the input's end as a run does; the audit SHALL then write its document with what that run reported, name the run as stopped among what was not compared, and exit 130 whatever the policy. --control SHALL be refused with exit 2 without --run, and beside a stream or diff read from standard input.
+`gotest audit --run --control=stdin` SHALL hand its standard input to the run it makes, which stops on a stop line or the input's end as a run does, and an interrupt the audit gets SHALL stop that run as one; the audit SHALL then write its document with what that run reported, name the run as stopped among what was not compared, and exit 130 whatever the policy. --control SHALL be refused with exit 2 without --run, and beside a stream or diff read from standard input.
 
 #### Scenario: A run stopped by the input's end
 - **WHEN** audit --run --control=stdin has its standard input at its end
 - **THEN** writes the document naming the stopped run among what was not compared and exits 130
 - **AND** the text format's closing line names exit 130
+
+#### Scenario: An interrupted audit run
+- **WHEN** audit --run is interrupted while its run is under way
+- **THEN** writes the document naming the stopped run among what was not compared and exits 130
+- **AND** leaves no directory of the run behind
 
 #### Scenario: Control without the run
 - **WHEN** --control=stdin is given to audit without --run, or beside --evidence=-

@@ -68,7 +68,8 @@ func (a *auditArgs) prove(doc *gotestaudit.Document, base, head *gotestaudit.Rec
 		gotestaudit.AddEvidence(doc, base, head, inputs)
 	}
 	if a.unproven() && profile != "" {
-		blocks, err := readProfile(profile)
+		// The run's own profile may hold no block: then no file has data.
+		blocks, err := readProfile(profile, a.coverage == "")
 		if err != nil {
 			return fmt.Errorf("--coverage: %w", err)
 		}
@@ -141,7 +142,7 @@ func readStreamFile(file string) ([]gotestspec.TestEvent, error) {
 	return events, nil
 }
 
-func readProfile(path string) ([]gotestspec.CoverageBlock, error) {
+func readProfile(path string, empty bool) ([]gotestspec.CoverageBlock, error) {
 	f, err := os.Open(path) //nolint:gosec // G304: the profile the user named or the run wrote
 	if err != nil {
 		return nil, err
@@ -151,7 +152,7 @@ func readProfile(path string) ([]gotestspec.CoverageBlock, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(blocks) == 0 {
+	if len(blocks) == 0 && !empty {
 		return nil, fmt.Errorf("%s holds no coverage block", path)
 	}
 	return blocks, nil
@@ -293,10 +294,16 @@ func (a *auditArgs) runChanged(doc *gotestaudit.Document, files []gotestaudit.Pr
 	if a.control {
 		args = append([]string{"--control=stdin"}, args...)
 	}
-	profile := ""
+	profile, covdir := "", ""
 	if a.unproven() && len(cover) > 0 {
 		profile = filepath.Join(dir, "cover.out")
 		args = append(args, "-coverprofile="+profile, "-coverpkg="+strings.Join(cover, ","))
+		// The binaries the tests start write their coverage here.
+		covdir = filepath.Join(dir, "covdata")
+		if err := os.Mkdir(covdir, 0o700); err != nil {
+			_ = os.RemoveAll(dir)
+			return nil, "", err
+		}
 	}
 	exe, err := os.Executable()
 	if err != nil {
@@ -304,12 +311,15 @@ func (a *auditArgs) runChanged(doc *gotestaudit.Document, files []gotestaudit.Pr
 		return nil, "", err
 	}
 	cmd := exec.Command(exe, append(args, run...)...) //nolint:gosec // G204: this CLI, running the changed packages
+	if covdir != "" {
+		cmd.Env = withCoverDir(os.Environ(), covdir)
+	}
 	var stdout strings.Builder
 	cmd.Stdout, cmd.Stderr = &stdout, os.Stderr
 	if a.control {
 		cmd.Stdin = os.Stdin
 	}
-	runErr := cmd.Run()
+	runErr := runForwarding(cmd)
 	var exit *exec.ExitError
 	if runErr != nil && !errors.As(runErr, &exit) {
 		_ = os.RemoveAll(dir)
@@ -324,6 +334,16 @@ func (a *auditArgs) runChanged(doc *gotestaudit.Document, files []gotestaudit.Pr
 	if err != nil || len(events) == 0 {
 		_ = os.RemoveAll(dir)
 		return nil, "", fmt.Errorf("--run: the run wrote no stream: %v", runErr)
+	}
+	if covdir != "" {
+		switch n, err := foldChildCoverage(covdir, profile, cover); {
+		case err != nil:
+			doc.Notes = append(doc.Notes, "--run: the coverage data of the binaries the tests started was not read: "+err.Error())
+		case n == 0 && !a.stopped:
+			doc.Notes = append(doc.Notes, childCoverNote)
+		default:
+			doc.Notes = append(doc.Notes, fmt.Sprintf("--run: the coverage counts what %s the tests started executed", binaries(n)))
+		}
 	}
 	if profile != "" {
 		if _, err := os.Stat(profile); err != nil {

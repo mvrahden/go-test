@@ -3608,6 +3608,204 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "lists, of the changed lines that binary's packages hold, only those it did not execute",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "childcov_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 116,
+                      "name": "lists,_of_the_changed_lines_that_binary's_packages_hold,_only_those_it_did_not_execute",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "leaves the module as it was and no directory of the run behind",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "childcov_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 129,
+                      "name": "leaves_the_module_as_it_was_and_no_directory_of_the_run_behind",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when audit --run runs a test that starts a binary built with go build -cover",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "childcov_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 115,
+                  "name": "audit_--run_runs_a_test_that_starts_a_binary_built_with_go_build_-cover",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ABinaryBuiltWithCover",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "childcov_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 114,
+              "name": "TestABinaryBuiltWithCover",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lists the changed files only those binaries execute as without coverage data",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "childcov_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 138,
+                      "name": "lists_the_changed_files_only_those_binaries_execute_as_without_coverage_data",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "notes that a binary a test starts counts when built with go build -cover",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "childcov_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 145,
+                      "name": "notes_that_a_binary_a_test_starts_counts_when_built_with_go_build_-cover",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when audit --run runs only tests that start binaries built without -cover",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "childcov_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 137,
+                  "name": "audit_--run_runs_only_tests_that_start_binaries_built_without_-cover",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "BinariesBuiltWithoutCover",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "childcov_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 136,
+              "name": "TestBinariesBuiltWithoutCover",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "writes the document naming the stopped run among what was not compared and exits 130",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "childcov_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 183,
+                      "name": "writes_the_document_naming_the_stopped_run_among_what_was_not_compared_and_exits_130",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "leaves no directory of the run behind",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "childcov_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 187,
+                      "name": "leaves_no_directory_of_the_run_behind",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when audit --run is interrupted while its run is under way",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "childcov_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 182,
+                  "name": "audit_--run_is_interrupted_while_its_run_is_under_way",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AnInterruptedAuditRun",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "childcov_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 152,
+              "name": "TestAnInterruptedAuditRun",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "AuditChildCoverage",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "childcov_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 19,
+          "name": "TestAuditChildCoverageTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "lists each as added, removed, reworded, moved or changed with its base and head file and line",
                       "duration": 0,
                       "excluded": false,
@@ -41203,13 +41401,13 @@
     }
   ],
   "stats": {
-    "behaviors": 1199,
+    "behaviors": 1205,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 167,
+    "suites": 168,
     "tests": 0
   }
 }

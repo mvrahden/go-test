@@ -1217,6 +1217,11 @@ shards of one run do not add up to every mutant exactly once.
 | `audit-stream-of-one-package-by-commit` | a stream that hashed one package is listed by commit | audit conformance: the stream-currency It finds the fresh/c stream stale |
 | `audit-one-hashed-package-unread` | a stream that hashed one package is judged without its hash | audit conformance: the stream-currency It finds the fresh/c stream stale |
 | `audit-base-stream-judged-by-hashes` | a stream of the base's run is judged by the working tree's hashes | audit conformance: the base-stream It finds it stale for changed inputs, not for the base's missing commit |
+| `audit-run-children-without-coverdir` | `--run` gives its tests no `GOCOVERDIR` | audit conformance: the child-coverage It finds greet.go without coverage data |
+| `audit-run-leaves-its-directory` | `--run` leaves its directory under `GOTMPDIR` | audit conformance: the run's and the interrupted run's directory Its find it left |
+| `audit-run-empty-profile-refused` | a `--run` profile with no block is refused as an empty `--coverage` | audit conformance: the without-cover It sees exit 2 |
+| `audit-run-child-note-dropped` | no note says how a binary a test starts counts | audit conformance: the note It finds no such note |
+| `audit-run-interrupt-kills-the-audit` | an interrupt ends the audit with its run unstopped | audit conformance: the interrupted-run It sees no exit 130 |
 | `audit-last-stream-wins` | of two current streams the last judges a behavior | audit conformance: the two-current-streams It finds the fresh/c rows judged by the second stream |
 
 ## Adding a mutant

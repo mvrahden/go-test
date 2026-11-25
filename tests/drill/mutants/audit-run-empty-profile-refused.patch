@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditChildCoverage / BinariesBuiltWithoutCover / when audit --run runs only tests that start binaries built without -cover / lists the changed files only those binaries execute as without coverage data \(
+Clause: when audit --run runs only tests that start binaries built without -cover → lists the changed files only those binaries execute as without coverage data
+--- a/cmd/gotest/auditproof.go
++++ b/cmd/gotest/auditproof.go
+@@ -152,7 +152,7 @@
+ 	if err != nil {
+ 		return nil, err
+ 	}
+-	if len(blocks) == 0 && !empty {
++	if len(blocks) == 0 {
+ 		return nil, fmt.Errorf("%s holds no coverage block", path)
+ 	}
+ 	return blocks, nil
