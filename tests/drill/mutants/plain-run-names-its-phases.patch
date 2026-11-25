@@ -2,12 +2,12 @@ Expect: ^FAIL .*conformance/cli CLIPhases .* / stderr names no phases \(
 Clause: when the package is run without --debug → stderr names no phases
 --- a/cmd/gotest/exec.go
 +++ b/cmd/gotest/exec.go
-@@ -14,7 +14,7 @@
-
- func Run(cfg ExecConfig) int { //nolint:gocritic // hugeParam: stable API
+@@ -27,7 +27,7 @@ func Run(cfg ExecConfig) int { //nolint:gocritic // hugeParam: stable API
+ // caller to print last.
+ func execRun(cfg ExecConfig) (exit int, judged *gotestrunner.PipelineResult, phases string) { //nolint:gocritic // hugeParam: stable API
  	clock := phaseClock{start: time.Now()}
 -	if cfg.Debug {
 +	if true {
- 		// Deferred first, so it prints last: after the cleanup and the stop.
- 		defer func() { fmt.Fprintln(os.Stderr, clock.phases(time.Now())) }()
+ 		// Deferred first, so it is taken last: after the cleanup and the stop.
+ 		defer func() { phases = fmt.Sprint(clock.phases(time.Now())) }()
  	}
