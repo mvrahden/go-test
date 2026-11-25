@@ -49,7 +49,7 @@ func runScenarios(inv Invocation) int { //nolint:gocritic // hugeParam: stable A
 	if refuseControl(own, own.Value("--input")) {
 		return 2
 	}
-	root, err := moduleRootOf(".")
+	root, err := scenariosModuleRoot(".")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
@@ -204,8 +204,8 @@ func configDefault(cfg *config.ProjectConfig, flag string) bool {
 	return flag == "--timeout" && cfg.Timeout != nil || flag == "--setup-timeout" && cfg.SetupTimeout != nil
 }
 
-// moduleRootOf is the directory of the go.mod at or above dir.
-func moduleRootOf(dir string) (string, error) {
+// scenariosModuleRoot is the directory of the go.mod at or above dir.
+func scenariosModuleRoot(dir string) (string, error) {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
 		return "", err
