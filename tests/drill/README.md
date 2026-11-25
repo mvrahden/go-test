@@ -1054,6 +1054,10 @@ shards of one run do not add up to every mutant exactly once.
 | `hook-stop-reports-again` | `gotest hook stop` forgets what it reported | cli conformance: the second end of the turn blocks again |
 | `hook-stop-without-default-audits-the-parent` | without a default branch, `gotest hook stop` audits against HEAD's parent | cli conformance: the stop reason lists the committed removal of `TestSubtracts` |
 | `hook-stop-ignores-stop-hook-active` | `gotest hook stop` blocks a turn a stop hook already continued | cli conformance: the end of a turn with `stop_hook_active` set writes a decision |
+| `testresult-vacuous-pass-passed` | a test that passed without an assertion is listed in `passedTests` | cli conformance: the failed run's `warnedTests` is empty |
+| `testresult-configuration-without-args` | the predicate's configuration leaves out the run's arguments | cli conformance: the configuration names no arguments |
+| `testresult-url-dropped` | the predicate leaves out the Actions run's url | cli conformance: the passed run under GitHub Actions has no url |
+| `testresult-without-manifest-attested` | a stream without a run manifest is attested | cli conformance: summary exits 0 instead of 2 |
 | `hook-lint-findings-dropped` | `gotest hook post-edit` drops the findings lint reports | cli conformance: an edited test file with a finding gets it as additional context |
 | `hook-lints-any-go-file` | `gotest hook post-edit` lints the package of any edited `.go` file, not only of a test file | cli conformance: an edited file that is not a test gets no answer |
 | `hook-note-keeps-go-test` | the `pre-shell` note gives the command line with `go test` left in it | cli conformance: the note's command line runs gotest in place of go test |

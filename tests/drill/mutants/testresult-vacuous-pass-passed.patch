@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / prints result FAILED with the failed test in failedTests, the one without an assertion in warnedTests and the others in passedTests \(
+Clause: when summary writes the test-result predicate of a stream whose run failed a test and passed one without an assertion → prints result FAILED with the failed test in failedTests, the one without an assertion in warnedTests and the others in passedTests
+--- a/cmd/gotest/attest.go
++++ b/cmd/gotest/attest.go
+@@ -127,7 +127,7 @@
+ 				pred.FailedTests = append(pred.FailedTests, name)
+ 				failedIn[k.pkg] = true
+ 			}
+-		case v == gotestspec.ActionPass && assertions[k] == "0" && !assertsBy[k]:
++		case v == gotestspec.ActionPass && assertions[k] == "-1" && !assertsBy[k]:
+ 			pred.WarnedTests = append(pred.WarnedTests, name)
+ 		case v == gotestspec.ActionPass:
+ 			pred.PassedTests = append(pred.PassedTests, name)

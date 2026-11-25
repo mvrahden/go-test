@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / names the CLI version, the Go version and the arguments the manifest records in its configuration \(
+Clause: when summary writes the test-result predicate of a stream whose run failed a test and passed one without an assertion → names the CLI version, the Go version and the arguments the manifest records in its configuration
+--- a/cmd/gotest/attest.go
++++ b/cmd/gotest/attest.go
+@@ -175,7 +175,7 @@
+ 	if m.Version != "" && !strings.ContainsAny(m.Version, " ()") {
+ 		uri += "@" + m.Version
+ 	}
+-	notes := map[string]any{"version": m.Version, "args": m.Args}
++	notes := map[string]any{"version": m.Version}
+ 	if m.GoVersion != "" {
+ 		notes["goVersion"] = m.GoVersion
+ 	}

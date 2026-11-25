@@ -452,6 +452,22 @@ gotest summary --github SHALL annotate a failed test at its file in its package'
 - **WHEN** gotest summary --github runs a package with a failed test
 - **THEN** annotates the failure at the test file in its package's directory
 
+### Requirement: A run's result as an in-toto predicate
+`gotest summary --input=<stream> --format=intoto-test-result` SHALL print the in-toto test-result predicate, v0.1, of the run the stream records: FAILED when a test or package failed or the run did not exit 0, WARNED when a test passed without an assertion, else PASSED; each leaf test as `<package>.<test>` in its list; the CLI and Go versions and the arguments from the manifest; the Actions run's url under GitHub Actions. A stream without a manifest SHALL exit 2.
+
+#### Scenario: The predicate of a failed run
+- **WHEN** summary writes the test-result predicate of a stream whose run failed a test and passed one without an assertion
+- **THEN** prints result FAILED with the failed test in failedTests, the one without an assertion in warnedTests and the others in passedTests
+- **AND** names the CLI version, the Go version and the arguments the manifest records in its configuration
+
+#### Scenario: The predicate of a passed run in GitHub Actions
+- **WHEN** summary writes the test-result predicate of a stream whose run passed, under GitHub Actions
+- **THEN** prints result PASSED and the url of the Actions run
+
+#### Scenario: A stream gotest did not write
+- **WHEN** summary writes the test-result predicate of a stream without a run manifest
+- **THEN** exits 2 naming --events-file on stderr, with nothing on stdout
+
 ### Requirement: Hooks that call t.T() where it is nil
 gotest SHALL refuse with exit 2 a suite whose hook calls t.T() where its wrapper makes it nil: every hook under a benchmark method, BeforeAll and AfterAll under a fuzz method. One error names every such hook in source order, at the first. It reads the hook's own body, closures and aliases of t included, not the helpers it calls, and accepts a call whose result is checked for nil. The cases are the table in `tests/conformance/cli/rejections_suite_test.go`.
 

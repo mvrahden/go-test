@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / exits 2 naming --events-file on stderr, with nothing on stdout \(
+Clause: when summary writes the test-result predicate of a stream without a run manifest → exits 2 naming --events-file on stderr, with nothing on stdout
+--- a/cmd/gotest/attest.go
++++ b/cmd/gotest/attest.go
+@@ -86,7 +86,7 @@
+ // verdict, the run's manifest and its exit code.
+ func testResultOf(events []gotestspec.TestEvent) (*testResult, error) {
+ 	run, ok := gotestspec.RunOf(events)
+-	if !ok {
++	if !ok && false {
+ 		return nil, errors.New("the stream holds no run manifest; attest a stream gotest wrote with --events-file")
+ 	}
+ 	verdicts := map[verdictKey]gotestspec.Action{}

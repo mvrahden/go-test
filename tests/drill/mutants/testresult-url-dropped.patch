@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / prints result PASSED and the url of the Actions run \(
+Clause: when summary writes the test-result predicate of a stream whose run passed, under GitHub Actions → prints result PASSED and the url of the Actions run
+--- a/cmd/gotest/attest.go
++++ b/cmd/gotest/attest.go
+@@ -152,7 +152,7 @@
+ 		pred.Result = "PASSED"
+ 	}
+ 	pred.Configuration = []resourceDescriptor{runConfiguration(&run)}
+-	pred.URL = actionsRunURL()
++	pred.URL = ""
+ 	return pred, nil
+ }
+ 
