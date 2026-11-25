@@ -2,16 +2,16 @@ Expect: ^FAIL .*conformance/cli .* / refuses it with exit 2, naming the flag and
 Clause: when -cpuprofile, -memprofile, -blockprofile, -mutexprofile or -trace is given to a run that starts two suite processes → refuses it with exit 2, naming the flag and how many processes would write its file
 --- a/internal/gotestrunner/pipeline.go
 +++ b/internal/gotestrunner/pipeline.go
-@@ -323,12 +323,6 @@
+@@ -336,12 +336,6 @@ func RunPipeline(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult
  	if cfg.Bench {
  		return runBench(ctx, cfg, overlay, pf)
  	}
 -	if name := sharedProfileFlag(pf.RunFlags); name != "" {
--		sel := selection{Run: pf.UserRunFilter, Skip: pf.UserSkipFilter, Groups: overlay.groups}
+-		sel := selection{Run: pf.UserRunFilter, Skip: pf.UserSkipFilter, Groups: overlay.groups, Only: cfg.Only}
 -		if n := plannedSuiteCount(planSuiteScopes(overlay.plan(), sel)); n > 1 {
 -			return PipelineResult{}, fmt.Errorf("%s writes one file, and this run starts %d suite processes that would each write it: select one suite of one package with -run '^Test<Suite>$'", name, n)
 -		}
 -	}
  	return runStreaming(ctx, cfg, overlay, pf)
  }
-
+ 
