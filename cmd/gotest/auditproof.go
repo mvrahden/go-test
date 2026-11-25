@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -54,7 +55,13 @@ func (a *auditArgs) prove(doc *gotestaudit.Document, base, head *gotestaudit.Rec
 			if err != nil {
 				return fmt.Errorf("--%s: %w", evidenceFlag(side.name), err)
 			}
-			inputs = append(inputs, gotestaudit.StreamInput{File: file, Side: side.name, Events: events})
+			in := gotestaudit.StreamInput{File: file, Side: side.name, Events: events}
+			if side.name == gotestaudit.SideHead && a.headFile == "" {
+				if in.Fresh, err = freshOnDisk(events); err != nil {
+					return fmt.Errorf("--evidence: %w", err)
+				}
+			}
+			inputs = append(inputs, in)
 		}
 	}
 	if len(inputs) > 0 {
@@ -69,6 +76,35 @@ func (a *auditArgs) prove(doc *gotestaudit.Document, base, head *gotestaudit.Rec
 		gotestaudit.AddUnproven(doc, files, blocks, gotestaudit.Coverage{Profile: shown, Lines: lines})
 	}
 	return nil
+}
+
+// freshOnDisk says, of each package whose verdict events stamped with an
+// input hash, whether the working tree's package still has it.
+func freshOnDisk(events []gotestspec.TestEvent) (map[string]bool, error) {
+	stamped := map[string]string{}
+	var pkgs []string
+	for i := range events {
+		ev := &events[i]
+		if ev.InputHash == "" || ev.RunLevel || ev.Test != "" {
+			continue
+		}
+		if _, ok := stamped[ev.Package]; !ok {
+			pkgs = append(pkgs, ev.Package)
+		}
+		stamped[ev.Package] = ev.InputHash
+	}
+	if len(pkgs) == 0 {
+		return nil, nil
+	}
+	current, err := currentHashes(context.Background(), pkgs, streamBuild(events))
+	if err != nil {
+		return nil, err
+	}
+	fresh := make(map[string]bool, len(pkgs))
+	for _, pkg := range pkgs {
+		fresh[pkg] = current[pkg] == stamped[pkg]
+	}
+	return fresh, nil
 }
 
 func evidenceFlag(side string) string {

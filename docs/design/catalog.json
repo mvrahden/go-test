@@ -4039,6 +4039,82 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "marks the evidence of the unchanged package current, though the tree has uncommitted changes",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "currency_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 72,
+                      "name": "marks_the_evidence_of_the_unchanged_package_current,_though_the_tree_has_uncommitted_changes",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "marks the evidence of the changed package stale, naming its inputs changed",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "currency_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 77,
+                      "name": "marks_the_evidence_of_the_changed_package_stale,_naming_its_inputs_changed",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when audit is given a stream with input hashes after an uncommitted change to one of its packages and to a file no package reads",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "currency_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 71,
+                  "name": "audit_is_given_a_stream_with_input_hashes_after_an_uncommitted_change_to_one_of_its_packages_and_to_a_file_no_package_reads",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AStreamWithInputHashes",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "currency_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 30,
+              "name": "TestAStreamWithInputHashes",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "AuditCurrency",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "currency_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 15,
+          "name": "TestAuditCurrencyTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "states for each added, reworded, moved and changed behavior and each finding's behavior its verdict, its run-time assertions, whether it passed vacuous and its AssertsBy",
                       "duration": 0,
                       "excluded": false,
@@ -40807,13 +40883,13 @@
     }
   ],
   "stats": {
-    "behaviors": 1185,
+    "behaviors": 1187,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 166,
+    "suites": 167,
     "tests": 0
   }
 }

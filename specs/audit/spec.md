@@ -101,11 +101,19 @@ The audit SHALL exit 0 whatever it finds unless `--fail-on` names finding classe
 - **AND** lists the stream with its manifest's CLI version, commit, dirty flag, agent and exit code
 
 ### Requirement: Current and stale evidence
-Evidence SHALL be current when its stream ran the head's commit with neither tree holding uncommitted changes, or when the audit ran it; else stale, naming why: another commit, uncommitted changes, or no manifest. Of the streams that judge one behavior the audit SHALL take a current one before a stale one, then the first given, and name the others' verdicts.
+Evidence SHALL be current when the audit ran it, or when its stream stamped the package's verdict with an InputHash the head's working tree still has; stale when the hash differs, naming the package's inputs changed. A stream without a hash for the package, or a head given as a record, SHALL be judged by commit: current when it ran the head's commit with neither tree dirty, else stale, naming another commit, uncommitted changes, or no manifest.
 
 #### Scenario: Streams of other trees
 - **WHEN** audit is given streams of another commit, of a tree with uncommitted changes and without a manifest
 - **THEN** marks each stale, naming another commit, uncommitted changes and no manifest
+
+#### Scenario: A stream with input hashes
+- **WHEN** audit is given a stream with input hashes after an uncommitted change to one of its packages and to a file no package reads
+- **THEN** marks the evidence of the unchanged package current, though the tree has uncommitted changes
+- **AND** marks the evidence of the changed package stale, naming its inputs changed
+
+### Requirement: The stream that judges a behavior
+Of the streams that judge one behavior the audit SHALL take a current one before a stale one, then the first given, and name the others' verdicts.
 
 #### Scenario: Two streams of one behavior
 - **WHEN** a current and a stale stream judge one behavior

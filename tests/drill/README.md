@@ -1203,6 +1203,8 @@ shards of one run do not add up to every mutant exactly once.
 | `runs-without-a-record-fails` | `gotest runs` prints nothing without a record | cli conformance: stdout does not say no run is recorded |
 | `import-forgets-the-file` | an imported run's record names no file | cli conformance: the imported entry has no events file |
 | `import-takes-an-empty-stream` | `--import` keeps a stream without a package verdict | cli conformance: the empty file is imported with exit 0 |
+| `audit-judges-hashed-streams-by-commit` | the audit judges a stream with input hashes by the tree's commit | audit conformance: the unchanged package's evidence is stale on the dirty tree |
+| `audit-trusts-every-hashed-package` | the audit takes every package a stream hashed as current | audit conformance: the changed package's evidence reads current |
 
 ## Adding a mutant
 

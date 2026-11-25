@@ -229,8 +229,9 @@ type Stream struct {
 	// Run is the stream's manifest and exit code; nil for a stream that
 	// opens with no manifest.
 	Run *StreamRun `json:"run"`
-	// Current says the stream ran the side's tree: its commit's, with
-	// neither dirty, or the audit's own run. Stale says why not.
+	// Current says the stream ran the side's tree: the audit's own run;
+	// one whose packages' input hashes the head's tree has each; else one
+	// of the side's commit, with neither dirty. Stale says why not.
 	Current bool   `json:"current"`
 	Stale   string `json:"stale,omitempty"`
 }
