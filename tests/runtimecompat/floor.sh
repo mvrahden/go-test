@@ -59,6 +59,22 @@ if ! "$work/gotest" --no-cache ./... >"$work/run.out" 2>&1; then
   exit 1
 fi
 
+# A runtime that predates assertion counts reports none: its passes are
+# unknown, never vacuous, in a text run and in the stream alike.
+if [ -n "$target" ] && ! git -C "$root" cat-file -e "$target:pkg/gotest/census.go" 2>/dev/null; then
+  mkdir -p uncounted
+  printf 'package uncounted\n\nimport "github.com/mvrahden/go-test/pkg/gotest"\n\ntype SilentTestSuite struct{}\n\nfunc (s *SilentTestSuite) TestNothing(t *gotest.T) {}\n' >uncounted/uncounted_suite_test.go
+  for mode in "" -v -json; do
+    if ! GOTEST_CI=1 "$work/gotest" --agent=false $mode ./uncounted/ >"$work/uncounted.out" 2>"$work/uncounted.err" || grep -q 'passed without an assertion' "$work/uncounted.err"; then
+      cat "$work/uncounted.err" >&2
+      echo "FAIL  a pass under runtime $target, which counts no assertion, is judged vacuous (${mode:-text})" >&2
+      exit 1
+    fi
+  done
+  rm -rf uncounted
+  echo "ok    passes under runtime $target, which counts no assertion, are not judged"
+fi
+
 (cd "$root" && go build -o "$work/render" ./tests/runtimecompat/render)
 "$work/render" ./... | grep -oE 'gotestruntime\.[A-Za-z_0-9]+' | sort -u >"$work/got"
 # The fuzz fan writes its runtime calls from Go (internal/gotestgen/fuzzfan.go).
