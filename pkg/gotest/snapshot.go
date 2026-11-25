@@ -410,5 +410,6 @@ func splitTestName(name string) (topLevel, rest string) {
 // GOTEST_UPDATE_SNAPSHOTS rewrites it. The optional name tells several
 // snapshots of one test apart.
 func MatchSnapshot(t testingT, value any, name ...string) {
+	countAssertion(t)
 	matchSnapshot(t, 2, value, name...)
 }

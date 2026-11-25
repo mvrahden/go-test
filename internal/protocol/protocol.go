@@ -28,6 +28,18 @@ const (
 	EnvFuzzEchoInput = "GOTEST_FUZZ_ECHO_INPUT"
 )
 
+// The test attributes the runtime reports on a leaf test as it ends, which go
+// test -json carries as attr events: how many assertions it made, and the
+// reason it declared for asserting by other means.
+const (
+	AttrAssertions = "gotest.assertions"
+	AttrAssertsBy  = "gotest.asserts-by"
+)
+
+// ExcludedLine is the reason the runner gives a suite it skips unstarted
+// because its X_ prefix, or a focus elsewhere, excludes it.
+const ExcludedLine = "test suite was excluded by user"
+
 // FuzzInputPrefix marks a line carrying the decoded input of a struct-typed
 // fuzz execution. The runtime emits it on failure; triage and promote scrape it.
 const FuzzInputPrefix = "ƒƒGOTEST_FUZZ_INPUT: "

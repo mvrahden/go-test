@@ -18,6 +18,7 @@ func init() {
 		EachT:  func(tb testing.TB) *T { return &T{tb: tb} },
 		BenchB: func(b *testing.B) *B { return &B{b: b} },
 		FuzzF:  newF,
+		Count:  func(t *testing.T) { openCensus(t, nil) },
 	}
 }
 
