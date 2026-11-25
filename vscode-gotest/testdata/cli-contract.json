@@ -2884,6 +2884,7 @@
           "migrate",
           "prepare",
           "refactor",
+          "runs",
           "scaffold",
           "scenarios",
           "skill",
