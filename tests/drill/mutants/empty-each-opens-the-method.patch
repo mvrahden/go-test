@@ -3,8 +3,8 @@ Judge: ./tests/canary CanaryTestSuite/TestAssertionsAreCounted
 Clause: when a method's When holds Its and its Each table rows → a method whose Each table is empty reports 0
 --- a/pkg/gotest/utils.go
 +++ b/pkg/gotest/utils.go
-@@ -23,6 +23,7 @@
- 		panic("gotest: Each is unavailable in benchmark/fuzz lifecycle hooks")
+@@ -27,6 +27,7 @@
+ 		return func(func(*T, E) bool) {}
  	}
  	return func(yield func(*T, E) bool) {
 +		t.opens()

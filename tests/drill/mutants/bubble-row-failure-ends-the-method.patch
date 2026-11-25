@@ -1,0 +1,14 @@
+Expect: bubble: TestRows/passing did not pass
+Judge: ./tests/canary CanaryTestSuite/TestABubbleRunsOnTheFakeClock
+Clause: when an Each row's Bubble fails → fails the row, and the next row runs and passes
+--- a/pkg/gotest/bubble.go
++++ b/pkg/gotest/bubble.go
+@@ -87,7 +87,7 @@
+ 	switch {
+ 	case out.skipped:
+ 		t.testingTB().SkipNow()
+-	case !out.passed && !t.soft:
++	case !out.passed:
+ 		t.FailNow() // fn failed it: synctest.Test failed t on another goroutine
+ 	}
+ }

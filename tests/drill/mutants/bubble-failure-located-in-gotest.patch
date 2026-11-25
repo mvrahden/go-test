@@ -1,0 +1,14 @@
+Expect: bubble: TestFails does not say "bubble_suite_test\.go:[0-9]+: Equal failed"
+Judge: ./tests/canary CanaryTestSuite/TestABubbleRunsOnTheFakeClock
+Clause: when an assertion fails inside a Bubble → fails the method at the assertion's line
+--- a/pkg/gotest/internal/assert/helper.go
++++ b/pkg/gotest/internal/assert/helper.go
+@@ -41,7 +41,7 @@
+ 	// parent's helpers.
+ 	if inner := v.FieldByName("isSynctest"); inner.IsValid() && inner.Kind() == reflect.Bool && inner.Bool() {
+ 		if parent := v.FieldByName("parent"); parent.IsValid() && parent.Kind() == reflect.Pointer && !parent.IsNil() {
+-			v = parent.Elem()
++			_ = parent.Elem()
+ 		}
+ 	}
+ 
