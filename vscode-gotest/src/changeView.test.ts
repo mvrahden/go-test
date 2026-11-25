@@ -58,6 +58,7 @@ function doc(over: Partial<AuditDocument> = {}): AuditDocument {
         change: "added",
         kind: "it",
         package: "mod/shop",
+        module: "mod",
         head: {
           path: ["Cart", "Copies", "the only copy"],
           file: "shop/cart_test.go",
@@ -65,6 +66,8 @@ function doc(over: Partial<AuditDocument> = {}): AuditDocument {
           endLine: 51,
         },
         behaviors: 1,
+        evidence: "e-copy",
+        order: 0,
       },
     ],
     streams: [],
@@ -142,6 +145,38 @@ describe("buildChangeBody", () => {
     );
     expect(some.match(/data-change="openDiff"/g)).toHaveLength(1);
     expect(some.match(/data-change="run"/g)).toHaveLength(1);
+  });
+
+  it("opens an evidence row that needs a decision at its source, a finding at its diff", () => {
+    const d = doc({
+      streams: [{ file: "run.json", side: "head", run: null, current: true }],
+      evidence: [
+        {
+          id: "e-total",
+          package: "mod/shop",
+          module: "mod",
+          path: ["Cart", "Total"],
+          location: { file: "shop/cart_test.go", line: 60, endLine: 62 },
+          verdict: "fail",
+          mark: "FAIL",
+          stream: 0,
+          current: true,
+          needsDecision: true,
+          why: ["changed"],
+        },
+      ],
+    });
+    const html = buildChangeBody(
+      view({
+        state: { kind: "doc", model: buildChangeModel(d), exitCode: 1 },
+        canOpen: (k) => k === "e-total" || k === budget.id,
+      }),
+    );
+    expect(html).toMatch(
+      /data-key="e-total"[\s\S]*?<button class="act" data-change="openSource" data-key="e-total"[^>]*>Open</,
+    );
+    expect(html.match(/data-change="openDiff"/g)).toHaveLength(1);
+    expect(html).toContain('data-change="openDiff" data-key="f-budget"');
   });
 
   it("strikes an accepted row through and moves it under the accepted", () => {
@@ -328,6 +363,7 @@ describe("buildChangeBody", () => {
           package: "mod/shop",
           path: ["Cart", "Copies", "the only copy"],
           verdict: "pass",
+          mark: "vacuous",
           assertions: 0,
           vacuous: true,
           stream: 0,

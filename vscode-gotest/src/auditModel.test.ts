@@ -38,8 +38,10 @@ function ev(over: Partial<AuditEvidence> = {}): AuditEvidence {
   return {
     id: `e:${(over.path ?? ["Cart", "Add"]).join("/")}`,
     package: "mod/shop",
+    module: "mod",
     path: ["Cart", "Add"],
     verdict: "pass",
+    mark: "pass 1",
     assertions: 1,
     stream: 0,
     current: true,
@@ -129,12 +131,11 @@ describe("sideText", () => {
 });
 
 describe("shortPackage", () => {
-  it("is a package's path in its module, the longest module first", () => {
-    const d = { modules: ["mod", "mod/sub"] };
-    expect(shortPackage(d, "mod")).toBe(".");
-    expect(shortPackage(d, "mod/shop")).toBe("./shop");
-    expect(shortPackage(d, "mod/sub/x")).toBe("./x");
-    expect(shortPackage(d, "other/x")).toBe("other/x");
+  it("is a package's path in the module the document names, itself without one", () => {
+    expect(shortPackage("mod", "mod")).toBe(".");
+    expect(shortPackage("mod/shop", "mod")).toBe("./shop");
+    expect(shortPackage("mod/sub/x", "mod/sub")).toBe("./x");
+    expect(shortPackage("other/x")).toBe("other/x");
   });
 });
 
@@ -148,42 +149,10 @@ describe("valueText", () => {
 });
 
 describe("markOf", () => {
-  it("writes the CLI text's marks", () => {
+  it("is the mark the CLI wrote, derived from nothing", () => {
     expect(markOf(undefined)).toBe("");
-    expect(markOf(ev({ verdict: "fail" }))).toBe("FAIL");
-    expect(markOf(ev({ assertions: 0, vacuous: true }))).toBe("vacuous");
-    expect(markOf(ev({ assertions: 3 }))).toBe("pass 3");
-    const leaves = { passed: 4, failed: 0, skipped: 0, notRun: 0, vacuous: 0 };
-    expect(markOf(ev({ assertions: 4, leaves }))).toBe("pass");
-    expect(markOf(ev({ leaves: { ...leaves, notRun: 1 } }))).toBe("partly run");
-    expect(markOf(ev({ verdict: "not run", assertions: undefined }))).toBe(
-      "not run",
-    );
-    expect(markOf(ev({ verdict: "skip", assertions: undefined }))).toBe("skip");
-    expect(
-      markOf(
-        ev({
-          verdict: "no evidence",
-          assertions: undefined,
-          stream: undefined,
-        }),
-      ),
-    ).toBe("no evidence");
-  });
-
-  it("stars a verdict of a stale stream, not one without a stream", () => {
-    expect(markOf(ev({ current: false }))).toBe("pass 1*");
-    expect(markOf(ev({ verdict: "fail", current: false }))).toBe("FAIL*");
-    expect(
-      markOf(
-        ev({
-          verdict: "no evidence",
-          assertions: undefined,
-          stream: undefined,
-          current: false,
-        }),
-      ),
-    ).toBe("no evidence");
+    // The verdict says fail; the row's mark is the CLI's alone.
+    expect(markOf(ev({ verdict: "fail", mark: "pass 1*" }))).toBe("pass 1*");
   });
 });
 
@@ -250,6 +219,8 @@ describe("buildChangeModel", () => {
             change: "added",
             kind: "it",
             package: "mod/shop",
+            module: "mod",
+            order: 0,
             head: {
               path: ["Cart", "Copies", "the only copy"],
               file: "shop/cart_test.go",
@@ -262,6 +233,8 @@ describe("buildChangeModel", () => {
             change: "removed",
             kind: "it",
             package: "mod/shop",
+            module: "mod",
+            order: 1,
             base: {
               path: ["Cart", "Remove"],
               file: "shop/cart_test.go",
@@ -297,12 +270,14 @@ describe("buildChangeModel", () => {
             path: ["Cart", "Copies", "the only copy"],
             assertions: 0,
             vacuous: true,
+            mark: "vacuous",
             needsDecision: true,
             why: ["added"],
           }),
           ev({
             path: ["Stock", "Count"],
             verdict: "fail",
+            mark: "FAIL",
             needsDecision: true,
             why: ["changed", "assertions"],
             run: "^TestStockTestSuite$/^TestCount$",
@@ -343,6 +318,7 @@ describe("buildChangeModel", () => {
       base: "Timeout 10s",
       head: "Timeout 1m0s",
       headLocation: { file: "shop/cart_test.go", line: 9, endLine: 9 },
+      evidence: "e:Cart",
     });
     const m = buildChangeModel(
       doc({
@@ -353,15 +329,19 @@ describe("buildChangeModel", () => {
             change: "changed",
             kind: "it",
             package: "mod/shop",
+            module: "mod",
             base: { path: ["Cart", "Add"], file: "f", line: 2, endLine: 3 },
             head: { path: ["Cart", "Add"], file: "f", line: 2, endLine: 3 },
+            evidence: "e:Cart/Add",
+            order: 0,
           },
         ],
         evidence: [
-          ev({ assertions: 2 }),
+          ev({ assertions: 2, mark: "pass 2" }),
           ev({
             path: ["Cart"],
             verdict: "fail",
+            mark: "FAIL",
             needsDecision: true,
             others: [{ stream: 1, verdict: "pass", current: false }],
           }),
@@ -482,6 +462,8 @@ describe("buildChangeModel", () => {
           change: "removed",
           kind: "it",
           package: "mod/shop",
+          module: "mod",
+          order: 0,
           base: at(["Cart", "Copies", "first"], 50),
           behaviors: 1,
         },
@@ -489,6 +471,8 @@ describe("buildChangeModel", () => {
           change: "added",
           kind: "when",
           package: "mod/shop",
+          module: "mod",
+          order: 1,
           head: at(["Stock", "Count", "when empty"], 30),
           behaviors: 3,
         },
@@ -496,6 +480,8 @@ describe("buildChangeModel", () => {
           change: "reworded",
           kind: "it",
           package: "mod/shop",
+          module: "mod",
+          order: 2,
           base: at(["Cart", "Add", "keeps the order"], 21),
           head: at(["Cart", "Add", "ignores the order"], 21),
         },
@@ -503,6 +489,8 @@ describe("buildChangeModel", () => {
           change: "moved",
           kind: "it",
           package: "mod/other",
+          module: "mod/other",
+          order: 3,
           base: at(["Stock", "full", "counts"], 15),
           head: at(["Stock", "refilled", "counts"], 26),
         },
@@ -526,7 +514,7 @@ describe("buildChangeModel", () => {
     expect(m.behaviors[1].suites[0].rows[0].text).toBe(
       "full / counts → refilled / counts",
     );
-    // Each row opens its sides, in the module that holds its package.
+    // Each row opens its sides, in the module the document names.
     const targets = targetsOf(d, m);
     expect(targets.get("b:0")).toMatchObject({
       module: "mod",
@@ -722,6 +710,7 @@ describe("a document that links its rows to evidence", () => {
           module: "mod",
           head: place(["Cart", "Add"], 40),
           evidence: "e1",
+          order: 0,
         },
       ],
     });
@@ -731,6 +720,8 @@ describe("a document that links its rows to evidence", () => {
     expect(m.behaviors[0].suites[0].rows[0].mark?.text).toBe("pass 7*");
     // The evidence row's own decision opens where the head declares it.
     const own = m.open.find((g) => g.tag === "pass 7*")!.rows[0];
+    expect(own.evidence).toBe(true);
+    expect(row.evidence).toBe(false);
     expect(own.target).toEqual({
       module: "mod",
       head: { file: "shop/cart_test.go", line: 40, endLine: 44 },
@@ -746,7 +737,9 @@ describe("a document that links its rows to evidence", () => {
           change: "added",
           kind: "it",
           package: "mod/shop",
+          module: "mod",
           head: place(["Cart", "Add"], 40),
+          order: 0,
         },
       ],
     });
@@ -760,6 +753,7 @@ describe("a document that links its rows to evidence", () => {
       change: "added",
       kind: "it",
       package: "mod/shop",
+      module: "mod",
       head: place(["Cart", name], 1),
       order,
     });

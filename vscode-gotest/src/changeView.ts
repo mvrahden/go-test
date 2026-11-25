@@ -248,9 +248,11 @@ function decisionHtml(view: ChangeView, r: DecisionRow): string {
   const path = `${pkg}${above ? `<span class="dim">${esc(above)} › </span>` : ""}${esc(last)}`;
   const k = attr(r.key);
   const acts = [
-    view.canOpen(r.key)
-      ? `<button class="act" data-change="openDiff" data-key="${k}" title="Open the diff of this file against the base">Open diff</button>`
-      : "",
+    !view.canOpen(r.key)
+      ? ""
+      : r.evidence
+        ? `<button class="act" data-change="openSource" data-key="${k}" title="Open where the head declares this behavior">Open</button>`
+        : `<button class="act" data-change="openDiff" data-key="${k}" title="Open the diff of this file against the base">Open diff</button>`,
     runButton(view, r.key),
     `<button class="act" data-change="accept" data-key="${k}" title="${attr(ACCEPT_NOTE)}">${r.accepted ? "Reopen" : "Accept"}</button>`,
   ].join("");
