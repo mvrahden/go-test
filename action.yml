@@ -60,6 +60,9 @@ inputs:
   audit-fail-on:
     description: "Finding classes the audit fails the step on (gotest audit --fail-on), comma-separated; empty (the default) reports and never fails"
     default: ""
+  audit-mutate:
+    description: "Also judge the mutants of the changed lines (gotest audit --mutate), which reruns the suites that executed each line once per mutant: a duration such as 5m is the time they may take (--mutate-budget), true the CLI's default budget; empty (the default) mutates nothing"
+    default: ""
   attest:
     description: "Attest the run's result with the in-toto test-result predicate through actions/attest, its subject the tested commit's source; the caller's job must grant id-token: write and attestations: write"
     default: "false"
@@ -354,6 +357,7 @@ runs:
       env:
         INPUT_AUDIT: ${{ inputs.audit }}
         INPUT_AUDIT_FAIL_ON: ${{ inputs.audit-fail-on }}
+        INPUT_AUDIT_MUTATE: ${{ inputs.audit-mutate }}
         INPUT_PACKAGES: ${{ inputs.packages }}
         INPUT_VERSION: ${{ inputs.version }}
         EVENT_NAME: ${{ github.event_name }}
@@ -377,6 +381,16 @@ runs:
         if [ "${INPUT_AUDIT:-auto}" = "auto" ] && [ "$EVENT_NAME" != "pull_request" ]; then
           exit 0
         fi
+        mutate=()
+        case "$INPUT_AUDIT_MUTATE" in
+          "") ;;
+          true) mutate=(--mutate) ;;
+          *)
+            if ! [[ "$INPUT_AUDIT_MUTATE" =~ ^([0-9]+(\.[0-9]+)?(ns|us|ms|s|m|h))+$ ]]; then
+              echo "::error::audit-mutate must be empty, true or a duration such as 5m; got ${INPUT_AUDIT_MUTATE}"; exit 2
+            fi
+            mutate=(--mutate "--mutate-budget=$INPUT_AUDIT_MUTATE") ;;
+        esac
         base="${PR_BASE:-$PUSH_BEFORE}"
         case "$base" in "" | *[!0]*) ;; *) base="" ;; esac
         if [ -z "$base" ]; then
@@ -406,6 +420,13 @@ runs:
         fi
         if [ -n "$INPUT_AUDIT_FAIL_ON" ]; then
           args+=("--fail-on=$INPUT_AUDIT_FAIL_ON")
+        fi
+        if [ "${#mutate[@]}" -gt 0 ]; then
+          if "${cmd[@]}" audit --help 2>/dev/null | grep -q -- --mutate-budget; then
+            args+=("${mutate[@]}")
+          else
+            echo "::warning title=gotest audit::the gotest in use has no audit --mutate; the audit mutates nothing"
+          fi
         fi
         case "$INPUT_PACKAGES" in *\"*|*\'*)
           echo "::error::packages must not contain quotes: one entry per word or line"; exit 2;;

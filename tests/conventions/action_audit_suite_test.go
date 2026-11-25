@@ -32,7 +32,8 @@ func (s *ActionAuditTestSuite) SuiteGuard() string {
 	return ""
 }
 
-// auditCLI logs each call, knows --events-file and --evidence, writes the
+// auditCLI logs each call, knows --events-file, --evidence and, unless
+// STANDIN_NO_MUTATE, --mutate-budget, writes the
 // files --events-file, -coverprofile and --output name, and exits
 // STANDIN_AUDIT_EXIT from audit. Its help runs on past a pipe's buffer, so
 // a probe that stops reading at the flag breaks the pipe it writes to.
@@ -41,7 +42,7 @@ echo "$*" >> "$STANDIN_LOG"
 out=""
 for a in "$@"; do
   case "$a" in
-    --help) echo "  --events-file=<file>"; echo "  --evidence=<stream>"; printf '%1048576s\n' ''; exit 0 ;;
+    --help) echo "  --events-file=<file>"; echo "  --evidence=<stream>"; [ -z "$STANDIN_NO_MUTATE" ] && echo "  --mutate-budget=<d>"; printf '%1048576s\n' ''; exit 0 ;;
     --events-file=*) echo '{}' > "${a#--events-file=}" ;;
     -coverprofile=*) echo 'mode: set' > "${a#-coverprofile=}" ;;
     --output=*) out="${a#--output=}" ;;
@@ -173,6 +174,35 @@ func (s *ActionAuditTestSuite) TestAuditFailOnFailsTheStep(t *gotest.T) {
 	gotest.Contains(t, call, " --fail-on=removed,focus ")
 	gotest.NotContains(t, call, "--evidence", "no stream was kept")
 	gotest.Contains(t, run.summary, "## gotest audit from the stand-in\n", "the report is posted before the step fails")
+}
+
+func (s *ActionAuditTestSuite) TestTheAuditMutatesOnlyWhenAsked(t *gotest.T) {
+	dir, base, _ := twoCommits(t)
+	for t, tc := range gotest.Each(t, []struct {
+		Desc, input string
+		env         []string
+		args        string
+		exit        int
+		stdout      string
+	}{
+		{Desc: "not asked", input: "", args: ""},
+		{Desc: "asked with a budget", input: "5m", args: " --mutate --mutate-budget=5m"},
+		{Desc: "asked with the default budget", input: "true", args: " --mutate"},
+		{Desc: "asked of a gotest without it", input: "5m", env: []string{"STANDIN_NO_MUTATE=1"}, stdout: "::warning title=gotest audit::the gotest in use has no audit --mutate; the audit mutates nothing"},
+		{Desc: "asked with no duration", input: "soon", exit: 2, stdout: "::error::audit-mutate must be empty, true or a duration such as 5m; got soon"},
+	}) {
+		run := s.runStep(t, dir, "audit", map[string]string{"audit-mutate": tc.input}, append([]string{"EVENT_NAME=pull_request", "PR_BASE=" + base}, tc.env...)...)
+		gotest.Equal(t, tc.exit, run.exit, "stdout: %s", run.stdout)
+		if tc.stdout != "" {
+			gotest.Contains(t, run.stdout, tc.stdout)
+		}
+		if tc.exit != 0 {
+			gotest.Empty(t, run.call("audit --base"))
+			continue
+		}
+		report := filepath.Join(run.temp, "gotest-audit.md")
+		gotest.Equal(t, "audit --base="+base+" --format=md --output="+report+tc.args+" ./...", run.call("audit --base"))
+	}
 }
 
 func (s *ActionAuditTestSuite) TestAShallowCheckoutFetchesTheBase(t *gotest.T) {
