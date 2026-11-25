@@ -125,7 +125,6 @@ func (s *LifetimesTestSuite) TestAFixtureAfterEachContextOutlivesTheDefaultDeadl
 			}}},
 			Cases: []gotestruntime.Method{{Name: "TestSlow", Run: func(mt *gotest.T, run func(func())) {
 				mt.AssertsBy(underTest)
-
 				run(func() { time.Sleep(150 * time.Millisecond) })
 			}}},
 		})

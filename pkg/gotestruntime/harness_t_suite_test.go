@@ -232,7 +232,6 @@ func (s *HarnessTTestSuite) TestRunMethods(t *gotest.T) {
 					},
 					Cases: []gotestruntime.Method{{Name: "TestOne", Run: func(mt *gotest.T, run func(func())) {
 						mt.AssertsBy(underTest)
-
 						calls = append(calls, "suite before")
 						run(func() { calls = append(calls, "method") })
 						calls = append(calls, "suite after")
