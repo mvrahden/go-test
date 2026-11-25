@@ -1198,6 +1198,7 @@ Agents with a plugin system can install it as a plugin instead. A plugin carries
 The Claude Code plugin also carries hooks that call `gotest hook` ([An agent's hook events](specs/cli/spec.md#requirement-an-agents-hook-events)).
 After the agent edits a `_test.go` file, it hands the agent what `gotest lint` reports for that package ([Lint findings after an agent's edit](specs/cli/spec.md#requirement-lint-findings-after-an-agents-edit)).
 Before the agent runs `go test` over suites, which `go test` does not run, it names the gotest command line that does ([A note before go test skips the suites](specs/cli/spec.md#requirement-a-note-before-go-test-skips-the-suites)); the command still runs.
+When the agent is about to end its turn in a git checkout, it audits the working tree against the merge base with `origin`'s default branch, without running a test, and hands back what the change weakened, removed or excluded tests, a guard, a raised budget, a new suppression and the like: the agent goes on to undo each or say so in its final message ([Weakenings at the end of an agent's turn](specs/cli/spec.md#requirement-weakenings-at-the-end-of-an-agents-turn)). Each weakening is handed back once per checkout, the state kept in gotest's cache; the wrapper starts no CLI in a checkout with no changed or untracked `.go` file, so a weakening only committed since the last turn waits for the next changed one.
 The hooks use `go tool gotest` where `go.mod` declares the tool and the `gotest` on `PATH` otherwise, download nothing, and do nothing where neither knows the `hook` command.
 They need `sh`, which Claude Code on Windows has through Git Bash.
 
@@ -1211,6 +1212,18 @@ Codex reads the same hook events from `.codex/hooks.json` (or `~/.codex/hooks.js
         "matcher": "Bash",
         "hooks": [{ "type": "command", "command": "GOPROXY=off go tool gotest hook pre-shell", "timeout": 30 }]
       }
+    ]
+  }
+}
+```
+
+Codex's `Stop` event carries the same `cwd` and `stop_hook_active` fields and continues the turn on the same `decision: "block"` answer, so the stop audit wires the same way:
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      { "hooks": [{ "type": "command", "command": "GOPROXY=off go tool gotest hook stop", "timeout": 30 }] }
     ]
   }
 }

@@ -134,6 +134,10 @@ invocation runs tests — there is NO `test` subcommand:
   changed production lines no test executed are listed;
   `--fail-on=proof` fails on a failing, not run, vacuous or stale
   behavior or an unproven line. `-v` lists the rows text groups.
+- `go tool gotest summary --input=<events file> --format=intoto-test-result`
+  (**v1.42+**) — prints the saved run's result as the in-toto test-result
+  predicate (PASSED, WARNED for a test that passed without an assertion,
+  FAILED), for an attestation.
 - `go tool gotest scenarios` (**v1.42+**) — binds the OpenSpec scenarios
   under `specs/` and `openspec/specs/` (or `--specs=<paths>`) to the
   suites' `When`/`It` labels by text, read from source, and lists the

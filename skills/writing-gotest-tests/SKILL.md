@@ -75,7 +75,9 @@ added, removed, reworded, moved and changed: a test removed, an `X_` or
 rewritten snapshot, fewer assertions, a new `AssertsBy`. Each one is what
 the change meant, said in your report, or a mistake to undo. Add `--run` to
 run what changed: each behavior then shows its verdict, and the changed
-production lines no test executed are listed.
+production lines no test executed are listed. The gotest plugin's stop hook
+runs the same audit when you end a turn and hands you each new weakening
+once: undo it, or name it in your final message.
 
 When the repository keeps OpenSpec scenarios (`specs/` or `openspec/specs/`),
 bind each one you implement by its text (v1.42+): a `t.When` whose label is
