@@ -10,6 +10,7 @@ import (
 	"maps"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 
@@ -74,6 +75,9 @@ const (
 	// NolintUnknown is integrity: a nolint comment naming a rule that does
 	// not exist suppresses nothing, whatever it was meant to.
 	NolintUnknown Rule = "nolint-unknown"
+	// NolintReason is integrity: a suppression without a reason cannot be
+	// audited, and a reader cannot tell a judgement from a silenced finding.
+	NolintReason Rule = "nolint-reason"
 )
 
 // Tier classifies what breaks when a rule's finding is ignored, and derives
@@ -137,6 +141,7 @@ var registry = []struct {
 		"no suite, a bare name, a generic suite without an alias",
 	}}},
 	{NolintUnknown, ruleInfo{TierIntegrity, ScopeEverywhere, false, []string{"//nolint ids that name no gotest rule or golangci-lint linter"}}},
+	{NolintReason, ruleInfo{TierIntegrity, ScopeEverywhere, false, []string{"//nolint comments reaching gotest rules with no // reason"}}},
 	{SuiteDeclaration, ruleInfo{TierIntegrity, ScopeSuites, true, []string{"Suites/fixtures declared inside a type ( … ) block"}}},
 	{NoEmbedding, ruleInfo{TierIntegrity, ScopeSuites, false, []string{
 		"Embedded suites, fixtures or hook-carrying types, and",
@@ -249,6 +254,8 @@ var Analyzer = &analysis.Analyzer{
 	Doc:      "checks for common mistakes in gotest test suites",
 	Requires: []*analysis.Analyzer{inspect.Analyzer},
 	Run:      run,
+	// The nolint comments of the package, for drivers that list them.
+	ResultType: reflect.TypeFor[*passResult](),
 }
 
 func init() {
@@ -288,7 +295,7 @@ func run(pass *analysis.Pass) (any, error) {
 	checkDroppedCase(pass, insp, suites)
 
 	checkOrphanedFiles(pass)
-	checkNolintIDs(pass)
+	checkNolint(pass)
 	checkStdlibTests(pass, insp)
 	checkTestifyImports(pass)
 
@@ -315,7 +322,7 @@ func run(pass *analysis.Pass) (any, error) {
 	// Last: it stands down on the lines other rules reported.
 	checkGenerationRejects(pass)
 
-	return nil, nil
+	return directives(pass), nil
 }
 
 // claims records positions owned by earlier findings, whether or not a
@@ -351,8 +358,11 @@ func reportWithFix(pass *analysis.Pass, rule Rule, rng analysis.Range, fixes []a
 	if skipped(rule) {
 		return
 	}
-	if !cfg.disableNolint && isSuppressed(pass, rng.Pos(), rule) {
-		return
+	if !cfg.disableNolint {
+		if by := suppressors(pass.Fset, pass.Files, rng.Pos(), rule); len(by) > 0 {
+			noteUsed(pass, by)
+			return
+		}
 	}
 	reportedLine(pass, rule, rng.Pos())
 	pass.Report(analysis.Diagnostic{
@@ -399,14 +409,15 @@ func ruleMatched(rules map[Rule]bool, rule Rule) bool {
 	return ok && rules[umbrella]
 }
 
-func isSuppressed(pass *analysis.Pass, pos token.Pos, rule Rule) bool {
-	return Suppressed(pass.Fset, pass.Files, pos, rule)
-}
-
 // Suppressed reports whether a nolint comment covers rule at pos: on the
 // package clause, on the line itself, or in a comment block of its own
 // directly above.
 func Suppressed(fset *token.FileSet, files []*ast.File, pos token.Pos, rule Rule) bool {
+	return len(suppressors(fset, files, pos, rule)) > 0
+}
+
+// suppressors returns every nolint comment that covers rule at pos.
+func suppressors(fset *token.FileSet, files []*ast.File, pos token.Pos, rule Rule) []*ast.Comment {
 	var file *ast.File
 	for _, f := range files {
 		if pos >= f.FileStart && pos <= f.FileEnd {
@@ -415,10 +426,11 @@ func Suppressed(fset *token.FileSet, files []*ast.File, pos token.Pos, rule Rule
 		}
 	}
 	if file == nil {
-		return false
+		return nil
 	}
 	line := fset.Position(pos).Line
 	pkgLine := fset.Position(file.Package).Line
+	var by []*ast.Comment
 	for _, cg := range file.Comments {
 		for _, c := range cg.List {
 			rules, ok := parseNolint(c.Text)
@@ -429,15 +441,13 @@ func Suppressed(fset *token.FileSet, files []*ast.File, pos token.Pos, rule Rule
 				continue
 			}
 			cLine := fset.Position(c.Pos()).Line
-			if cLine == pkgLine || cLine == line {
-				return true
-			}
-			if fset.Position(cg.End()).Line == line-1 && startsItsLine(fset, file, cg) {
-				return true
+			if cLine == pkgLine || cLine == line ||
+				fset.Position(cg.End()).Line == line-1 && startsItsLine(fset, file, cg) {
+				by = append(by, c)
 			}
 		}
 	}
-	return false
+	return by
 }
 
 // startsItsLine reports whether no code precedes the comment group on its
@@ -460,7 +470,7 @@ func startsItsLine(fset *token.FileSet, file *ast.File, cg *ast.CommentGroup) bo
 }
 
 func parseNolint(text string) (rules map[Rule]bool, ok bool) {
-	ids, ok := nolintIDs(text)
+	ids, _, ok := nolintIDs(text)
 	if !ok || len(ids) == 0 || slices.Contains(ids, "all") {
 		return nil, ok
 	}
@@ -471,9 +481,9 @@ func parseNolint(text string) (rules map[Rule]bool, ok bool) {
 	return rules, true
 }
 
-// nolintIDs returns the ids a nolint comment names; none means every rule.
-// A reason may follow after " //", with or without ids.
-func nolintIDs(text string) (ids []string, ok bool) {
+// nolintIDs returns the ids a nolint comment names, none meaning every rule,
+// and its reason: the text after " //", with or without ids.
+func nolintIDs(text string) (ids []string, reason string, ok bool) {
 	var rest string
 	switch {
 	case strings.HasPrefix(text, "//nolint"):
@@ -481,27 +491,27 @@ func nolintIDs(text string) (ids []string, ok bool) {
 	case strings.HasPrefix(text, "// nolint"):
 		rest = text[len("// nolint"):]
 	default:
-		return nil, false
+		return nil, "", false
 	}
 	if rest == "" {
-		return nil, true
+		return nil, "", true
 	}
 	if rest[0] != ':' {
-		if reason := strings.TrimLeft(rest, " \t"); reason != rest && strings.HasPrefix(reason, "//") {
-			return nil, true
+		if after := strings.TrimLeft(rest, " \t"); after != rest && strings.HasPrefix(after, "//") {
+			return nil, strings.TrimSpace(after[2:]), true
 		}
-		return nil, false
+		return nil, "", false
 	}
 	rest = rest[1:]
 	if idx := strings.Index(rest, " //"); idx >= 0 {
-		rest = rest[:idx]
+		rest, reason = rest[:idx], strings.TrimSpace(rest[idx+3:])
 	}
 	for _, id := range strings.Split(rest, ",") {
 		if id = strings.TrimSpace(id); id != "" {
 			ids = append(ids, id)
 		}
 	}
-	return ids, true
+	return ids, reason, true
 }
 
 type suiteInfo struct {

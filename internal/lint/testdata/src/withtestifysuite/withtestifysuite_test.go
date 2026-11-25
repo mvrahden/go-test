@@ -32,6 +32,6 @@ func (s *StoreTestSuite) X_AfterEach() {}
 
 func (s *StoreTestSuite) BeforAll() {}
 
-func TestStore(t *testing.T) { //nolint:stdlib-test
+func TestStore(t *testing.T) { //nolint:stdlib-test // the suppression under test
 	suite.Run(t, new(StoreTestSuite))
 }

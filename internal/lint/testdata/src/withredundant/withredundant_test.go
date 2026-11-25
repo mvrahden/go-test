@@ -1,4 +1,4 @@
-package withredundant //nolint:stdlib-test
+package withredundant //nolint:stdlib-test // stdlib tests are this fixture's input
 
 import (
 	"errors"

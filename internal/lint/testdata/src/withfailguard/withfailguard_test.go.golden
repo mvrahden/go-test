@@ -1,4 +1,4 @@
-package withfailguard //nolint:stdlib-test
+package withfailguard //nolint:stdlib-test // stdlib tests are this fixture's input
 
 import (
 	"errors"

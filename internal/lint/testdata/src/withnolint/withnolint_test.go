@@ -4,31 +4,31 @@ import (
 	"testing"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
-	_ "github.com/stretchr/testify/assert"  //nolint:testify
+	_ "github.com/stretchr/testify/assert"  //nolint:testify // the suppression under test
 	_ "github.com/stretchr/testify/require" // want `testify import github.com/stretchr/testify/require — consider migrating to gotest`
 )
 
 // suppressed: inline on same line
-func TestInline(t *testing.T) {} //nolint:stdlib-test
+func TestInline(t *testing.T) {} //nolint:stdlib-test // the suppression under test
 
 // suppressed: nolint directly above
 //
-//nolint:stdlib-test
+//nolint:stdlib-test // the suppression under test
 func TestAbove(t *testing.T) {}
 
 // suppressed: nolint in doc block
 // TestDocBlock tests doc-block suppression.
 //
-//nolint:stdlib-test
+//nolint:stdlib-test // the suppression under test
 func TestDocBlock(t *testing.T) {}
 
 // suppressed: blanket nolint
-// nolint
+// nolint // the suppression under test
 func TestBlanket(t *testing.T) {}
 
 // suppressed: multiple rules including stdlib-test
 //
-//nolint:testify,stdlib-test
+//nolint:testify,stdlib-test // the suppression under test
 func TestMultiRule(t *testing.T) {}
 
 // NOT suppressed: wrong rule
@@ -41,9 +41,9 @@ func TestUnsuppressed(t *testing.T) {} // want `stdlib test TestUnsuppressed —
 func TestWithReason(t *testing.T) {} //nolint:stdlib-test // legacy test
 
 // suppressed: fail-guard inline
-func TestFailGuardNolint(t *testing.T) { //nolint:stdlib-test
+func TestFailGuardNolint(t *testing.T) { //nolint:stdlib-test // the suppression under test
 	var err error
-	if err != nil { //nolint:fail-guard
+	if err != nil { //nolint:fail-guard // the suppression under test
 		gotest.Fail(t, "boom")
 	}
 }
@@ -55,28 +55,28 @@ type AboveTestSuite struct{}
 // suppressed: standalone nolint on the line directly above; the
 // generator's rejection of the line is still reported
 //
-//nolint:receiver
+//nolint:receiver // the suppression under test
 func (s AboveTestSuite) TestReceiverAbove(t *testing.T) {} // want `signature of "TestReceiverAbove" has unsupported value type receiver`
 
 // suppressed: nolint:receiver is not the last line of the attached block
 //
-//nolint:receiver
-//nolint:testify
+//nolint:receiver // the suppression under test
+//nolint:testify // the suppression under test
 func (s AboveTestSuite) TestReceiverDocBlock(t *testing.T) {} // want `signature of "TestReceiverDocBlock" has unsupported value type receiver`
 
 // NOT suppressed: wrong rule above
 //
-//nolint:testify
+//nolint:testify // the suppression under test
 func (s AboveTestSuite) TestWrongRuleAbove(t *testing.T) {} // want `suite method AboveTestSuite.TestWrongRuleAbove should use a pointer receiver`
 
-var _ = 0 //nolint:receiver
+var _ = 0 //nolint:receiver // the suppression under test
 // NOT suppressed: the nolint above trails other code, it does not start the line
 func (s AboveTestSuite) TestTrailingAbove(t *testing.T) {} // want `suite method AboveTestSuite.TestTrailingAbove should use a pointer receiver`
 
 // suppressed: standalone nolint above a statement-level finding
-func TestFailGuardNolintAbove(t *testing.T) { //nolint:stdlib-test
+func TestFailGuardNolintAbove(t *testing.T) { //nolint:stdlib-test // the suppression under test
 	var err error
-	//nolint:fail-guard
+	//nolint:fail-guard // the suppression under test
 	if err != nil {
 		gotest.Fail(t, "boom")
 	}
@@ -87,7 +87,7 @@ func TestBareWithReason(t *testing.T) {} //nolint // kept on purpose
 
 // suppressed: nolint:all, above the line
 //
-//nolint:all
+//nolint:all // the suppression under test
 func (s AboveTestSuite) TestAllAbove(t *testing.T) {}
 
 // NOT suppressed: an unknown rule suppresses nothing and is a finding

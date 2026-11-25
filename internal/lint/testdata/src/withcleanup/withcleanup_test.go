@@ -107,9 +107,9 @@ func (h *cleanupHelper) doCleanup(t *testing.T) {
 // The new suite-lifecycle ID suppresses directly, and the historical
 // t-escape ID keeps working as an umbrella alias.
 func (s *ResourceTestSuite) TestNolintNewID(t *gotest.T) {
-	t.T().Cleanup(func() {}) //nolint:suite-lifecycle
+	t.T().Cleanup(func() {}) //nolint:suite-lifecycle // the suppression under test
 }
 
 func (s *ResourceTestSuite) TestNolintAlias(t *gotest.T) {
-	t.T().Cleanup(func() {}) //nolint:t-escape
+	t.T().Cleanup(func() {}) //nolint:t-escape // the suppression under test
 }

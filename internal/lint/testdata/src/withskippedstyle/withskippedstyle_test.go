@@ -1,4 +1,4 @@
-package withskippedstyle //nolint:stdlib-test
+package withskippedstyle //nolint:stdlib-test // stdlib tests are this fixture's input
 
 import (
 	"errors"

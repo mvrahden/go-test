@@ -90,6 +90,7 @@ type lintArgs struct {
 	tags     string // -tags, as for go build
 	noLoad   bool   // -flags or -V: the driver answers without loading
 	unknown  bool   // a flag nobody defines: the driver reports it
+	supp     bool   // -suppressions: print the nolint comments, not the findings
 }
 
 // lintValueFlags take a value, as -name=value or as the next argument.
@@ -132,6 +133,8 @@ func parseLintArgs(args []string) (lintArgs, error) {
 			a.json, err = strconv.ParseBool(value)
 		case name == "rules":
 			a.rules, err = strconv.ParseBool(value)
+		case name == "suppressions":
+			a.supp, err = strconv.ParseBool(value)
 		case name == "test":
 			a.tests, err = strconv.ParseBool(value)
 		case name == "c":
@@ -160,6 +163,22 @@ func parseLintArgs(args []string) (lintArgs, error) {
 	// -diff previews -fix, so it implies it.
 	a.fix = a.fix || a.diff
 	return a, nil
+}
+
+// beside names a flag that prints or writes something of its own besides
+// what -suppressions prints, or is "".
+func (a *lintArgs) beside() string {
+	switch {
+	case a.json:
+		return "-json"
+	case a.diff:
+		return "-diff"
+	case a.fix:
+		return "-fix"
+	case len(a.driver) > 0:
+		return a.driver[0]
+	}
+	return ""
 }
 
 // inProcess reports whether lint can run without the go/analysis driver.
@@ -228,6 +247,10 @@ func runLintInProcess(stdout, stderr io.Writer, dir string, args []string, githu
 			return 1, true
 		}
 		return 0, true
+	}
+	if other := a.beside(); a.supp && other != "" {
+		fmt.Fprintf(stderr, "FAIL: -suppressions prints its own document; it does not take %s\n", other)
+		return 2, true
 	}
 	if a.fix && a.loads() && len(a.driver) > 0 {
 		fmt.Fprintf(stderr, "FAIL: %s is a go/analysis driver flag; -fix and -diff do not take it\n", a.driver[0])
@@ -319,12 +342,14 @@ func runLintInProcess(stdout, stderr io.Writer, dir string, args []string, githu
 		return cmp.Or(cmp.Compare(x.File, y.File), cmp.Compare(x.Line, y.Line), cmp.Compare(x.Col, y.Col))
 	})
 	switch {
+	case a.supp:
+		// The list, not the findings: exit 0 whatever they are.
+		return printLintJSON(stderr, res.WriteSuppressionsJSON(stdout)), true
 	case a.json:
 		// As with the driver, -json exits 0 with findings. A dropped fix
 		// has no place in its format; stderr names it.
-		if err := res.PrintJSON(stdout); err != nil {
-			fmt.Fprintf(stderr, "FAIL: %v\n", err)
-			return 1, true
+		if code := printLintJSON(stderr, res.PrintJSON(stdout)); code != 0 {
+			return code, true
 		}
 		reportLintPlain(stderr, res.Unapplied, -1, source)
 		return 0, true
@@ -333,6 +358,16 @@ func runLintInProcess(stdout, stderr io.Writer, dir string, args []string, githu
 	default:
 		return reportLintPlain(stderr, findings, a.context, source), true
 	}
+}
+
+// printLintJSON is the exit code of writing a JSON document that failed
+// with err, saying why on stderr.
+func printLintJSON(stderr io.Writer, err error) int {
+	if err != nil {
+		fmt.Fprintf(stderr, "FAIL: %v\n", err)
+		return 1
+	}
+	return 0
 }
 
 // writeLintFixes writes every fixed file or none (see filewrite.Stage). A

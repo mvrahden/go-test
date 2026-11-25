@@ -49,7 +49,7 @@ func (s *HookTestSuite) TestReset(t *gotest.T) {
 }
 
 func (s *HookTestSuite) TestSuppressed(t *gotest.T) {
-	s.AfterAll(t) //nolint:fixture-hook-call
+	s.AfterAll(t) //nolint:fixture-hook-call // the suppression under test
 }
 
 func (s *HookTestSuite) helper() {}

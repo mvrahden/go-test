@@ -1,4 +1,4 @@
-package withforeign //nolint:stdlib-test
+package withforeign //nolint:stdlib-test // stdlib tests are this fixture's input
 
 import (
 	"testing"

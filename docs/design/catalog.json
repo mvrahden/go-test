@@ -29140,6 +29140,251 @@
           "name": "TestLinterRulesTestSuite",
           "output": [],
           "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lint reports the comment under nolint-reason at the comment and still honours its suppression",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "suppressions_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 25,
+                      "name": "lint_reports_the_comment_under_nolint-reason_at_the_comment_and_still_honours_its_suppression",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "the comment cannot suppress that finding, even naming nolint-reason",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "suppressions_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 28,
+                      "name": "the_comment_cannot_suppress_that_finding,_even_naming_nolint-reason",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a nolint comment naming a rule of lint's gives no reason",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "suppressions_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 24,
+                  "name": "a_nolint_comment_naming_a_rule_of_lint's_gives_no_reason",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lint leaves the comment unreported, bare or naming rules",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "suppressions_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 33,
+                      "name": "lint_leaves_the_comment_unreported,_bare_or_naming_rules",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a nolint comment gives a reason after its rules",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "suppressions_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 32,
+                  "name": "a_nolint_comment_gives_a_reason_after_its_rules",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lint leaves the comment without a reason to that linter",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "suppressions_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 41,
+                      "name": "lint_leaves_the_comment_without_a_reason_to_that_linter",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a nolint comment naming only another linter's rule gives no reason",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "suppressions_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 40,
+                  "name": "a_nolint_comment_naming_only_another_linter's_rule_gives_no_reason",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "Reasons",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "suppressions_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 23,
+              "name": "TestReasons",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "prints one document opening with version that lists each comment reaching a rule of lint's once, sorted by file and position, with its module, module-relative file, rules and reason, and exits 0",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "suppressions_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 72,
+                      "name": "prints_one_document_opening_with_version_that_lists_each_comment_reaching_a_rule_of_lint's_once,_sorted_by_file_and_position,_with_its_module,_module-relative_file,_rules_and_reason,_and_exits_0",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "marks as suppressed exactly the comments that suppressed a finding",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "suppressions_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 95,
+                      "name": "marks_as_suppressed_exactly_the_comments_that_suppressed_a_finding",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "leaves out a comment naming only another linter's rule, and prints nothing on stderr",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "suppressions_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 103,
+                      "name": "leaves_out_a_comment_naming_only_another_linter's_rule,_and_prints_nothing_on_stderr",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when lint -suppressions runs over a package with nolint comments",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "suppressions_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 71,
+                  "name": "lint_-suppressions_runs_over_a_package_with_nolint_comments",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lint refuses the pair with exit 2, naming the other flag",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "suppressions_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 112,
+                      "name": "lint_refuses_the_pair_with_exit_2,_naming_the_other_flag",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when lint -suppressions is given with -json or -fix",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "suppressions_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 111,
+                  "name": "lint_-suppressions_is_given_with_-json_or_-fix",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "List",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "suppressions_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 60,
+              "name": "TestList",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "LinterSuppressions",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "suppressions_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 13,
+          "name": "TestLinterSuppressionsTestSuite",
+          "output": [],
+          "status": "none"
         }
       ],
       "output": [],
@@ -34050,13 +34295,13 @@
     }
   ],
   "stats": {
-    "behaviors": 981,
+    "behaviors": 989,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 145,
+    "suites": 146,
     "tests": 0
   }
 }
