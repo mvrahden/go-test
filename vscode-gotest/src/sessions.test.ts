@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 
 vi.mock("vscode", () => {
   class CancellationTokenSource {
@@ -35,6 +35,7 @@ vi.mock("vscode", () => {
 
 import * as vscode from "vscode";
 import {
+  PROGRESS_TICK_MS,
   Sessions,
   SessionsTree,
   linkedSession,
@@ -136,5 +137,63 @@ describe("SessionsTree", () => {
     expect(item.label).toBe("audit: against main");
     expect(item.contextValue).toBe("gotestSession");
     expect(String(item.description)).toMatch(/^started \d\d:\d\d:\d\d$/);
+  });
+});
+
+describe("a test run's row", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("shows its elapsed time and the events it applied so far", () => {
+    const all = new Sessions();
+    const tally = { started: 12, passed: 10, failed: 1 };
+    const h = all.add({
+      kind: "run",
+      folder: "/w",
+      target: "3 items",
+      stop: () => {},
+      progress: { tally },
+    });
+    const [s] = all.list();
+    expect(sessionItem(s, s.startedAt + 42_000).description).toMatch(
+      /^started \d\d:\d\d:\d\d · 0:42 · 12 started · 10 passed · 1 failed$/,
+    );
+    tally.passed = 11;
+    expect(sessionItem(s, s.startedAt + 61_000).description).toMatch(
+      / · 1:01 · 12 started · 11 passed · 1 failed$/,
+    );
+    h.dispose();
+  });
+
+  it("is redrawn each tick while a run counts, and not once none does", () => {
+    vi.useFakeTimers();
+    const all = new Sessions();
+    let told = 0;
+    all.onDidChange(() => told++);
+    const watch = all.add({
+      kind: "watch",
+      folder: "/w",
+      target: "./...",
+      stop: () => {},
+    });
+    told = 0;
+    vi.advanceTimersByTime(5 * PROGRESS_TICK_MS);
+    expect(told, "a watcher counts nothing").toBe(0);
+    const run = all.add({
+      kind: "run",
+      folder: "/w",
+      target: "m/a",
+      stop: () => {},
+      progress: { tally: { started: 0, passed: 0, failed: 0 } },
+    });
+    told = 0;
+    vi.advanceTimersByTime(3 * PROGRESS_TICK_MS);
+    expect(told).toBe(3);
+    run.dispose();
+    told = 0;
+    vi.advanceTimersByTime(5 * PROGRESS_TICK_MS);
+    expect(told).toBe(0);
+    watch.dispose();
   });
 });

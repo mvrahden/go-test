@@ -124,6 +124,7 @@ Open it with **Go Test: Show Spec View**.
 - **Persistence** — the panel survives editor reload and restores what it kept
 - **A render that failed** — when a render fails the panel keeps the last picture and says so at its top, with the reason and a Retry button; the next successful render removes the notice
 - **Live updates** — refreshes from test runs, coverage runs and watch mode, rendered when the panel is visible; with `gotest.specView.autoRefresh` off, runs are kept and shown on **Refresh**
+- **A run in progress** — a banner over the Spec scope names each run with its elapsed time and how many test events it applied (started, passed, failed), and the rows it reached are rendered at most every few seconds while the panel is on show
 - **Scopes** — **Spec**, **Change** and **Runs** switch at the panel's top; the panel reopens in the scope it was left in
 - **Saved runs** — **Go Test: Open Events File…** opens a `--events-file` stream (or any `go test -json` capture) as a source of its own beside the workspace's runs, and replays it into the Test Explorer as a run named `Imported: <file>`; packages the workspace does not hold are listed once
 
@@ -157,7 +158,7 @@ The panel's **Runs** scope lists the folder's run records, newest first, as `got
 
 ### Sessions
 
-A **gotest Sessions** view in the Testing sidebar lists the CLI sessions running now, per folder: test and coverage runs, `--changed` runs, watchers, bench and fuzz sessions from the Test Explorer, audits and the `prepare` behind a debug session, each with what it runs and when it started. **Stop** on a row stops that session alone, the way its own cancel does: a run gets its stop and its fixtures' teardown, then force after `gotest.forceKillTimeout`. The view is hidden while nothing runs.
+A **gotest Sessions** view in the Testing sidebar lists the CLI sessions running now, per folder: test and coverage runs, `--changed` runs, watchers, bench and fuzz sessions from the Test Explorer, audits and the `prepare` behind a debug session, each with what it runs and when it started; a test or coverage run's row also shows its elapsed time and the started, passed and failed test events it applied so far. **Stop** on a row stops that session alone, the way its own cancel does: a run gets its stop and its fixtures' teardown, then force after `gotest.forceKillTimeout`. The view is hidden while nothing runs.
 
 ### Language model tool
 

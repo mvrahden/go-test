@@ -39,6 +39,7 @@ import {
 import { spawnTestProcess } from "./runnerUtils.js";
 import { buildCliCommand } from "./cli.js";
 import { setEventsDir } from "./eventsFiles.js";
+import { RunProgress } from "./liveProgress.js";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import * as path from "node:path";
@@ -245,5 +246,29 @@ describe("a batch's live stream", () => {
     } finally {
       settings.values = {};
     }
+  });
+
+  it("counts each event of its packages as it applies, and keeps the stream", async () => {
+    const lines = [
+      '{"Action":"run","Package":"example.com/cart","Test":"TestX"}',
+      '{"Action":"run","Package":"example.com/cart","Test":"TestX/TestA"}',
+      '{"Action":"pass","Package":"example.com/cart","Test":"TestX/TestA"}',
+      '{"Action":"run","Package":"example.com/other","Test":"TestY"}',
+    ];
+    let midRun: string | undefined;
+    vi.mocked(spawnTestProcess).mockImplementationOnce(
+      async (...args: unknown[]) => {
+        const onLine = args[7] as (l: string) => void;
+        for (const l of lines) onLine(l);
+        midRun = progress.pieces().at(-1)?.stream;
+        return { stdout: lines.join("\n") + "\n", stderr: "", exitCode: 0 };
+      },
+    );
+    const progress = new RunProgress("run: cart", () => {});
+    await executeBatch(config({ progress }));
+    expect(progress.tally).toEqual({ started: 2, passed: 1, failed: 0 });
+    expect(midRun).toBe(lines.join("\n") + "\n");
+    expect(progress.pieces()).toHaveLength(1);
+    expect(progress.pieces()[0].folder).toBe("/w");
   });
 });

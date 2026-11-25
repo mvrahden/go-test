@@ -5,6 +5,10 @@
 // child's own graceful stop, its teardown grace and the force after it.
 import * as vscode from "vscode";
 import * as path from "node:path";
+import { elapsedText, tallyText, type Tally } from "./liveProgress.js";
+
+// How often a row that counts a run's events is redrawn.
+export const PROGRESS_TICK_MS = 1000;
 
 export interface SessionInfo {
   // What it is: run, coverage, watch, bench, fuzz, audit, prepare.
@@ -15,6 +19,8 @@ export interface SessionInfo {
   target: string;
   // Asks the session to stop, as its owner stops it.
   stop: () => void;
+  // A test run's events so far: its row shows them and its elapsed time.
+  progress?: { tally: Tally };
 }
 
 export interface Session extends SessionInfo {
@@ -34,8 +40,22 @@ export class Sessions {
     return { dispose: () => this.listeners.delete(fn) };
   };
 
+  private tick: ReturnType<typeof setInterval> | undefined;
+
   private fire(): void {
     for (const fn of Array.from(this.listeners)) fn();
+  }
+
+  // ticking redraws the rows each PROGRESS_TICK_MS while one counts a run.
+  private ticking(): void {
+    const counting = Array.from(this.live.values()).some((s) => s.progress);
+    if (counting && !this.tick) {
+      this.tick = setInterval(() => this.fire(), PROGRESS_TICK_MS);
+      this.tick.unref?.();
+    } else if (!counting && this.tick) {
+      clearInterval(this.tick);
+      this.tick = undefined;
+    }
   }
 
   // add lists a session until the returned handle is disposed.
@@ -48,9 +68,12 @@ export class Sessions {
       stopping: false,
     });
     this.fire();
+    this.ticking();
     return {
       dispose: () => {
-        if (this.live.delete(id)) this.fire();
+        if (!this.live.delete(id)) return;
+        this.ticking();
+        this.fire();
       },
     };
   }
@@ -103,18 +126,26 @@ function clock(at: number): string {
   return `${two(d.getHours())}:${two(d.getMinutes())}:${two(d.getSeconds())}`;
 }
 
-// sessionItem is how a session's row reads.
-export function sessionItem(s: Session): {
+// sessionItem is how a session's row reads: a test run's with its elapsed
+// time and the events it applied so far.
+export function sessionItem(
+  s: Session,
+  now = Date.now(),
+): {
   label: string;
   description: string;
   tooltip: string;
   contextValue: string;
 } {
+  const counts = s.progress
+    ? ` · ${elapsedText(now - s.startedAt)} · ${tallyText(s.progress.tally)}`
+    : "";
   return {
     label: `${s.kind}: ${s.target}`,
-    description: s.stopping
-      ? `stopping… (started ${clock(s.startedAt)})`
-      : `started ${clock(s.startedAt)}`,
+    description:
+      (s.stopping
+        ? `stopping… (started ${clock(s.startedAt)})`
+        : `started ${clock(s.startedAt)}`) + counts,
     tooltip: `${s.kind} in ${s.folder}\n${s.target}\nstarted ${new Date(s.startedAt).toLocaleString()}`,
     contextValue: s.stopping ? "gotestSessionStopping" : "gotestSession",
   };

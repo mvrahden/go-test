@@ -12,6 +12,13 @@ import { ManagedChild } from "./managedChild.js";
 import { readModulePath } from "./gomod.js";
 import { JsonStore } from "./jsonStore.js";
 import { SpecStore, type RunPiece } from "./specStore.js";
+import {
+  elapsedText,
+  liveRuns,
+  tallyText,
+  type LiveRuns,
+  type RunProgress,
+} from "./liveProgress.js";
 import type { DiscoveryCache } from "./discovery.js";
 import type { ChangeScope } from "./changeScope.js";
 import type { RunsScope } from "./runsScope.js";
@@ -38,6 +45,11 @@ import {
 const RUNS_FILE = "specRuns.json";
 // 2: lines are kept per suite instance and in the order they were merged.
 const RUNS_VERSION = 2;
+
+// The least time between two renders of a run in progress, and how often its
+// banner's elapsed time and counts are redrawn.
+export const LIVE_RENDER_MS = 3000;
+export const LIVE_BANNER_MS = 1000;
 
 // How long a burst of file changes settles before freshness is asked again.
 const FRESH_DEBOUNCE_MS = 750;
@@ -111,6 +123,19 @@ export class SpecViewPanel implements vscode.Disposable {
     string,
     { child?: ManagedChild; gen: number }
   >();
+  // Each folder's document as the last render drew it, so a render of a run
+  // in progress redraws only the folders the run streams into.
+  private folderDocs = new Map<string, SpecData>();
+  // The render of runs in progress: the timer that spaces renders, the
+  // render running and its children, and whether one waits behind it.
+  private liveTimer: ReturnType<typeof setTimeout> | undefined;
+  private liveBannerTimer: ReturnType<typeof setInterval> | undefined;
+  private liveGen = 0;
+  private liveRunning = false;
+  private liveWaiting = false;
+  private readonly liveChildren = new Set<ManagedChild>();
+  // The picture on show holds a run in progress.
+  private liveDrawn = false;
 
   // patternsFor names the packages a folder's discovery reads; the CLI lays
   // the folder's runs over what their source declares. Without it, or for a
@@ -125,8 +150,11 @@ export class SpecViewPanel implements vscode.Disposable {
     // The folders that use gotest: one nothing ran in yet shows what its
     // source declares.
     private readonly declaredFolders?: () => string[],
+    // The window's runs in progress.
+    private readonly live: LiveRuns = liveRuns,
   ) {
     this.persisted = new JsonStore(storageDir, RUNS_FILE, RUNS_VERSION);
+    this.disposables.push(live.onDidChange((run) => this.liveChanged(run)));
     if (cache) {
       this.disposables.push(
         cache.onDidUpdate(() => {
@@ -346,6 +374,7 @@ export class SpecViewPanel implements vscode.Disposable {
         this.ensureScope();
         this.checkFreshSoon([], 0);
         if (this.stale && this.autoRefresh()) void this.render();
+        this.liveSoon();
       },
       null,
       this.disposables,
@@ -418,6 +447,7 @@ export class SpecViewPanel implements vscode.Disposable {
       if (this.scope !== "spec") this.ensureScope();
       else if (this.stale) void this.render();
       else this.checkFreshSoon([], 0);
+      this.liveSoon();
     } else if (msg.type === "change") {
       void this.change?.act(msg);
     } else if (msg.type === "runs") {
@@ -658,6 +688,8 @@ export class SpecViewPanel implements vscode.Disposable {
   private async renderNow(): Promise<void> {
     if (!this.stale) return;
     this.stale = false;
+    // A render of a run in progress would draw over this one.
+    this.cancelLive();
     try {
       const data = await this.renderRuns();
       this.lastSpecData = data;
@@ -665,6 +697,7 @@ export class SpecViewPanel implements vscode.Disposable {
       await this.resolveModulePaths();
       this.draw();
       this.checkFreshSoon(this.renderFolders(), 0);
+      this.liveSoon();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       this.outputChannel.error(`[specView] ${message}`);
@@ -679,12 +712,16 @@ export class SpecViewPanel implements vscode.Disposable {
   // and what the source of a folder nothing ran in declares.
   private async renderRuns(): Promise<SpecData | undefined> {
     const runs = this.currentRuns();
-    const docs: SpecData[] = [];
+    const docs = new Map<string, SpecData>();
     for (const folder of this.renderFolders()) {
       const raw = await this.runSpec(runs.compose(folder), folder, "json");
-      docs.push(JSON.parse(raw) as SpecData);
+      docs.set(folder, JSON.parse(raw) as SpecData);
     }
-    return docs.length > 0 ? combineSpecData(docs) : undefined;
+    this.folderDocs = docs;
+    this.liveDrawn = false;
+    return docs.size > 0
+      ? combineSpecData(Array.from(docs.values()))
+      : undefined;
   }
 
   // copy puts on the clipboard what the panel shows, as the CLI writes it in
@@ -804,6 +841,8 @@ export class SpecViewPanel implements vscode.Disposable {
 
   dispose(): void {
     this.runsScope?.dispose();
+    this.cancelLive();
+    clearInterval(this.liveBannerTimer);
     clearTimeout(this.freshTimer);
     for (const c of this.freshChecks.values())
       void c.child?.terminate("prompt");
@@ -856,7 +895,7 @@ export class SpecViewPanel implements vscode.Disposable {
         ? buildChangeBody(this.change.view())
         : this.scope === "runs" && this.runsScope
           ? buildRunsBody(this.runsScope.view())
-          : specBody;
+          : liveBannerHtml(this.live.active(), Date.now()) + specBody;
     const body =
       (this.change || this.runsScope
         ? buildScopeTabs(this.scope, {
@@ -901,6 +940,8 @@ ${SCRIPT}
     folder: string | undefined,
     format: string,
     extra: string[] = [],
+    // Told of the child, so a superseded render can be stopped.
+    track?: Set<ManagedChild>,
   ): Promise<string> {
     const workspaceDir =
       folder ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -920,6 +961,7 @@ ${SCRIPT}
       cwd: workspaceDir,
       kind: "spec",
     });
+    track?.add(mc);
     let stdout = "";
     let stderr = "";
     let timedOut = false;
@@ -961,9 +1003,157 @@ ${SCRIPT}
       return outcome.stdout;
     } finally {
       clearTimeout(budget);
+      track?.delete(mc);
       mc.dispose();
     }
   }
+
+  // liveChanged follows a run in progress: its banner, and a render of the
+  // rows it has reached. A run that ended stops its render; the finished
+  // run's refresh renders what it judged.
+  private liveChanged(run: RunProgress): void {
+    if (!run.active) {
+      this.cancelLive();
+      if (this.liveDrawn) this.stale = true;
+      if (this.live.active().length === 0) this.stopBanner();
+      if (this.panel && this.scope === "spec") this.draw();
+      return;
+    }
+    this.startBanner();
+    this.liveSoon();
+  }
+
+  // liveOn says whether a run in progress is the panel's to render: the
+  // workspace's runs on show in the Spec scope, which refreshes itself.
+  private liveOn(): boolean {
+    return (
+      this.live.active().length > 0 &&
+      this.isVisible() &&
+      this.scope === "spec" &&
+      !this.selected &&
+      this.autoRefresh()
+    );
+  }
+
+  // liveSoon renders the runs in progress LIVE_RENDER_MS from now, unless a
+  // render is due already; one running has the next wait behind it.
+  private liveSoon(): void {
+    if (!this.liveOn() || this.liveTimer) return;
+    if (this.liveRunning) {
+      this.liveWaiting = true;
+      return;
+    }
+    this.liveTimer = setTimeout(() => {
+      this.liveTimer = undefined;
+      void this.renderLive();
+    }, LIVE_RENDER_MS);
+  }
+
+  // cancelLive stops the render of runs in progress, the one running too:
+  // what it would draw is superseded.
+  private cancelLive(): void {
+    clearTimeout(this.liveTimer);
+    this.liveTimer = undefined;
+    this.liveWaiting = false;
+    this.liveGen++;
+    for (const mc of this.liveChildren) void mc.terminate("prompt");
+  }
+
+  // renderLive has the CLI render the kept runs with the runs in progress
+  // laid over them, in the folders those runs stream into.
+  private async renderLive(): Promise<void> {
+    if (!this.liveOn()) return;
+    const gen = ++this.liveGen;
+    const runs = this.live.active();
+    const overlay = new SpecStore();
+    overlay.restore(this.runs.serialize());
+    const folders = new Set<string>();
+    for (const run of runs) {
+      for (const piece of run.pieces()) {
+        if (!piece.stream) continue;
+        overlay.merge(piece);
+        folders.add(piece.folder);
+      }
+    }
+    if (folders.size === 0) return;
+    this.liveRunning = true;
+    try {
+      const docs = new Map(this.folderDocs);
+      for (const folder of folders) {
+        const raw = await this.runSpec(
+          overlay.compose(folder),
+          folder,
+          "json",
+          [],
+          this.liveChildren,
+        );
+        if (gen !== this.liveGen) return;
+        docs.set(folder, JSON.parse(raw) as SpecData);
+      }
+      if (gen !== this.liveGen) return;
+      const order = [
+        ...this.renderFolders(),
+        ...Array.from(folders).filter((f) => !this.renderFolders().includes(f)),
+      ];
+      const shown = order
+        .map((f) => docs.get(f))
+        .filter((d): d is SpecData => d !== undefined);
+      this.lastSpecData = combineSpecData(shown);
+      this.liveDrawn = true;
+      this.draw();
+    } catch (err: unknown) {
+      // The run's own refresh renders it; a render that fails here waits.
+      if (gen === this.liveGen) {
+        const message = err instanceof Error ? err.message : String(err);
+        this.outputChannel.warn(`[specView] live render: ${message}`);
+      }
+    } finally {
+      this.liveRunning = false;
+      if (this.liveWaiting) {
+        this.liveWaiting = false;
+        this.liveSoon();
+      }
+    }
+  }
+
+  // startBanner redraws the banner of the runs in progress each
+  // LIVE_BANNER_MS, while the panel shows it.
+  private startBanner(): void {
+    if (this.liveBannerTimer) return;
+    this.postBanner();
+    this.liveBannerTimer = setInterval(() => this.postBanner(), LIVE_BANNER_MS);
+  }
+
+  private stopBanner(): void {
+    clearInterval(this.liveBannerTimer);
+    this.liveBannerTimer = undefined;
+    this.postBanner();
+  }
+
+  private postBanner(): void {
+    if (!this.panel || !this.isVisible() || this.scope !== "spec") return;
+    void this.panel.webview.postMessage?.({
+      type: "liveBanner",
+      html: liveBannerInner(this.live.active(), Date.now()),
+    });
+  }
+}
+
+// liveBannerInner is the banner's content: a line per run in progress, with
+// its elapsed time and the test events it applied so far; empty when none.
+export function liveBannerInner(runs: RunProgress[], now: number): string {
+  return runs
+    .map(
+      (r) =>
+        `<div class="live-run"><span class="live-dot" aria-hidden="true"></span>Running ${escapeHtml(r.label)} · ${elapsedText(now - r.startedAt)} · ${tallyText(r.tally)}</div>`,
+    )
+    .join("");
+}
+
+// liveBannerHtml is the banner over the Spec scope, hidden without a run.
+export function liveBannerHtml(runs: RunProgress[], now: number): string {
+  const inner = liveBannerInner(runs, now);
+  return `<div id="live-banner" class="live-banner" role="status"${inner ? "" : " hidden"}>${inner}</div>`;
 }
 
 // encodeStateForScript serialises the spec for embedding inside a <script>
@@ -2250,6 +2440,11 @@ summary.node:hover > .node-actions,
 .error-details { margin: 2px 0 4px 20px; }
 .ran-at, .ran-at-line { opacity: 0.7; font-size: 0.9em; }
 .ran-at-line { margin: 0 0 4px 4px; }
+.live-banner { margin: 8px 12px; padding: 6px 10px; border: 1px solid var(--vscode-focusBorder); border-radius: 3px; font-variant-numeric: tabular-nums; }
+.live-banner[hidden] { display: none; }
+.live-dot { display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--vscode-progressBar-background); animation: live-pulse 1.2s ease-in-out infinite; }
+@keyframes live-pulse { 50% { opacity: 0.3; } }
+@media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
 .render-error { margin: 8px 12px; padding: 6px 10px; border: 1px solid var(--vscode-inputValidation-warningBorder); background: var(--vscode-inputValidation-warningBackground); }
 .error-summary {
   color: var(--vscode-descriptionForeground);
@@ -2301,7 +2496,33 @@ details.module-section.stale > :not(summary) { opacity: 0.55; }
 
 const SCRIPT = `
 const vscode = acquireVsCodeApi();
+const PREV_STATE = vscode.getState() || {};
 vscode.setState(Object.assign({}, PANEL_STATE, { spec: SPEC_STATE }));
+
+// A redraw of the same scope keeps where the reader was: a run in progress
+// redraws the rows every few seconds.
+const sameScope = PREV_STATE.scope === PANEL_STATE.scope;
+if (sameScope && typeof PREV_STATE.scrollY === 'number') {
+  window.scrollTo(0, PREV_STATE.scrollY);
+  vscode.setState(Object.assign({}, vscode.getState() || {}, { scrollY: PREV_STATE.scrollY }));
+}
+let scrollSave = null;
+window.addEventListener('scroll', () => {
+  clearTimeout(scrollSave);
+  scrollSave = setTimeout(() => {
+    vscode.setState(Object.assign({}, vscode.getState() || {}, { scrollY: window.scrollY }));
+  }, 100);
+});
+
+// The banner of a run in progress, redrawn in place.
+window.addEventListener('message', (e) => {
+  const m = e.data;
+  if (!m || m.type !== 'liveBanner') return;
+  const el = document.getElementById('live-banner');
+  if (!el) return;
+  el.innerHTML = m.html;
+  el.hidden = !m.html;
+});
 
 // The item ids above each row, as the rows list them.
 function ancestorsOf(rows) {
@@ -2449,7 +2670,13 @@ if (searchInput) {
   searchInput.addEventListener('input', () => {
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(applySearch, 200);
+    vscode.setState(Object.assign({}, vscode.getState() || {}, { search: searchInput.value }));
   });
+  if (sameScope && typeof PREV_STATE.search === 'string' && PREV_STATE.search) {
+    searchInput.value = PREV_STATE.search;
+    vscode.setState(Object.assign({}, vscode.getState() || {}, { search: PREV_STATE.search }));
+    applySearch();
+  }
 }
 
 function applySearch() {

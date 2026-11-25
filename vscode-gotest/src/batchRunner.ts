@@ -23,6 +23,7 @@ import {
 import { coverOf, type RunPiece } from "./specStore.js";
 import { nextEventsFile, pruneEventsFiles } from "./eventsFiles.js";
 import { liveResults } from "./config.js";
+import type { RunProgress } from "./liveProgress.js";
 import {
   runGoToolCoverFunc,
   splitCoverByPackage,
@@ -56,6 +57,8 @@ export interface BatchConfig {
   // selection would let its focus skip the selected suites. Without it the
   // patterns widen unchecked.
   knownPackages?: { importPath: string; dir: string }[];
+  // The run this invocation belongs to, told of each event as it applies.
+  progress?: RunProgress;
 }
 
 // liveEnv is the environment of a run child: GOTEST_LIVE=1 unless the
@@ -134,6 +137,12 @@ export function narrowedLine(n: Narrowed): string {
 }
 
 export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
+  const result = await runBatch(config);
+  config.progress?.finished(result.piece);
+  return result;
+}
+
+async function runBatch(config: BatchConfig): Promise<BatchResult> {
   const {
     pkgInfos,
     filter,
@@ -149,6 +158,7 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
     onResults,
     knownPackages,
     changed,
+    progress,
   } = config;
 
   const importPaths = pkgInfos.map((p) => p.importPath);
@@ -212,8 +222,11 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
       workspaceDir,
       new OnceLog((m) => outputChannel.warn(m)),
     );
+    let streamed = "";
+    progress?.streaming(() => runPiece(streamed, config));
 
     const handleStdoutLine = (line: string) => {
+      streamed += line + "\n";
       let event: TestEvent;
       try {
         event = JSON.parse(line) as TestEvent;
@@ -223,6 +236,7 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
       }
       const applied = applier.apply([event]);
       if (applied.length > 0) onResults?.(applied);
+      if (pkgDirMap.has(event.Package)) progress?.note(event);
     };
 
     // What the CLI says on stderr — a note that a package was not run, a

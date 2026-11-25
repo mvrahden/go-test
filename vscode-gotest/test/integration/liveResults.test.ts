@@ -29,6 +29,7 @@ import { DiscoveryCache, DiscoveryService } from "../../src/discovery.js";
 import { GoTestController } from "../../src/testController.js";
 import { TestResultStore } from "../../src/testResultStore.js";
 import { executeBatch } from "../../src/batchRunner.js";
+import { RunProgress } from "../../src/liveProgress.js";
 import { createRecordingChannel } from "./vscodeStub.js";
 import { FakeTestRun } from "./vscodeTestApi.js";
 
@@ -121,6 +122,7 @@ async function runHeld(hold = true) {
       free("passes");
   };
   const fallback = setTimeout(() => free("fallback"), FALLBACK_MS);
+  const progress = new RunProgress("run: liveholds", () => {});
   const item = controller.findItem(importPath);
   expect(item, `no test item for ${importPath}`).toBeDefined();
   try {
@@ -135,22 +137,24 @@ async function runHeld(hold = true) {
       outputChannel: recorder.channel as never,
       label: "liveholds",
       env: hold ? { LIVE_RELEASE_DIR: release } : undefined,
+      progress,
     });
   } finally {
     clearTimeout(fallback);
   }
-  return { run, releasedBy, suitesEndedFirst };
+  return { run, releasedBy, suitesEndedFirst, progress };
 }
 
 describe("a run with live results", () => {
   it("shows each suite's first pass while both suites still run", async () => {
     state.config = {};
-    const { run, releasedBy, suitesEndedFirst } = await runHeld();
+    const { run, releasedBy, suitesEndedFirst, progress } = await runHeld();
     expect(releasedBy).toBe("passes");
     expect(suitesEndedFirst).toBe(false);
     for (const id of [...firstPasses, ...suites]) {
       expect(run.verdicts.get(id), id).toBe("passed");
     }
+    expect(progress.tally).toEqual({ started: 6, passed: 6, failed: 0 });
   }, 120_000);
 
   it("shows them only when the suites end where the folder turned it off", async () => {

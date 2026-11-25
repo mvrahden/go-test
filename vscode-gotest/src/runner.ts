@@ -18,6 +18,7 @@ import { executeBatch } from "./batchRunner.js";
 import type { RunRegistry } from "./runRegistry.js";
 import type { RunPiece } from "./specStore.js";
 import { sessions } from "./sessions.js";
+import { liveRuns, type RunProgress } from "./liveProgress.js";
 
 export interface RunOptions {
   updateSnapshots?: boolean;
@@ -92,6 +93,7 @@ export class TestRunner {
 
     let recordId: string | undefined;
     let session: vscode.Disposable | undefined;
+    let progress: RunProgress | undefined;
 
     try {
       // Benchmarks never run as part of a normal test run: they answer with
@@ -127,15 +129,19 @@ export class TestRunner {
           ),
         ),
       );
+      const kind = narrow ? "run --changed" : "run";
+      const target = narrow
+        ? "changed packages"
+        : items.length === 1
+          ? items[0].id
+          : `${items.length} items`;
+      progress = liveRuns.start(`${kind}: ${target}`);
       session = sessions.add({
-        kind: narrow ? "run --changed" : "run",
+        kind,
         folder: folders[0] ?? "",
-        target: narrow
-          ? "changed packages"
-          : items.length === 1
-            ? items[0].id
-            : `${items.length} items`,
+        target,
         stop: () => cts.cancel(),
+        progress,
       });
 
       // A narrowed run starts nothing up front: a package it leaves out
@@ -246,6 +252,7 @@ export class TestRunner {
             effectiveToken,
             extraEnv,
             !!narrow,
+            progress,
           );
         }
 
@@ -265,6 +272,8 @@ export class TestRunner {
             run,
             effectiveToken,
             extraEnv,
+            false,
+            progress,
           );
         }
       }
@@ -327,6 +336,8 @@ export class TestRunner {
         this.activeRun = undefined;
       }
       cts.dispose();
+      // Ended before the Spec View takes the finished run.
+      progress?.end();
       if (this._lastJsonOutput) {
         this._onDidComplete.fire(this._lastPieces);
       }
@@ -351,9 +362,11 @@ export class TestRunner {
     token: vscode.CancellationToken,
     env?: Record<string, string>,
     changed = false,
+    progress?: RunProgress,
   ): Promise<void> {
     const result = await executeBatch({
       changed,
+      progress,
       pkgInfos,
       filter,
       workspaceDir,
