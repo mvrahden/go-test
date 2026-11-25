@@ -89,6 +89,9 @@ type PipelineConfig struct {
 	// Groups and SkipGroups are --group and --skip-group: the named groups
 	// the run is narrowed to, and those it leaves out.
 	Groups, SkipGroups []string
+	// Manifest opens a -json stream, which EndRun then closes; nil for a
+	// stream that is neither.
+	Manifest *protocol.Manifest
 }
 
 // flushOrder is the order a text run prints its verdicts in: the matched
@@ -439,7 +442,7 @@ func runBench(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 	sel := selection{Run: pf.UserRunFilter, Skip: pf.UserSkipFilter, Bench: ExtractBenchFilter(pf.RunFlags), Groups: overlay.groups}
 	win := planBenchFixtureWindows(plan, overlay.SharedFixtures, sel)
 	win.reportSkipped()
-	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose)
+	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose, WithManifest(cfg.Manifest))
 	collector.StdlibTestsByPkg = plan.StdlibTests()
 	collector.bench = true
 	resolvedSetupTimeout := resolveSetupTimeout(cfg.SetupTimeout)

@@ -448,8 +448,10 @@ func (c *OutputCollector) takeCensus(cfg PipelineConfig, declared DeclaredUnits,
 	}
 
 	var booked []streamEvent
+	notRun := 0
 	for _, g := range groups {
 		missing := missingUnits(g.declared, g.executed)
+		notRun += len(missing)
 		if len(missing) == 0 {
 			continue
 		}
@@ -463,6 +465,7 @@ func (c *OutputCollector) takeCensus(cfg PipelineConfig, declared DeclaredUnits,
 	}
 	booked = append(booked, c.verdicts.packageFailures(booked)...)
 	writeBooked(c.jsonTarget(), booked)
+	c.starts.judged(notRun)
 	return code
 }
 
