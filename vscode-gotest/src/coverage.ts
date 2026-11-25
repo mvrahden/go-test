@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { sessions } from "./sessions.js";
 import * as path from "node:path";
 import type { GoTestController } from "./testController.js";
 import type { DiscoveryCache } from "./discovery.js";
@@ -293,6 +294,12 @@ export class CoverageRunner implements vscode.Disposable {
       packages: items.map((i) => i.id),
     }).id;
     this.activeRecordId = recordId;
+    const session = sessions.add({
+      kind: "coverage",
+      folder: this.cache.getWorkspaceDir(items[0].id) ?? "",
+      target: items.length === 1 ? items[0].id : `${items.length} items`,
+      stop: () => cts.cancel(),
+    });
 
     let resolveRun!: () => void;
     this.previousRunPromise = new Promise<void>((r) => {
@@ -455,6 +462,7 @@ export class CoverageRunner implements vscode.Disposable {
         this.onJsonOutput(pieces);
       }
     } finally {
+      session.dispose();
       const wasCancelled = effectiveToken.isCancellationRequested;
       if (this.activeRecordId === recordId) {
         if (wasCancelled) {

@@ -164,6 +164,11 @@
       {
         "command": "gotest.applyLintFix",
         "title": "Go Test: Apply lint fix"
+      },
+      {
+        "command": "gotest.stopSession",
+        "title": "Go Test: Stop Session",
+        "icon": "$(debug-stop)"
       }
     ],
     "menus": {
@@ -209,6 +214,10 @@
           "when": "false"
         },
         {
+          "command": "gotest.stopSession",
+          "when": "false"
+        },
+        {
           "command": "gotest.toggleFocus",
           "when": "false"
         },
@@ -245,6 +254,13 @@
         {
           "command": "gotest.copyTestResults",
           "when": "controllerId == gotest",
+          "group": "inline"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "gotest.stopSession",
+          "when": "view == gotest.sessions && viewItem == gotestSession",
           "group": "inline"
         }
       ]
@@ -387,7 +403,17 @@
         "path": "./skills/writing-gotest-tests/SKILL.md",
         "when": "gotest.active"
       }
-    ]
+    ],
+    "views": {
+      "test": [
+        {
+          "id": "gotest.sessions",
+          "name": "gotest Sessions",
+          "when": "gotest.hasSessions",
+          "icon": "$(pulse)"
+        }
+      ]
+    }
   },
   "scripts": {
     "compile": "node esbuild.config.mjs",

@@ -1,4 +1,5 @@
 // The Change scope of the Spec View panel: per workspace folder, the audit
+import { sessions } from "./sessions.js";
 // of the working tree against a base, as `gotest audit --format=json`
 // prints it. The CLI computes the document; this runs it, keeps it, and
 // wires its rows to the editor.
@@ -250,6 +251,12 @@ export class ChangeScope implements vscode.Disposable {
     fs.cancelled = false;
     fs.notice = undefined;
     this.deps.changed();
+    const session = sessions.add({
+      kind: mode === "run" ? "audit --run" : "audit",
+      folder,
+      target: fs.baseLabel ? `against ${fs.baseLabel}` : "the working tree",
+      stop: () => this.cancel(folder),
+    });
     try {
       await this.auditNow(folder, fs, mode);
     } catch (err: unknown) {
@@ -264,6 +271,7 @@ export class ChangeScope implements vscode.Disposable {
         fs.state = { kind: "error", message };
       }
     } finally {
+      session.dispose();
       fs.busy = false;
       fs.child = undefined;
       if (!this.disposed) this.deps.changed();

@@ -83,6 +83,7 @@ import { TestRunner } from "./runner.js";
 import { executeBatch } from "./batchRunner.js";
 import { enqueueDescendants, skipUnresolved } from "./runnerUtils.js";
 import type { RunPiece } from "./specStore.js";
+import { sessions } from "./sessions.js";
 
 const batch = vi.mocked(executeBatch);
 
@@ -206,6 +207,21 @@ describe("TestRunner", () => {
     expect(controller.clearResults).not.toHaveBeenCalled();
     expect(runs[0].started).not.toHaveBeenCalled();
     expect(skipUnresolved).not.toHaveBeenCalled();
+  });
+
+  it("lists the run as a session while it runs; its stop cancels the run", async () => {
+    const { runner } = setup([A]);
+    let seen: string[] = [];
+    batch.mockImplementationOnce(async (cfg: any) => {
+      const mine = sessions.list().at(-1)!;
+      seen = [mine.kind, mine.target, mine.folder];
+      sessions.stop(mine.id);
+      expect(cfg.token.isCancellationRequested).toBe(true);
+      return result("");
+    });
+    await runner.run({ include: [item("m/a", "m/a")] } as any, token().token);
+    expect(seen).toEqual(["run", "m/a", "/ws"]);
+    expect(sessions.list()).toEqual([]);
   });
 
   it("says nothing for a request with no items", async () => {

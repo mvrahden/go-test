@@ -17,6 +17,7 @@ import type { CoverageStore } from "./coverageStore.js";
 import { executeBatch } from "./batchRunner.js";
 import type { RunRegistry } from "./runRegistry.js";
 import type { RunPiece } from "./specStore.js";
+import { sessions } from "./sessions.js";
 
 export interface RunOptions {
   updateSnapshots?: boolean;
@@ -90,6 +91,7 @@ export class TestRunner {
     });
 
     let recordId: string | undefined;
+    let session: vscode.Disposable | undefined;
 
     try {
       // Benchmarks never run as part of a normal test run: they answer with
@@ -118,6 +120,23 @@ export class TestRunner {
         packages: items.map((i) => i.id),
       }).id;
       this.activeRecordId = recordId;
+      const folders = Array.from(
+        new Set(
+          items.map(
+            (i) => this.cache.getWorkspaceDir(getPackageItem(i).id) ?? "",
+          ),
+        ),
+      );
+      session = sessions.add({
+        kind: narrow ? "run --changed" : "run",
+        folder: folders[0] ?? "",
+        target: narrow
+          ? "changed packages"
+          : items.length === 1
+            ? items[0].id
+            : `${items.length} items`,
+        stop: () => cts.cancel(),
+      });
 
       // A narrowed run starts nothing up front: a package it leaves out
       // keeps its verdict, and one it runs is marked as its events come.
@@ -292,6 +311,7 @@ export class TestRunner {
           });
       }
     } finally {
+      session?.dispose();
       const wasCancelled = effectiveToken.isCancellationRequested;
       if (recordId !== undefined && this.activeRecordId === recordId) {
         if (wasCancelled) {
