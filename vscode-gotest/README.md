@@ -36,7 +36,7 @@ The **Spec View** renders your test structure as a behavioral specification — 
 
 The extension invokes the gotest CLI automatically — no separate install needed.
 It runs the CLI your `go.mod` selects: `go tool` when the tool directive is declared, otherwise `go run` at the pinned version.
-The CLI must be **v1.38.0 or newer**. A release candidate or a commit before that release (`v1.38.0-rc.1`, `v1.37.1-0.<time>-<commit>`) is older than it; a commit after it (`v1.38.1-0.<time>-<commit>`) is newer. A binary or a `go.mod` pin is checked at activation; a CLI reached through `go run` or `go tool` is checked from the `version` that opens every document it writes, so an older one is refused at discovery rather than trusted.
+The CLI must be **v1.39.0 or newer**; the Spec View's **Change** scope needs **v1.42.0**, and with an older CLI it says so and leaves the rest of the extension as it is. A release candidate or a commit before that release (`v1.39.0-rc.1`, `v1.38.1-0.<time>-<commit>`) is older than it; a commit after it (`v1.39.1-0.<time>-<commit>`) is newer. A binary or a `go.mod` pin is checked at activation; a CLI reached through `go run` or `go tool` is checked from the `version` that opens every document it writes, so an older one is refused at discovery rather than trusted.
 
 ### Install
 
@@ -109,6 +109,9 @@ Open it with **Go Test: Show Spec View**.
 - **When each package last ran** — each package shows when it last ran (last run 14:32, with the date when it was not today): the time the newest run that reported the package finished. A rerun of one method moves the package's time; the other rows keep the verdicts of their own, older runs. An imported events file shows no time
 - **Rows that are gone** — a suite or method that was deleted or renamed leaves the panel at the next discovery of its package; before, its last verdict stayed until the whole package ran again. Rows below a method (behaviors, table rows) follow their method's next run
 - **The specification under the runs** — the CLI lays a folder's runs over what the folder's source declares (`gotest spec --declared`), so a behavior no run reported is listed as *not run*, and every package and module row carries the CLI's counts
+- **Before the first run** — a folder nothing ran in shows what its source declares, every row *not run* and each package marked *declared, not run yet*
+- **What the CLI says of a row** — a skip's reason, a row whose behaviors are known only at run time (*INCOMPLETE*), a leaf that passed without an assertion (*VACUOUS*), one that asserts by other means (*ASSERTS BY*) and how many assertions a leaf made when the run counted them; the trailer counts the vacuous, the other-means and the excluded leaves
+- **Which run it shows** — a line under the toolbar names the run's commit, whether the tree had uncommitted changes, the agent that ran it and its exit code; each named `ExclusiveGroup` is listed with its suites and wall time
 - **A branch's own verdict** — a suite whose hooks failed is red, and what it printed (a failed `AfterAll`, a panic booked on the suite) is shown on it
 - **Go-to-source** — click any suite, method, fuzz target, When or It the source declares to navigate to the line the CLI names; `file:line` in failure output opens that line
 - **Run, Debug, Rerun failed** — hover a row to run or debug it; a behavior the Test Explorer does not list runs as its method
@@ -117,7 +120,21 @@ Open it with **Go Test: Show Spec View**.
 - **Persistence** — the panel survives editor reload and restores what it kept
 - **A render that failed** — when a render fails the panel keeps the last picture and says so at its top, with the reason and a Retry button; the next successful render removes the notice
 - **Live updates** — refreshes from test runs, coverage runs and watch mode, rendered when the panel is visible; with `gotest.specView.autoRefresh` off, runs are kept and shown on **Refresh**
+- **Scopes** — **Spec** and **Change** switch at the panel's top; the panel reopens in the scope it was left in
 - **Saved runs** — **Go Test: Open Events File…** opens a `--events-file` stream (or any `go test -json` capture) as a source of its own beside the workspace's runs, and replays it into the Test Explorer as a run named `Imported: <file>`; packages the workspace does not hold are listed once
+
+### Change scope
+
+The panel's **Change** scope (or **Go Test: Show Change View**) is the audit of a change: what the working tree did to the tests against a base, as `gotest audit --base=<ref> --format=json` reports it. The extension renders the document and judges nothing itself; the terminal (`gotest audit`) and a pull request (`--format=md`) show the same facts.
+
+- **The base** — by default the merge-base of `HEAD` with the remote default branch (`origin/HEAD`, else a remote's `main` or `master`). **Base:** picks another: the merge-base again, a branch or tag, or any ref typed in; the choice is kept per folder. The extension passes the ref; the CLI records the base tree itself. A folder outside git says so, and one with no default branch asks for a base
+- **Head and counts** — the branch, the head commit and whether it has uncommitted changes, the base's ref and commit, and the document's counts
+- **Needs a decision** — every weakening the audit lists, in its order (removed, excluded, focused, guarded, budget, suppression, snapshot, assertions, asserts-by), then the evidence a run did not prove when the document holds evidence. Each row opens the diff of its file against the base at its lines (**Open diff**), runs its test when the Test Explorer holds one declared there (**Run**), and can be **Accept**ed. A class with more than five rows is folded behind its count
+- **Accept** — a note for yourself: kept in the workspace's state, never sent anywhere, and forgotten when the head commit changes. Accepted rows move to the bottom; the band's head counts open and accepted
+- **Changed behaviors** — added, removed, reworded, moved and changed, by package and suite; a row opens where the behavior is declared, a removed one in the base's copy of its file
+- **Information, evidence, unproven, not compared, notes** — the document's other lists, when it has them
+- **Refresh** — on the button, and after a run in the folder while the scope is on show. One audit of a folder runs at a time, a busy notice shows while it does, and closing the panel stops it. An audit that exits non-zero with a document (a package it could not read) still renders, with its exit code; one without a document shows what the CLI wrote on stderr
+- **An older CLI** — the scope asks the folder's CLI its version before it audits, since a CLI without `audit` would read the word as a package to test. Below v1.42.0 it names the version and the `go get` that upgrades, and offers **Upgrade** when `go.mod` pins the CLI
 
 ### Lint
 
@@ -222,6 +239,7 @@ The palette offers these. Commands that act on one test, benchmark or fuzz targe
 | Go Test: Refresh | Re-run test discovery for all workspace folders |
 | Go Test: Show Focused Tests | List all focused tests and navigate to them |
 | Go Test: Show Spec View | Open the BDD spec output panel |
+| Go Test: Show Change View | Open the panel's Change scope: the audit of the working tree against its base |
 | Go Test: Open Events File… | Open a saved `go test -json` stream in the Spec View and the Test Explorer |
 | Go Test: Fix lint findings in package | Apply every suggested lint fix in a package and show what is left |
 | Go Test: Lint Workspace | Run `gotest lint` on every workspace folder |
@@ -301,8 +319,8 @@ The extension runs whatever `go.mod` selects, in this order:
 2. **Workspace is gotest module** — If the workspace's `go.mod` declares the gotest module itself (development or `go.work` overlap), uses `go run ./cmd/gotest`.
 3. **Tool directive** — If `go.mod` declares the CLI as a tool (`go get -tool github.com/mvrahden/go-test/cmd/gotest@<version>`), uses `go tool <modulePath>`.
 4. **`go.mod` + replace directive** — If `go.mod` has a `replace` directive for the gotest module, uses `go run modulePath` (no version, respects replace resolution).
-5. **`go.mod` pinned version** — If `go.mod` requires gotest at v1.38.0 or newer, uses `go run modulePath@version`, and offers once to declare the tool at that version (`gotest.suggestToolDirective`; never in a vendored module).
-6. **Pinned below v1.38.0** — Refused with an **Upgrade** action; a newer CLI generates code the pinned runtime cannot compile. **Upgrade** moves each pinning module to the newest release whose `go` line does not exceed the module's, so the module's Go version stays put. A `go 1.N` line takes a release that needs `go 1.N.0`: the same language version, which `go get` only spells out. When even v1.38.0 needs a newer Go, it changes nothing and names the `go` line required; raising it is your call. The release lookup runs in a private temporary module, so your `go.mod`, a `go.work` and `-mod`/`-modfile` in `GOFLAGS` do not affect it, while proxy settings do; it shows progress and can be cancelled, and releases the proxy cannot serve are skipped. A floor hit while an upgrade runs does not start a second one.
+5. **`go.mod` pinned version** — If `go.mod` requires gotest at v1.39.0 or newer, uses `go run modulePath@version`, and offers once to declare the tool at that version (`gotest.suggestToolDirective`; never in a vendored module).
+6. **Pinned below v1.39.0** — Refused with an **Upgrade** action; a newer CLI generates code the pinned runtime cannot compile. **Upgrade** moves each pinning module to the newest release whose `go` line does not exceed the module's, so the module's Go version stays put. A `go 1.N` line takes a release that needs `go 1.N.0`: the same language version, which `go get` only spells out. When even v1.39.0 needs a newer Go, it changes nothing and names the `go` line required; raising it is your call. The release lookup runs in a private temporary module, so your `go.mod`, a `go.work` and `-mod`/`-modfile` in `GOFLAGS` do not affect it, while proxy settings do; it shows progress and can be cancelled, and releases the proxy cannot serve are skipped. A floor hit while an upgrade runs does not start a second one.
 7. **No pin** — When no module requires gotest the extension runs no CLI: there is no version to run, and it never substitutes `@latest`. **Scaffold Suite** then offers to add gotest first (`go get -tool <module>@latest` in the module of the target) and scaffolds once go.mod pins it. A `gotest.modulePath` that carries its own `@version` is run as written.
 
 In a `go.work` root every `use` module is read: a tool declared by any of them counts, and the pin is the highest across modules, which is what the workspace builds.
