@@ -413,7 +413,33 @@
           "icon": "$(pulse)"
         }
       ]
-    }
+    },
+    "languageModelTools": [
+      {
+        "name": "gotest_audit",
+        "displayName": "gotest Audit",
+        "toolReferenceName": "gotestAudit",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(checklist)",
+        "userDescription": "The audit of the working tree's test change against a base, as gotest audit writes it in Markdown",
+        "modelDescription": "Audits what the working tree changed in the Go test suites of the active gotest workspace folder against a git base, with `gotest audit --format=md`, and returns that Markdown document: behaviors added, removed, reworded, moved and changed; findings that weaken the test estate (removed tests, focus, exclusions, guards, budgets, suppressions, snapshots, assertions); and, as evidence, the verdicts of runs chosen in the editor or of a run this audit makes. Use it to review a test change before committing or merging. With run=true it runs the tests of the changed behaviors with coverage and also lists changed production lines no test executed; that is slower and asks the user to confirm. Without base it audits against the base chosen in the editor's Change view, by default the merge-base with the remote default branch. It does not change any file.",
+        "when": "gotest.active",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "base": {
+              "type": "string",
+              "description": "A git ref to audit against, such as origin/main or a commit; omit for the folder's chosen base"
+            },
+            "run": {
+              "type": "boolean",
+              "description": "Run the tests of the changed behaviors as evidence; asks the user first",
+              "default": false
+            }
+          }
+        }
+      }
+    ]
   },
   "scripts": {
     "compile": "node esbuild.config.mjs",

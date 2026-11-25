@@ -33,6 +33,7 @@ import { FocusDiagnostics } from "./diagnostics.js";
 import { SpecViewPanel, nearestItemId } from "./specView.js";
 import { ChangeScope } from "./changeScope.js";
 import { RunsScope } from "./runsScope.js";
+import { registerAuditTool } from "./auditTool.js";
 import { EvidenceSelection } from "./evidence.js";
 import { readFile } from "node:fs/promises";
 import { BASE_SCHEME, parseBaseQuery, showFile } from "./git.js";
@@ -220,6 +221,19 @@ export function activate(context: vscode.ExtensionContext): void {
     changed: () => specView.runsChanged(),
   });
   specView.setRunsScope(runsScope);
+  // gotest_audit: the same audit for an agent in the editor.
+  const auditTool = registerAuditTool({
+    folder: () => {
+      const here = resolveActiveWorkspaceDir();
+      return here && active.has(here) ? here : changeScope.folder;
+    },
+    audit: (folder, input) => changeScope.auditMarkdown(folder, input),
+  });
+  if (auditTool) context.subscriptions.push(auditTool);
+  else
+    outputChannel.info(
+      "[activate] this editor has no language model tools API; gotest_audit is not offered",
+    );
   // A file as the audit's base commit holds it, for the diff editor.
   const baseContent = vscode.workspace.registerTextDocumentContentProvider(
     BASE_SCHEME,

@@ -121,6 +121,8 @@ interface FolderState {
   runs: Map<string, RunTarget>;
   cliOk: boolean;
   upgrade?: CliBelowFloorError;
+  // Waiting for the folder's audit slot.
+  waiters: (() => void)[];
 }
 
 // How much of a run audit's stderr is kept for its complaint: the run's
@@ -160,6 +162,7 @@ export class ChangeScope implements vscode.Disposable {
         targets: new Map(),
         runs: new Map(),
         cliOk: false,
+        waiters: [],
       };
       this.folders.set(folder, fs);
     }
@@ -280,7 +283,99 @@ export class ChangeScope implements vscode.Disposable {
     fs.again = undefined;
     if (again && !this.disposed && !fs.cancelled) {
       await this.audit(folder, again);
+      return;
     }
+    for (const w of fs.waiters.splice(0)) w();
+  }
+
+  // idle resolves once no audit of the folder runs.
+  private idle(folder: string): Promise<void> {
+    const fs = this.stateOf(folder);
+    if (!fs.busy) return Promise.resolve();
+    return new Promise((resolve) => fs.waiters.push(resolve));
+  }
+
+  // auditMarkdown is the folder's audit as the CLI writes it in Markdown,
+  // for a language model tool. It takes the folder's one audit slot, as
+  // the scope's own audits do, and the same base, patterns and evidence;
+  // base names another ref. What the CLI cannot do is said in plain words.
+  async auditMarkdown(
+    folder: string,
+    opts: { base?: string; run?: boolean },
+  ): Promise<string> {
+    const mode: AuditMode = opts.run ? "run" : "static";
+    let fs = this.stateOf(folder);
+    while (fs.busy) {
+      await this.idle(folder);
+      fs = this.stateOf(folder);
+    }
+    fs.busy = mode;
+    fs.cancelled = false;
+    this.deps.changed();
+    const session = sessions.add({
+      kind: opts.run ? "audit --run" : "audit",
+      folder,
+      target: "for a language model tool",
+      stop: () => this.cancel(folder),
+    });
+    try {
+      if (!(await gitToplevel(folder)))
+        return "This folder is not in a git checkout, so there is no base to audit against.";
+      const ref = opts.base ?? (await this.resolveBase(folder))?.ref;
+      if (!ref)
+        return "No base to audit against: the checkout has no remote default branch. Name a base ref.";
+      if (!fs.cliOk && !(await this.checkCli(folder, fs))) {
+        const st = fs.state as ChangeState;
+        if (st.kind === "oldCli")
+          return `This folder's gotest CLI${st.version ? ` (${st.version})` : ""} has no audit command; it needs ${st.floor}. ${st.advice}`;
+        if (st.kind === "newSchema")
+          return `This folder's CLI writes audit schema ${st.schema}; this extension reads ${st.supported}. Update the extension.`;
+        return "This folder's gotest CLI cannot audit.";
+      }
+      const patterns = (await this.deps.patternsFor?.(folder)) ?? [];
+      const args = ["audit", `--base=${ref}`, "--format=md"];
+      if (opts.run) args.push("--run");
+      args.push(...this.evidenceArgs(folder), ...patterns);
+      let cmd;
+      try {
+        cmd = await buildCliCommand(args, folder, this.deps.log);
+      } catch (err: unknown) {
+        offerCliUpgrade(err);
+        return err instanceof Error ? err.message : String(err);
+      }
+      this.deps.log.info(
+        `[change] ${cmd.bin} ${cmd.args.join(" ")} (cwd ${folder}, tool)`,
+      );
+      const out = await this.spawnAudit(folder, fs, cmd.bin, cmd.args, mode);
+      if (out.stdout.trim()) return out.stdout;
+      return (
+        stripGoRunExitEcho(out.stderr) ||
+        `gotest audit exited with code ${out.code}`
+      );
+    } catch (err: unknown) {
+      return err instanceof Error ? err.message : String(err);
+    } finally {
+      session.dispose();
+      fs.busy = false;
+      fs.child = undefined;
+      // The scope's document may now be older than the tree's.
+      if (opts.run) fs.stale = true;
+      this.release(folder, fs);
+    }
+  }
+
+  // release hands the slot to an audit asked for meanwhile, or to whoever
+  // waits for the folder to be idle.
+  private release(folder: string, fs: FolderState): void {
+    if (this.disposed) return;
+    this.deps.changed();
+    const again = fs.again;
+    fs.again = undefined;
+    if (again && !fs.cancelled) {
+      void this.audit(folder, again);
+      return;
+    }
+    for (const w of fs.waiters.splice(0)) w();
   }
 
   // cancel stops the folder's audit, and the run it started.
@@ -397,6 +492,23 @@ export class ChangeScope implements vscode.Disposable {
     args: string[],
     mode: AuditMode,
   ): Promise<AuditOutcome> {
+    const { code, stdout, stderr } = await this.spawnAudit(
+      folder,
+      fs,
+      bin,
+      args,
+      mode,
+    );
+    return interpretAuditExit(code, stdout, stderr);
+  }
+
+  private async spawnAudit(
+    folder: string,
+    fs: FolderState,
+    bin: string,
+    args: string[],
+    mode: AuditMode,
+  ): Promise<{ code: number | null; stdout: string; stderr: string }> {
     if (fs.cancelled) throw new Error("audit stopped");
     const budgetSeconds = auditTimeoutSeconds(folder);
     const mc = new ManagedChild(bin, args, {
@@ -428,7 +540,7 @@ export class ChangeScope implements vscode.Disposable {
       if (spawnError) throw spawnError;
       if (timedOut) throw new Error(`audit timed out after ${budgetSeconds}s`);
       if (this.disposed || fs.cancelled) throw new Error("audit stopped");
-      return interpretAuditExit(code, stdout, stderr);
+      return { code, stdout, stderr };
     } finally {
       clearTimeout(budget);
       mc.dispose();
