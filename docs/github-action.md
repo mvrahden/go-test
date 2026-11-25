@@ -43,6 +43,9 @@ The tables below are the canonical action surface — a drift guard test keeps t
 | `fuzz-for` | Approximate wall-clock budget for the whole fuzz session (default: the CLI's own, one minute) |
 | `fuzz-cache` | Carry Go's fuzz cache between runs so each session resumes where the last stopped; `false` for a from-seeds run (default `true`) |
 | `events-file` | Also save the run's go test `-json` event stream to this path (`--events-file`); prefer one under `runner.temp`; needs gotest v1.36.0 or newer, and the step fails naming it with an older CLI; default empty saves nothing |
+| `audit` | `auto` (default) appends `gotest audit`'s comparison with the pull request's base to the step summary on `pull_request` events; `true` also on other events, against `github.event.before`; `false` never ([Audit and attestation](#audit-and-attestation)) |
+| `audit-fail-on` | Finding classes the audit fails the step on (`--fail-on`), comma-separated; default empty reports and never fails |
+| `attest` | Attest the run's result with the in-toto test-result predicate through `actions/attest`; the job must grant `id-token: write` and `attestations: write` (default `false`) |
 | `version` | `gomod` (default) runs the CLI from go.mod; a tag (e.g. `v1.0.0`, `latest`) installs globally |
 
 ### Outputs
@@ -53,9 +56,33 @@ The tables below are the canonical action surface — a drift guard test keeps t
 | `coverage` | Coverage percentage (empty if coverage not enabled) |
 | `badge` | Path of the rendered coverage badge SVG (empty unless badge is enabled and the tests ran) |
 | `events-file` | Absolute path of the saved event stream (empty unless `events-file` is set and the file was written) |
+| `audit-report` | Path of the audit's Markdown document (empty when the audit did not run) |
+| `attestation-url` | URL of the run's attestation (empty unless `attest` is enabled and it was made) |
 | `bench-report` | Path to the `gotest bench --json` report file (empty if bench not enabled) |
 | `bench-breached-keys` | Comma-joined benchmark keys that breached the gate (empty if none or no gate) |
 | `fuzz-crashers` | Comma-joined workspace-relative paths of the corpus files the fuzz session added (empty if none or fuzz not enabled) |
+
+## Audit and attestation
+
+On a `pull_request` event the action runs [`gotest audit`](../specs/audit/spec.md) after the tests and appends its Markdown document to the step summary: the behaviors the pull request adds, removes, rewords, moves and changes against `github.event.pull_request.base.sha`, the weakenings, and, from the run's own event stream and its coverage profile when `coverage` made one, the evidence for each changed behavior and the changed lines no test executed. The action keeps that stream in `runner.temp` when `events-file` is not set. `actions/checkout` fetches one commit, so the action fetches the base commit alone (`git fetch --depth=1 origin <sha>`); where that fails, the summary says the audit was skipped and why. `audit: true` also audits other events against `github.event.before`, the commit a push started from, and says the audit was skipped on an event that names none, such as a push that created its branch. The audit only reports: the step fails only when `audit-fail-on` names classes the document lists, and then also when the audit cannot judge them.
+
+```yaml
+- uses: mvrahden/go-test@v1
+  with:
+    coverage: true
+    audit-fail-on: removed,focus,excluded
+```
+
+With `attest: true` the action writes the run's result as the in-toto [test-result predicate](https://github.com/in-toto/attestation/blob/main/spec/predicates/test-result.md) (`gotest summary --input=<stream> --format=intoto-test-result`, [A run's result as an in-toto predicate](../specs/cli/spec.md#requirement-a-runs-result-as-an-in-toto-predicate)) and attests it through [`actions/attest`](https://github.com/actions/attest). A test run attests the source it tested, so the subject is the checked-out commit: `actions/attest` takes only SHA-2 digests, not a git commit id, so the subject is named `git+<server>/<repository>@<commit>` and its digest is the sha256 of `git archive --format=tar <commit>`, which anyone holding the commit can recompute. A composite action cannot grant permissions; the calling job needs:
+
+```yaml
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+```
+
+Without them, as on a pull request from a fork, the attestation fails softly: the job goes on and the summary says what was missing. Verify one with `gh attestation verify` against the archive, with `--predicate-type https://in-toto.io/attestation/test-result/v0.1`.
 
 ## Event Stream
 

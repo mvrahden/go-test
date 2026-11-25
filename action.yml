@@ -54,6 +54,15 @@ inputs:
   events-file:
     description: "Also save the run's go test -json event stream to this path, for upload-artifact, gotestsum or gotest summary --input; empty (the default) saves nothing. Prefer a path under runner.temp so it stays out of the checkout. Artifacts are not masked like logs: a token a test prints ends up in the file."
     default: ""
+  audit:
+    description: "After the tests, append gotest audit's comparison with the base commit to the step summary, with the run's stream as evidence and its coverage profile when it made one: auto (default) on pull_request events against the pull request's base, true also on other events against the pushed range's first parent (github.event.before), false never"
+    default: "auto"
+  audit-fail-on:
+    description: "Finding classes the audit fails the step on (gotest audit --fail-on), comma-separated; empty (the default) reports and never fails"
+    default: ""
+  attest:
+    description: "Attest the run's result with the in-toto test-result predicate through actions/attest, its subject the tested commit's source; the caller's job must grant id-token: write and attestations: write"
+    default: "false"
   version:
     description: "gotest version: 'gomod' (default) runs the CLI go.mod declares; or a version tag such as v1.33.0 to install that binary. Pin the version go.mod requires: a binary that drifts from it is refused or runs the wrong runtime."
     default: "gomod"
@@ -71,6 +80,12 @@ outputs:
   events-file:
     description: "Absolute path of the saved event stream (empty unless events-file is set and the file was written)"
     value: ${{ steps.test.outputs.events-file }}
+  audit-report:
+    description: "Path of the audit's Markdown document (empty when the audit did not run)"
+    value: ${{ steps.audit.outputs.audit-report }}
+  attestation-url:
+    description: "URL of the run's attestation (empty unless attest is enabled and it was made)"
+    value: ${{ steps.attest.outputs.attestation-url }}
   bench-report:
     description: "Path to the gotest bench --json report file (empty if bench not enabled)"
     value: ${{ steps.bench.outputs.bench-report }}
@@ -146,11 +161,23 @@ runs:
         INPUT_BADGE: ${{ inputs.badge }}
         INPUT_EVENTS_FILE: ${{ inputs.events-file }}
         INPUT_VERSION: ${{ inputs.version }}
+        INPUT_AUDIT: ${{ inputs.audit }}
+        INPUT_ATTEST: ${{ inputs.attest }}
+        EVENT_NAME: ${{ github.event_name }}
       run: |
         if [ "$INPUT_VERSION" != "gomod" ]; then
           cmd=(gotest)
         else
           cmd=("$GOTEST_BIN")
+        fi
+
+        audit="${INPUT_AUDIT:-auto}"
+        case "$audit" in auto | true | false) ;; *)
+          echo "::error::audit must be auto, true or false; got ${audit}"; exit 2;;
+        esac
+        want_audit=""
+        if [ "$audit" = "true" ] || { [ "$audit" = "auto" ] && [ "$EVENT_NAME" = "pull_request" ]; }; then
+          want_audit=1
         fi
 
         args=(summary --github)
@@ -179,6 +206,19 @@ runs:
           args+=("--events-file=$events_file")
         fi
 
+        # The audit and the attestation read the run's stream: one is kept
+        # in RUNNER_TEMP when the caller keeps none and the CLI can write it.
+        stream="$events_file"
+        if [ -z "$stream" ] && { [ -n "$want_audit" ] || [ "$INPUT_ATTEST" = "true" ]; } &&
+          "${cmd[@]}" summary --help 2>/dev/null | grep -q -- --events-file; then
+          stream="${RUNNER_TEMP}/gotest-run-events.json"
+          if command -v cygpath > /dev/null; then
+            stream="$(cygpath -m "$stream")"
+          fi
+          rm -f "$stream"
+          args+=("--events-file=$stream")
+        fi
+
         gtflags=()
         if [ -n "$INPUT_GO_TEST_FLAGS" ]; then
           case "$INPUT_GO_TEST_FLAGS" in *\"*|*\'*)
@@ -202,6 +242,10 @@ runs:
         if [ "$INPUT_COVERAGE" = "true" ] || [ "$INPUT_BADGE" = "true" ]; then
           if [ -n "$user_profile" ]; then
             cover_profile="$user_profile"
+          elif [ -n "$want_audit" ]; then
+            cover_profile="${RUNNER_TEMP}/gotest-cover.out"
+            rm -f "$cover_profile"
+            args+=("-coverprofile=$cover_profile")
           else
             cover_profile="$(mktemp -t gotest-cover-XXXXXX.out)"
             temp_profile="$cover_profile"
@@ -287,7 +331,161 @@ runs:
           echo "events-file=$events_file" >> "$GITHUB_OUTPUT"
         fi
 
+        if [ -n "$stream" ] && [ -f "$stream" ]; then
+          echo "stream=$stream" >> "$GITHUB_OUTPUT"
+        fi
+        if [ -n "$want_audit" ] && [ -n "$cover_profile" ] && [ -f "$cover_profile" ]; then
+          echo "profile=$cover_profile" >> "$GITHUB_OUTPUT"
+        fi
+
         exit "$exit_code"
+
+    - name: Audit the change
+      id: audit
+      if: ${{ !cancelled() && inputs.audit != 'false' && steps.test.outputs.exit-code != '' }}
+      shell: bash
+      env:
+        INPUT_AUDIT: ${{ inputs.audit }}
+        INPUT_AUDIT_FAIL_ON: ${{ inputs.audit-fail-on }}
+        INPUT_PACKAGES: ${{ inputs.packages }}
+        INPUT_VERSION: ${{ inputs.version }}
+        EVENT_NAME: ${{ github.event_name }}
+        PR_BASE: ${{ github.event.pull_request.base.sha }}
+        PUSH_BEFORE: ${{ github.event.before }}
+        STREAM: ${{ steps.test.outputs.stream }}
+        PROFILE: ${{ steps.test.outputs.profile }}
+      run: |
+        if [ "$INPUT_VERSION" != "gomod" ]; then
+          cmd=(gotest)
+        else
+          cmd=("$GOTEST_BIN")
+        fi
+
+        skip() {
+          echo "gotest audit skipped: $1"
+          printf '\n> gotest audit skipped: %s\n' "$1" >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+        }
+
+        if [ "${INPUT_AUDIT:-auto}" = "auto" ] && [ "$EVENT_NAME" != "pull_request" ]; then
+          exit 0
+        fi
+        base="${PR_BASE:-$PUSH_BEFORE}"
+        case "$base" in "" | *[!0]*) ;; *) base="" ;; esac
+        if [ -z "$base" ]; then
+          skip "the ${EVENT_NAME:-unknown} event names no base commit"
+        fi
+        if ! "${cmd[@]}" audit --help 2>/dev/null | grep -q -- --evidence; then
+          skip "the gotest in use has no audit command that reads a run's stream"
+        fi
+
+        # A shallow checkout lacks the base: fetch that one commit.
+        log="${RUNNER_TEMP}/gotest-audit-fetch.log"
+        if ! git cat-file -e "${base}^{commit}" 2>/dev/null &&
+          ! git fetch --no-tags --quiet --depth=1 origin "$base" > "$log" 2>&1; then
+          cat "$log"
+          skip "the base commit ${base} could not be fetched"
+        fi
+
+        report="${RUNNER_TEMP}/gotest-audit.md"
+        args=(audit "--base=$base" --format=md "--output=$report")
+        if [ -n "$STREAM" ] && [ -f "$STREAM" ]; then
+          args+=("--evidence=$STREAM")
+        fi
+        if [ -n "$PROFILE" ] && [ -f "$PROFILE" ]; then
+          args+=("--coverage=$PROFILE")
+        fi
+        if [ -n "$INPUT_AUDIT_FAIL_ON" ]; then
+          args+=("--fail-on=$INPUT_AUDIT_FAIL_ON")
+        fi
+        case "$INPUT_PACKAGES" in *\"*|*\'*)
+          echo "::error::packages must not contain quotes: one entry per word or line"; exit 2;;
+        esac
+        read -r -d '' -a pkgs <<< "$INPUT_PACKAGES" || true
+        args+=("${pkgs[@]}")
+
+        set +e
+        "${cmd[@]}" "${args[@]}"
+        code=$?
+        set -e
+        if [ -s "$report" ]; then
+          { echo; cat "$report"; } >> "$GITHUB_STEP_SUMMARY"
+          echo "audit-report=$report" >> "$GITHUB_OUTPUT"
+        fi
+
+        # Only a policy the caller set fails the step.
+        if [ "$code" -ne 0 ] && [ -n "$INPUT_AUDIT_FAIL_ON" ]; then
+          exit "$code"
+        fi
+        if [ "$code" -ne 0 ]; then
+          echo "::warning title=gotest audit::gotest audit exited ${code}; its report says why"
+        fi
+        exit 0
+
+    - name: Write the test-result predicate
+      id: predicate
+      if: ${{ !cancelled() && inputs.attest == 'true' && steps.test.outputs.exit-code != '' }}
+      shell: bash
+      env:
+        INPUT_VERSION: ${{ inputs.version }}
+        STREAM: ${{ steps.test.outputs.stream }}
+      run: |
+        if [ "$INPUT_VERSION" != "gomod" ]; then
+          cmd=(gotest)
+        else
+          cmd=("$GOTEST_BIN")
+        fi
+
+        skip() {
+          echo "::warning title=gotest attest::attestation skipped: $1"
+          printf '\n> gotest attestation skipped: %s\n' "$1" >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+        }
+
+        if [ -z "$STREAM" ] || [ ! -f "$STREAM" ]; then
+          skip "the run saved no event stream"
+        fi
+        predicate="${RUNNER_TEMP}/gotest-test-result.json"
+        if ! "${cmd[@]}" summary "--input=$STREAM" --format=intoto-test-result "--output=$predicate"; then
+          skip "the gotest in use cannot write the test-result predicate"
+        fi
+
+        # The subject is the tested commit's source: actions/attest takes
+        # SHA-2 digests only, so it is the sha256 of git archive's tar of
+        # the commit, which a verifier recomputes from the commit.
+        if ! commit=$(git rev-parse --verify HEAD 2>/dev/null); then
+          skip "the workspace is not a git checkout"
+        fi
+        if command -v sha256sum > /dev/null; then
+          sum=(sha256sum)
+        else
+          sum=(shasum -a 256)
+        fi
+        digest=$(git archive --format=tar "$commit" | "${sum[@]}" | cut -d' ' -f1)
+        {
+          echo "path=$predicate"
+          echo "subject-name=git+${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY}@${commit}"
+          echo "subject-digest=sha256:$digest"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Attest the run
+      id: attest
+      if: ${{ !cancelled() && steps.predicate.outputs.path != '' }}
+      continue-on-error: true
+      uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+      with:
+        subject-name: ${{ steps.predicate.outputs.subject-name }}
+        subject-digest: ${{ steps.predicate.outputs.subject-digest }}
+        predicate-type: https://in-toto.io/attestation/test-result/v0.1
+        predicate-path: ${{ steps.predicate.outputs.path }}
+
+    - name: Report a failed attestation
+      if: ${{ !cancelled() && steps.attest.outcome == 'failure' }}
+      shell: bash
+      run: |
+        msg="the run was not attested: does the job grant id-token: write and attestations: write? A pull request from a fork gets neither."
+        echo "::warning title=gotest attest::$msg"
+        printf '\n> gotest attestation failed: %s\n' "$msg" >> "$GITHUB_STEP_SUMMARY"
 
     # The badge follows the default branch only: a pull request or feature
     # branch must never rewrite it. Exit code 2 means the suites did not run

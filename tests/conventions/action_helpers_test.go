@@ -17,6 +17,7 @@ type actionRun struct {
 	exit           int
 	stdout, stderr string
 	output, env    string // what the step appended to GITHUB_OUTPUT and GITHUB_ENV
+	summary        string // what it appended to GITHUB_STEP_SUMMARY
 	dir, temp      string // the working directory and RUNNER_TEMP
 }
 
@@ -73,14 +74,16 @@ func runActionStep(t *gotest.T, script, dir string, bins map[string]string, env 
 	_ = cmd.Run()
 	written, _ := os.ReadFile(output)
 	envWritten, _ := os.ReadFile(envFile)
+	summary, _ := os.ReadFile(filepath.Join(base, "summary"))
 	return actionRun{
-		exit:   cmd.ProcessState.ExitCode(),
-		stdout: stdout.String(),
-		stderr: stderr.String(),
-		output: string(written),
-		env:    string(envWritten),
-		dir:    dir,
-		temp:   temp,
+		exit:    cmd.ProcessState.ExitCode(),
+		stdout:  stdout.String(),
+		stderr:  stderr.String(),
+		output:  string(written),
+		env:     string(envWritten),
+		summary: string(summary),
+		dir:     dir,
+		temp:    temp,
 	}
 }
 

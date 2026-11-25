@@ -689,7 +689,7 @@ percentage = covered / total</div>
           <tr><td><code>gotest clean ./...</code></td><td>Remove orphaned generated files.</td></tr>
           <tr><td><code>gotest refactor toggle-focus &lt;file&gt; &lt;id&gt;</code></td><td>Toggle <code>F_</code>/<code>X_</code> prefixes programmatically.</td></tr>
           <tr><td><code>gotest skill install</code></td><td>Install the coding-agent skill shipped with this version (v1.35.0+); <code>--dir</code> picks the skills directory.</td></tr>
-          <tr><td><code>gotest hook &lt;event&gt;</code></td><td>Answer a coding agent&#39;s hook event read on stdin: lint findings after a test file is edited (<code>post-edit</code>), the gotest command before a <code>go test</code> that would skip the suites (<code>pre-shell</code>). The Claude Code plugin wires it.</td></tr>
+          <tr><td><code>gotest hook &lt;event&gt;</code></td><td>Answer a coding agent&#39;s hook event read on stdin: lint findings after a test file is edited (<code>post-edit</code>), the gotest command before a <code>go test</code> that would skip the suites (<code>pre-shell</code>), and at the end of a turn the weakenings <code>gotest audit</code> finds, once each (<code>stop</code>). The Claude Code plugin wires it.</td></tr>
           <tr><td><code>gotest prepare ./...</code></td><td>Start shared fixtures for debugging; blocks until SIGTERM.</td></tr>
           <tr><td><code>gotest version</code></td><td>Print version information.</td></tr>
           <tr><td><code>gotest help [subcommand]</code></td><td>General or subcommand-specific help.</td></tr>
@@ -705,7 +705,7 @@ percentage = covered / total</div>
           <tr><td><code>--no-cache</code></td><td>Bypass the test binary cache and link afresh (generation is not cached).</td></tr>
           <tr><td><code>--spec</code></td><td>Render the spec view instead of the default output (default and watch modes).</td></tr>
           <tr><td><code>--update-snapshots</code></td><td>Regenerate snapshot files.</td></tr>
-          <tr><td><code>--format=&lt;fmt&gt;</code></td><td>Output format for <code>spec</code>/<code>summary</code> (terminal, md/markdown, json).</td></tr>
+          <tr><td><code>--format=&lt;fmt&gt;</code></td><td>Output format for <code>spec</code>/<code>summary</code> (terminal, md/markdown, json); <code>summary --input</code> also writes <code>intoto-test-result</code>, the in-toto test-result predicate of the saved run.</td></tr>
           <tr><td><code>--output=&lt;path&gt;</code></td><td>Write formatted output to file.</td></tr>
           <tr><td><code>--no-color</code></td><td>Strip ANSI codes from terminal output.</td></tr>
           <tr><td><code>--min=&lt;pct&gt;</code></td><td>Fail if coverage is below threshold (enables <code>-coverprofile</code>).</td></tr>
@@ -914,6 +914,9 @@ FAIL  pkg/bar TestProcessOrder / concurrent writes (1.2s)
           <tr><td><code>fuzz-for</code></td><td><em>none</em></td><td>Approximate wall-clock budget for the fuzz session; empty uses the CLI's default of one minute.</td></tr>
           <tr><td><code>fuzz-cache</code></td><td><code>true</code></td><td>Carry Go's fuzz cache between runs, so each session resumes where the last one stopped.</td></tr>
           <tr><td><code>events-file</code></td><td></td><td>Also save the run's <code>go test -json</code> event stream to this path, for <code>upload-artifact</code>, gotestsum or <code>gotest summary --input</code>; prefer a path under <code>runner.temp</code>. Needs gotest v1.36.0 or newer. Artifacts are not masked like logs: a token a test prints ends up in the file.</td></tr>
+          <tr><td><code>audit</code></td><td><code>auto</code></td><td>Append <code>gotest audit</code>'s comparison with the base commit to the step summary: on <code>pull_request</code> events for <code>auto</code>, on every event that names a base for <code>true</code>, never for <code>false</code>.</td></tr>
+          <tr><td><code>audit-fail-on</code></td><td><em>none</em></td><td>Finding classes the audit fails the step on (<code>--fail-on</code>); empty reports and never fails.</td></tr>
+          <tr><td><code>attest</code></td><td><code>false</code></td><td>Attest the run's result with the in-toto test-result predicate through <code>actions/attest</code>; the job must grant <code>id-token: write</code> and <code>attestations: write</code>.</td></tr>
           <tr><td><code>version</code></td><td><code>gomod</code></td><td>Version to install, or <code>gomod</code> to resolve from <code>go.mod</code>.</td></tr>
         </tbody>
       </table>
@@ -926,6 +929,8 @@ FAIL  pkg/bar TestProcessOrder / concurrent writes (1.2s)
           <tr><td><code>coverage</code></td><td>Coverage percentage (empty if coverage not enabled).</td></tr>
           <tr><td><code>events-file</code></td><td>Absolute path of the saved event stream (empty unless <code>events-file</code> is set and the file was written).</td></tr>
           <tr><td><code>badge</code></td><td>Path of the rendered coverage badge SVG (empty unless <code>badge</code> is enabled and the tests ran).</td></tr>
+          <tr><td><code>audit-report</code></td><td>Path of the audit's Markdown document (empty when the audit did not run).</td></tr>
+          <tr><td><code>attestation-url</code></td><td>URL of the run's attestation (empty unless <code>attest</code> is enabled and it was made).</td></tr>
           <tr><td><code>bench-report</code></td><td>Path to the <code>gotest bench --json</code> report file (empty if <code>bench</code> is not enabled).</td></tr>
           <tr><td><code>bench-breached-keys</code></td><td>Comma-joined benchmark keys that breached the gate (empty if none or no gate).</td></tr>
           <tr><td><code>fuzz-crashers</code></td><td>Comma-joined workspace-relative paths of the corpus files the fuzz session added (empty if none or <code>fuzz</code> is not enabled).</td></tr>
