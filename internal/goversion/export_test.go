@@ -1,4 +1,4 @@
-package goversion //nolint:stdlib-test
+package goversion
 
 import "golang.org/x/tools/go/packages"
 

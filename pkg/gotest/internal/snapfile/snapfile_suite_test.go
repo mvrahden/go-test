@@ -1,7 +1,7 @@
 // Ring 0: raw checks only, so a broken assertion engine cannot pass its own
 // tests. No gotest.* assertion may appear in this file. snapfile is what
 // MatchSnapshot reads and writes, so its truth sits below the assertions.
-package snapfile_test //nolint:fail-guard
+package snapfile_test //nolint:fail-guard // ring 0: raw checks only, never a gotest assertion
 
 import (
 	"github.com/mvrahden/go-test/pkg/gotest"

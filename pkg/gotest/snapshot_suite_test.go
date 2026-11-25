@@ -118,7 +118,7 @@ func (s *SnapshotConcurrencyTestSuite) TestMatchSnapshotConcurrency(t *gotest.T)
 	t.When("multiple goroutines write concurrently", func(w *gotest.T) {
 		for i := range 10 {
 			w.It(fmt.Sprintf("goroutine %d writes its value", i), func(it *gotest.T) {
-				it.T().Parallel() //nolint:t-escape
+				it.T().Parallel() //nolint:t-escape // parallel Its race their snapshot writes
 				gotest.MatchSnapshot(it, fmt.Sprintf("concurrent-value-%d", i))
 			})
 		}

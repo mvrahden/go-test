@@ -1,5 +1,5 @@
 // Ring 0: raw checks only (see ring0_suite_test.go).
-package gotestruntime_test //nolint:fail-guard
+package gotestruntime_test //nolint:fail-guard // ring 0: raw checks only, never a gotest assertion
 
 import (
 	"context"

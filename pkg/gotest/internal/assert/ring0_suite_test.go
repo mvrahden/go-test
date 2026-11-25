@@ -2,7 +2,7 @@
 // tests. No gotest.* assertion may appear in this package's tests. The kernel
 // returns a failure message as a string, or "" on success, which is what makes
 // plain comparisons sufficient here.
-package assert_test //nolint:fail-guard
+package assert_test //nolint:fail-guard // ring 0: raw checks only, never a gotest assertion
 
 import (
 	"strings"
