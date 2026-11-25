@@ -43,16 +43,20 @@ func Read(ctx context.Context, opts *Options) (rec Record, unmatched []string, e
 		Notes:      []string{FloorNote},
 	}
 	var loaded []string
+	var mods []module
 	for _, lr := range pkgs.Loaded {
 		rec.Packages = append(rec.Packages, readPackage(lr))
 		loaded = append(loaded, lr.PkgPath)
 		rec.Snapshots = append(rec.Snapshots, snapshotsIn(lr.PkgDir, moduleOf(lr))...)
+		mods = append(mods, moduleOf(lr))
 	}
 	for i := range pkgs.Broken {
 		pkg, m := brokenPackage(&pkgs.Broken[i])
 		rec.Packages = append(rec.Packages, pkg)
 		rec.Snapshots = append(rec.Snapshots, snapshotsIn(pkgs.Broken[i].Dir, m)...)
+		mods = append(mods, m)
 	}
+	rec.ModuleDirs = moduleDirs(mods)
 	slices.SortFunc(rec.Packages, func(a, b Package) int { return cmp.Compare(a.Path, b.Path) })
 	slices.SortFunc(rec.Snapshots, func(a, b Snapshot) int {
 		return cmp.Or(cmp.Compare(a.Module, b.Module), cmp.Compare(a.File, b.File))
@@ -111,6 +115,30 @@ func normalizeBehaviors(bs []Behavior) {
 // module is a package's module: its path and root directory.
 type module struct{ path, dir string }
 
+// moduleDirs are the modules with a path, each once, their directories
+// relative to the current one.
+func moduleDirs(mods []module) []ModuleDir {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil
+	}
+	seen := map[string]bool{}
+	var out []ModuleDir
+	for _, m := range mods {
+		if m.path == "" || seen[m.path] {
+			continue
+		}
+		seen[m.path] = true
+		rel, err := filepath.Rel(cwd, m.dir)
+		if err != nil {
+			continue
+		}
+		out = append(out, ModuleDir{Path: m.path, Dir: filepath.ToSlash(rel)})
+	}
+	slices.SortFunc(out, func(a, b ModuleDir) int { return cmp.Compare(a.Path, b.Path) })
+	return out
+}
+
 func moduleOf(lr *gotestgen.LoadResult) module {
 	for _, p := range []*packages.Package{lr.Ptest, lr.Pxtest} {
 		if p != nil && p.Module != nil {
@@ -153,7 +181,10 @@ func brokenPackage(b *gotestgen.BrokenPackage) (Package, module) {
 	m := module{path: gotestspec.ReadModulePath(root), dir: root}
 	errs := make([]string, 0, len(b.Errors))
 	for _, e := range b.Errors {
-		errs = append(errs, strings.ReplaceAll(e, root+string(filepath.Separator), ""))
+		if root != "" {
+			e = strings.ReplaceAll(e, root+string(filepath.Separator), "")
+		}
+		errs = append(errs, e)
 	}
 	if len(errs) == 0 {
 		errs = append(errs, "the package does not compile")

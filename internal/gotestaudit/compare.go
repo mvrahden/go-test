@@ -12,11 +12,12 @@ import (
 // Compare audits head against base. It reads only the two records.
 func Compare(base, head *Record) Document {
 	doc := Document{
-		Version: about.ResolvedVersion(),
-		Schema:  Schema,
-		Base:    Side{Version: base.Version, Provenance: base.Provenance, Patterns: base.Patterns},
-		Head:    Side{Version: head.Version, Provenance: head.Provenance, Patterns: head.Patterns},
-		Modules: modulesOf(base, head),
+		Version:    about.ResolvedVersion(),
+		Schema:     Schema,
+		Base:       Side{Version: base.Version, Provenance: base.Provenance, Patterns: base.Patterns},
+		Head:       Side{Version: head.Version, Provenance: head.Provenance, Patterns: head.Patterns},
+		Modules:    modulesOf(base, head),
+		ModuleDirs: moduleDirsOf(head, base),
 	}
 	if !slices.Equal(base.Patterns, head.Patterns) {
 		doc.Notes = append(doc.Notes, fmt.Sprintf("the records name other packages: base %s, head %s",
@@ -84,6 +85,23 @@ func (m *matcher) packages(base, head *Record, doc *Document) (bRoots, hRoots []
 	return bRoots, hRoots
 }
 
+// moduleDirsOf are the records' module directories, the first record's
+// where two name one module.
+func moduleDirsOf(records ...*Record) []ModuleDir {
+	seen := map[string]bool{}
+	var out []ModuleDir
+	for _, r := range records {
+		for _, m := range r.ModuleDirs {
+			if !seen[m.Path] {
+				seen[m.Path] = true
+				out = append(out, m)
+			}
+		}
+	}
+	slices.SortFunc(out, func(a, b ModuleDir) int { return cmp.Compare(a.Path, b.Path) })
+	return out
+}
+
 func modulesOf(records ...*Record) []string {
 	seen := map[string]bool{}
 	var out []string
@@ -111,6 +129,32 @@ func (c *collector) find(class, pkg, subject, base, head string, loc Location) {
 	c.doc.Findings = append(c.doc.Findings, f)
 }
 
+// at names the behavior each side has for the finding just found: its
+// labels, its place and its test, the head's where it has one.
+func (c *collector) at(b, h *node) {
+	f := &c.doc.Findings[len(c.doc.Findings)-1]
+	if b != nil {
+		f.basePath, f.Module = b.path, b.mod
+		l := b.loc
+		f.BaseLocation = &l
+		f.Selector = selectorOf(b.names, !b.bench)
+	}
+	if h != nil {
+		f.headPath, f.Module = h.path, h.mod
+		l := h.loc
+		f.HeadLocation = &l
+		f.Selector = selectorOf(h.names, !h.bench)
+	}
+}
+
+// selector is the test of the side a change has, the head's first.
+func selector(b, h *node) Selector {
+	if h != nil {
+		return selectorOf(h.names, !h.bench)
+	}
+	return selectorOf(b.names, !b.bench)
+}
+
 func place(n *node) *Place { return &Place{Path: n.path, Location: n.loc} }
 
 func subject(n *node) string { return strings.Join(n.path, " / ") }
@@ -132,38 +176,47 @@ func (c *collector) pairs(roots []*node) {
 func (c *collector) pair(b, h *node) {
 	switch {
 	case b.how != "":
-		c.doc.Behaviors = append(c.doc.Behaviors, Change{Change: b.how, Kind: h.kind, Package: h.pkg, Base: place(b), Head: place(h)})
+		c.doc.Behaviors = append(c.doc.Behaviors, Change{Change: b.how, Kind: h.kind, Package: h.pkg, Base: place(b), Head: place(h), Selector: selector(b, h)})
 	case h.kind != KindSuite && (b.hash != h.hash || h.whole && b.tree != h.tree):
-		c.doc.Behaviors = append(c.doc.Behaviors, Change{Change: ChangeChanged, Kind: h.kind, Package: h.pkg, Base: place(b), Head: place(h)})
+		c.doc.Behaviors = append(c.doc.Behaviors, Change{Change: ChangeChanged, Kind: h.kind, Package: h.pkg, Base: place(b), Head: place(h), Selector: selector(b, h)})
 		c.find(ClassChanged, h.pkg, subject(h), b.hash, h.hash, h.loc)
+		c.at(b, h)
 	}
 	if h.suite != nil {
-		c.suitePair(b.suite, h.suite, h)
+		c.suitePair(b, h)
 		return
 	}
 	if h.b.Excluded && !b.b.Excluded {
 		c.find(ClassExcluded, h.pkg, subject(h), b.b.Name, h.b.Name, h.loc)
+		c.at(b, h)
 	}
 	if h.b.Focused && !b.b.Focused {
 		c.find(ClassFocus, h.pkg, subject(h), b.b.Name, h.b.Name, h.loc)
+		c.at(b, h)
 	}
 	if h.b.Assertions < b.b.Assertions {
 		c.find(ClassAssertions, h.pkg, subject(h), fmt.Sprint(b.b.Assertions), fmt.Sprint(h.b.Assertions), h.loc)
+		c.at(b, h)
 	}
 	if h.b.AssertsBy && !b.b.AssertsBy {
 		c.find(ClassAssertsBy, h.pkg, subject(h), "no AssertsBy", "AssertsBy", h.loc)
+		c.at(b, h)
 	}
 }
 
-func (c *collector) suitePair(b, h *Suite, n *node) {
+func (c *collector) suitePair(bn, n *node) {
+	b, h := bn.suite, n.suite
 	if h.Excluded && !b.Excluded {
 		c.find(ClassExcluded, n.pkg, subject(n), b.Name, h.Name, n.loc)
+		c.at(bn, n)
 	}
 	if h.Focused && !b.Focused {
 		c.find(ClassFocus, n.pkg, subject(n), b.Name, h.Name, n.loc)
+		c.at(bn, n)
 	}
 	if h.Guard && !b.Guard {
 		c.find(ClassGuard, n.pkg, subject(n), "no SuiteGuard", "SuiteGuard", n.loc)
+		c.at(bn, n)
 	}
 	for _, d := range []struct{ name, base, head string }{
 		{"Timeout", b.Budget.Timeout, h.Budget.Timeout},
@@ -172,6 +225,7 @@ func (c *collector) suitePair(b, h *Suite, n *node) {
 		raised, known := budgetLess(d.base, d.head)
 		if raised || (!known && d.base != BudgetUnknown && d.head == BudgetUnknown) {
 			c.find(ClassBudget, n.pkg, subject(n), d.name+" "+d.base, d.name+" "+d.head, n.loc)
+			c.at(bn, n)
 		}
 	}
 }
@@ -187,10 +241,11 @@ func (c *collector) unmatched(roots []*node, change string) {
 				continue
 			}
 			if n.match == nil && (n.parent == nil || n.parent.match != nil) {
-				ch := Change{Change: change, Kind: n.kind, Package: n.pkg, Behaviors: n.leaves()}
+				ch := Change{Change: change, Kind: n.kind, Package: n.pkg, Behaviors: n.leaves(), Selector: selector(nil, n)}
 				if change == ChangeRemoved {
 					ch.Base = place(n)
 					c.find(ClassRemoved, n.pkg, subject(n), n.kind, "", n.loc)
+					c.at(n, nil)
 				} else {
 					ch.Head = place(n)
 					c.marked(n)
@@ -214,9 +269,11 @@ func (c *collector) marked(n *node) {
 	}
 	if excluded {
 		c.find(ClassExcluded, n.pkg, subject(n), "", name, n.loc)
+		c.at(nil, n)
 	}
 	if focused {
 		c.find(ClassFocus, n.pkg, subject(n), "", name, n.loc)
+		c.at(nil, n)
 	}
 	for _, k := range n.kids {
 		if k.match == nil {
@@ -263,11 +320,16 @@ func (c *collector) suppressions(base, head *Record) {
 	}
 	for _, s := range added {
 		loc := Location{File: s.File, Line: s.Line, EndLine: s.Line}
+		head := loc
 		if was := left[rules(s)]; len(was) == 1 && addedRules[rules(s)] == 1 {
-			c.doc.Findings = append(c.doc.Findings, Finding{Class: ClassSuppression, Subject: s.File, Base: suppressionText(was[0]), Head: suppressionText(s), Location: &loc})
+			base := Location{File: was[0].File, Line: was[0].Line, EndLine: was[0].Line}
+			c.doc.Findings = append(c.doc.Findings, Finding{Class: ClassSuppression, Module: s.Module, Subject: s.File, Base: suppressionText(was[0]), Head: suppressionText(s),
+				Location: &loc, BaseLocation: &base, HeadLocation: &head})
 			continue
 		}
 		c.find(ClassSuppression, "", s.File, "", suppressionText(s), loc)
+		f := &c.doc.Findings[len(c.doc.Findings)-1]
+		f.Module, f.HeadLocation = s.Module, &head
 	}
 }
 
@@ -296,12 +358,19 @@ func (c *collector) snapshots(base, head *Record) {
 	}
 	for _, s := range base.Snapshots {
 		sum, ok := heads[s.Module+"\x00"+s.File]
+		file := Location{File: s.File}
 		switch {
 		case !ok:
-			c.find(ClassSnapshot, "", s.File, s.SHA256[:12], "deleted", Location{File: s.File})
+			c.find(ClassSnapshot, "", s.File, s.SHA256[:12], "deleted", file)
 		case sum != s.SHA256:
-			c.find(ClassSnapshot, "", s.File, s.SHA256[:12], sum[:12], Location{File: s.File})
+			c.find(ClassSnapshot, "", s.File, s.SHA256[:12], sum[:12], file)
+			f := &c.doc.Findings[len(c.doc.Findings)-1]
+			f.HeadLocation = &Location{File: s.File}
+		default:
+			continue
 		}
+		f := &c.doc.Findings[len(c.doc.Findings)-1]
+		f.Module, f.BaseLocation = s.Module, &Location{File: s.File}
 	}
 }
 
@@ -318,10 +387,15 @@ func (d *Document) finish() {
 	changeOrder := map[string]int{ChangeRemoved: 0, ChangeAdded: 1, ChangeReworded: 2, ChangeMoved: 3, ChangeChanged: 4}
 	slices.SortStableFunc(d.Behaviors, func(a, b Change) int {
 		return cmp.Or(cmp.Compare(changeOrder[a.Change], changeOrder[b.Change]), cmp.Compare(a.Package, b.Package),
-			cmp.Compare(changePath(a), changePath(b)))
+			cmp.Compare(changePath(&a), changePath(&b)))
 	})
+	for i := range d.Findings {
+		f := &d.Findings[i]
+		f.ID = stableID(f.Class, f.Module, f.Package, f.Subject, f.Base, f.Head)
+	}
 	d.Summary = Summary{Classes: map[string]int{}, Incomplete: len(d.Incomplete)}
-	for _, f := range d.Findings {
+	for i := range d.Findings {
+		f := &d.Findings[i]
 		if f.Weakens || f.Class == ClassChanged {
 			d.Summary.Classes[f.Class]++
 		}
@@ -348,7 +422,7 @@ func (d *Document) finish() {
 	d.normalize()
 }
 
-func changePath(c Change) string {
+func changePath(c *Change) string {
 	p := c.Head
 	if p == nil {
 		p = c.Base
@@ -375,8 +449,14 @@ func (d *Document) normalize() {
 	if d.Notes == nil {
 		d.Notes = []string{}
 	}
+	if d.Streams == nil {
+		d.Streams = []Stream{}
+	}
 	if d.Modules == nil {
 		d.Modules = []string{}
+	}
+	if d.ModuleDirs == nil {
+		d.ModuleDirs = []ModuleDir{}
 	}
 	if d.Base.Patterns == nil {
 		d.Base.Patterns = []string{}

@@ -28,13 +28,18 @@ type Record struct {
 	// Unread names what could not be read beyond a package, such as the
 	// suppressions; a comparison then leaves it out.
 	Unread []string `json:"unread,omitempty"`
+	// ModuleDirs are the modules recorded and their directories, relative
+	// to the directory the record was made in.
+	ModuleDirs []ModuleDir `json:"moduleDirs,omitempty"`
 }
 
 // Provenance is the checkout a record was made from. A fact that could not be
 // learned is left out.
 type Provenance struct {
 	// Ref is the ref the tree was exported from, "" for a working tree.
-	Ref    string `json:"ref,omitempty"`
+	Ref string `json:"ref,omitempty"`
+	// Branch is the branch checked out, or the one Ref names.
+	Branch string `json:"branch,omitempty"`
 	Commit string `json:"commit,omitempty"`
 	Dirty  *bool  `json:"dirty,omitempty"`
 }

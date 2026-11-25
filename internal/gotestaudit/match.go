@@ -3,6 +3,7 @@ package gotestaudit
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"slices"
 	"strings"
 )
 
@@ -11,6 +12,9 @@ type node struct {
 	kind    string
 	key     string // its identity among its siblings
 	pkg     string
+	mod     string
+	names   []string // the levels go test reports, from the suite down
+	bench   bool     // a benchmark or fuzz target, or under one
 	path    []string
 	loc     Location
 	hash    string // its own body's
@@ -48,7 +52,7 @@ func suiteNodes(pkg *Package) []*node {
 		if s.External {
 			key += " (external)"
 		}
-		n := &node{kind: KindSuite, key: key, pkg: pkg.Path, path: []string{s.Display}, loc: s.Location, suite: s}
+		n := &node{kind: KindSuite, key: key, pkg: pkg.Path, mod: pkg.Module, names: []string{"Test" + s.Name}, path: []string{s.Display}, loc: s.Location, suite: s}
 		n.kids = behaviorNodes(s.Methods, n)
 		n.tree = treeHash(n)
 		out = append(out, n)
@@ -65,7 +69,8 @@ func behaviorNodes(bs []Behavior, parent *node) []*node {
 			key = identity(b.Name)
 		}
 		path := append(append([]string{}, parent.path...), b.Display)
-		n := &node{kind: b.Kind, key: key, pkg: parent.pkg, path: path, loc: b.Location, hash: b.Hash, b: b, parent: parent}
+		n := &node{kind: b.Kind, key: key, pkg: parent.pkg, mod: parent.mod, path: path, loc: b.Location, hash: b.Hash, b: b, parent: parent,
+			names: append(slices.Clip(parent.names), b.Name), bench: parent.bench || b.Kind == KindBenchmark || b.Kind == KindFuzz}
 		n.kids = behaviorNodes(b.Children, n)
 		n.tree = treeHash(n)
 		out = append(out, n)

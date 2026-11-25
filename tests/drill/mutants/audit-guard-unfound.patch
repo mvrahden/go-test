@@ -2,12 +2,12 @@ Expect: ^FAIL .*conformance/audit AuditCompare / WhatGotWeaker / when the head r
 Clause: when the head removes a test, excludes one, focuses one, adds a guard, raises a budget, sets NoDeadline, adds a suppression, rewrites and deletes a snapshot, drops an assertion and adds AssertsBy → lists a finding of each class with its subject and its base and head values
 --- a/internal/gotestaudit/compare.go
 +++ b/internal/gotestaudit/compare.go
-@@ -162,7 +162,7 @@
- 	if h.Focused && !b.Focused {
+@@ -214,7 +214,7 @@
  		c.find(ClassFocus, n.pkg, subject(n), b.Name, h.Name, n.loc)
+ 		c.at(bn, n)
  	}
 -	if h.Guard && !b.Guard {
 +	if h.Guard && !b.Guard && false {
  		c.find(ClassGuard, n.pkg, subject(n), "no SuiteGuard", "SuiteGuard", n.loc)
+ 		c.at(bn, n)
  	}
- 	for _, d := range []struct{ name, base, head string }{
