@@ -45,6 +45,13 @@ type Behavior struct {
 	Kind     BehaviorKind
 	Line     int
 	Children []*Behavior
+	// Stmt is the statement that declares it: the call's, or the Each loop
+	// every row of a table shares.
+	Stmt ast.Stmt
+	// Body is what runs for it: the function literal's body, or the loop's.
+	Body *ast.BlockStmt
+	// Entry is a table row's element; nil for When and It.
+	Entry ast.Expr
 	// added is the length of the repeat suffix this reader appended to Name.
 	added int
 }
@@ -107,6 +114,7 @@ func (w *behaviorWalker) walkBlock(block *ast.BlockStmt) []*Behavior {
 		switch s := stmt.(type) {
 		case *ast.ExprStmt:
 			if b := w.behaviorCall(s.X); b != nil {
+				b.Stmt = s
 				out = append(out, b)
 				continue
 			}
@@ -266,6 +274,7 @@ func (w *behaviorWalker) behaviorCall(expr ast.Expr) *Behavior {
 		w.incomplete(call.Args[1].Pos(), "%s body is not a function literal", sel.Sel.Name)
 		return behavior
 	}
+	behavior.Body = fn.Body
 	behavior.Children = w.walkBlock(fn.Body)
 	return behavior
 }
@@ -310,6 +319,9 @@ func (w *behaviorWalker) eachRows(s *ast.RangeStmt) []*Behavior {
 			Kind:     BehaviorEach,
 			Line:     w.line(elt.Pos()),
 			Children: cloneBehaviors(perRow),
+			Stmt:     s,
+			Body:     s.Body,
+			Entry:    elt,
 		})
 	}
 	return rows

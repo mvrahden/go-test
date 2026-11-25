@@ -329,6 +329,9 @@ func (ts *TestSuiteSpec) Fuzzers() []*TestSuiteMethod {
 // FOR RENDERING
 func (ts *TestSuiteSpec) HasConfig() bool { return ts.th.Config != nil }
 
+// ConfigDecl is the SuiteConfig method's declaration, nil without one.
+func (ts *TestSuiteSpec) ConfigDecl() *ast.FuncDecl { return ts.th.ConfigDecl }
+
 // HasGuard returns true when the suite defines a SuiteGuard() marker method.
 //
 // FOR RENDERING
@@ -396,6 +399,9 @@ func (ts *TestSuiteSpec) Pos() token.Pos          { return ts.ts.Name.Pos() }
 func (ts *TestSuiteSpec) IsFocused() bool         { return strings.HasPrefix(ts.ts.Name.Name, "F_") }
 func (ts *TestSuiteSpec) IsExcluded() bool        { return strings.HasPrefix(ts.ts.Name.Name, "X_") }
 
+// TypeSpecEnd is where the suite's type declaration ends.
+func (ts *TestSuiteSpec) TypeSpecEnd() token.Pos { return ts.ts.End() }
+
 // TypeSpecPos returns the token position of the test suite type name.
 func (ts *TestSuiteSpec) TypeSpecPos() token.Pos {
 	return ts.ts.Name.Pos()
@@ -433,6 +439,7 @@ type TestSuiteHarness struct {
 	Benchmarks     []*TestSuiteMethod
 	Fuzzers        []*TestSuiteMethod
 	Config         *types.Func // SuiteConfig() method, may be nil
+	ConfigDecl     *ast.FuncDecl
 	Guard          *types.Func // SuiteGuard() method, may be nil
 	ConfigParallel bool
 	// ConfigExclusive mirrors SuiteConfig.Exclusive, resolved statically so
@@ -482,6 +489,15 @@ func qualifier(pkg *types.Package) types.Qualifier {
 }
 
 func (m *TestSuiteMethod) Pos() token.Pos { return m.n.Pos() }
+
+// Decl is the method's declaration, nil when it has none in syntax.
+func (m *TestSuiteMethod) Decl() *ast.FuncDecl {
+	fd, _ := m.n.(*ast.FuncDecl)
+	return fd
+}
+
+// TypesInfo is the type information of the package declaring the method.
+func (m *TestSuiteMethod) TypesInfo() *types.Info { return m.info }
 
 // NamePos is where the method's name is written.
 func (m *TestSuiteMethod) NamePos() token.Pos { return m.m.Pos() }
@@ -816,6 +832,7 @@ func DetermineTestSuiteHarness(n ast.Node, pkg *packages.Package, s *TestSuiteSp
 			return m.Pos(), fmt.Errorf("unsupported return type for %q: expected gotest.SuiteConfig, got %s", methodID, resType)
 		}
 		s.th.Config = m
+		s.th.ConfigDecl = decl
 		staticCfg, err := parseSuiteConfigAST(pkg, decl)
 		if err != nil {
 			return m.Pos(), fmt.Errorf("%s.SuiteConfig: %w", s.ts.Name.Name, err)
