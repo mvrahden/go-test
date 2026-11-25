@@ -59,6 +59,9 @@ import { parseBenchReport } from "./benchReport.js";
 import { parseCoverProfile } from "./coverage.js";
 import { parsePromotedSeed } from "./fuzz.js";
 import { parseLintJson } from "./lintFindings.js";
+import { buildChangeModel, parseAuditDocument } from "./auditModel.js";
+import { interpretAuditExit } from "./changeScope.js";
+import { cliMeets, AUDIT_CLI_VERSION } from "./cli.js";
 
 interface Invocation {
   exitCode: number | null;
@@ -139,11 +142,19 @@ interface SpecDocument {
 // A `gotest spec --input=-` run over a stream under testdata/, with
 // --declared or --hide; the repository's directory is masked as "<repo>".
 interface SpecRun {
-  stream: string;
+  stream: string | null;
   args: string[];
   exitCode: number | null;
   stderr: string;
   document: SpecDocument;
+}
+
+interface AuditRun {
+  args: string[];
+  exitCode: number | null;
+  stderr: string;
+  stdout?: string;
+  document?: unknown;
 }
 
 interface ContractCase {
@@ -178,6 +189,7 @@ const golden = JSON.parse(
   live: Record<string, LiveRun>;
   outputs: Record<string, OutputRun>;
   lint: Record<string, LintRun>;
+  audit: Record<string, AuditRun>;
 };
 
 // nodesOf lists every node beneath pkg, keyed by its slash-joined path.
@@ -506,6 +518,7 @@ describe("recorded spec runs", () => {
   it("records exactly the stated runs", () => {
     expect(Object.keys(golden.spec).sort()).toEqual([
       "declared",
+      "declared-unrun",
       "hide-nothing",
       "hide-pass",
     ]);
@@ -801,6 +814,7 @@ describe("recorded outputs", () => {
       "promote-nothing",
       "promote-refused",
       "promote-staged",
+      "version",
     ]);
   });
 
@@ -1096,5 +1110,118 @@ describe("recorded lint runs", () => {
       );
       for (const f of findings) expect(ids).toContain(f.category);
     });
+  });
+});
+
+// A folder nothing ran in shows what its source declares: the --declared
+// overlay over an empty stream.
+describe("recorded declared tree of a folder nothing ran in", () => {
+  const recorded = golden.spec["declared-unrun"];
+
+  it("gives every declared row no verdict, each counted as not run", () => {
+    const statuses = new Set<string>();
+    for (const p of recorded.document.packages)
+      for (const n of nodesOf(p).values()) statuses.add(n.status);
+    expect(Array.from(statuses)).toEqual(["none"]);
+    const stats = recorded.document.stats as unknown as {
+      behaviors: number;
+      notRun: number;
+    };
+    expect(stats.behaviors).toBeGreaterThan(0);
+    expect(stats.notRun).toBe(stats.behaviors);
+  });
+});
+
+describe("recorded version", () => {
+  it("names a version the audit floor check reads, a source build passing it", () => {
+    const out = golden.outputs.version as unknown as { stdout: string };
+    const version = /^gotest\s+(\S+)/m.exec(out.stdout)?.[1];
+    expect(version).toBe("dev");
+    expect(cliMeets(version!, AUDIT_CLI_VERSION)).toBe(true);
+    expect(cliMeets("v1.41.0", AUDIT_CLI_VERSION)).toBe(false);
+  });
+});
+
+describe("recorded audit", () => {
+  it("records exactly the stated runs", () => {
+    expect(Object.keys(golden.audit).sort()).toEqual([
+      "base-outside-git",
+      "compare",
+      "record-base",
+      "record-head",
+    ]);
+  });
+
+  it("records both trees with exit 0 and nothing on stderr", () => {
+    for (const side of ["record-base", "record-head"]) {
+      expect(golden.audit[side].exitCode).toBe(0);
+      expect(golden.audit[side].stderr).toBe("");
+    }
+  });
+
+  describe("two records compared", () => {
+    const recorded = golden.audit.compare;
+    const outcome = interpretAuditExit(
+      recorded.exitCode,
+      JSON.stringify(recorded.document),
+      recorded.stderr,
+    );
+    const doc = outcome.ok ? outcome.doc : undefined;
+
+    it("exits 0 without a policy and is read as one document", () => {
+      expect(recorded.exitCode).toBe(0);
+      expect(recorded.stderr).toBe("");
+      expect(doc?.schema).toBe(1);
+    });
+
+    it("holds the lists the Change scope reads, evidence and unproven empty", () => {
+      expect(doc?.findings.length).toBeGreaterThan(0);
+      expect(doc?.behaviors.length).toBeGreaterThan(0);
+      expect(doc?.evidence).toEqual([]);
+      expect(doc?.unproven).toEqual([]);
+      expect(doc?.modules).toEqual(["auditmod"]);
+    });
+
+    it("marks the weakenings, which the scope keeps as its decisions in order", () => {
+      const weak = doc!.findings.filter((f) => f.weakens);
+      expect(weak.length).toBeLessThan(doc!.findings.length);
+      const model = buildChangeModel(doc!);
+      expect(model.openCount).toBe(doc!.summary.weakenings);
+      expect(model.open.map((g) => g.tag)).toEqual(
+        Array.from(new Set(weak.map((f) => f.class))),
+      );
+    });
+
+    it("places every finding of a package and every behavior in a module file", () => {
+      for (const f of doc!.findings) {
+        if (!f.package) continue;
+        expect(f.location?.file).toMatch(/^shop\//);
+        expect(f.package.startsWith("auditmod")).toBe(true);
+      }
+      for (const c of doc!.behaviors) {
+        const place = c.head ?? c.base;
+        expect(place?.path.length).toBeGreaterThan(1);
+        expect(place?.line).toBeGreaterThan(0);
+      }
+    });
+
+    it("lists every change kind the scope groups", () => {
+      expect(new Set(doc!.behaviors.map((c) => c.change))).toEqual(
+        new Set(["added", "removed", "reworded", "moved", "changed"]),
+      );
+    });
+  });
+
+  it("writes no document for a base outside git, and stderr says what to give instead", () => {
+    const recorded = golden.audit["base-outside-git"];
+    expect(recorded.exitCode).toBe(2);
+    expect(recorded.stdout).toBe("");
+    const outcome = interpretAuditExit(
+      recorded.exitCode,
+      recorded.stdout ?? "",
+      recorded.stderr,
+    );
+    expect(outcome.ok).toBe(false);
+    if (!outcome.ok) expect(outcome.message).toContain("--base-record");
   });
 });
