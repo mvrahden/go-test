@@ -14,7 +14,10 @@ const (
 	EnvSharedProtocolFD = "GOTEST_SHARED_PROTOCOL_FD"
 	EnvUpdateSnapshots  = "GOTEST_UPDATE_SNAPSHOTS"
 	EnvCI               = "GOTEST_CI"
-	EnvCacheDir         = "GOTEST_CACHE_DIR"
+	// EnvAgentOutput switches a text run's agent output on or off, read as
+	// EnvCI is; unset, a detected agent turns it on.
+	EnvAgentOutput = "GOTEST_AGENT"
+	EnvCacheDir    = "GOTEST_CACHE_DIR"
 	// EnvSlowBuildThreshold is how long a build runs, as a Go duration,
 	// before the CLI says it is still building.
 	EnvSlowBuildThreshold = "GOTEST_SLOW_BUILD_THRESHOLD"
