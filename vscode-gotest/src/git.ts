@@ -31,12 +31,6 @@ export async function gitToplevel(dir: string): Promise<string | undefined> {
   );
 }
 
-// currentBranch is the branch HEAD is on, undefined when detached.
-export async function currentBranch(dir: string): Promise<string | undefined> {
-  const name = (await git(dir, ["rev-parse", "--abbrev-ref", "HEAD"]))?.trim();
-  return name && name !== "HEAD" ? name : undefined;
-}
-
 // defaultBranch is the remote default branch, as origin/HEAD names it, else
 // a remote's main or master; origin is asked first.
 export async function defaultBranch(dir: string): Promise<string | undefined> {

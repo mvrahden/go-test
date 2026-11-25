@@ -18,6 +18,7 @@ import {
   buildBenchArgs,
   buildFuzzArgs,
   MIN_CLI_VERSION,
+  parseCliCapabilities,
 } from "./cli.js";
 
 // Every other test reads the floor from cli.ts; this one pins its value, so
@@ -158,5 +159,33 @@ describe("formatCliCommand", () => {
 
   it("handles empty args", () => {
     expect(formatCliCommand({ bin: "gotest", args: [] })).toBe("gotest ");
+  });
+});
+
+describe("parseCliCapabilities", () => {
+  it("reads what version --json says the CLI has", () => {
+    const caps = parseCliCapabilities(
+      JSON.stringify({
+        version: "v1.41.1-0.20261125120000-abcdef123456",
+        goVersion: "go1.27.4",
+        platform: "linux/amd64",
+        commands: ["audit", "spec"],
+        schemas: { audit: 1, other: "x" },
+      }) + "\n",
+    );
+    expect(caps).toEqual({
+      json: true,
+      version: "v1.41.1-0.20261125120000-abcdef123456",
+      commands: ["audit", "spec"],
+      schemas: { audit: 1 },
+    });
+  });
+
+  it("reads a CLI that predates --json by its version line", () => {
+    expect(
+      parseCliCapabilities("gotest v1.41.0 go1.26.0 linux/amd64\n"),
+    ).toEqual({ json: false, version: "v1.41.0", commands: [], schemas: {} });
+    expect(parseCliCapabilities("")).toBeUndefined();
+    expect(parseCliCapabilities("{broken")).toBeUndefined();
   });
 });

@@ -59,9 +59,16 @@ import { parseBenchReport } from "./benchReport.js";
 import { parseCoverProfile } from "./coverage.js";
 import { parsePromotedSeed } from "./fuzz.js";
 import { parseLintJson } from "./lintFindings.js";
-import { buildChangeModel, parseAuditDocument } from "./auditModel.js";
+import {
+  AUDIT_SCHEMA,
+  buildChangeModel,
+  markOf,
+  parseAuditDocument,
+  runsOf,
+  targetsOf,
+} from "./auditModel.js";
 import { interpretAuditExit } from "./changeScope.js";
-import { cliMeets, AUDIT_CLI_VERSION } from "./cli.js";
+import { parseCliCapabilities } from "./cli.js";
 
 interface Invocation {
   exitCode: number | null;
@@ -815,6 +822,7 @@ describe("recorded outputs", () => {
       "promote-refused",
       "promote-staged",
       "version",
+      "version-json",
     ]);
   });
 
@@ -1133,12 +1141,29 @@ describe("recorded declared tree of a folder nothing ran in", () => {
 });
 
 describe("recorded version", () => {
-  it("names a version the audit floor check reads, a source build passing it", () => {
+  it("names the subcommands and the audit schema the Change scope asks for", () => {
+    const out = golden.outputs["version-json"];
+    expect(out.exitCode).toBe(0);
+    expect(out.stderr).toBe("");
+    const caps = parseCliCapabilities(JSON.stringify(out.document));
+    expect(caps?.json).toBe(true);
+    expect(caps?.commands).toContain("audit");
+    expect(caps?.schemas.audit).toBe(AUDIT_SCHEMA);
+    expect(Object.keys(out.document as object)).toEqual([
+      "version",
+      "goVersion",
+      "platform",
+      "commands",
+      "schemas",
+    ]);
+  });
+
+  it("still answers the plain version line without --json", () => {
     const out = golden.outputs.version as unknown as { stdout: string };
-    const version = /^gotest\s+(\S+)/m.exec(out.stdout)?.[1];
-    expect(version).toBe("dev");
-    expect(cliMeets(version!, AUDIT_CLI_VERSION)).toBe(true);
-    expect(cliMeets("v1.41.0", AUDIT_CLI_VERSION)).toBe(false);
+    expect(parseCliCapabilities(out.stdout)).toMatchObject({
+      json: false,
+      version: "dev",
+    });
   });
 });
 
@@ -1147,6 +1172,8 @@ describe("recorded audit", () => {
     expect(Object.keys(golden.audit).sort()).toEqual([
       "base-outside-git",
       "compare",
+      "evidence",
+      "evidence-text",
       "record-base",
       "record-head",
     ]);
@@ -1209,6 +1236,155 @@ describe("recorded audit", () => {
       expect(new Set(doc!.behaviors.map((c) => c.change))).toEqual(
         new Set(["added", "removed", "reworded", "moved", "changed"]),
       );
+    });
+  });
+
+  describe("an audit with evidence", () => {
+    const recorded = golden.audit.evidence;
+    const outcome = interpretAuditExit(
+      recorded.exitCode,
+      JSON.stringify(recorded.document),
+      recorded.stderr,
+    );
+    const doc = outcome.ok ? outcome.doc : undefined;
+    const model = doc ? buildChangeModel(doc) : undefined;
+    const text = golden.audit["evidence-text"].stdout ?? "";
+
+    it("exits 0 without a policy and is read as one document", () => {
+      expect(recorded.exitCode).toBe(0);
+      expect(recorded.stderr).toBe("");
+      expect(doc?.schema).toBe(AUDIT_SCHEMA);
+    });
+
+    it("gives every finding and evidence row an id of its own", () => {
+      const ids = [
+        ...doc!.findings.map((f) => f.id),
+        ...doc!.evidence.map((e) => e.id),
+      ];
+      expect(ids.every((id) => typeof id === "string" && id.length > 0)).toBe(
+        true,
+      );
+      expect(new Set(ids).size).toBe(ids.length);
+    });
+
+    it("names the head's branch and where each module lies", () => {
+      expect(doc!.head.branch).toBe("trunk");
+      expect(model!.headBranch).toBe("trunk");
+      expect(doc!.moduleDirs).toEqual([{ path: "auditmod", dir: "." }]);
+      for (const f of doc!.findings) expect(f.module).toBe("auditmod");
+    });
+
+    it("names the streams under the evidence heading as the CLI's text does", () => {
+      const lines = text.split("\n");
+      const at = lines.indexOf(model!.streamsHead!);
+      expect(at).toBe(1);
+      expect(
+        lines
+          .slice(at + 1, at + 1 + model!.streams.length)
+          .map((l) => l.replace(/^ {2}(current|stale) {2,}/, "")),
+      ).toEqual(model!.streams.map((st) => st.text));
+      expect(model!.streams.map((st) => st.current)).toEqual(
+        lines
+          .slice(at + 1, at + 1 + model!.streams.length)
+          .map((l) => l.trimStart().startsWith("current")),
+      );
+    });
+
+    it("marks the weakenings and behaviors with the CLI text's marks", () => {
+      // The text's mark column: after a head of width 11 (weakenings) or 9
+      // (behaviors) and two spaces, twelve wide.
+      const column = (title: string, width: number) => {
+        const lines = text.split("\n");
+        const from = lines.findIndex((l) => l.startsWith(title));
+        const out: string[] = [];
+        for (const l of lines.slice(from + 1)) {
+          if (!l.startsWith("  ")) break;
+          out.push(l.slice(2 + width + 2, 2 + width + 2 + 12).trim());
+        }
+        return out;
+      };
+      const weakenings = model!.open
+        .flatMap((g) => g.rows)
+        .filter((r) => doc!.findings.some((f) => f.id === r.key))
+        .map((r) => r.mark?.text ?? "");
+      expect(weakenings).toEqual(column("weakenings:", 11));
+      const behaviors = model!.behaviors
+        .flatMap((p) => p.suites.flatMap((s) => s.rows))
+        .map((r) => r.mark?.text ?? "");
+      expect(behaviors.sort()).toEqual(column("behaviors:", 9).sort());
+      expect(new Set(doc!.evidence.map(markOf))).toEqual(
+        new Set([
+          "vacuous",
+          "not run",
+          "pass",
+          "pass 1",
+          "FAIL",
+          "skip",
+          "partly run",
+        ]),
+      );
+    });
+
+    it("asks a decision of the rows the document marks, after the weakenings", () => {
+      const rows = model!.open.flatMap((g) => g.rows);
+      const evidenceKeys = rows
+        .filter((r) => doc!.evidence.some((e) => e.id === r.key))
+        .map((r) => r.key);
+      // Grouped by their mark, so compared as a set.
+      expect(evidenceKeys.sort()).toEqual(
+        doc!.evidence
+          .filter((e) => e.needsDecision)
+          .map((e) => e.id)
+          .sort(),
+      );
+      const firstEvidence = rows.findIndex((r) => evidenceKeys.includes(r.key));
+      expect(firstEvidence).toBe(doc!.summary.weakenings);
+      expect(model!.openCount).toBe(
+        doc!.summary.weakenings + evidenceKeys.length,
+      );
+    });
+
+    it("runs the head's tests by their -run pattern, a removed one never", () => {
+      const runs = runsOf(model!);
+      for (const f of doc!.findings) {
+        if (!f.weakens) continue;
+        expect(runs.get(f.id)?.run).toBe(f.headLocation ? f.run : undefined);
+      }
+      expect(runs.size).toBeGreaterThan(0);
+      for (const r of runs.values()) expect(r.package).toBe("auditmod/shop");
+    });
+
+    it("opens each finding on the sides it has, a removed one on the base's", () => {
+      const targets = targetsOf(doc!, model!);
+      for (const f of doc!.findings.filter((f) => f.weakens)) {
+        const t = targets.get(f.id);
+        expect(t?.base).toEqual(f.baseLocation);
+        expect(t?.head).toEqual(f.headLocation);
+      }
+      const removed = doc!.findings.find((f) => f.class === "removed")!;
+      expect(targets.get(removed.id)?.head).toBeUndefined();
+    });
+
+    it("lists the unproven lines as the CLI's text does", () => {
+      const u = model!.unproven!;
+      expect(text).toContain(`unproven: ${u.head}`);
+      for (const f of u.files) {
+        const line = text
+          .split("\n")
+          .find((l) => l.trimStart().startsWith(f.file + " "));
+        const want = f.coverage
+          ? `${f.counts}: ${f.ranges.map((r) => r.text).join(", ")}`
+          : "no coverage data";
+        expect(line?.trim().slice(f.file.length).trim()).toBe(want);
+      }
+      const byLabel = Object.fromEntries(
+        model!.counters.map((c) => [c.label, c.value]),
+      );
+      expect(byLabel).toMatchObject({
+        evidence: doc!.summary.evidence,
+        failing: doc!.summary.failing,
+        unproven: `${doc!.summary.unproven} of ${doc!.summary.changedLines} lines`,
+      });
     });
   });
 

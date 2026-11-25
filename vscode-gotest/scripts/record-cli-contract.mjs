@@ -42,7 +42,9 @@
 // The `audit` cases record the base and head modules the conformance suite
 // audits, each staged with its go.mod bound to this checkout, and compare the
 // two records as the Change scope reads them; one more asks a tree outside
-// git for a base. `version` is what the extension's floor check reads.
+// git for a base. One more commits the head and gives it the conformance
+// suite's saved runs, diff and profile as evidence, as JSON and as text.
+// `version --json` is what the Change scope asks a CLI before it audits.
 //
 // The `lint` cases run `gotest lint -json` from the fixture module, through
 // a go.work that spans this checkout, on packages with known findings and on
@@ -750,6 +752,87 @@ const audit = {};
     stderr: maskDir(outside.stderr, auditRoot, "<stage>"),
     stdout: outside.stdout,
   };
+
+  // The head committed, with the conformance suite's saved runs, diff and
+  // profile as its proof; the streams name the head's commit where they ran
+  // it. The commit hashes the staged go.mod, so it is masked.
+  const proofHead = path.join(auditRoot, "proof-head");
+  cpSync(path.join(auditRoot, "head"), proofHead, { recursive: true });
+  const gitEnv = {
+    ...env,
+    GIT_AUTHOR_DATE: "2026-01-01T00:00:00Z",
+    GIT_COMMITTER_DATE: "2026-01-01T00:00:00Z",
+  };
+  const git = async (...args) => {
+    const r = await run(
+      "git",
+      [
+        "-c",
+        "user.name=gotest",
+        "-c",
+        "user.email=gotest@example.com",
+        "-c",
+        "commit.gpgsign=false",
+        "-c",
+        "init.defaultBranch=trunk",
+        ...args,
+      ],
+      "",
+      { cwd: proofHead, env: gitEnv },
+    );
+    if (r.exitCode !== 0) throw new Error(`git ${args.join(" ")}: ${r.stderr}`);
+    return r.stdout.trim();
+  };
+  await git("init", "-q");
+  await git("add", "-A");
+  await git("commit", "-q", "-m", "head");
+  const commit = await git("rev-parse", "--short", "HEAD");
+  const proofDir = path.join(auditRoot, "proof");
+  mkdirSync(proofDir, { recursive: true });
+  const proofSource = path.join(auditSource, "proof");
+  for (const file of readdirSync(proofSource)) {
+    writeFileSync(
+      path.join(proofDir, file),
+      readFileSync(path.join(proofSource, file), "utf-8").replaceAll(
+        "HEAD_COMMIT",
+        commit,
+      ),
+    );
+  }
+  const proofShown = [
+    "audit",
+    "--base-record=<base>",
+    "--evidence=<proof>/another-commit.json",
+    "--evidence=<proof>/current.json",
+    "--evidence=<proof>/uncommitted.json",
+    "--evidence=<proof>/no-manifest.json",
+    "--base-evidence=<proof>/base-run.json",
+    "--diff=<proof>/shop.diff",
+    "--coverage=<proof>/shop.cover",
+  ];
+  const proofArgs = proofShown.map((a) =>
+    a.replace("<base>", records.base).replace("<proof>", proofDir),
+  );
+  const unstage = (text) =>
+    maskDir(maskDir(text, proofDir, "<proof>"), auditRoot, "<stage>")
+      .split(commit)
+      .join("<commit>");
+  for (const [name, format] of [
+    ["evidence", ["--format=json"]],
+    ["evidence-text", []],
+  ]) {
+    const result = await run(bin, [...proofArgs, ...format], "", {
+      cwd: proofHead,
+      env,
+    });
+    const stdout = unstage(result.stdout);
+    audit[name] = {
+      args: [...proofShown, ...format],
+      exitCode: result.exitCode,
+      stderr: unstage(result.stderr),
+      ...(format.length > 0 ? document(stdout, (d) => d) : { stdout }),
+    };
+  }
 }
 removeAudit();
 
@@ -761,6 +844,22 @@ removeAudit();
     stderr: result.stderr,
     // The Go and the platform it was built on are the host's.
     stdout: result.stdout.replace(/ go\S+ \S+\/\S+$/m, " <go> <platform>"),
+  };
+}
+
+{
+  const args = ["version", "--json"];
+  const result = await run(bin, args, "", { env: outputEnv() });
+  outputs["version-json"] = {
+    args,
+    exitCode: result.exitCode,
+    stderr: result.stderr,
+    // The Go and the platform it was built on are the host's.
+    ...document(result.stdout, (d) => ({
+      ...d,
+      goVersion: "<go>",
+      platform: "<platform>",
+    })),
   };
 }
 

@@ -44,6 +44,7 @@ import { SpecViewPanel } from "../../src/specView.js";
 import { clearBinaryCache } from "../../src/cli.js";
 import type { Memento } from "../../src/acceptance.js";
 import { createRecordingChannel } from "./vscodeStub.js";
+import { setChildObserver } from "../../src/managedChild.js";
 
 const extensionDir = path.resolve(__dirname, "..", "..");
 const repoRoot = path.resolve(extensionDir, "..");
@@ -61,6 +62,8 @@ let checkout = "";
 let plainDir = "";
 let currentCli = "";
 let oldCli = "";
+let preCli = "";
+let futureCli = "";
 
 function git(dir: string, ...args: string[]): string {
   const r = spawnSync(
@@ -82,13 +85,27 @@ function stage(tree: string, dir: string): void {
   );
 }
 
-// wrapper is a CLI that says it is version and runs the real binary.
-function wrapper(name: string, version: string, real: string): string {
+// wrapper is a CLI that says it is version and runs the real binary. Asked
+// version --json it answers json, the real binary's when json is "real",
+// and its version line when it has none, as a CLI before --json did.
+function wrapper(
+  name: string,
+  version: string,
+  real: string,
+  json?: string,
+): string {
   const file = path.join(tmp, name);
+  const answer =
+    json === "real"
+      ? `exec ${real} "$@"`
+      : json
+        ? `echo '${json}'; exit 0`
+        : `echo "gotest ${version} integration"; exit 0`;
   writeFileSync(
     file,
     [
       "#!/bin/sh",
+      `if [ "$1" = "version" ] && [ "$2" = "--json" ]; then ${answer}; fi`,
       `if [ "$1" = "version" ]; then echo "gotest ${version} integration"; exit 0; fi`,
       `exec ${real} "$@"`,
       "",
@@ -115,6 +132,7 @@ function scope(folder: string, store = memento()) {
     log: rec.channel as never,
     memento: store,
     folders: () => [folder],
+    hasPackage: () => true,
     changed: () => changes++,
   });
   return { s, rec, changes: () => changes };
@@ -129,8 +147,30 @@ beforeAll(() => {
     { cwd: repoRoot, encoding: "utf-8" },
   );
   expect(built.status, `go build failed: ${built.stderr}`).toBe(0);
-  currentCli = wrapper("gotest-current", "v1.42.0", real);
+  currentCli = wrapper("gotest-current", "v1.42.0", real, "real");
   oldCli = wrapper("gotest-old", "v1.41.0", real);
+  // A pre-release build of a tree that has audit.
+  const pre = "v1.41.1-0.20261125120000-abcdef123456";
+  preCli = wrapper(
+    "gotest-pre",
+    pre,
+    real,
+    JSON.stringify({
+      version: pre,
+      commands: ["audit"],
+      schemas: { audit: 1 },
+    }),
+  );
+  futureCli = wrapper(
+    "gotest-future",
+    "v1.60.0",
+    real,
+    JSON.stringify({
+      version: "v1.60.0",
+      commands: ["audit"],
+      schemas: { audit: 2 },
+    }),
+  );
 
   // main holds the base; feat/audit the head, one commit on top.
   checkout = path.join(tmp, "repo");
@@ -170,11 +210,11 @@ describe.skipIf(sh)("the Change scope", () => {
     const view = s.view();
     expect(rec.errors).toEqual([]);
     expect(view.state.kind).toBe("doc");
-    expect(view.headBranch).toBe("feat/audit");
     const mb = git(checkout, "rev-parse", "--short", "main").trim();
     expect(view.baseLabel).toBe(`merge-base with origin/main (${mb})`);
     if (view.state.kind !== "doc") return;
     const m = view.state.model;
+    expect(m.headBranch).toBe("feat/audit");
     // The CLI names the base by the commit it was given.
     expect(m.base).toBe(mb);
     expect(m.open.map((g) => g.tag)).toEqual([
@@ -194,7 +234,123 @@ describe.skipIf(sh)("the Change scope", () => {
     const removed = m.open[0].rows[0];
     expect(view.canOpen(removed.key)).toBe(true);
     expect(view.canRun(removed.key)).toBe(false);
+    const focus = m.open[2].rows[0];
+    expect(view.canRun(focus.key)).toBe(true);
+    expect(focus.runs).toEqual({
+      package: "auditmod/shop",
+      run: "^TestCartTestSuite$/^F_TestTotal$",
+    });
+    // A plain audit reads no run.
+    expect(m.streams).toEqual([]);
+    expect(m.unproven).toBeUndefined();
   });
+
+  it("runs a row's test by the package and -run pattern the document gives", async () => {
+    const ran: [string, string][] = [];
+    const rec = createRecordingChannel();
+    const s = new ChangeScope({
+      log: rec.channel as never,
+      memento: memento(),
+      folders: () => [checkout],
+      hasPackage: () => true,
+      runTest: async (pkg, run) => {
+        ran.push([pkg, run]);
+      },
+      changed: () => {},
+    });
+    await s.audit(checkout);
+    const v = s.view();
+    if (v.state.kind !== "doc") throw new Error(v.state.kind);
+    const behavior = v.state.model.behaviors[0].suites
+      .flatMap((x) => x.rows)
+      .find((r) => r.change === "added")!;
+    await s.act({ act: "run", key: behavior.key });
+    expect(ran).toEqual([
+      ["auditmod/shop", "^TestCartTestSuite$/^TestCopies$/^the_only_copy$"],
+    ]);
+  });
+
+  it("audits with a run: the run's verdicts as current evidence, and the lines it left unexecuted", async () => {
+    const { s, rec } = scope(checkout);
+    await s.audit(checkout, "run");
+    const v = s.view();
+    expect(rec.errors).toEqual([]);
+    if (v.state.kind !== "doc") throw new Error(JSON.stringify(v.state));
+    const m = v.state.model;
+    expect(m.streamsHead).toBe("evidence: 1 stream, 1 current");
+    expect(m.streams[0].current).toBe(true);
+    expect(m.streams[0].text).toMatch(
+      /^this audit's run of [0-9a-f]+, exit \d+$/,
+    );
+    // The focused test runs alone; the rest of its suite did not.
+    const focus = m.open.find((g) => g.tag === "focus")!.rows[0];
+    expect(focus.mark?.text).toBe("pass 1");
+    const marks = m.behaviors
+      .flatMap((p) => p.suites.flatMap((x) => x.rows))
+      .map((r) => r.mark?.text ?? "");
+    expect(marks).toContain("not run");
+    expect(m.open.some((g) => g.tag === "not run")).toBe(true);
+    expect(m.notes.some((n) => n.startsWith("--run: coverage"))).toBe(true);
+    expect(m.unproven?.files.map((f) => f.file)).toContain("shop/shop.go");
+    // A plain refresh afterwards is static again.
+    await s.audit(checkout);
+    const after = s.view();
+    if (after.state.kind !== "doc") throw new Error(after.state.kind);
+    expect(after.state.model.streams).toEqual([]);
+  }, 300_000);
+
+  it("runs one audit of a folder at a time, a run among them", async () => {
+    let live = 0;
+    let most = 0;
+    const kinds: string[] = [];
+    const tokens = new Map<string, string>();
+    let n = 0;
+    setChildObserver({
+      spawned: (_pid, kind) => {
+        const token = String(++n);
+        tokens.set(token, kind);
+        if (kind.startsWith("audit")) {
+          kinds.push(kind);
+          most = Math.max(most, ++live);
+        }
+        return token;
+      },
+      exited: (token) => {
+        if (token && tokens.get(token)?.startsWith("audit")) live--;
+      },
+    });
+    try {
+      const { s } = scope(checkout);
+      await Promise.all([
+        s.audit(checkout, "run"),
+        s.audit(checkout),
+        s.audit(checkout),
+      ]);
+      // The run, then one more for the two asked while it ran.
+      expect(kinds).toEqual(["audit-run", "audit"]);
+      expect(most).toBe(1);
+    } finally {
+      setChildObserver(undefined);
+    }
+  }, 300_000);
+
+  it("stops an audit with a run, keeping the last document", async () => {
+    const { s } = scope(checkout);
+    await s.audit(checkout);
+    const before = s.view();
+    if (before.state.kind !== "doc") throw new Error(before.state.kind);
+    const running = s.audit(checkout, "run");
+    expect(s.view().busy).toBe("run");
+    await s.act({ act: "cancel" });
+    await running;
+    const v = s.view();
+    expect(v.busy).toBe(false);
+    expect(v.notice).toBe(
+      "The audit was stopped; this is the last one that finished.",
+    );
+    if (v.state.kind !== "doc") throw new Error(v.state.kind);
+    expect(v.state.model.streams).toEqual([]);
+  }, 300_000);
 
   it("renders in the panel when the Change scope is chosen", async () => {
     const { s } = scope(checkout);
@@ -225,6 +381,8 @@ describe.skipIf(sh)("the Change scope", () => {
     const v = first.s.view();
     if (v.state.kind !== "doc") throw new Error(v.state.kind);
     const key = v.state.model.open[0].rows[0].key;
+    // The finding's own id.
+    expect(key).toMatch(/^[0-9a-f]{16}$/);
     await first.s.act({ act: "accept", key });
     const after = first.s.view();
     if (after.state.kind !== "doc") throw new Error(after.state.kind);
@@ -284,5 +442,24 @@ describe.skipIf(sh)("the Change scope", () => {
       canUpgrade: false,
     });
     expect(rec.errors).toEqual([]);
+  });
+
+  it("audits with a pre-release CLI that says it has audit", async () => {
+    state.cliPath = preCli;
+    const { s } = scope(checkout);
+    await s.audit(checkout);
+    expect(s.view().state.kind).toBe("doc");
+  });
+
+  it("asks for a newer extension when the CLI writes a schema it does not read", async () => {
+    state.cliPath = futureCli;
+    const { s } = scope(checkout);
+    await s.audit(checkout);
+    expect(s.view().state).toMatchObject({
+      kind: "newSchema",
+      version: "v1.60.0",
+      schema: 2,
+      supported: 1,
+    });
   });
 });

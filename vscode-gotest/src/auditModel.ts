@@ -3,6 +3,9 @@
 // is the CLI's, the words are the CLI's text renderer's, and nothing is
 // judged that the document did not judge.
 
+// The audit document's schema this extension reads.
+export const AUDIT_SCHEMA = 1;
+
 export interface AuditLocation {
   // Relative to the module root, slash-separated.
   file: string;
@@ -13,6 +16,7 @@ export interface AuditLocation {
 export interface AuditSide {
   version?: string;
   ref?: string;
+  branch?: string;
   commit?: string;
   dirty?: boolean;
   patterns?: string[];
@@ -30,23 +34,40 @@ export interface AuditSummary {
   evidence: number;
   unproven: number;
   incomplete: number;
+  failing?: number;
+  notRun?: number;
+  vacuous?: number;
+  stale?: number;
+  changedLines?: number;
+  noCoverage?: number;
 }
 
-export interface AuditFinding {
+// The go test name of a test and the -run pattern that selects it.
+export interface Selector {
+  test?: string;
+  run?: string;
+}
+
+export interface AuditFinding extends Selector {
+  id: string;
   class: string;
   weakens: boolean;
   package?: string;
   subject: string;
   base: string;
   head: string;
+  module?: string;
   location?: AuditLocation;
+  baseLocation?: AuditLocation;
+  headLocation?: AuditLocation;
+  runtime?: { base: number | null; head: number | null };
 }
 
 export interface AuditPlace extends AuditLocation {
   path: string[];
 }
 
-export interface AuditChange {
+export interface AuditChange extends Selector {
   change: string;
   kind: string;
   package: string;
@@ -55,21 +76,77 @@ export interface AuditChange {
   behaviors?: number;
 }
 
-// What a run proved of a changed behavior. The fields past verdict are
-// shown when a CLI sends them.
-export interface AuditEvidence {
+export interface StreamRun {
+  version?: string;
+  goVersion?: string;
+  args?: string[];
+  commit?: string;
+  dirty?: boolean;
+  agent?: string;
+  exitCode?: number;
+}
+
+export interface AuditStream {
+  file?: string;
+  side: string;
+  ran?: boolean;
+  run: StreamRun | null;
+  current: boolean;
+  stale?: string;
+}
+
+export interface Leaves {
+  passed: number;
+  failed: number;
+  skipped: number;
+  notRun: number;
+  vacuous: number;
+}
+
+// What the head's runs say of one behavior the comparison names.
+export interface AuditEvidence extends Selector {
+  id: string;
   package: string;
   path: string[];
   verdict: string;
-  commit?: string;
+  kind?: string;
+  why?: string[];
+  assertions?: number;
+  vacuous?: boolean;
+  assertsBy?: string;
+  skipReason?: string;
+  runs?: number;
+  leaves?: Leaves;
+  stream?: number;
+  current: boolean;
+  stale?: string;
+  others?: { stream: number; verdict: string; current: boolean }[];
+  needsDecision: boolean;
   source?: string;
-  stale?: boolean;
+  commit?: string;
+}
+
+export interface AuditCoverage {
+  profile?: string;
+  lines: string;
+  packages: string[];
 }
 
 export interface AuditUnproven {
   module?: string;
   file: string;
+  package: string;
   line: number;
+  coverage: boolean;
+  changed: number;
+  unexecuted: number;
+  ranges: { line: number; endLine: number }[];
+}
+
+export interface ModuleDir {
+  path: string;
+  // Relative to the audited directory, slash-separated, "." for it.
+  dir: string;
 }
 
 export interface AuditDocument {
@@ -78,10 +155,13 @@ export interface AuditDocument {
   base: AuditSide;
   head: AuditSide;
   modules: string[];
+  moduleDirs: ModuleDir[];
   summary: AuditSummary;
   findings: AuditFinding[];
   behaviors: AuditChange[];
+  streams: AuditStream[];
   evidence: AuditEvidence[];
+  coverage?: AuditCoverage;
   unproven: AuditUnproven[];
   incomplete: string[];
   notes: string[];
@@ -115,28 +195,20 @@ export function parseAuditDocument(stdout: string): AuditDocument | undefined {
     base: side(raw.base),
     head: side(raw.head),
     modules: list<string>(raw.modules),
+    moduleDirs: list<ModuleDir>(raw.moduleDirs),
     summary: raw.summary as AuditSummary,
     findings: list<AuditFinding>(raw.findings),
     behaviors: list<AuditChange>(raw.behaviors),
+    streams: list<AuditStream>(raw.streams),
     evidence: list<AuditEvidence>(raw.evidence),
+    coverage:
+      raw.coverage && typeof raw.coverage === "object"
+        ? (raw.coverage as AuditCoverage)
+        : undefined,
     unproven: list<AuditUnproven>(raw.unproven),
     incomplete: list<string>(raw.incomplete),
     notes: list<string>(raw.notes),
   };
-}
-
-// findingKey is a finding's identity in the document: its class, what it is
-// about and its values. The document has no id of its own.
-export function findingKey(f: AuditFinding): string {
-  return ["finding", f.class, f.package ?? "", f.subject, f.base, f.head].join(
-    "\u0000",
-  );
-}
-
-export function evidenceKey(e: AuditEvidence): string {
-  return ["evidence", e.package, e.path.join("\u0001"), e.verdict].join(
-    "\u0000",
-  );
 }
 
 // sideText names a side as the CLI's text does: ref and commit, and whether
@@ -176,32 +248,112 @@ export function shortPackage(
   return "./" + pkg.slice(m.length + 1);
 }
 
-// valueText is a finding's values: base → head, or the one there is.
-export function valueText(f: Pick<AuditFinding, "base" | "head">): string {
-  if (f.base && f.head) return `${f.base} → ${f.head}`;
-  return f.head || f.base;
+function countText(n: number | null | undefined): string {
+  return typeof n === "number" ? String(n) : "?";
+}
+
+// valueText is a finding's values: base → head, or the one there is, and
+// the counts the runs reported.
+export function valueText(
+  f: Pick<AuditFinding, "base" | "head" | "runtime">,
+): string {
+  let text = f.base;
+  if (f.base && f.head) text = `${f.base} → ${f.head}`;
+  else if (f.head) text = f.head;
+  if (f.runtime)
+    text += ` (run time ${countText(f.runtime.base)} → ${countText(f.runtime.head)})`;
+  return text;
 }
 
 function whereText(loc: AuditLocation | undefined): string {
   return loc && loc.line > 0 ? `${loc.file}:${loc.line}` : "";
 }
 
-// A place a row can open: a file of a module, at lines. module is undefined
-// for a finding about a file, which names no package.
-export interface Target {
-  module?: string;
-  file: string;
-  line: number;
-  endLine: number;
-  // Which side holds the lines: a removed behavior's are the base's.
-  side: "head" | "base";
+// markOf is an evidence row's mark as the CLI's text writes it: its
+// verdict, the assertions a passing leaf made, and * for a stale stream.
+export function markOf(e: AuditEvidence | undefined): string {
+  if (!e) return "";
+  let m = e.verdict;
+  if (e.verdict === "fail") m = "FAIL";
+  else if (e.verdict === "pass" && e.vacuous) m = "vacuous";
+  else if (e.verdict === "pass" && e.leaves && e.leaves.notRun > 0)
+    m = "partly run";
+  else if (e.verdict === "pass" && e.assertions !== undefined && !e.leaves)
+    m = `pass ${e.assertions}`;
+  if (e.stream !== undefined && !e.current) m += "*";
+  return m;
 }
 
-export type Tone = "fail" | "warn" | "info" | "none";
+export type Tone = "fail" | "warn" | "info" | "pass" | "none";
+
+function markTone(e: AuditEvidence): Tone {
+  if (e.verdict === "fail") return "fail";
+  if (e.needsDecision) return "warn";
+  return e.verdict === "pass" ? "pass" : "none";
+}
+
+// A row's evidence: the mark, and what the row judged by says beside it.
+export interface Mark {
+  text: string;
+  tone: Tone;
+  detail: string;
+}
+
+function streamLabel(st: AuditStream | undefined): string {
+  if (!st) return "";
+  if (st.ran) return "this audit's run";
+  return st.file ?? "";
+}
+
+function markFor(
+  doc: AuditDocument,
+  e: AuditEvidence | undefined,
+): Mark | undefined {
+  if (!e) return undefined;
+  const parts: string[] = [];
+  const st = e.stream !== undefined ? doc.streams[e.stream] : undefined;
+  if (st) {
+    let by = `judged by ${streamLabel(st)}`;
+    if (e.commit) by += ` of ${e.commit}`;
+    parts.push(
+      by + (e.current ? "" : ` (stale: ${e.stale ?? st.stale ?? ""})`),
+    );
+  }
+  if (e.runs) parts.push(`${e.runs} runs`);
+  if (e.leaves) {
+    const l = e.leaves;
+    parts.push(
+      `leaves: ${l.passed} passed, ${l.failed} failed, ${l.skipped} skipped, ${l.notRun} not run, ${l.vacuous} vacuous`,
+    );
+  }
+  if (e.assertsBy) parts.push(`AssertsBy: ${e.assertsBy}`);
+  if (e.skipReason) parts.push(`skipped: ${e.skipReason}`);
+  for (const o of e.others ?? []) {
+    parts.push(
+      `${streamLabel(doc.streams[o.stream])}: ${o.verdict}${o.current ? "" : " (stale)"}`,
+    );
+  }
+  return { text: markOf(e), tone: markTone(e), detail: parts.join("\n") };
+}
+
+// A place a row can open: a file of a module, as each side has it. The base
+// side is read from git, the head side is the working tree.
+export interface Target {
+  module?: string;
+  base?: AuditLocation;
+  head?: AuditLocation;
+}
+
+// What a Run button runs: go test's -run pattern in a package of the head.
+export interface RunTarget {
+  package: string;
+  run: string;
+}
 
 export interface DecisionRow {
+  // The finding's or the evidence row's id.
   key: string;
-  // The finding's class, or the evidence's verdict.
+  // The finding's class, or the evidence's mark.
   tag: string;
   tone: Tone;
   pkg?: string;
@@ -209,7 +361,9 @@ export interface DecisionRow {
   labels: string[];
   fact: string;
   where: string;
+  mark?: Mark;
   target?: Target;
+  runs?: RunTarget;
   accepted: boolean;
 }
 
@@ -229,7 +383,9 @@ export interface BehaviorRow {
   // Labels below the suite, as the CLI's text joins them.
   text: string;
   where: string;
+  mark?: Mark;
   target?: Target;
+  runs?: RunTarget;
 }
 
 export interface SuiteGroup {
@@ -242,22 +398,42 @@ export interface PackageGroup {
   suites: SuiteGroup[];
 }
 
+export interface StreamRow {
+  current: boolean;
+  // The CLI's text for the stream: its file or the audit's run, side,
+  // commit and exit code, and why it is stale.
+  text: string;
+  agent?: string;
+}
+
+export interface UnprovenRange {
+  key: string;
+  text: string;
+}
+
 export interface UnprovenFile {
-  module?: string;
+  key: string;
   file: string;
-  lines: number[];
+  pkg: string;
+  coverage: boolean;
+  // "3 of 7" for a file with coverage data.
+  counts: string;
+  ranges: UnprovenRange[];
 }
 
 export interface Counter {
   label: string;
-  value: number;
+  value: number | string;
   tone?: Tone | "add" | "del";
 }
 
 export interface ChangeModel {
   base: string;
   head: string;
+  headBranch?: string;
   counters: Counter[];
+  streamsHead?: string;
+  streams: StreamRow[];
   open: DecisionGroup[];
   accepted: DecisionRow[];
   openCount: number;
@@ -265,13 +441,16 @@ export interface ChangeModel {
   behaviors: PackageGroup[];
   behaviorCount: number;
   information: string[];
-  evidence: { pkg: string; text: string; verdict: string; facts: string }[];
-  unproven: UnprovenFile[];
+  // Absent when the audit looked for no unproven lines.
+  unproven?: { head: string; source: string; files: UnprovenFile[] };
   incomplete: string[];
   notes: string[];
 }
 
 export const FOLD_ABOVE = 5;
+
+// How many ranges of a file show before the rest fold, as the CLI's text.
+export const MAX_RANGES = 6;
 
 const SIGNS: Record<string, string> = {
   added: "+",
@@ -281,38 +460,28 @@ const SIGNS: Record<string, string> = {
   changed: "±",
 };
 
-// Evidence verdicts a run proved; any other asks for a decision.
-const PROVEN = new Set(["pass"]);
-
 function findingTone(f: AuditFinding): Tone {
   if (!f.weakens) return "info";
   return f.class === "removed" ? "fail" : "warn";
 }
 
-function findingTarget(
-  doc: AuditDocument,
-  f: AuditFinding,
-): Target | undefined {
-  if (!f.location?.file) return undefined;
-  return {
-    module: f.package ? moduleOf(doc, f.package) : undefined,
-    file: f.location.file,
-    line: f.location.line,
-    endLine: f.location.endLine,
-    side: f.class === "removed" || f.head === "deleted" ? "base" : "head",
-  };
+function findingTarget(f: AuditFinding): Target | undefined {
+  if (!f.baseLocation && !f.headLocation) return undefined;
+  return { module: f.module, base: f.baseLocation, head: f.headLocation };
 }
 
 function placeTarget(doc: AuditDocument, c: AuditChange): Target | undefined {
-  const p = c.head ?? c.base;
-  if (!p) return undefined;
-  return {
-    module: moduleOf(doc, c.package),
-    file: p.file,
-    line: p.line,
-    endLine: p.endLine,
-    side: c.head ? "head" : "base",
-  };
+  if (!c.head && !c.base) return undefined;
+  return { module: moduleOf(doc, c.package), base: c.base, head: c.head };
+}
+
+// runTarget is what a row runs: its selector, when the head has the test.
+function runTarget(
+  pkg: string | undefined,
+  s: Selector,
+  inHead: boolean,
+): RunTarget | undefined {
+  return pkg && s.run && inHead ? { package: pkg, run: s.run } : undefined;
 }
 
 // behaviorText is a change's labels below its suite, as the CLI's text
@@ -339,42 +508,74 @@ function behaviorWhere(c: AuditChange): string {
   return w(p) + leaves;
 }
 
+const pathKey = (pkg: string, path: string[]) => [pkg, ...path].join("\u0000");
+
+// streamText is a stream's line under the CLI's evidence heading.
+function streamText(st: AuditStream): string {
+  let name = st.ran ? "this audit's run" : (st.file ?? "");
+  if (st.side === "base") name = "base " + name;
+  if (st.run?.commit) name += " of " + st.run.commit;
+  if (typeof st.run?.exitCode === "number") name += `, exit ${st.run.exitCode}`;
+  if (st.stale) name += ": " + st.stale;
+  return name;
+}
+
+function plural(n: number): string {
+  return n === 1 ? "" : "s";
+}
+
 // buildChangeModel lays the document out for the panel: the decisions first,
-// the weakenings in the document's order with the unproven evidence after
-// them, then the behaviors by package and suite. accepted says which rows
-// the reviewer acknowledged here.
+// the weakenings in the document's order with the evidence rows that need a
+// decision after them, then the behaviors by package and suite. accepted
+// says which rows the reviewer acknowledged here.
 export function buildChangeModel(
   doc: AuditDocument,
   accepted: (key: string) => boolean = () => false,
 ): ChangeModel {
+  // A row's evidence, found as the CLI's text finds it: by package and labels.
+  // A finding's subject is its head labels joined as the CLI joins them.
+  const ev = new Map<string, AuditEvidence>();
+  const bySubject = new Map<string, AuditEvidence>();
+  for (const e of doc.evidence) {
+    ev.set(pathKey(e.package, e.path), e);
+    bySubject.set(pathKey(e.package, [e.path.join(" / ")]), e);
+  }
+  const findingEvidence = (f: AuditFinding) =>
+    f.package && f.headLocation
+      ? bySubject.get(pathKey(f.package, [f.subject]))
+      : undefined;
+
   const rows: DecisionRow[] = [];
   for (const f of doc.findings) {
     if (!f.weakens) continue;
-    const key = findingKey(f);
     rows.push({
-      key,
+      key: f.id,
       tag: f.class,
       tone: findingTone(f),
       pkg: f.package ? shortPackage(doc, f.package) : undefined,
       labels: f.subject.split(" / "),
       fact: f.class === "removed" ? f.base : valueText(f),
       where: whereText(f.location),
-      target: findingTarget(doc, f),
-      accepted: accepted(key),
+      mark: markFor(doc, findingEvidence(f)),
+      target: findingTarget(f),
+      runs: runTarget(f.package, f, !!f.headLocation),
+      accepted: accepted(f.id),
     });
   }
   for (const e of doc.evidence) {
-    if (PROVEN.has(e.verdict) && !e.stale) continue;
-    const key = evidenceKey(e);
+    if (!e.needsDecision) continue;
+    const mark = markFor(doc, e)!;
     rows.push({
-      key,
-      tag: e.stale ? "stale" : e.verdict,
+      key: e.id,
+      tag: mark.text,
       tone: e.verdict === "fail" ? "fail" : "warn",
       pkg: shortPackage(doc, e.package),
       labels: e.path,
-      fact: evidenceFacts(e),
+      fact: (e.why ?? []).join(", "),
       where: "",
-      accepted: accepted(key),
+      mark,
+      runs: runTarget(e.package, e, true),
+      accepted: accepted(e.id),
     });
   }
 
@@ -412,7 +613,11 @@ export function buildChangeModel(
       kind: c.kind,
       text: behaviorText(c),
       where: behaviorWhere(c),
+      mark: c.head
+        ? markFor(doc, ev.get(pathKey(c.package, c.head.path)))
+        : undefined,
       target: placeTarget(doc, c),
+      runs: runTarget(c.package, c, !!c.head),
     });
   }
 
@@ -420,16 +625,6 @@ export function buildChangeModel(
   const information = doc.findings
     .filter((f) => !f.weakens && f.class !== "changed")
     .map((f) => `${f.class}  ${findingLine(doc, f)}`);
-
-  const unproven: UnprovenFile[] = [];
-  for (const u of doc.unproven) {
-    let file = unproven.find((x) => x.file === u.file && x.module === u.module);
-    if (!file) {
-      file = { module: u.module, file: u.file, lines: [] };
-      unproven.push(file);
-    }
-    file.lines.push(u.line);
-  }
 
   const s = doc.summary;
   const counters: Counter[] = [
@@ -441,16 +636,50 @@ export function buildChangeModel(
     { label: "moved", value: s.moved },
     { label: "changed", value: s.changed },
   ];
-  if (s.evidence > 0) counters.push({ label: "evidence", value: s.evidence });
-  if (s.unproven > 0)
-    counters.push({ label: "unproven", value: s.unproven, tone: "warn" });
+  if (doc.streams.length > 0) {
+    counters.push(
+      { label: "evidence", value: s.evidence },
+      { label: "failing", value: s.failing ?? 0, tone: "fail" },
+      { label: "not run", value: s.notRun ?? 0, tone: "warn" },
+      { label: "vacuous", value: s.vacuous ?? 0, tone: "warn" },
+      { label: "stale", value: s.stale ?? 0, tone: "warn" },
+    );
+  }
+  if (doc.coverage) {
+    counters.push({
+      label: "unproven",
+      value: `${s.unproven} of ${s.changedLines ?? 0} lines`,
+      tone: s.unproven > 0 ? "warn" : undefined,
+    });
+    if ((s.noCoverage ?? 0) > 0)
+      counters.push({
+        label: "without coverage",
+        value: s.noCoverage!,
+        tone: "warn",
+      });
+  }
   if (s.incomplete > 0)
     counters.push({ label: "not compared", value: s.incomplete, tone: "fail" });
+
+  let streamsHead: string | undefined;
+  if (doc.streams.length > 0) {
+    const n = doc.streams.length;
+    const current = doc.streams.filter((st) => st.current).length;
+    streamsHead = `evidence: ${n} stream${plural(n)}, ${current} current`;
+    if (current < n) streamsHead += "; * marks a verdict of a stale one";
+  }
 
   return {
     base: sideText(doc.base),
     head: sideText(doc.head),
+    headBranch: doc.head.branch,
     counters,
+    streamsHead,
+    streams: doc.streams.map((st) => ({
+      current: st.current,
+      text: streamText(st),
+      agent: st.run?.agent,
+    })),
     open,
     accepted: acceptedRows,
     openCount: rows.length - acceptedRows.length,
@@ -458,23 +687,31 @@ export function buildChangeModel(
     behaviors,
     behaviorCount: doc.behaviors.length,
     information,
-    evidence: doc.evidence.map((e) => ({
-      pkg: shortPackage(doc, e.package),
-      text: e.path.join(" / "),
-      verdict: e.stale ? "stale" : e.verdict,
-      facts: evidenceFacts(e),
-    })),
-    unproven,
+    unproven: doc.coverage ? unprovenOf(doc) : undefined,
     incomplete: doc.incomplete,
     notes: doc.notes,
   };
 }
 
-function evidenceFacts(e: AuditEvidence): string {
-  const parts: string[] = [];
-  if (e.source) parts.push(e.source);
-  if (e.commit) parts.push(`@${e.commit}`);
-  return parts.join(" ");
+function unprovenOf(doc: AuditDocument): ChangeModel["unproven"] {
+  const s = doc.summary;
+  let head = `${s.unproven} of ${s.changedLines ?? 0} changed executable lines not executed`;
+  const none = s.noCoverage ?? 0;
+  if (none > 0) head += `, ${none} file${plural(none)} without coverage data`;
+  const cov = doc.coverage!;
+  const source = `${cov.profile ? cov.profile : "the coverage of this audit's run"}, lines from ${cov.lines}`;
+  const files = doc.unproven.map((u, i) => ({
+    key: `u:${i}`,
+    file: u.file,
+    pkg: shortPackage(doc, u.package),
+    coverage: u.coverage,
+    counts: u.coverage ? `${u.unexecuted} of ${u.changed}` : "",
+    ranges: u.ranges.map((r, j) => ({
+      key: `u:${i}:${j}`,
+      text: r.line === r.endLine ? `${r.line}` : `${r.line}-${r.endLine}`,
+    })),
+  }));
+  return { head, source, files };
 }
 
 // findingLine is a finding's line as the CLI's text writes it.
@@ -486,13 +723,45 @@ export function findingLine(doc: AuditDocument, f: AuditFinding): string {
   return `${text}: ${valueText(f)} (${loc})`;
 }
 
-// targets lists what each row of the model opens, by the row's key.
-export function targetsOf(m: ChangeModel): Map<string, Target> {
+// targetsOf lists what each row of the model opens, by the row's key: the
+// decisions and behaviors their file, an unproven file its first range and
+// each range its lines.
+export function targetsOf(
+  doc: AuditDocument,
+  m: ChangeModel,
+): Map<string, Target> {
   const out = new Map<string, Target>();
   const rows = [...m.open.flatMap((g) => g.rows), ...m.accepted];
   for (const r of rows) if (r.target) out.set(r.key, r.target);
   for (const p of m.behaviors)
     for (const s of p.suites)
       for (const r of s.rows) if (r.target) out.set(r.key, r.target);
+  for (const [i, u] of doc.unproven.entries()) {
+    const first = u.ranges[0];
+    out.set(`u:${i}`, {
+      module: u.module,
+      head: {
+        file: u.file,
+        line: first?.line ?? 0,
+        endLine: first?.endLine ?? 0,
+      },
+    });
+    for (const [j, r] of u.ranges.entries())
+      out.set(`u:${i}:${j}`, {
+        module: u.module,
+        head: { file: u.file, line: r.line, endLine: r.endLine },
+      });
+  }
+  return out;
+}
+
+// runsOf lists what each row's Run runs, by the row's key.
+export function runsOf(m: ChangeModel): Map<string, RunTarget> {
+  const out = new Map<string, RunTarget>();
+  for (const r of [...m.open.flatMap((g) => g.rows), ...m.accepted])
+    if (r.runs) out.set(r.key, r.runs);
+  for (const p of m.behaviors)
+    for (const s of p.suites)
+      for (const r of s.rows) if (r.runs) out.set(r.key, r.runs);
   return out;
 }

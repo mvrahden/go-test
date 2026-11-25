@@ -41,8 +41,9 @@ const DEFAULT_MODULE_PATH = "github.com/mvrahden/go-test/cmd/gotest";
 // extension accepts must enforce a runtime floor no newer than itself.
 export const MIN_CLI_VERSION = "v1.39.0";
 
-// The Change scope reads `gotest audit`, which v1.42.0 brings. A floor of
-// that one feature: below it the rest of the extension still works.
+// The Change scope reads `gotest audit`, which v1.42.0 brings. Whether a
+// CLI has it is asked of the CLI (`version --json`); this is the version
+// the upgrade advice names. Below it the rest of the extension still works.
 export const AUDIT_CLI_VERSION = "v1.42.0";
 
 export interface CliCommand {
@@ -258,20 +259,55 @@ export function offerCliUpgrade(err: unknown): boolean {
   return true;
 }
 
-// cliMeets says whether a CLI's reported version is at or above floor. A
-// dev build, a source checkout or a replace directive, is current.
-export function cliMeets(version: string, floor: string): boolean {
-  return version.startsWith("dev") || compareVersions(version, floor) >= 0;
+// What `gotest version --json` says a CLI can do. json is false for a CLI
+// that answered with its version line: one that predates --json.
+export interface CliCapabilities {
+  json: boolean;
+  version?: string;
+  commands: string[];
+  schemas: Record<string, number>;
 }
 
-// queryCliVersion asks the folder's CLI who it is: `gotest version`, through
-// the command the extension would run. Undefined when it says nothing usable.
-export async function queryCliVersion(
+// parseCliCapabilities reads what `gotest version --json` printed.
+export function parseCliCapabilities(
+  stdout: string,
+): CliCapabilities | undefined {
+  const text = stdout.trim();
+  if (text.startsWith("{")) {
+    try {
+      const v = JSON.parse(text.split("\n")[0]) as Record<string, unknown>;
+      const schemas: Record<string, number> = {};
+      if (v.schemas && typeof v.schemas === "object") {
+        for (const [k, n] of Object.entries(v.schemas)) {
+          if (typeof n === "number") schemas[k] = n;
+        }
+      }
+      return {
+        json: true,
+        version: typeof v.version === "string" ? v.version : undefined,
+        commands: Array.isArray(v.commands)
+          ? v.commands.filter((c): c is string => typeof c === "string")
+          : [],
+        schemas,
+      };
+    } catch {
+      // not the document; read it as the version line below
+    }
+  }
+  const version = /^gotest\s+(\S+)/m.exec(text)?.[1];
+  if (!version) return undefined;
+  return { json: false, version, commands: [], schemas: {} };
+}
+
+// queryCliCapabilities asks the folder's CLI what it is and can do:
+// `gotest version --json`, through the command the extension would run.
+// Undefined when it says nothing usable.
+export async function queryCliCapabilities(
   workspaceDir: string,
   log?: vscode.LogOutputChannel,
   timeoutMs = 120_000,
-): Promise<string | undefined> {
-  const cmd = await buildCliCommand(["version"], workspaceDir, log);
+): Promise<CliCapabilities | undefined> {
+  const cmd = await buildCliCommand(["version", "--json"], workspaceDir, log);
   // A managed child: through go run the CLI is a grandchild a budget must
   // reach too.
   const mc = new ManagedChild(cmd.bin, cmd.args, {
@@ -290,7 +326,7 @@ export async function queryCliVersion(
   try {
     const { code } = await mc.exited;
     if (code !== 0) return undefined;
-    return /^gotest\s+(\S+)/m.exec(stdout)?.[1];
+    return parseCliCapabilities(stdout);
   } finally {
     clearTimeout(budget);
     mc.dispose();

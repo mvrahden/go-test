@@ -5,7 +5,9 @@ import type {
   ChangeModel,
   DecisionGroup,
   DecisionRow,
+  Mark,
 } from "./auditModel.js";
+import { MAX_RANGES } from "./auditModel.js";
 
 // What the Change scope shows for its folder.
 export type ChangeState =
@@ -19,16 +21,19 @@ export type ChangeState =
       advice: string;
       canUpgrade: boolean;
     }
+  | { kind: "newSchema"; version?: string; schema: number; supported: number }
   | { kind: "error"; message: string }
   | { kind: "doc"; model: ChangeModel; exitCode: number | null };
 
 export interface ChangeView {
   state: ChangeState;
-  busy: boolean;
+  // The audit running now: a plain one, or one that runs the change.
+  busy: false | "static" | "run";
   folders: { path: string; label: string; selected: boolean }[];
-  // The folder's base as the user chose it, and the branch HEAD is on.
+  // The folder's base as the user chose it.
   baseLabel?: string;
-  headBranch?: string;
+  // Said above the document, such as an audit that was stopped.
+  notice?: string;
   // Which rows' buttons do something here.
   canRun: (key: string) => boolean;
   canOpen: (key: string) => boolean;
@@ -62,10 +67,17 @@ function changeToolbar(view: ChangeView): string {
           )
           .join("")}</select></div>`
       : "";
-  const canAudit = !["notGit", "idle"].includes(view.state.kind);
-  const busy = view.busy
-    ? `<span class="busy" role="status">Auditing…</span>`
-    : "";
+  const canAudit =
+    !["notGit", "idle", "noBase", "oldCli", "newSchema"].includes(
+      view.state.kind,
+    ) && !view.busy;
+  const busy =
+    view.busy === "run"
+      ? `<span class="busy" role="status">Auditing with a run…</span><button class="tool-btn" data-change="cancel" title="Stop the audit and the run it started">Cancel</button>`
+      : view.busy
+        ? `<span class="busy" role="status">Auditing…</span>`
+        : "";
+  const off = canAudit ? "" : " disabled";
   return `<div class="toolbar">
   ${picker}
   <div class="toolbar-group">
@@ -73,7 +85,8 @@ function changeToolbar(view: ChangeView): string {
   </div>
   <div class="toolbar-group search-group">${busy}</div>
   <div class="toolbar-group">
-    <button class="tool-btn" data-change="refresh" title="Audit the working tree against the base again"${canAudit && !view.busy ? "" : " disabled"}>Refresh</button>
+    <button class="tool-btn" data-change="refresh" title="Audit the working tree against the base again, from source"${view.busy || view.state.kind === "notGit" ? " disabled" : ""}>Refresh</button>
+    <button class="tool-btn" data-change="auditRun" title="Run the packages of the changed behaviors, with coverage of the changed production packages, and audit with that run as evidence"${off}>Audit with a run</button>
   </div>
 </div>`;
 }
@@ -110,11 +123,22 @@ function changeContent(view: ChangeView): string {
         button,
       );
     }
+    case "newSchema":
+      return emptyHtml(
+        "Update the extension",
+        `This folder's CLI${s.version ? " " + esc(s.version) : ""} writes the audit document in schema ${s.schema}; this extension reads schema ${s.supported}.`,
+      );
     case "error":
-      return `<div class="render-error" role="alert">The audit failed.<pre class="error-output">${esc(s.message)}</pre></div>`;
+      return `${noticeHtml(view)}<div class="render-error" role="alert">The audit failed.<pre class="error-output">${esc(s.message)}</pre></div>`;
     case "doc":
       return docHtml(view, s.model, s.exitCode);
   }
+}
+
+function noticeHtml(view: ChangeView): string {
+  return view.notice
+    ? `<div class="notice" role="status">${esc(view.notice)}</div>`
+    : "";
 }
 
 function emptyHtml(title: string, text: string, extra = ""): string {
@@ -130,38 +154,56 @@ function docHtml(
   m: ChangeModel,
   exitCode: number | null,
 ): string {
-  const branch = view.headBranch ? `<b>${esc(view.headBranch)}</b> ` : "";
+  const branch = m.headBranch ? `<b>${esc(m.headBranch)}</b> ` : "";
   const exit =
     exitCode !== 0 && exitCode !== null
       ? ` · <span class="fail">exit ${exitCode}</span>`
       : "";
   const counters = m.counters
-    .map(
-      (c) =>
-        `<span class="counter${c.value > 0 && c.tone ? " " + c.tone : ""}">${esc(c.label)} <b>${c.value}</b></span>`,
-    )
+    .map((c) => {
+      const lit = c.tone && (typeof c.value === "string" || c.value > 0);
+      return `<span class="counter${lit ? " " + c.tone : ""}">${esc(c.label)} <b>${esc(String(c.value))}</b></span>`;
+    })
     .join("");
-  const decisions = decisionsHtml(view, m);
   const parts = [
+    noticeHtml(view),
     `<div class="ctx">
   <div class="ctx-line">head ${branch}${esc(m.head)} ← base ${esc(m.base)}${exit}</div>
   <div class="counters">${counters}</div>
 </div>`,
-    decisions,
+    streamsHtml(m),
+    decisionsHtml(view, m),
     behaviorsHtml(view, m),
+    unprovenHtml(view, m),
     listHtml("Information", m.information),
-    evidenceHtml(m),
-    unprovenHtml(m),
     listHtml("Not compared", m.incomplete),
     listHtml("Notes", m.notes),
   ];
   return parts.filter(Boolean).join("\n");
 }
 
+// streamsHtml names the runs that judged the change, as the CLI's text
+// lists them under its first line.
+function streamsHtml(m: ChangeModel): string {
+  if (!m.streamsHead) return "";
+  const rows = m.streams
+    .map(
+      (st) =>
+        `<div class="stream"><span class="tag-chip ${st.current ? "pass" : "warn"}">${st.current ? "current" : "stale"}</span> <span class="mono">${esc(st.text)}</span>${st.agent ? ` <span class="dim">· agent ${esc(st.agent)}</span>` : ""}</div>`,
+    )
+    .join("");
+  return `<section class="band" id="streams"><div class="band-head">Evidence <span class="band-count">${esc(m.streamsHead)}</span></div>${rows}</section>`;
+}
+
+function markHtml(mark: Mark | undefined): string {
+  if (!mark) return "";
+  return `<span class="mark ${mark.tone}" title="${attr(mark.detail)}">${esc(mark.text)}</span>`;
+}
+
 function decisionsHtml(view: ChangeView, m: ChangeModel): string {
   const head = `<div class="band-head">Needs a decision <span class="band-count">${m.openCount} open · ${m.acceptedCount} accepted</span></div>`;
   if (m.openCount === 0 && m.acceptedCount === 0) {
-    return `<section class="band" id="decisions">${head}<div class="band-empty">Nothing got weaker.</div></section>`;
+    return `<section class="band" id="decisions">${head}<div class="band-empty">Nothing needs a decision.</div></section>`;
   }
   const groups = m.open.map((g) => groupHtml(view, g)).join("");
   const accepted =
@@ -177,6 +219,12 @@ function groupHtml(view: ChangeView, g: DecisionGroup): string {
   return `<details class="decision-group" data-tag="${attr(g.tag)}"><summary class="group-head"><span class="tag-chip ${g.rows[0].tone}">${esc(g.tag)}</span> ${g.rows.length} findings</summary>${rows}</details>`;
 }
 
+function runButton(view: ChangeView, key: string): string {
+  return view.canRun(key)
+    ? `<button class="act" data-change="run" data-key="${attr(key)}" title="Run this test">Run</button>`
+    : "";
+}
+
 function decisionHtml(view: ChangeView, r: DecisionRow): string {
   const last = r.labels[r.labels.length - 1] ?? "";
   const above = r.labels.slice(0, -1).join(" › ");
@@ -187,13 +235,15 @@ function decisionHtml(view: ChangeView, r: DecisionRow): string {
     view.canOpen(r.key)
       ? `<button class="act" data-change="openDiff" data-key="${k}" title="Open the diff of this file against the base">Open diff</button>`
       : "",
-    view.canRun(r.key)
-      ? `<button class="act" data-change="run" data-key="${k}" title="Run this test">Run</button>`
-      : "",
+    runButton(view, r.key),
     `<button class="act" data-change="accept" data-key="${k}" title="${attr(ACCEPT_NOTE)}">${r.accepted ? "Reopen" : "Accept"}</button>`,
   ].join("");
+  // An evidence row's tag is its mark already.
+  const mark = r.mark && r.mark.text !== r.tag ? markHtml(r.mark) : "";
+  const tagTitle = r.mark && !mark ? ` title="${attr(r.mark.detail)}"` : "";
   return `<div class="decision ${r.tone}${r.accepted ? " accepted" : ""}" data-key="${k}">
-  <span class="tag-chip ${r.tone}">${esc(r.tag)}</span>
+  <span class="tag-chip ${r.tone}"${tagTitle}>${esc(r.tag)}</span>
+  ${mark}
   <span class="path">${path}</span>
   <span class="fact">${esc(r.fact)}</span>
   ${r.where ? `<span class="where">${esc(r.where)}</span>` : ""}
@@ -221,7 +271,7 @@ function behaviorHtml(view: ChangeView, r: BehaviorRow): string {
   const text = view.canOpen(r.key)
     ? `<a class="src-link" data-change="openSource" data-key="${attr(r.key)}">${esc(r.text)}</a>`
     : esc(r.text);
-  return `<div class="behavior ${r.change}"><span class="sign ${r.change}">${esc(r.sign)}</span> <span class="change-word">${esc(r.change)}</span> ${text} <span class="where">${esc(r.where)}</span></div>`;
+  return `<div class="behavior ${r.change}"><span class="sign ${r.change}">${esc(r.sign)}</span> <span class="change-word">${esc(r.change)}</span> ${markHtml(r.mark)} ${text} <span class="where">${esc(r.where)}</span> <span class="row-acts">${runButton(view, r.key)}</span></div>`;
 }
 
 function listHtml(title: string, items: string[]): string {
@@ -229,26 +279,33 @@ function listHtml(title: string, items: string[]): string {
   return `<section class="band"><div class="band-head">${esc(title)}</div><ul class="plain-list">${items.map((i) => `<li>${esc(i)}</li>`).join("")}</ul></section>`;
 }
 
-function evidenceHtml(m: ChangeModel): string {
-  if (m.evidence.length === 0) return "";
-  const rows = m.evidence
-    .map(
-      (e) =>
-        `<div class="behavior"><span class="tag-chip ${e.verdict === "pass" ? "pass" : "warn"}">${esc(e.verdict)}</span> <span class="dim">${esc(e.pkg)}</span> ${esc(e.text)} <span class="where">${esc(e.facts)}</span></div>`,
-    )
-    .join("");
-  return `<section class="band"><div class="band-head">Evidence</div>${rows}</section>`;
-}
-
-function unprovenHtml(m: ChangeModel): string {
-  if (m.unproven.length === 0) return "";
-  const rows = m.unproven
-    .map((u) => {
-      const n = u.lines.length;
-      return `<div class="behavior"><span class="mono">${esc(u.file)}</span> <span class="fact">${n} changed line${n === 1 ? "" : "s"} no test executed: ${esc(u.lines.join(", "))}</span></div>`;
+// unprovenHtml lists per changed production file the changed lines no test
+// executed; each range opens the file at its lines.
+function unprovenHtml(view: ChangeView, m: ChangeModel): string {
+  const u = m.unproven;
+  if (!u) return "";
+  const link = (key: string, text: string) =>
+    view.canOpen(key)
+      ? `<a class="src-link mono" data-change="openSource" data-key="${attr(key)}">${esc(text)}</a>`
+      : `<span class="mono">${esc(text)}</span>`;
+  const rows = u.files
+    .map((f) => {
+      const name = link(f.key, f.file);
+      const pkg = `<span class="dim">${esc(f.pkg)}</span>`;
+      if (!f.coverage)
+        return `<div class="unproven">${name} ${pkg} <span class="fact">no coverage data</span></div>`;
+      const shown = f.ranges
+        .slice(0, MAX_RANGES)
+        .map((r) => link(r.key, r.text));
+      const more = f.ranges.slice(MAX_RANGES);
+      const rest =
+        more.length > 0
+          ? ` <details class="more-ranges"><summary>… ${more.length} more</summary>${more.map((r) => link(r.key, r.text)).join(", ")}</details>`
+          : "";
+      return `<div class="unproven">${name} ${pkg} <span class="fact">${esc(f.counts)}:</span> ${shown.join(", ")}${rest}</div>`;
     })
     .join("");
-  return `<section class="band"><div class="band-head">Unproven</div>${rows}</section>`;
+  return `<section class="band" id="unproven"><div class="band-head">Unproven lines <span class="band-count">${esc(u.head)}</span></div><div class="caption">${esc(u.source)}</div>${rows}</section>`;
 }
 
 export const CHANGE_CSS = `
@@ -299,5 +356,14 @@ details.decision-group[open] > summary::before, details.accepted-group[open] > s
 .change-word { font-size: 0.8em; color: var(--vscode-descriptionForeground); display: inline-block; min-width: 8ch; }
 .plain-list { margin: 0; padding: 0 12px 0 32px; font-size: 0.9em; }
 .mono { font-family: var(--vscode-editor-font-family); }
+.stream, .unproven { padding: 1px 12px 1px 24px; overflow-wrap: anywhere; }
+.notice { padding: 6px 12px; color: var(--vscode-descriptionForeground); border-bottom: 1px solid var(--vscode-panel-border); }
+.mark { font-size: 0.8em; font-family: var(--vscode-editor-font-family); display: inline-block; min-width: 10ch; }
+.mark.fail { color: var(--vscode-testing-iconFailed); font-weight: 600; }
+.mark.warn { color: var(--vscode-testing-iconSkipped); }
+.mark.pass { color: var(--vscode-testing-iconPassed); }
+.mark.none, .mark.info { color: var(--vscode-descriptionForeground); }
+details.more-ranges { display: inline; }
+details.more-ranges > summary { display: inline; cursor: pointer; color: var(--vscode-descriptionForeground); }
 .fail { color: var(--vscode-testing-iconFailed); }
 `;

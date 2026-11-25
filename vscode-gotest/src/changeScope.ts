@@ -8,30 +8,30 @@ import { existsSync } from "node:fs";
 import {
   AUDIT_CLI_VERSION,
   buildCliCommand,
-  cliMeets,
   cliPackagePath,
   offerCliUpgrade,
   pinnedBelow,
-  queryCliVersion,
+  queryCliCapabilities,
   stripGoRunExitEcho,
   type CliBelowFloorError,
 } from "./cli.js";
 import { auditTimeoutSeconds } from "./config.js";
 import { ManagedChild } from "./managedChild.js";
-import { readModuleRoots } from "./gomod.js";
 import {
+  AUDIT_SCHEMA,
   buildChangeModel,
   parseAuditDocument,
+  runsOf,
   targetsOf,
   type AuditDocument,
-  type Target,
+  type AuditLocation,
+  type RunTarget,
 } from "./auditModel.js";
 import type { ChangeState, ChangeView } from "./changeView.js";
 import { AcceptanceStore, type Memento } from "./acceptance.js";
 import {
   BASE_SCHEME,
   baseQuery,
-  currentBranch,
   defaultBranch,
   gitToplevel,
   listRefs,
@@ -52,10 +52,10 @@ export interface ChangeScopeDeps {
   // The folders that use gotest; the scope audits one of them.
   folders: () => string[];
   patternsFor?: (folder: string) => Promise<string[] | undefined>;
-  // Whether a test item is declared in file within the 1-based lines, and
-  // running the narrowest such item.
-  hasItemAt?: (file: string, line: number, endLine: number) => boolean;
-  runAt?: (file: string, line: number, endLine: number) => Promise<void>;
+  // Whether the Test Explorer holds a package, and running a -run pattern
+  // in it through the extension's runner.
+  hasPackage?: (pkg: string) => boolean;
+  runTest?: (pkg: string, run: string) => Promise<void>;
   // Called whenever what the scope shows changed.
   changed: () => void;
 }
@@ -81,30 +81,46 @@ export function interpretAuditExit(
   };
 }
 
-// A target placed on disk: the file in the working tree and its path in the
-// checkout, for the base's copy.
-interface Placed extends Target {
+// One side of a target placed on disk: the file in the working tree, its
+// path in the checkout for the base's copy, and its lines.
+interface PlacedSide {
   abs: string;
   rel: string;
+  loc: AuditLocation;
 }
+
+interface Placed {
+  base?: PlacedSide;
+  head?: PlacedSide;
+}
+
+// An audit's kind: from source alone, or with a run of the change.
+export type AuditMode = "static" | "run";
 
 interface FolderState {
   state: ChangeState;
-  busy: boolean;
-  again: boolean;
+  busy: false | AuditMode;
+  // An audit asked for while one runs; a run outweighs a plain one.
+  again?: AuditMode;
   // A run in the folder finished since the last audit.
   stale: boolean;
   child?: ManagedChild;
+  cancelled: boolean;
+  notice?: string;
   doc?: AuditDocument;
   exitCode?: number | null;
   baseRef?: string;
   baseLabel?: string;
-  headBranch?: string;
   toplevel?: string;
   targets: Map<string, Placed>;
+  runs: Map<string, RunTarget>;
   cliOk: boolean;
   upgrade?: CliBelowFloorError;
 }
+
+// How much of a run audit's stderr is kept for its complaint: the run's
+// own output goes there too.
+const STDERR_KEEP = 64 * 1024;
 
 export class ChangeScope implements vscode.Disposable {
   private selected: string | undefined;
@@ -134,9 +150,10 @@ export class ChangeScope implements vscode.Disposable {
       fs = {
         state: { kind: "idle" },
         busy: false,
-        again: false,
         stale: false,
+        cancelled: false,
         targets: new Map(),
+        runs: new Map(),
         cliOk: false,
       };
       this.folders.set(folder, fs);
@@ -200,56 +217,73 @@ export class ChangeScope implements vscode.Disposable {
       busy: fs.busy,
       folders,
       baseLabel: fs.baseLabel,
-      headBranch: fs.headBranch,
+      notice: fs.notice,
       canOpen: (key) => fs.targets.has(key),
       canRun: (key) => {
-        const t = fs.targets.get(key);
-        return (
-          !!t &&
-          t.side === "head" &&
-          t.line > 0 &&
-          !!this.deps.hasItemAt?.(t.abs, t.line, t.endLine)
-        );
+        const r = fs.runs.get(key);
+        return !!r && !!this.deps.hasPackage?.(r.package);
       },
     };
   }
 
   // audit runs the folder's audit, one at a time: asked again while one
-  // runs, it runs once more after it.
-  async audit(folder: string): Promise<void> {
+  // runs, it runs once more after it, with a run if either asked for one.
+  async audit(folder: string, mode: AuditMode = "static"): Promise<void> {
     if (this.disposed) return;
     const fs = this.stateOf(folder);
     if (fs.busy) {
-      fs.again = true;
+      fs.again = fs.again === "run" ? "run" : mode;
       return;
     }
-    fs.busy = true;
+    fs.busy = mode;
     fs.stale = false;
+    fs.cancelled = false;
+    fs.notice = undefined;
     this.deps.changed();
     try {
-      await this.auditNow(folder, fs);
+      await this.auditNow(folder, fs, mode);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      this.deps.log.error(`[change] ${message}`);
-      fs.state = { kind: "error", message };
+      if (fs.cancelled) {
+        fs.notice = fs.doc
+          ? "The audit was stopped; this is the last one that finished."
+          : "The audit was stopped.";
+        this.deps.log.info(`[change] stopped: ${message}`);
+      } else {
+        this.deps.log.error(`[change] ${message}`);
+        fs.state = { kind: "error", message };
+      }
     } finally {
       fs.busy = false;
       fs.child = undefined;
       if (!this.disposed) this.deps.changed();
     }
-    if (fs.again && !this.disposed) {
-      fs.again = false;
-      await this.audit(folder);
+    const again = fs.again;
+    fs.again = undefined;
+    if (again && !this.disposed && !fs.cancelled) {
+      await this.audit(folder, again);
     }
   }
 
-  private async auditNow(folder: string, fs: FolderState): Promise<void> {
+  // cancel stops the folder's audit, and the run it started.
+  cancel(folder: string): void {
+    const fs = this.folders.get(folder);
+    if (!fs?.busy) return;
+    fs.cancelled = true;
+    fs.again = undefined;
+    void fs.child?.terminate(fs.busy === "run" ? "teardown" : "prompt");
+  }
+
+  private async auditNow(
+    folder: string,
+    fs: FolderState,
+    mode: AuditMode,
+  ): Promise<void> {
     fs.toplevel = await gitToplevel(folder);
     if (!fs.toplevel) {
       fs.state = { kind: "notGit" };
       return;
     }
-    fs.headBranch = await currentBranch(folder);
     const base = await this.resolveBase(folder);
     if (!base) {
       fs.baseLabel = undefined;
@@ -262,10 +296,12 @@ export class ChangeScope implements vscode.Disposable {
     if (!fs.cliOk && !(await this.checkCli(folder, fs))) return;
 
     const patterns = (await this.deps.patternsFor?.(folder)) ?? [];
+    const args = ["audit", `--base=${base.ref}`, "--format=json"];
+    if (mode === "run") args.push("--run");
     let cmd;
     try {
       cmd = await buildCliCommand(
-        ["audit", `--base=${base.ref}`, "--format=json", ...patterns],
+        [...args, ...patterns],
         folder,
         this.deps.log,
       );
@@ -276,39 +312,48 @@ export class ChangeScope implements vscode.Disposable {
     this.deps.log.info(
       `[change] ${cmd.bin} ${cmd.args.join(" ")} (cwd ${folder})`,
     );
-    const outcome = await this.runChild(folder, fs, cmd.bin, cmd.args);
+    const outcome = await this.runChild(folder, fs, cmd.bin, cmd.args, mode);
     if (!outcome.ok) {
       fs.state = { kind: "error", message: outcome.message };
       return;
     }
     fs.doc = outcome.doc;
     fs.exitCode = outcome.exitCode;
-    fs.targets = await this.place(folder, fs.toplevel, outcome.doc);
-    fs.state = {
-      kind: "doc",
-      model: buildChangeModel(outcome.doc),
-      exitCode: outcome.exitCode,
-    };
+    const model = buildChangeModel(outcome.doc);
+    fs.targets = this.place(folder, fs.toplevel, outcome.doc, model);
+    fs.runs = runsOf(model);
+    fs.state = { kind: "doc", model, exitCode: outcome.exitCode };
   }
 
-  // checkCli asks the folder's CLI its version before the first audit: one
-  // that predates audit would read the word as a package to test.
+  // checkCli asks the folder's CLI what it can do before the first audit:
+  // one without audit would read the word as a package to test. A CLI that
+  // predates `version --json` answers with its version line.
   private async checkCli(folder: string, fs: FolderState): Promise<boolean> {
-    let version: string | undefined;
+    let caps;
     try {
-      version = await queryCliVersion(folder, this.deps.log);
+      caps = await queryCliCapabilities(folder, this.deps.log);
     } catch (err: unknown) {
       offerCliUpgrade(err);
       throw err;
     }
-    if (version && cliMeets(version, AUDIT_CLI_VERSION)) {
+    const schema = caps?.schemas.audit;
+    if (caps?.json && caps.commands.includes("audit") && schema !== undefined) {
+      if (schema > AUDIT_SCHEMA) {
+        fs.state = {
+          kind: "newSchema",
+          version: caps.version,
+          schema,
+          supported: AUDIT_SCHEMA,
+        };
+        return false;
+      }
       fs.cliOk = true;
       return true;
     }
     fs.upgrade = await pinnedBelow(folder, AUDIT_CLI_VERSION, this.deps.log);
     fs.state = {
       kind: "oldCli",
-      version,
+      version: caps?.version,
       floor: AUDIT_CLI_VERSION,
       advice: `Run: go get -tool ${cliPackagePath(folder)}@${AUDIT_CLI_VERSION}`,
       canUpgrade: !!fs.upgrade,
@@ -316,33 +361,47 @@ export class ChangeScope implements vscode.Disposable {
     return false;
   }
 
+  // runChild runs one audit. A plain one has a budget; one with a run
+  // runs tests, so it runs until it ends or is cancelled, and a stop gives
+  // its fixtures their teardown.
   private async runChild(
     folder: string,
     fs: FolderState,
     bin: string,
     args: string[],
+    mode: AuditMode,
   ): Promise<AuditOutcome> {
+    if (fs.cancelled) throw new Error("audit stopped");
     const budgetSeconds = auditTimeoutSeconds(folder);
-    const mc = new ManagedChild(bin, args, { cwd: folder, kind: "audit" });
+    const mc = new ManagedChild(bin, args, {
+      cwd: folder,
+      kind: mode === "run" ? "audit-run" : "audit",
+    });
     fs.child = mc;
     let stdout = "";
     let stderr = "";
     let timedOut = false;
     let spawnError: Error | undefined;
     mc.child.stdout?.on("data", (chunk: string) => (stdout += chunk));
-    mc.child.stderr?.on("data", (chunk: string) => (stderr += chunk));
+    mc.child.stderr?.on("data", (chunk: string) => {
+      stderr += chunk;
+      if (stderr.length > 2 * STDERR_KEEP) stderr = stderr.slice(-STDERR_KEEP);
+    });
     mc.child.on("error", (err: Error) => (spawnError = err));
     mc.child.stdin?.on("error", () => {});
     mc.child.stdin?.end();
-    const budget = setTimeout(() => {
-      timedOut = true;
-      void mc.terminate("prompt");
-    }, budgetSeconds * 1000);
+    const budget =
+      mode === "static"
+        ? setTimeout(() => {
+            timedOut = true;
+            void mc.terminate("prompt");
+          }, budgetSeconds * 1000)
+        : undefined;
     try {
       const { code } = await mc.exited;
       if (spawnError) throw spawnError;
       if (timedOut) throw new Error(`audit timed out after ${budgetSeconds}s`);
-      if (this.disposed) throw new Error("audit stopped");
+      if (this.disposed || fs.cancelled) throw new Error("audit stopped");
       return interpretAuditExit(code, stdout, stderr);
     } finally {
       clearTimeout(budget);
@@ -350,33 +409,31 @@ export class ChangeScope implements vscode.Disposable {
     }
   }
 
-  // place puts each row's file on disk: a module's file under the module's
-  // directory, a file the document names without a package under the one
-  // module that holds it.
-  private async place(
+  // place puts each side of each row's file on disk, under its module's
+  // directory as the document gives it.
+  private place(
     folder: string,
     toplevel: string,
     doc: AuditDocument,
-  ): Promise<Map<string, Placed>> {
-    const dirs = new Map<string, string>();
-    for (const root of await readModuleRoots(folder)) {
-      const m = /^\s*module\s+(\S+)/m.exec(root.goMod)?.[1];
-      if (m) dirs.set(m, root.dir);
-    }
+    model: ReturnType<typeof buildChangeModel>,
+  ): Map<string, Placed> {
+    const dirs = new Map(doc.moduleDirs.map((m) => [m.path, m.dir]));
     const out = new Map<string, Placed>();
-    for (const [key, t] of targetsOf(buildChangeModel(doc))) {
-      let dir = t.module ? dirs.get(t.module) : undefined;
-      if (!t.module) {
-        const candidates = Array.from(dirs.values());
-        dir =
-          candidates.length === 1
-            ? candidates[0]
-            : candidates.find((d) => existsSync(path.join(d, t.file)));
-      }
-      if (!dir) continue;
-      const abs = path.join(dir, ...t.file.split("/"));
-      const rel = path.relative(toplevel, abs).split(path.sep).join("/");
-      out.set(key, { ...t, abs, rel });
+    for (const [key, t] of targetsOf(doc, model)) {
+      const dir = t.module !== undefined ? dirs.get(t.module) : undefined;
+      if (dir === undefined) continue;
+      const side = (loc: AuditLocation | undefined): PlacedSide | undefined => {
+        if (!loc?.file) return undefined;
+        const abs = path.join(
+          folder,
+          ...dir.split("/"),
+          ...loc.file.split("/"),
+        );
+        const rel = path.relative(toplevel, abs).split(path.sep).join("/");
+        return { abs, rel, loc };
+      };
+      const placed = { base: side(t.base), head: side(t.head) };
+      if (placed.base || placed.head) out.set(key, placed);
     }
     return out;
   }
@@ -484,8 +541,15 @@ export class ChangeScope implements vscode.Disposable {
     const key = typeof msg.key === "string" ? msg.key : "";
     switch (msg.act) {
       case "refresh":
-        if (fs.state.kind === "oldCli") fs.cliOk = false;
+        if (fs.state.kind === "oldCli" || fs.state.kind === "newSchema")
+          fs.cliOk = false;
         await this.audit(folder);
+        return;
+      case "auditRun":
+        await this.audit(folder, "run");
+        return;
+      case "cancel":
+        this.cancel(folder);
         return;
       case "chooseBase":
         await this.chooseBase(folder);
@@ -494,14 +558,13 @@ export class ChangeScope implements vscode.Disposable {
         if (fs.upgrade) offerCliUpgrade(fs.upgrade);
         return;
       case "accept":
-        if (!fs.doc) return;
+        if (!fs.doc || !key) return;
         await this.acceptance.toggle(folder, fs.doc.head.commit ?? "", key);
         this.deps.changed();
         return;
       case "run": {
-        const t = fs.targets.get(key);
-        if (t && t.side === "head")
-          await this.deps.runAt?.(t.abs, t.line, t.endLine);
+        const r = fs.runs.get(key);
+        if (r) await this.deps.runTest?.(r.package, r.run);
         return;
       }
       case "openDiff":
@@ -513,61 +576,83 @@ export class ChangeScope implements vscode.Disposable {
     }
   }
 
-  private baseUri(fs: FolderState, t: Placed): vscode.Uri {
+  private baseUri(fs: FolderState, side: PlacedSide): vscode.Uri {
     const commit = fs.doc?.base.commit || fs.baseRef || "";
-    return vscode.Uri.file(t.abs).with({
+    return vscode.Uri.file(side.abs).with({
       scheme: BASE_SCHEME,
-      query: baseQuery({ toplevel: fs.toplevel ?? "", commit, path: t.rel }),
+      query: baseQuery({ toplevel: fs.toplevel ?? "", commit, path: side.rel }),
     });
   }
 
-  private emptyUri(t: Placed): vscode.Uri {
-    return vscode.Uri.file(t.abs).with({
+  private emptyUri(side: PlacedSide): vscode.Uri {
+    return vscode.Uri.file(side.abs).with({
       scheme: BASE_SCHEME,
-      query: baseQuery({ toplevel: "", commit: "", path: t.rel }),
+      query: baseQuery({ toplevel: "", commit: "", path: side.rel }),
     });
   }
 
-  private range(t: Placed): vscode.Range | undefined {
-    if (t.line <= 0) return undefined;
-    return new vscode.Range(t.line - 1, 0, Math.max(t.endLine, t.line) - 1, 0);
-  }
-
-  // openDiff opens the file as the base had it beside the working tree's,
-  // at the row's lines when the working tree holds them.
-  private async openDiff(fs: FolderState, key: string): Promise<void> {
-    const t = fs.targets.get(key);
-    if (!t) return;
-    const right = existsSync(t.abs) ? vscode.Uri.file(t.abs) : this.emptyUri(t);
-    const base = fs.doc?.base.commit || fs.baseRef?.slice(0, 8) || "base";
-    const selection = t.side === "head" ? this.range(t) : undefined;
-    await vscode.commands.executeCommand(
-      "vscode.diff",
-      this.baseUri(fs, t),
-      right,
-      `${path.basename(t.abs)} (${base} ↔ working tree)`,
-      { preview: true, selection },
+  private range(loc: AuditLocation): vscode.Range | undefined {
+    if (loc.line <= 0) return undefined;
+    return new vscode.Range(
+      loc.line - 1,
+      0,
+      Math.max(loc.endLine, loc.line) - 1,
+      0,
     );
   }
 
-  // openSource opens where a behavior is declared: the working tree's line,
-  // or the base's copy of a removed one.
+  // openDiff opens the file as the base had it beside the working tree's:
+  // the base's lines revealed on the left, the head's selected on the right.
+  // A side the row lacks shows its file as the other side names it.
+  private async openDiff(fs: FolderState, key: string): Promise<void> {
+    const t = fs.targets.get(key);
+    if (!t) return;
+    const leftSide = (t.base ?? t.head)!;
+    const rightSide = (t.head ?? t.base)!;
+    const left = this.baseUri(fs, leftSide);
+    const right = existsSync(rightSide.abs)
+      ? vscode.Uri.file(rightSide.abs)
+      : this.emptyUri(rightSide);
+    const base = fs.doc?.base.commit || fs.baseRef?.slice(0, 8) || "base";
+    const selection = t.head ? this.range(t.head.loc) : undefined;
+    await vscode.commands.executeCommand(
+      "vscode.diff",
+      left,
+      right,
+      `${path.basename(rightSide.abs)} (${base} ↔ working tree)`,
+      { preview: true, selection },
+    );
+    const lines = t.base ? this.range(t.base.loc) : undefined;
+    if (!lines) return;
+    const editor = vscode.window.visibleTextEditors.find(
+      (e) => e.document.uri.toString() === left.toString(),
+    );
+    if (!editor) return;
+    editor.revealRange(
+      lines,
+      vscode.TextEditorRevealType.InCenterIfOutsideViewport,
+    );
+    if (!t.head)
+      editor.selection = new vscode.Selection(lines.start, lines.end);
+  }
+
+  // openSource opens a row's lines: the working tree's, or the base's copy
+  // of what the head no longer has.
   private async openSource(fs: FolderState, key: string): Promise<void> {
     const t = fs.targets.get(key);
     if (!t) return;
-    const uri =
-      t.side === "head" ? vscode.Uri.file(t.abs) : this.baseUri(fs, t);
-    const selection = this.range(t);
+    const side = (t.head ?? t.base)!;
+    const uri = t.head ? vscode.Uri.file(side.abs) : this.baseUri(fs, side);
+    const lines = this.range(side.loc);
     await vscode.window.showTextDocument(uri, {
       preview: true,
-      selection: selection
-        ? new vscode.Range(selection.start, selection.start)
-        : undefined,
+      selection: lines,
     });
   }
 
   dispose(): void {
     this.disposed = true;
-    for (const fs of this.folders.values()) void fs.child?.terminate("prompt");
+    for (const fs of this.folders.values())
+      void fs.child?.terminate(fs.busy === "run" ? "teardown" : "prompt");
   }
 }

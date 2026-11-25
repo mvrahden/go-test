@@ -168,20 +168,21 @@ export function activate(context: vscode.ExtensionContext): void {
   );
   specView.setExtensionUri(context.extensionUri);
   // The panel's Change scope: the audit of each folder against its base.
-  // Its rows run tests by where they are declared.
+  // Its rows run the test the document selects, in its package.
   const changeScope = new ChangeScope({
     log: outputChannel,
     memento: context.workspaceState,
     folders: () => active.list(),
     patternsFor: workspacePatterns,
-    hasItemAt: (file, line, endLine) =>
-      !!controller.findItemAt(file, line, endLine),
-    runAt: async (file, line, endLine) => {
-      const item = controller.findItemAt(file, line, endLine);
+    hasPackage: (pkg) => !!controller.findItem(pkg),
+    runTest: async (pkg, run) => {
+      const item = controller.findItem(pkg);
       if (!item) return;
       const cts = new vscode.CancellationTokenSource();
       try {
-        await runner.run(new vscode.TestRunRequest([item]), cts.token);
+        await runner.run(new vscode.TestRunRequest([item]), cts.token, {
+          filter: run,
+        });
       } finally {
         cts.dispose();
       }
