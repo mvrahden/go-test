@@ -195,6 +195,15 @@ func writeOverlayFiles(dir string, results gotestgen.GenerateResults) error {
 		}
 	}
 
+	mutants, err := mutantOverlay()
+	if err != nil {
+		return err
+	}
+	for name, file := range mutants {
+		if _, ok := overlay.Replace[name]; !ok {
+			overlay.Replace[name] = file
+		}
+	}
 	data, err := json.Marshal(overlay)
 	if err != nil {
 		return fmt.Errorf("marshal overlay json: %w", err)

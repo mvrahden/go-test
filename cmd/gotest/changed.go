@@ -193,6 +193,9 @@ func saveRun(result *gotestrunner.PipelineResult, code int, manifest *protocol.M
 	if result == nil || result.Judged == nil || manifest == nil {
 		return nil
 	}
+	if os.Getenv(protocol.EnvMutantOverlay) != "" {
+		return result.Failed // a run on audit --mutate's mutants is not of the tree
+	}
 	dir, err := os.Getwd()
 	if err != nil {
 		return result.Failed

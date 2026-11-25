@@ -132,6 +132,7 @@ func (r *streamRun) runSuite(t SuiteTarget, idx int, mode suiteMode, held chan s
 		r.collector.RecordResult(t.Package, idx, SuiteResult{ExitCode: 1})
 		return
 	}
+	env = withSuiteCoverDir(env, &t)
 	if mode != alone {
 		if held == nil {
 			held = r.slots.queue()
@@ -179,6 +180,9 @@ func newStreamRun(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 	r := &streamRun{cfgCtx: ctx, cfg: cfg, pf: pf, overlay: overlay}
 	if pf.UserCoverProfile != "" {
 		r.coverDir = filepath.Join(overlay.WorkDir, "cover")
+		if dir := suiteCoverageDir(); dir != "" {
+			r.coverDir = dir
+		}
 		_ = os.MkdirAll(r.coverDir, 0o755)
 	}
 	if cfg.OutputMode == RunBatchText && os.MkdirAll(filepath.Join(overlay.WorkDir, "counts"), 0o755) == nil {
@@ -494,6 +498,7 @@ func (r *streamRun) finish() PipelineResult {
 
 	if r.pf.UserCoverProfile != "" {
 		mergeCoverProfiles(r.coverTargets, r.pf.UserCoverProfile)
+		writeSuiteCoverage(r.coverTargets)
 	}
 
 	// "Nothing to run" is a clean outcome only when every matched package

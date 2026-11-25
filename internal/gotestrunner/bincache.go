@@ -10,6 +10,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/mvrahden/go-test/internal/protocol"
 )
 
 // A run links its test binaries into a cache keyed by what decides the
@@ -34,8 +36,9 @@ func binaryCacheKey(cwd string, buildFlags []string) string {
 }
 
 // keyedEnv are the variables that change a test binary beside its build
-// flags: GOFLAGS carries build flags too.
-var keyedEnv = []string{"GOFLAGS", "GOEXPERIMENT", "CGO_ENABLED"}
+// flags: GOFLAGS carries build flags too, and the mutants' overlay adds
+// their source.
+var keyedEnv = []string{"GOFLAGS", "GOEXPERIMENT", "CGO_ENABLED", protocol.EnvMutantOverlay}
 
 // traceFlags change what go prints, not the binary it links.
 var traceFlags = []string{"x", "v", "n", "work", "json", "p"}
