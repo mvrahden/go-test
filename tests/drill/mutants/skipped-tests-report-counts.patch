@@ -1,0 +1,14 @@
+Expect: assertcount: TestCountTestSuite/TestSkipped gotest\.assertions is reported, want none
+Judge: ./tests/canary CanaryTestSuite/TestAssertionsAreCounted
+Clause: when a test skips → reports no count
+--- a/pkg/gotest/census.go
++++ b/pkg/gotest/census.go
+@@ -37,7 +37,7 @@
+ 	tt.Cleanup(func() {
+ 		censuses.Delete(tt)
+ 		openCensuses.Add(-1)
+-		if c.nested.Load() || tt.Skipped() {
++		if c.nested.Load() {
+ 			return
+ 		}
+ 		if by := c.by.Load(); by != nil {

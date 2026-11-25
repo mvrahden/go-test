@@ -2,7 +2,7 @@ Expect: ^FAIL .*conformance/spec SpecSkipReason / ARowThatLogsBeforeItSkips / wh
 Clause: when a run's row logs a line and then skips → the spec shows the skip's reason, not the logged line
 --- a/internal/gotestspec/tree.go
 +++ b/internal/gotestspec/tree.go
-@@ -552,7 +552,7 @@
+@@ -572,7 +572,7 @@
  
  func lastSkipMessage(output []string, calls map[string]bool) string {
  	lines := filterOutput(output)
@@ -10,4 +10,4 @@ Clause: when a run's row logs a line and then skips → the spec shows the skip'
 +	for i := 0; i < len(lines); i++ {
  		file, line, msg := parseFileLine(lines[i])
  		if file == "" {
- 			continue // a message's continuation line
+ 			if i == len(lines)-1 && strings.TrimSpace(lines[i]) == protocol.ExcludedLine {

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec .* / the JSON spec carries each reason and stats count them apart from the vacuous ones \(
+Clause: when a run holds leaves that declared how they assert → the JSON spec carries each reason and stats count them apart from the vacuous ones
+--- a/internal/gotestspec/json.go
++++ b/internal/gotestspec/json.go
+@@ -196,7 +196,7 @@
+ 			SkipReason:  skipReason(n),
+ 			Assertions:  n.Assertions,
+ 			Vacuous:     n.Vacuous(),
+-			AssertsBy:   n.AssertsBy,
++			AssertsBy:   "",
+ 			Output:      n.Output,
+ 			Children:    c.convertNodes(n.Children),
+ 			Iterations:  n.Iterations,

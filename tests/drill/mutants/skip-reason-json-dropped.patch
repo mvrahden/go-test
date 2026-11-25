@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/spec .* / the JSON spec gives each its skip reason \(
+Clause: when a run holds a suite its guard kept from running and an excluded suite → the JSON spec gives each its skip reason
+--- a/internal/gotestspec/json.go
++++ b/internal/gotestspec/json.go
+@@ -193,7 +193,6 @@
+ 			Reported:    n.Reported,
+ 			File:        n.File,
+ 			Line:        n.Line,
+-			SkipReason:  skipReason(n),
+ 			Assertions:  n.Assertions,
+ 			Vacuous:     n.Vacuous(),
+ 			AssertsBy:   n.AssertsBy,

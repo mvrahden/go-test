@@ -1,0 +1,14 @@
+Expect: assertcount: TestCountTestSuite/TestNested gotest\.assertions is reported, want none
+Judge: ./tests/canary CanaryTestSuite/TestAssertionsAreCounted
+Clause: when a method's When holds Its and its Each table rows → each It and each row reports its own count, and the method and the When report none
+--- a/pkg/gotest/census.go
++++ b/pkg/gotest/census.go
+@@ -86,7 +86,7 @@
+ // opens marks t's test as one that opens subtests: no leaf.
+ func (t *T) opens() {
+ 	if c := t.census(); c != nil {
+-		c.nested.Store(true)
++		c.nested.Store(false)
+ 	}
+ }
+ 

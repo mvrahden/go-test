@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/spec .* / stats count the excluded suite as excluded \(
+Clause: when a run holds a suite its guard kept from running and an excluded suite → stats count the excluded suite as excluded
+--- a/internal/gotestspec/tree.go
++++ b/internal/gotestspec/tree.go
+@@ -935,9 +935,6 @@
+ 	if n.AssertsBy != "" {
+ 		s.AssertsBy++
+ 	}
+-	if excluded {
+-		s.Excluded++
+-	}
+ }
+ 
+ // countVerdict counts a leaf or a fuzz target by its verdict; one the stream

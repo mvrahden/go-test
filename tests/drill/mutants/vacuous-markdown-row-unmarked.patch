@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/spec .* / the Markdown spec marks it VACUOUS on its row and under Needs attention \(
+Clause: when a run holds a vacuous leaf → the Markdown spec marks it VACUOUS on its row and under Needs attention
+--- a/internal/gotestspec/markdown.go
++++ b/internal/gotestspec/markdown.go
+@@ -283,9 +283,6 @@
+ 	if word != "" && leaf {
+ 		if reason := skipReason(n); reason != "" {
+ 			line += " — " + EscapeLabel(reason)
+-		}
+-		if am := assertionMark(n); am != "" {
+-			line += " — " + EscapeLabel(am)
+ 		}
+ 	}
+ 	if !bare && showsDuration(n) {

@@ -7,6 +7,7 @@ Clause: when an It runs on an Each row's T → an assertion that fails in its bo
  		panic("gotest: It/When are unavailable in benchmark/fuzz lifecycle hooks")
  	}
  	t.t.Run(description, func(tt *testing.T) {
+ 		openCensus(tt, by)
 -		execTestFn(testFn, t.sub(tt))
 +		it := t.sub(tt)
 +		it.soft = t.soft

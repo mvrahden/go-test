@@ -1,0 +1,14 @@
+Expect: emptyreason: verdicts differ from the golden list
+Judge: ./tests/canary CanaryTestSuite/TestAnEmptyReasonFails
+Clause: when a test declares an empty reason → fails at the line of the call
+--- a/pkg/gotest/census.go
++++ b/pkg/gotest/census.go
+@@ -97,7 +97,7 @@
+ // tests opened below it afterwards. An empty reason fails the test.
+ func (t *T) AssertsBy(reason string) {
+ 	reason = strings.Join(strings.Fields(reason), " ")
+-	if reason == "" {
++	if reason == "-" {
+ 		fail(t, "AssertsBy: the reason is empty; say how the test asserts", nil)
+ 		return
+ 	}

@@ -1,0 +1,13 @@
+Expect: assertcount: TestCountTestSuite/TestDeclaredAbove/is_covered gotest\.asserts-by is ""
+Judge: ./tests/canary CanaryTestSuite/TestAssertionsAreCounted
+Clause: when a method declares a reason and then opens an It → the It reports the method's reason
+--- a/pkg/gotest/census.go
++++ b/pkg/gotest/census.go
+@@ -31,7 +31,6 @@
+ // reason the test above declared, nil for none.
+ func openCensus(tt *testing.T, by *string) *census {
+ 	c := &census{}
+-	c.by.Store(by)
+ 	censuses.Store(tt, c)
+ 	openCensuses.Add(1)
+ 	tt.Cleanup(func() {

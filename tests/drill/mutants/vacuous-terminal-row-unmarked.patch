@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec .* / the terminal spec marks it VACUOUS on its row and under Needs attention \(
+Clause: when a run holds a vacuous leaf → the terminal spec marks it VACUOUS on its row and under Needs attention
+--- a/internal/gotestspec/terminal.go
++++ b/internal/gotestspec/terminal.go
+@@ -250,7 +250,7 @@
+ 	case am == "":
+ 		return nil
+ 	case n.Vacuous():
+-		return []tailPart{{" — " + am, c.yellow}}
++		return nil
+ 	}
+ 	return []tailPart{{" — " + am, c.dim}}
+ }

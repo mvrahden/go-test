@@ -1,0 +1,15 @@
+Expect: assertcount: TestCountTestSuite/TestNested/asserts_on_the_method's_T gotest\.assertions is "" \(reported: false\)
+Judge: ./tests/canary CanaryTestSuite/TestAssertionsAreCounted
+Clause: when a method's When holds Its and its Each table rows → an It that asserts only on the method's T reports 0
+--- a/pkg/gotest/t.go
++++ b/pkg/gotest/t.go
+@@ -177,7 +177,8 @@
+ 	t.opens()
+ 	by := t.declared()
+ 	t.t.Run(description, func(tt *testing.T) {
+-		openCensus(tt, by)
++		censuses.Store(tt, t.census())
++		_ = by
+ 		execTestFn(testFn, t.sub(tt))
+ 	})
+ }

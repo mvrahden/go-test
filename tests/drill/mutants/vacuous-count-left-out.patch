@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/cli .* / closes the stream with their count as Vacuous \(
+Clause: when a -json run holds tests that passed without an assertion → closes the stream with their count as Vacuous
+--- a/internal/gotestrunner/vacuous.go
++++ b/internal/gotestrunner/vacuous.go
+@@ -175,9 +175,6 @@
+ 	c.mu.Lock()
+ 	defer c.mu.Unlock()
+ 	vacuous := c.assertions.vacuous
+-	if c.assertions.counted {
+-		c.starts.vacuity(len(vacuous))
+-	}
+ 	if len(vacuous) == 0 {
+ 		return code
+ 	}

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec .* / the JSON spec gives each leaf its count and marks only the leaves that passed with none vacuous \(
+Clause: when a run holds leaves that pass with assertions, pass with none and fail with none → the JSON spec gives each leaf its count and marks only the leaves that passed with none vacuous
+--- a/internal/gotestspec/tree.go
++++ b/internal/gotestspec/tree.go
+@@ -972,7 +972,7 @@
+ // other means declared. A count the runtime did not report is unknown,
+ // never zero, so such a leaf is not vacuous.
+ func (n *Node) Vacuous() bool {
+-	return n.Status == StatusPass && len(n.Children) == 0 && !n.NotRun &&
++	return n.Status != StatusSkip && len(n.Children) == 0 && !n.NotRun &&
+ 		n.Kind != KindBenchmark && n.Kind != KindFuzz &&
+ 		n.Assertions != nil && *n.Assertions == 0 && n.AssertsBy == ""
+ }
