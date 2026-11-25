@@ -1,0 +1,24 @@
+{"Action":"start","Package":"gotest run","RunLevel":true,"Manifest":{"Version":"v1.38.0","Args":["-json","./..."]},"Time":"2026-11-25T10:00:00Z"}
+{"Action":"start","Package":"example.com/shop","Time":"2026-11-25T10:00:00.010000Z"}
+{"Action":"run","Package":"example.com/shop","Test":"TestCrashTestSuite","Gotest":{"Subtest":"TestCrashTestSuite"},"Time":"2026-11-25T10:00:00.020000Z"}
+{"Action":"output","Package":"example.com/shop","Test":"TestCrashTestSuite","Output":"=== RUN   TestCrashTestSuite\n","Time":"2026-11-25T10:00:00.040000Z"}
+{"Action":"run","Package":"example.com/shop","Test":"TestCrashTestSuite/TestPanics","Gotest":{"Subtest":"TestPanics"},"Time":"2026-11-25T10:00:00.060000Z"}
+{"Action":"output","Package":"example.com/shop","Test":"TestCrashTestSuite/TestPanics","Output":"=== RUN   TestCrashTestSuite/TestPanics\n","Time":"2026-11-25T10:00:00.080000Z"}
+{"Action":"output","Package":"example.com/shop","Test":"TestCrashTestSuite/TestPanics","Output":"panic: boom\n","Time":"2026-11-25T10:00:00.100000Z"}
+{"Action":"output","Package":"example.com/shop","Test":"TestCrashTestSuite/TestPanics","Output":"goroutine 7 [running]:\n","Time":"2026-11-25T10:00:00.120000Z"}
+{"Action":"run","Package":"example.com/shop","Test":"TestOtherTestSuite","Gotest":{"Subtest":"TestOtherTestSuite"},"Time":"2026-11-25T10:00:00.030000Z"}
+{"Action":"output","Package":"example.com/shop","Test":"TestOtherTestSuite","Output":"=== RUN   TestOtherTestSuite\n","Time":"2026-11-25T10:00:00.050000Z"}
+{"Action":"run","Package":"example.com/shop","Test":"TestOtherTestSuite/TestA","Gotest":{"Subtest":"TestA"},"Time":"2026-11-25T10:00:00.070000Z"}
+{"Action":"output","Package":"example.com/shop","Test":"TestOtherTestSuite/TestA","Output":"=== RUN   TestOtherTestSuite/TestA\n","Time":"2026-11-25T10:00:00.090000Z"}
+{"Action":"output","Package":"example.com/shop","Test":"TestOtherTestSuite/TestA","Output":"--- PASS: TestOtherTestSuite/TestA (0.00s)\n","Time":"2026-11-25T10:00:00.110000Z"}
+{"Action":"pass","Package":"example.com/shop","Test":"TestOtherTestSuite/TestA","Elapsed":0,"Time":"2026-11-25T10:00:00.130000Z"}
+{"Action":"run","Package":"example.com/shop","Test":"TestOtherTestSuite/TestB","Gotest":{"Subtest":"TestB"},"Time":"2026-11-25T10:00:00.140000Z"}
+{"Action":"output","Package":"example.com/shop","Test":"TestOtherTestSuite/TestB","Output":"=== RUN   TestOtherTestSuite/TestB\n","Time":"2026-11-25T10:00:00.150000Z"}
+{"Action":"output","Package":"example.com/shop","Test":"TestOtherTestSuite/TestB","Output":"--- PASS: TestOtherTestSuite/TestB (0.00s)\n","Time":"2026-11-25T10:00:00.160000Z"}
+{"Action":"pass","Package":"example.com/shop","Test":"TestOtherTestSuite/TestB","Elapsed":0,"Time":"2026-11-25T10:00:00.170000Z"}
+{"Action":"output","Package":"example.com/shop","Test":"TestOtherTestSuite","Output":"--- PASS: TestOtherTestSuite (0.01s)\n","Time":"2026-11-25T10:00:00.180000Z"}
+{"Action":"pass","Package":"example.com/shop","Test":"TestOtherTestSuite","Elapsed":0.01,"Time":"2026-11-25T10:00:00.190000Z"}
+{"Action":"output","Package":"example.com/shop","Output":"gotest: suite binary exited with status 2\n","Time":"2026-11-25T10:00:00.200000Z"}
+{"Action":"output","Package":"example.com/shop","Output":"FAIL\texample.com/shop\t0.050s\n","Time":"2026-11-25T10:00:00.210000Z"}
+{"Action":"fail","Package":"example.com/shop","Elapsed":0.05,"Time":"2026-11-25T10:00:00.220000Z"}
+{"Action":"fail","Package":"gotest run","RunLevel":true,"Elapsed":1.5,"Time":"2026-11-25T10:00:00.230000Z"}

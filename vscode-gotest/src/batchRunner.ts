@@ -8,16 +8,14 @@ import { type TestEvent } from "./outputParser.js";
 import { buildCliCommand, clearBinaryCache, formatCliCommand } from "./cli.js";
 import { readModulePath } from "./gomod.js";
 import {
-  applyEvent,
   OnceLog,
-  TestItemRouter,
+  StreamApplier,
   getPackageItem,
   skipUnresolved,
   spawnTestProcess,
   resolveRunPatterns,
   readWorkspacePatterns,
   type AppliedResult,
-  BuildOutputs,
   erroredItem,
   itemTestPath,
   markFailedRun,
@@ -192,15 +190,17 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
     const cmd = await buildCliCommand(cliArgs, workspaceDir, outputChannel);
     outputChannel.info(`[${label}] ${formatCliCommand(cmd)}`);
 
-    const streamedPkgs = new Set<string>();
-    // Whether the stream carried a verdict the tree can show as red.
-    let streamedFailure = false;
-    const pkgOutputMaps = new Map<string, Map<string, string>>();
     const pkgDirMap = new Map(pkgInfos.map((p) => [p.importPath, p.dir]));
-    const builds = new BuildOutputs();
-    // One router per package, sharing one log for the run.
-    const routers = new Map<string, TestItemRouter>();
-    const unrouted = new OnceLog((m) => outputChannel.warn(m));
+    // A package's output is kept for the whole run, not dropped at its
+    // verdict: a --timeout writes the hung test's verdict after the
+    // package's, and a live stream interleaves suites.
+    const applier = new StreamApplier(
+      controller,
+      run,
+      (importPath) => pkgDirMap.get(importPath),
+      workspaceDir,
+      new OnceLog((m) => outputChannel.warn(m)),
+    );
 
     const handleStdoutLine = (line: string) => {
       let event: TestEvent;
@@ -210,60 +210,8 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
       } catch {
         return;
       }
-
-      if (builds.absorb(event)) return;
-      const dir = pkgDirMap.get(event.Package);
-      if (!dir) {
-        // The CLI books a run's own failure (shared fixtures, an interrupt,
-        // the global deadline) under a package of its own, marked RunLevel.
-        // No item holds it, so it is said in the run's output.
-        if (
-          event.RunLevel === true &&
-          event.Action === "output" &&
-          event.Output
-        ) {
-          run.appendOutput(
-            `[${event.Package}] ${event.Output.replace(/\n$/, "")}\r\n`,
-          );
-        }
-        return;
-      }
-
-      let outputMap = pkgOutputMaps.get(event.Package);
-      if (!outputMap) {
-        outputMap = new Map();
-        pkgOutputMaps.set(event.Package, outputMap);
-      }
-      let router = routers.get(event.Package);
-      if (!router) {
-        router = new TestItemRouter(controller, event.Package, unrouted);
-        routers.set(event.Package, router);
-      }
-
-      const result = applyEvent(
-        controller,
-        run,
-        event,
-        outputMap,
-        event.Package,
-        dir,
-        { builds, buildDir: workspaceDir, router },
-      );
-      if (result) onResults?.([result]);
-
-      if (event.Action === "fail") {
-        streamedFailure = true;
-      }
-
-      const isTerminal =
-        !event.Test &&
-        (event.Action === "pass" ||
-          event.Action === "fail" ||
-          event.Action === "skip");
-      if (isTerminal) {
-        streamedPkgs.add(event.Package);
-        pkgOutputMaps.delete(event.Package);
-      }
+      const applied = applier.apply([event]);
+      if (applied.length > 0) onResults?.(applied);
     };
 
     // What the CLI says on stderr — a note that a package was not run, a
@@ -290,7 +238,7 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
     if (token.isCancellationRequested) {
       const skippedPkgs = changed
         ? []
-        : pkgInfos.filter((i) => !streamedPkgs.has(i.importPath));
+        : pkgInfos.filter((i) => !applier.reported.has(i.importPath));
       if (skippedPkgs.length > 0) {
         outputChannel.info(
           `[${label}] cancelled, skipping ${skippedPkgs.length} remaining package(s)`,
@@ -315,7 +263,7 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
       let attributed = false;
       for (const info of pkgInfos) {
         // A narrowed run left the package out; it did not fail.
-        if (streamedPkgs.has(info.importPath) || changed) {
+        if (applier.reported.has(info.importPath) || changed) {
           continue;
         }
 
@@ -345,12 +293,12 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
       markFailedRun(
         run,
         pkgInfos
-          .filter((info) => !changed || streamedPkgs.has(info.importPath))
+          .filter((info) => !changed || applier.reported.has(info.importPath))
           .flatMap((info) => info.items.map(getPackageItem)),
         {
           exitCode: result.exitCode,
           cancelled: false,
-          failed: attributed || streamedFailure,
+          failed: attributed || applier.failed,
           reason: stderrFiltered,
         },
         controller,

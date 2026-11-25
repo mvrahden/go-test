@@ -1,0 +1,31 @@
+{"Action":"start","Package":"gotest run","RunLevel":true,"Manifest":{"Version":"v1.38.0","Args":["-json","./..."]},"Time":"2026-11-25T10:00:00Z"}
+{"Action":"start","Package":"example.com/shop","Time":"2026-11-25T10:00:00.010000Z"}
+{"Action":"run","Package":"example.com/shop","Test":"TestSecondTestSuite","Gotest":{"Subtest":"TestSecondTestSuite"},"Time":"2026-11-25T10:00:00.030000Z"}
+{"Action":"output","Package":"example.com/shop","Test":"TestSecondTestSuite","Output":"=== RUN   TestSecondTestSuite\n","Time":"2026-11-25T10:00:00.050000Z"}
+{"Action":"run","Package":"example.com/shop","Test":"TestSecondTestSuite/TestAPasses","Gotest":{"Subtest":"TestAPasses"},"Time":"2026-11-25T10:00:00.070000Z"}
+{"Action":"output","Package":"example.com/shop","Test":"TestSecondTestSuite/TestAPasses","Output":"=== RUN   TestSecondTestSuite/TestAPasses\n","Time":"2026-11-25T10:00:00.090000Z"}
+{"Action":"output","Package":"example.com/shop","Test":"TestSecondTestSuite/TestAPasses","Output":"--- PASS: TestSecondTestSuite/TestAPasses (0.00s)\n","Time":"2026-11-25T10:00:00.110000Z"}
+{"Action":"pass","Package":"example.com/shop","Test":"TestSecondTestSuite/TestAPasses","Elapsed":0,"Time":"2026-11-25T10:00:00.130000Z"}
+{"Action":"run","Package":"example.com/shop","Test":"TestSecondTestSuite/TestBHolds","Gotest":{"Subtest":"TestBHolds"},"Time":"2026-11-25T10:00:00.150000Z"}
+{"Action":"output","Package":"example.com/shop","Test":"TestSecondTestSuite/TestBHolds","Output":"=== RUN   TestSecondTestSuite/TestBHolds\n","Time":"2026-11-25T10:00:00.170000Z"}
+{"Action":"output","Package":"example.com/shop","Test":"TestSecondTestSuite/TestBHolds","Output":"gotest: a method did not return within 5s of its context ending; it is cut short\n","Time":"2026-11-25T10:00:00.190000Z"}
+{"Action":"run","Package":"example.com/shop","Test":"TestFirstTestSuite","Gotest":{"Subtest":"TestFirstTestSuite"},"Time":"2026-11-25T10:00:00.020000Z"}
+{"Action":"output","Package":"example.com/shop","Test":"TestFirstTestSuite","Output":"=== RUN   TestFirstTestSuite\n","Time":"2026-11-25T10:00:00.040000Z"}
+{"Action":"run","Package":"example.com/shop","Test":"TestFirstTestSuite/TestAPasses","Gotest":{"Subtest":"TestAPasses"},"Time":"2026-11-25T10:00:00.060000Z"}
+{"Action":"output","Package":"example.com/shop","Test":"TestFirstTestSuite/TestAPasses","Output":"=== RUN   TestFirstTestSuite/TestAPasses\n","Time":"2026-11-25T10:00:00.080000Z"}
+{"Action":"output","Package":"example.com/shop","Test":"TestFirstTestSuite/TestAPasses","Output":"--- PASS: TestFirstTestSuite/TestAPasses (0.00s)\n","Time":"2026-11-25T10:00:00.100000Z"}
+{"Action":"pass","Package":"example.com/shop","Test":"TestFirstTestSuite/TestAPasses","Elapsed":0,"Time":"2026-11-25T10:00:00.120000Z"}
+{"Action":"run","Package":"example.com/shop","Test":"TestFirstTestSuite/TestBHolds","Gotest":{"Subtest":"TestBHolds"},"Time":"2026-11-25T10:00:00.140000Z"}
+{"Action":"output","Package":"example.com/shop","Test":"TestFirstTestSuite/TestBHolds","Output":"=== RUN   TestFirstTestSuite/TestBHolds\n","Time":"2026-11-25T10:00:00.160000Z"}
+{"Action":"output","Package":"example.com/shop","Test":"TestFirstTestSuite/TestBHolds","Output":"--- PASS: TestFirstTestSuite/TestBHolds (0.00s)\n","Time":"2026-11-25T10:00:00.180000Z"}
+{"Action":"pass","Package":"example.com/shop","Test":"TestFirstTestSuite/TestBHolds","Elapsed":0,"Time":"2026-11-25T10:00:00.200000Z"}
+{"Action":"output","Package":"example.com/shop","Test":"TestFirstTestSuite","Output":"--- PASS: TestFirstTestSuite (0.01s)\n","Time":"2026-11-25T10:00:00.210000Z"}
+{"Action":"pass","Package":"example.com/shop","Test":"TestFirstTestSuite","Elapsed":0.01,"Time":"2026-11-25T10:00:00.220000Z"}
+{"Action":"output","Package":"example.com/shop","Output":"gotest: suite binary terminated by signal\n","Time":"2026-11-25T10:00:00.230000Z"}
+{"Action":"output","Package":"example.com/shop","Output":"FAIL\texample.com/shop\t10.917s\n","Time":"2026-11-25T10:00:00.240000Z"}
+{"Action":"fail","Package":"example.com/shop","Elapsed":10.917,"Time":"2026-11-25T10:00:00.250000Z"}
+{"Action":"output","Package":"example.com/shop","Test":"TestSecondTestSuite/TestBHolds","Output":"    gotest: --timeout expired while this test was running\n","Time":"2026-11-25T10:00:00.260000Z"}
+{"Action":"fail","Package":"example.com/shop","Test":"TestSecondTestSuite/TestBHolds","Elapsed":0,"Time":"2026-11-25T10:00:00.270000Z"}
+{"Action":"fail","Package":"example.com/shop","Test":"TestSecondTestSuite","Elapsed":0,"Time":"2026-11-25T10:00:00.280000Z"}
+{"Action":"fail","Package":"example.com/shop","Elapsed":10.917,"Time":"2026-11-25T10:00:00.290000Z"}
+{"Action":"fail","Package":"gotest run","RunLevel":true,"Elapsed":1.5,"Time":"2026-11-25T10:00:00.300000Z"}
