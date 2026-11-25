@@ -226,12 +226,22 @@ func (s *ConfigTestSuite) TestLoad_NolintAllow(t *gotest.T, ctx *configCtx) {
 	}
 }
 
+func (s *ConfigTestSuite) TestLoad_ScenarioSpecs(t *gotest.T, ctx *configCtx) {
+	writeFile(t, ctx.dir, "go.mod", "module test\n")
+	writeFile(t, ctx.dir, config.FileName, "scenarios:\n  specs: [docs/specs, openspec/specs]\n")
+	cfg, err := config.Load(ctx.dir)
+	gotest.NoError(t, err)
+	gotest.Equal(t, []string{"docs/specs", "openspec/specs"}, cfg.Scenarios.Specs)
+}
+
 func (s *ConfigTestSuite) TestLoad_ValuesAFlagWouldRefuse(t *gotest.T, _ *configCtx) {
 	for sub, tc := range gotest.Each(t, []struct{ Desc, yaml, want string }{
 		{"a negative parallel", "parallel: -3\n", "parallel: -3 is not a positive integer (omit the key for the default)"},
 		{"a negative compile-parallel", "compile-parallel: -1\n", "compile-parallel: -1 is not a positive integer (omit the key for the default)"},
 		{"a negative min-coverage", "min-coverage: -5\n", "min-coverage: -5 is not a percentage from 0 to 100"},
 		{"a min-coverage above 100", "min-coverage: 150\n", "min-coverage: 150 is not a percentage from 0 to 100"},
+		{"a number among the scenario specs", "scenarios:\n  specs: [specs, 7]\n", `line 2: scenarios.specs: "7" is not a string`},
+		{"an empty scenario spec path", "scenarios:\n  specs: [\"\"]\n", "scenarios.specs: an empty path names no spec file"},
 		{"a second document", "parallel: 4\n---\nparallel: 8\n", "line 3: holds more than one YAML document; gotest reads one"},
 		{"a second document after an empty one", "parallel: 4\n---\n---\n# set\nparallel: 8\n", "line 5: holds more than one YAML document; gotest reads one"},
 	}) {

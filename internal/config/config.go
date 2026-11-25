@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"go.yaml.in/yaml/v4"
@@ -44,6 +45,16 @@ type ProjectConfig struct {
 	Bench BenchConfig `yaml:"bench"`
 	// Fuzz holds fuzz seed-harvesting configuration.
 	Fuzz FuzzConfig `yaml:"fuzz"`
+	// Scenarios holds the defaults of "gotest scenarios".
+	Scenarios ScenariosConfig `yaml:"scenarios"`
+}
+
+// ScenariosConfig names where "gotest scenarios" reads spec files. The CLI
+// flag (--specs) takes precedence.
+type ScenariosConfig struct {
+	// Specs lists spec files and directories, relative to the module root;
+	// empty reads specs/ and openspec/specs/.
+	Specs []string `yaml:"specs"`
 }
 
 // LintConfig controls which lint rules are disabled project-wide.
@@ -210,6 +221,11 @@ func (c *ProjectConfig) validate() error {
 			return fmt.Errorf("%s: %d is not a positive integer (omit the key for the default)", kv.key, kv.n)
 		}
 	}
+	for _, p := range c.Scenarios.Specs {
+		if strings.TrimSpace(p) == "" {
+			return errors.New("scenarios.specs: an empty path names no spec file")
+		}
+	}
 	if c.MinCoverage < 0 || c.MinCoverage > 100 {
 		return fmt.Errorf("min-coverage: %d is not a percentage from 0 to 100", c.MinCoverage)
 	}
@@ -223,13 +239,15 @@ func checkStringLists(data []byte) error {
 	if err := yaml.Unmarshal(data, &root); err != nil || len(root.Content) == 0 {
 		return err
 	}
-	list := lookup(root.Content[0], "lint", "nolint-allow")
-	if list == nil || list.Kind != yaml.SequenceNode {
-		return nil
-	}
-	for _, el := range list.Content {
-		if el.Kind != yaml.ScalarNode || el.Tag != "!!str" {
-			return fmt.Errorf("line %d: lint.nolint-allow: %q is not a string", el.Line, el.Value)
+	for _, keys := range [][]string{{"lint", "nolint-allow"}, {"scenarios", "specs"}} {
+		list := lookup(root.Content[0], keys...)
+		if list == nil || list.Kind != yaml.SequenceNode {
+			continue
+		}
+		for _, el := range list.Content {
+			if el.Kind != yaml.ScalarNode || el.Tag != "!!str" {
+				return fmt.Errorf("line %d: %s: %q is not a string", el.Line, strings.Join(keys, "."), el.Value)
+			}
 		}
 	}
 	return nil
