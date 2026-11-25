@@ -95,6 +95,13 @@ func RunCLIWithEnv(ctx context.Context, dir string, env []string, args ...string
 	return runCLI(ctx, dir, "", env, args...)
 }
 
+type stdinKey struct{}
+
+// RunCLIWithInput is RunCLI with input as the CLI's standard input.
+func RunCLIWithInput(ctx context.Context, dir, input string, args ...string) (Run, error) {
+	return runCLI(context.WithValue(ctx, stdinKey{}, input), dir, "", nil, args...)
+}
+
 func runCLI(ctx context.Context, dir, markerDir string, extraEnv []string, args ...string) (Run, error) {
 	binary, err := cli(ctx)
 	if err != nil {
@@ -115,6 +122,9 @@ func runBinary(ctx context.Context, binary string, grace time.Duration, dir, mar
 	}
 	cmd := exec.CommandContext(ctx, binary, args...) //nolint:gosec // G204: the repo's own CLI with the caller's arguments
 	cmd.Dir = dir
+	if input, ok := ctx.Value(stdinKey{}).(string); ok {
+		cmd.Stdin = strings.NewReader(input)
+	}
 	// PWD as exec sets it for a nil Env: a symlinked dir keeps its own path.
 	cwd, err := filepath.Abs(dir)
 	if err != nil {
