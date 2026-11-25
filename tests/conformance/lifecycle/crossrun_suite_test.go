@@ -174,7 +174,8 @@ func (c *crossRuns) outputs() string {
 	return b.String()
 }
 
-const waits = "waits for another gotest run"
+// waits is what a wait line says, whichever scope waits.
+const waits = " for another gotest run"
 
 var holdEnv = []string{"CROSSRUN_HOLD=1"}
 
@@ -193,7 +194,7 @@ func (s *CrossRunTestSuite) TestTwoRunsOfOneModule(t *gotest.T) {
 		w.It("says once on stderr that it waits, naming the other run's pid, and nothing of it in the -json stream", func(it *gotest.T) {
 			pid := strconv.Itoa(c.runs[0].cmd.Process.Pid)
 			gotest.Equal(it, 1, strings.Count(b.stderr.String(), waits), "stderr: %s", b.stderr)
-			gotest.Contains(it, b.stderr.String(), "gotest: the exclusive suites of github.com/mvrahden/go-test "+waits+" (pid "+pid+" in ")
+			gotest.Contains(it, b.stderr.String(), "gotest: the exclusive suites of github.com/mvrahden/go-test wait for another gotest run (pid "+pid+" in ")
 			gotest.NotContains(it, b.stdout.String(), waits)
 		})
 		w.It("starts its Exclusive suite only once the other run's has ended", func(it *gotest.T) {
@@ -220,7 +221,7 @@ func (s *CrossRunTestSuite) TestARunWaitingForAGroup(t *gotest.T) {
 	t.When("a run reaches group e2e while another run of the module runs that group", func(w *gotest.T) {
 		w.It("runs its default group's Exclusive suite without waiting", func(it *gotest.T) {
 			gotest.Contains(it, beforeRelease, "b hold ends")
-			gotest.Contains(it, b.stderr.String(), "gotest: group e2e of github.com/mvrahden/go-test "+waits)
+			gotest.Contains(it, b.stderr.String(), "gotest: group e2e of github.com/mvrahden/go-test waits for another gotest run (")
 		})
 		w.It("holds no scope while it waits, so a third run's Exclusive suite runs at once", func(it *gotest.T) {
 			gotest.Equal(it, 0, thirdExit, "stderr: %s", third.stderr)

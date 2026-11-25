@@ -45,7 +45,7 @@ func (l *lockedText) String() string {
 // saysWaiting returns once stderr carries a wait line.
 func saysWaiting(t *gotest.T, stderr *lockedText) {
 	gotest.Eventually(t, 10*time.Second, 5*time.Millisecond, func(poll *gotest.R) {
-		gotest.Contains(poll, stderr.String(), "waits for another gotest run")
+		gotest.Contains(poll, stderr.String(), " for another gotest run")
 	})
 }
 
@@ -147,7 +147,7 @@ func (s *ExclusiveLockTestSuite) TestAScopeTakesItsModulesInOrder(t *gotest.T) {
 	t.When("a scope of two modules waits for the later one", func(w *gotest.T) {
 		w.It("holds the earlier one already, whatever order its suites came in", func(it *gotest.T) {
 			gotest.Error(it, firstFree)
-			gotest.Contains(it, stderr.String(), "of b.example/m waits")
+			gotest.Contains(it, stderr.String(), "of b.example/m wait for")
 			gotest.NoError(it, <-got)
 		})
 	})

@@ -164,7 +164,11 @@ func (l *crossRunLocks) take(ctx context.Context, k scopeKey, path string) (func
 	}
 	unlock, err := tryLockFile(path)
 	if err != nil {
-		msg := fmt.Sprintf("gotest: %s waits for another gotest run", k)
+		verb := "waits"
+		if k.Group == "" {
+			verb = "wait"
+		}
+		msg := fmt.Sprintf("gotest: %s %s for another gotest run", k, verb)
 		if h := readHolder(path); h != nil {
 			msg += " (" + h.String() + ")"
 		}

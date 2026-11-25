@@ -2,7 +2,7 @@ Expect: ^FAIL .*conformance/lifecycle .* / runs its default group's Exclusive su
 Clause: when a run reaches group e2e while another run of the module runs that group → runs its default group's Exclusive suite without waiting
 --- a/internal/gotestrunner/exclusivelock.go
 +++ b/internal/gotestrunner/exclusivelock.go
-@@ -297,7 +297,7 @@
+@@ -301,7 +301,7 @@
  		}
  		var keys []scopeKey
  		for _, s := range suites {
