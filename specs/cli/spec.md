@@ -133,19 +133,21 @@ Outside CI mode, a run, gotest spec or gotest summary that holds a focused suite
 - **AND** summary notes on stderr that F_ narrows the run, naming the method where it is declared, and exits 0
 
 ### Requirement: Passes without an assertion under CI mode
-With --ci, a run, gotest spec or gotest summary whose stream holds a test that passed without an assertion and declared no means SHALL fail with exit 1 when nothing else failed it, naming each such test on stderr. It is 1, not 2: the run completed and its verdicts can be believed; a test broke the run's policy, as a focused one breaks the focus guard. The text run holds no stream and is not judged.
+With --ci, a run, gotest spec or gotest summary holding a test that passed without an assertion and declared no means SHALL fail with exit 1 when nothing else failed it, naming each such test on stderr, in every output mode, a text run with or without -v included. It is 1, not 2: the run completed and its verdicts can be believed; a test broke the run's policy, as a focused one breaks the focus guard. A test whose runtime reports no count is never such a test.
 
 #### Scenario: A vacuous pass under CI mode
 - **WHEN** --ci runs a package whose only problem is a test that passed without an assertion
 - **THEN** fails with exit 1, naming the test on stderr, in the -json mode and under spec
+- **AND** fails with exit 1, naming the test on stderr, in a text run with and without -v
 - **AND** exits 0 for a package whose tests all assert or declare how
 
 ### Requirement: Passes without an assertion outside CI mode
-Outside CI mode, a run, gotest spec or gotest summary whose stream holds a test that passed without an assertion SHALL say on stderr how many did and name them, and SHALL exit by what ran.
+Outside CI mode, a run, gotest spec or gotest summary holding a test that passed without an assertion SHALL say on stderr how many did and name them, in every output mode, and SHALL exit by what ran.
 
 #### Scenario: A vacuous pass outside CI mode
 - **WHEN** a run outside CI mode holds a test that passed without an assertion
 - **THEN** notes on stderr how many passed without an assertion, naming the test, and exits 0
+- **AND** a text run without -v notes so too
 
 ### Requirement: Value flags and unknown flags
 Every command SHALL refuse with exit 2 a value flag given no value, a flag it does not know and a flag another command owns. The cases are the table in `tests/conformance/cli/flags_suite_test.go`.
@@ -725,12 +727,17 @@ A text run SHALL print for a coding agent when --agent is given, else when GOTES
 - **THEN** prints no ok line and ends stdout with the closing line
 
 ### Requirement: The closing line
-A text run that reaches its packages SHALL end with one line: `gotest:`; PASS for exit 0 with a test passed, or in a plain text run a package, EMPTY for exit 0 with none, else FAIL; `exit` and the code; under agent output the tests passed, failed, skipped and not run, else the tests not run if any; the packages passed, failed and skipped; after an agent's failed run, `rerun:` and the command. It SHALL be the last line of stdout under agent output, else of stderr before --debug's phases.
+A text run that reaches its packages SHALL end with one line: `gotest:`; PASS for exit 0 with a test passed, or in a plain text run a package, EMPTY for exit 0 with none, else FAIL; `exit` and the code; under agent output the tests passed, failed, skipped and not run, else those not run if any; then those vacuous if any; the packages passed, failed and skipped; after an agent's failed run, `rerun:` and the command. It SHALL end stdout under agent output, else stderr before --debug's phases.
 
 #### Scenario: A passing text run
 - **WHEN** a text run of a passing package ends
 - **THEN** prints on stdout go test's text alone
 - **AND** ends stderr with the closing line naming PASS, exit 0 and 1 package passed
+
+#### Scenario: A run with vacuous passes
+- **WHEN** a run of a package with 5 tests that passed without an assertion ends
+- **THEN** a text run ends stderr with the closing line naming PASS, exit 0 and 5 tests vacuous
+- **AND** under agent output with --ci ends stdout with the closing line naming FAIL, exit 1 and 5 vacuous after the tests not run
 
 ### Requirement: The census in a text run
 A text run SHALL take the census of a -json run, under its rules: a suite whose binary exits 0 without its result line, as under a TestMain that never calls m.Run or an -exec that never starts it, ran none of its declared units, and the run SHALL exit 2, naming each on stderr as -json does. No run's census SHALL judge a run given -count=0 or -h after -args, and a --failed run's SHALL judge only the units it reruns.
@@ -753,13 +760,17 @@ A test run, a -json run, spec and summary SHALL record, when they run their pack
 - **AND** the module holds no file it did not hold before
 
 ### Requirement: Rerunning what failed
---failed SHALL rerun only what the last run in the working directory failed by its record: each failed method, a suite or fuzz target that failed without a failed method, and a package that failed whole, of the packages given, else of the record's, in a text or -json run, spec or summary. It SHALL refuse -run and -list, and SHALL run nothing and exit 2, saying why on stderr, without a record, after a run that failed nothing and when no package given failed.
+--failed SHALL rerun only what the working directory's last run failed by its record: each failed method, a suite or fuzz target failed without a failed method, a package that failed whole and the method of a vacuous pass that failed a --ci run, of the packages given, else of the record's, in a text or -json run, spec or summary. It SHALL refuse -run and -list, and run nothing and exit 2, saying why on stderr, without a record, after a run that failed nothing and when no package given failed.
 
 #### Scenario: Rerunning a failed method
 - **WHEN** --failed follows a run in which one method of a suite failed and one passed, beside a passing package
 - **THEN** runs only the failed method and exits 1
 - **AND** -json --failed streams the failed method's verdict and no other method's
 - **AND** spec --failed renders the failed method and no other
+
+#### Scenario: Rerunning after vacuous passes
+- **WHEN** --failed follows a --ci run that failed only on tests that passed without an assertion
+- **THEN** runs only their methods and exits 1
 
 #### Scenario: Nothing to rerun
 - **WHEN** --failed is given without a record, after a run that failed nothing, or with a package that did not fail
