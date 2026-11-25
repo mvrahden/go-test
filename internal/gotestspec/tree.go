@@ -270,6 +270,10 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 			}
 			continue
 		}
+		if isRunEvent(ev) {
+			// The run's own events describe the run, not a package.
+			continue
+		}
 		pkg := pkgs[ev.Package]
 		if pkg == nil {
 			pkg = &Package{Path: ev.Package}

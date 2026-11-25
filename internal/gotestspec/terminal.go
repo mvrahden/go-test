@@ -43,6 +43,7 @@ type renderConfig struct {
 	module          string
 	provenance      Provenance
 	width           int
+	run             *RunInfo
 }
 
 type RenderOption func(*renderConfig)

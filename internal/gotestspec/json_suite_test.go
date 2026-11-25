@@ -8,6 +8,7 @@ import (
 
 	"github.com/mvrahden/go-test/internal/about"
 	"github.com/mvrahden/go-test/internal/gotestspec"
+	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -40,6 +41,26 @@ func (s *JSONRenderTestSuite) TestRenderJSON_VersionOpensTheDocument(t *gotest.T
 	gotestspec.RenderJSON(&buf, nil)
 	gotest.Regexp(t, `^\{"version":"`+regexp.QuoteMeta(about.ResolvedVersion())+`",`, buf.String())
 	gotest.Equal(t, about.ResolvedVersion(), renderJSON(t, nil).Version)
+}
+
+// The run a document renders follows the version; a document of no run has
+// none.
+func (s *JSONRenderTestSuite) TestRenderJSON_TheRun(t *gotest.T, _ *jsonRenderCtx) {
+	dirty, code := true, 2
+	var buf bytes.Buffer
+	gotestspec.RenderJSON(&buf, nil, gotestspec.WithRun(gotestspec.RunInfo{
+		Manifest: protocol.Manifest{Version: "v1.2.3", GoVersion: "go1.26.0", Args: []string{"-json"}, Commit: "abc1234", Dirty: &dirty, Agent: "claude-code"},
+		ExitCode: &code,
+	}))
+	gotest.Regexp(t, `^\{"version":"[^"]*","run":\{"version":"v1.2.3","goVersion":"go1.26.0","args":\["-json"\],"commit":"abc1234","dirty":true,"agent":"claude-code","exitCode":2\},"packages":`, buf.String())
+
+	buf.Reset()
+	gotestspec.RenderJSON(&buf, nil, gotestspec.WithRun(gotestspec.RunInfo{Manifest: protocol.Manifest{Version: "v1.2.3"}}))
+	gotest.Regexp(t, `"run":\{"version":"v1.2.3"\},`, buf.String())
+
+	buf.Reset()
+	gotestspec.RenderJSON(&buf, nil)
+	gotest.NotContains(t, buf.String(), `"run"`)
 }
 
 func (s *JSONRenderTestSuite) TestRenderJSON_SuiteHierarchy(t *gotest.T, _ *jsonRenderCtx) {
