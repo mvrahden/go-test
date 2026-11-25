@@ -15678,7 +15678,7 @@
                       "file": "version_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 21,
+                      "line": 23,
                       "name": "exits_0_and_prints_the_version_on_stdout",
                       "output": [],
                       "status": "none",
@@ -15692,7 +15692,7 @@
                   "file": "version_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 20,
+                  "line": 22,
                   "name": "the_version_subcommand_runs",
                   "output": [],
                   "status": "none",
@@ -15706,8 +15706,54 @@
               "file": "version_suite_test.go",
               "focused": false,
               "kind": "method",
-              "line": 17,
+              "line": 19,
               "name": "TestVersion",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "prints one JSON document naming the version, the subcommands and the audit's schema",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "version_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 33,
+                      "name": "prints_one_JSON_document_naming_the_version,_the_subcommands_and_the_audit's_schema",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the version subcommand runs with --json",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "version_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 32,
+                  "name": "the_version_subcommand_runs_with_--json",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "VersionAsJSON",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "version_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 31,
+              "name": "TestVersionAsJSON",
               "output": [],
               "status": "none"
             }
@@ -15719,7 +15765,7 @@
           "file": "version_suite_test.go",
           "focused": false,
           "kind": "suite",
-          "line": 11,
+          "line": 13,
           "name": "TestCLIVersionTestSuite",
           "output": [],
           "status": "none"
@@ -38331,7 +38377,7 @@
     }
   ],
   "stats": {
-    "behaviors": 1115,
+    "behaviors": 1116,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

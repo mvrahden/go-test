@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mvrahden/go-test/internal/about"
 	"github.com/mvrahden/go-test/internal/config"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
 	"github.com/mvrahden/go-test/internal/protocol"
@@ -31,7 +30,7 @@ func main() {
 	// not stand between a newcomer and the page that explains it.
 	switch subcmd {
 	case "version":
-		fmt.Println(about.LongInfo())
+		printVersion(remaining)
 		return
 	case "help":
 		topic := ""

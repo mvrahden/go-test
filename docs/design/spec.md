@@ -126,7 +126,7 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `hook` | Answer a coding agent's hook event read on stdin: `hook post-edit\|pre-shell\|stop` |
 | `discover` | Discover test suites and output JSON metadata |
 | `prepare` | Start shared fixtures for debug (blocks until SIGTERM) |
-| `version` | Print version information |
+| `version` | Print version information; `--json` prints it as one document with the subcommands and the audit's schema ([The version as JSON](../../specs/cli/spec.md#requirement-the-version-as-json)) |
 | `help` | Show help |
 
 ### Flags
@@ -168,7 +168,7 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `--save=<path>` | Save a benchmark run as a JSON baseline (`bench`; a bare `--save=` uses `bench.baseline` from `.gotest.yml`, and saving to the configured baseline promotes the run without comparing it) |
 | `--against=<path>` | Compare a benchmark run against a saved baseline and print the delta table (`bench`; defaults to `bench.baseline`); a baseline from another machine or Go version warns and still compares |
 | `--gate=<pct>` | Fail (exit 1) if the worst significant benchmark regression exceeds the threshold (`bench`); needs `-count=4` or more |
-| `--json` | Emit one versioned JSON report to stdout instead of human output (`bench`; for tooling) |
+| `--json` | Emit one versioned JSON report to stdout instead of human output (`bench`; for tooling); print the version as one JSON document (`version`) |
 | `--for=<dur>` | Approximate wall-clock fuzz budget for the session, split across targets (`fuzz`; default 1m or half of a shorter `--timeout`; `0` removes the budget) |
 | `--target=<name>` | Fuzz exactly one generated wrapper by name; an unmatched name lists the available ones (`fuzz`) |
 | `--jobs=<n>` | Max concurrent fuzz targets (`fuzz`; default: max(1, GOMAXPROCS/2)) |

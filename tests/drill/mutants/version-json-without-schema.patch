@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLIVersion / VersionAsJSON / when the version subcommand runs with --json / prints one JSON document naming the version, the subcommands and the audit's schema \(
+Clause: when the version subcommand runs with --json → prints one JSON document naming the version, the subcommands and the audit's schema
+--- a/cmd/gotest/version.go
++++ b/cmd/gotest/version.go
+@@ -32,7 +32,7 @@
+ 		Version:   about.ResolvedVersion(),
+ 		GoVersion: runtime.Version(),
+ 		Platform:  runtime.GOOS + "/" + runtime.GOARCH,
+-		Schemas:   map[string]int{"audit": gotestaudit.Schema},
++		Schemas:   map[string]int{"audit": gotestaudit.Schema + 1},
+ 	}
+ 	for name := range knownSubcommands {
+ 		doc.Commands = append(doc.Commands, name)

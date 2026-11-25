@@ -1133,6 +1133,7 @@ shards of one run do not add up to every mutant exactly once.
 | `audit-run-pattern-unanchored` | the -run pattern is not anchored, so it selects siblings sharing a prefix | audit conformance: the selector It finds an unanchored pattern |
 | `audit-head-branch-dropped` | the head's provenance names no branch | audit conformance: the branch It finds none on the head |
 | `audit-needs-decision-only-on-failure` | only a failing row needs a decision | audit conformance: the decision It finds the vacuous row undecided |
+| `version-json-without-schema` | `version --json` names a schema the audit does not write | cli conformance: the version It finds schema 2 |
 | `audit-base-records-a-missing-directory` | a directory the commit lacks is recorded as a package that cannot be read | audit conformance: the missing-directory It sees exit 2 |
 
 ## Adding a mutant
