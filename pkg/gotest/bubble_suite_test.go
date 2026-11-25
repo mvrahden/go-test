@@ -135,7 +135,7 @@ func (s *BubbleTestSuite) FuzzInAFuzzBody(f *gotest.F) {
 	f.Add(0)
 	f.Fuzz(func(t *gotest.T, n int) {
 		gotest.Bubble(t, func(bt *gotest.T) {
-			begin := time.Now()
+			begin := time.Now() //nolint:fuzz-determinism // a bubble's clock starts at the same instant on every run
 			time.Sleep(time.Duration(n) * time.Hour)
 			gotest.Equal(bt, time.Duration(n)*time.Hour, time.Since(begin))
 		})

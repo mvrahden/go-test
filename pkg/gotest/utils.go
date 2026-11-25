@@ -128,11 +128,11 @@ func logAtUser(tb testing.TB, msg string) {
 
 // userFrame reports whether f is the user's: not gotest's, not a generated
 // harness's and not the standard library's.
-func userFrame(f runtime.Frame) bool {
+func userFrame(f *runtime.Frame) bool {
 	return !assert.IsGotestSource(f.File) && !assert.IsGeneratedBridge(f.File) && !callsite.IsStd(f.Function, f.File)
 }
 
-func formatFrame(f runtime.Frame) string { return callsite.Format(f.File, f.Line) }
+func formatFrame(f *runtime.Frame) string { return callsite.Format(f.File, f.Line) }
 
 func eachEntryName(v reflect.Value, index int) string {
 	if v.Kind() == reflect.Struct {

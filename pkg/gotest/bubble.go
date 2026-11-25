@@ -259,8 +259,8 @@ func userLine() string {
 	frames := runtime.CallersFrames(pcs[:runtime.Callers(2, pcs)])
 	for {
 		f, more := frames.Next()
-		if userFrame(f) {
-			return formatFrame(f)
+		if userFrame(&f) {
+			return formatFrame(&f)
 		}
 		if !more {
 			return ""
@@ -342,8 +342,8 @@ func blockedAt(frames string) string {
 		if err != nil {
 			continue
 		}
-		if f := (runtime.Frame{Function: fn, File: at[:colon], Line: line}); userFrame(f) {
-			return formatFrame(f)
+		if f := (runtime.Frame{Function: fn, File: at[:colon], Line: line}); userFrame(&f) {
+			return formatFrame(&f)
 		}
 	}
 	return ""
