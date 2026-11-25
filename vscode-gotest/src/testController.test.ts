@@ -867,3 +867,37 @@ describe("GoTestController.invalidateResults", () => {
     expect(mock.invalidateTestResults).not.toHaveBeenCalled();
   });
 });
+
+describe("GoTestController.findItemAt", () => {
+  it("finds the test declared first within the lines, the outermost on a shared line", () => {
+    mockWorkspaceFolders.length = 0;
+    mockGetWorkspaceFolder.mockReset();
+    const suite = makeSuite("CartTestSuite");
+    suite.methods.push({ ...suite.methods[0], name: "TestTwo", line: 20 });
+    const cache = createMockCache([
+      {
+        importPath: "example.com/p",
+        dir: "/w/p",
+        wsDir: "/w",
+        suites: [suite],
+      },
+    ]);
+    const ctrl = createController(cache);
+    ctrl.rebuild();
+    const file = "/w/p/carttestsuite_test.go";
+    expect(ctrl.findItemAt(file, 10, 12)?.id).toBe(
+      "example.com/p/CartTestSuite/TestOne",
+    );
+    expect(ctrl.findItemAt(file, 15, 25)?.id).toBe(
+      "example.com/p/CartTestSuite/TestTwo",
+    );
+    expect(ctrl.findItemAt(file, 11, 19)).toBeUndefined();
+    // A suite declared on its first method's line is the outer one.
+    suite.line = 10;
+    ctrl.rebuild();
+    expect(ctrl.findItemAt(file, 10, 10)?.id).toBe(
+      "example.com/p/CartTestSuite",
+    );
+    expect(ctrl.findItemAt("/w/p/other_test.go", 10, 10)).toBeUndefined();
+  });
+});

@@ -694,6 +694,37 @@ export class GoTestController implements vscode.Disposable {
     return this.findItemRecursive(this.controller.items, id);
   }
 
+  // findItemAt is the item declared first in file within the 1-based lines
+  // line..endLine, the outermost when several start on one line: the test
+  // a row of the audit names by its place.
+  findItemAt(
+    file: string,
+    line: number,
+    endLine: number,
+  ): vscode.TestItem | undefined {
+    this.flushPendingRebuild();
+    let best:
+      { item: vscode.TestItem; line: number; depth: number } | undefined;
+    const walk = (collection: vscode.TestItemCollection, depth: number) => {
+      collection.forEach((item) => {
+        const at = item.range?.start.line;
+        if (item.uri?.fsPath === file && at !== undefined) {
+          const l = at + 1;
+          if (
+            l >= line &&
+            l <= Math.max(line, endLine) &&
+            (!best || l < best.line || (l === best.line && depth < best.depth))
+          ) {
+            best = { item, line: l, depth };
+          }
+        }
+        walk(item.children, depth + 1);
+      });
+    };
+    walk(this.controller.items, 0);
+    return best?.item;
+  }
+
   // noteStart remembers when go test registered a node, so the terminal event
   // can close the bracket. It is kept off the result store on purpose: an
   // in-flight node has no verdict, and a run that dies mid-way must not leave

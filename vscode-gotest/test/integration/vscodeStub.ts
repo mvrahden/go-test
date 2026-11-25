@@ -13,7 +13,9 @@ export interface StubPanel {
   webview: {
     html: string;
     cspSource: string;
-    onDidReceiveMessage: () => void;
+    onDidReceiveMessage: (handler: (msg: unknown) => void) => void;
+    // What the webview's script would post, delivered to the panel.
+    post?: (msg: unknown) => void;
     asWebviewUri: (u: unknown) => unknown;
   };
   onDidDispose: () => void;
@@ -223,7 +225,9 @@ export function buildVscodeStub(state: StubState) {
           webview: {
             html: "",
             cspSource: "vscode-resource:",
-            onDidReceiveMessage: () => {},
+            onDidReceiveMessage: (handler: (msg: unknown) => void) => {
+              panel.webview.post = handler;
+            },
             asWebviewUri: (u: unknown) => u,
           },
           onDidDispose: () => {},

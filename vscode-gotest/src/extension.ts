@@ -28,6 +28,8 @@ import {
 } from "./focusExclude.js";
 import { FocusDiagnostics } from "./diagnostics.js";
 import { SpecViewPanel, nearestItemId } from "./specView.js";
+import { ChangeScope } from "./changeScope.js";
+import { BASE_SCHEME, parseBaseQuery, showFile } from "./git.js";
 import { WatchManager } from "./watch.js";
 import {
   ScaffoldCodeActionProvider,
@@ -162,8 +164,43 @@ export function activate(context: vscode.ExtensionContext): void {
     cache,
     context.storageUri?.fsPath,
     workspacePatterns,
+    () => active.list(),
   );
   specView.setExtensionUri(context.extensionUri);
+  // The panel's Change scope: the audit of each folder against its base.
+  // Its rows run tests by where they are declared.
+  const changeScope = new ChangeScope({
+    log: outputChannel,
+    memento: context.workspaceState,
+    folders: () => active.list(),
+    patternsFor: workspacePatterns,
+    hasItemAt: (file, line, endLine) =>
+      !!controller.findItemAt(file, line, endLine),
+    runAt: async (file, line, endLine) => {
+      const item = controller.findItemAt(file, line, endLine);
+      if (!item) return;
+      const cts = new vscode.CancellationTokenSource();
+      try {
+        await runner.run(new vscode.TestRunRequest([item]), cts.token);
+      } finally {
+        cts.dispose();
+      }
+    },
+    changed: () => specView.changeChanged(),
+  });
+  specView.setChangeScope(changeScope);
+  // A file as the audit's base commit holds it, for the diff editor.
+  const baseContent = vscode.workspace.registerTextDocumentContentProvider(
+    BASE_SCHEME,
+    {
+      async provideTextDocumentContent(uri: vscode.Uri) {
+        const f = parseBaseQuery(uri.query);
+        if (!f || !f.commit) return "";
+        return (await showFile(f.toplevel, f.commit, f.path)) ?? "";
+      },
+    },
+  );
+  context.subscriptions.push(baseContent);
 
   const specViewSerializer = vscode.window.registerWebviewPanelSerializer(
     "gotestSpecView",
@@ -707,6 +744,10 @@ export function registerCommands(deps: {
 
     vscode.commands.registerCommand("gotest.showSpecView", async () => {
       await specView.show();
+    }),
+
+    vscode.commands.registerCommand("gotest.showChangeView", async () => {
+      await specView.showChange();
     }),
 
     vscode.commands.registerCommand(

@@ -102,6 +102,10 @@
         }
       },
       {
+        "command": "gotest.showChangeView",
+        "title": "Go Test: Show Change View"
+      },
+      {
         "command": "gotest.openEventsFile",
         "title": "Go Test: Open Events File…"
       },

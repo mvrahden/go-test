@@ -29,6 +29,11 @@ import {
   renderErrorHtml,
   declaredTests,
   formatRanAt,
+  buildScopeTabs,
+  combineSpecData,
+  parseStoredState,
+  provenanceText,
+  groupText,
 } from "./specView.js";
 import type { DiscoverPackage } from "./types.js";
 import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
@@ -981,5 +986,164 @@ describe("when each package last ran", () => {
   it("shows no time when none is known", () => {
     const html = buildSpecBody(twoPackages, [], { dirOf: () => undefined });
     expect(html).not.toContain("last run");
+  });
+});
+
+describe("the facts a node carries", () => {
+  const pkg = (nodes: Node[]): SpecPackage => ({
+    path: "example.com/p",
+    status: "pass",
+    duration: 0,
+    nodes,
+  });
+
+  it("marks a vacuous leaf, and one that asserts by other means", () => {
+    const html = body([
+      pkg([
+        node("S", "pass", [
+          node("a", "pass", [], { vacuous: true, assertions: 0 }),
+          node("b", "pass", [], { assertsBy: "golden file" }),
+          node("c", "pass", [], { assertions: 3 }),
+        ]),
+      ]),
+    ]);
+    expect(html).toContain("VACUOUS: passed without an assertion");
+    expect(html).toContain("ASSERTS BY: golden file");
+    expect(html).toContain("3 assertions");
+    expect(html).not.toContain("0 assertions");
+  });
+
+  it("gives a skip its reason", () => {
+    const html = body([
+      pkg([
+        node(
+          "S",
+          "skip",
+          [node("a", "skip", [], { skipReason: "needs docker" })],
+          { skipReason: "guarded" },
+        ),
+      ]),
+    ]);
+    expect(html).toContain("— SKIPPED: needs docker");
+    expect(html).toContain("SKIPPED: guarded</span>");
+  });
+
+  it("marks a row whose children are a floor", () => {
+    const html = body([
+      pkg([node("S", "none", [node("M", "none", [], { incomplete: true })])]),
+    ]);
+    expect(html).toContain("INCOMPLETE: behaviors known only at run time");
+  });
+
+  it("counts vacuous and other-means leaves as the CLI's trailer does", () => {
+    expect(statsText(stats({ passed: 2, vacuous: 1, assertsBy: 1 }))).toBe(
+      "2 passed, 1 vacuous, 1 asserting by other means",
+    );
+    const html = buildSpecBody(
+      { packages: [], stats: stats({ vacuous: 2, excluded: 1 }) },
+      [],
+      { dirOf: () => undefined },
+    );
+    expect(html).toContain("2 vacuous");
+    expect(html).toContain("1 excluded");
+  });
+});
+
+describe("the document's run and groups", () => {
+  it("states the run's commit, dirty tree, agent and exit code", () => {
+    expect(
+      provenanceText({
+        commit: "abc1234",
+        dirty: true,
+        agent: "claude-code",
+        exitCode: 1,
+      }),
+    ).toBe("abc1234, uncommitted changes · agent claude-code · exit 1");
+    expect(provenanceText({ commit: "abc1234" })).toBe(
+      "abc1234 · run did not finish",
+    );
+    const html = buildSpecBody(
+      { packages: [], stats: stats(), run: { commit: "abc1234", exitCode: 0 } },
+      [],
+      { dirOf: () => undefined },
+    );
+    expect(html).toContain("Run: abc1234 · exit 0");
+  });
+
+  it("words a group as the CLI's summary does", () => {
+    expect(groupText({ name: "e2e", suites: 1, wall: 72 })).toBe(
+      "group e2e: 1 suite, 72.0s, run apart",
+    );
+    const html = buildSpecBody(
+      {
+        packages: [],
+        stats: stats(),
+        groups: [{ name: "db", suites: 2, wall: 0.5 }],
+      },
+      [],
+      { dirOf: () => undefined },
+    );
+    expect(html).toContain("group db: 2 suites, 500ms, run apart");
+  });
+
+  it("keeps each folder's run and groups when it combines documents", () => {
+    const one = {
+      packages: [],
+      stats: stats(),
+      run: { commit: "a" },
+      groups: [{ name: "x", suites: 1, wall: 1 }],
+    };
+    const two = {
+      packages: [],
+      stats: stats({ vacuous: 1 }),
+      run: { commit: "b" },
+    };
+    const joined = combineSpecData([one, two]);
+    expect(joined.runs?.map((r) => r.commit)).toEqual(["a", "b"]);
+    expect(joined.groups).toHaveLength(1);
+    expect(joined.stats.vacuous).toBe(1);
+  });
+
+  it("says a package of a folder nothing ran in is declared, not run yet", () => {
+    const html = buildSpecBody(
+      {
+        packages: [
+          {
+            path: "a",
+            status: "none",
+            duration: 0,
+            nodes: [node("S", "none")],
+          },
+          {
+            path: "b",
+            status: "none",
+            duration: 0,
+            nodes: [node("T", "none")],
+          },
+        ],
+        stats: stats(),
+      },
+      [],
+      { dirOf: () => undefined, neverRan: (p) => p === "a" },
+    );
+    expect(html.match(/declared, not run yet/g)).toHaveLength(1);
+  });
+});
+
+describe("scopes", () => {
+  it("switches between Spec and Change, the current one selected", () => {
+    const html = buildScopeTabs("change");
+    expect(html).toContain('data-scope="spec" aria-selected="false"');
+    expect(html).toContain('data-scope="change" aria-selected="true"');
+  });
+
+  it("restores the scope, its folder and the spec, and an older panel's spec", () => {
+    const spec = { packages: [], stats: stats() };
+    expect(parseStoredState(spec)).toEqual({ spec });
+    expect(
+      parseStoredState({ scope: "change", folder: "/ws", spec: null }),
+    ).toEqual({ scope: "change", folder: "/ws", spec: undefined });
+    expect(parseStoredState({ scope: "runs" }).scope).toBeUndefined();
+    expect(parseStoredState(null)).toEqual({});
   });
 });
