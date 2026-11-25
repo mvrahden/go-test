@@ -94,6 +94,7 @@ var witnesses = []witness{
 	{file: "reference/fixtures.md", quote: "the suite declares (v1.38+)", label: "v1.38+", path: "specs/fixtures/spec.md", literal: "### Requirement: The context a fixture's AfterEach gets"},
 	{file: "reference/fixtures.md", quote: "the hook and the error (v1.38+)", label: "v1.38+", path: "specs/fixtures/spec.md", literal: "### Requirement: What a failed fixture BeforeAll or AfterAll says"},
 	{file: "reference/fixtures.md", quote: "refuses (v1.38+) an embedded", label: "v1.38+", path: "internal/gotestast/transfer.go", literal: "an interface the state cannot carry"},
+	{file: "reference/cli.md", quote: "incl. every subtest name", label: "v1.42+", path: "internal/protocol/manifest.go", literal: "RunPackage"},
 }
 
 var (
