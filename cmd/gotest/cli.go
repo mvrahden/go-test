@@ -406,6 +406,11 @@ func parseExecFlags(own OwnFlags, goTestArgs []string, projCfg *config.ProjectCo
 	}
 	var only map[string]string
 	changed := own.Bool("--changed")
+	if own.Bool("--failed") && changed {
+		if err := refuseSelection(goTestArgs); err != nil {
+			return ExecConfig{}, err
+		}
+	}
 	if own.Bool("--failed") && !changed {
 		if only, patterns, err = rerunFailed(goTestArgs, patterns); err != nil {
 			return ExecConfig{}, err
@@ -435,10 +440,8 @@ func parseExecFlags(own OwnFlags, goTestArgs []string, projCfg *config.ProjectCo
 // rerunFailed is --failed's selection and the packages it runs: those given,
 // else the packages of the last run's failures.
 func rerunFailed(goTestArgs, patterns []string) (map[string]string, []string, error) {
-	for _, flag := range []string{"-run", "-list"} {
-		if hasFlag(goTestArgs, flag) {
-			return nil, nil, fmt.Errorf("--failed selects the tests it runs itself; drop %s", flag)
-		}
+	if err := refuseSelection(goTestArgs); err != nil {
+		return nil, nil, err
 	}
 	dir, err := os.Getwd()
 	if err != nil {
@@ -452,6 +455,16 @@ func rerunFailed(goTestArgs, patterns []string) (map[string]string, []string, er
 		patterns = failedPkgs
 	}
 	return only, patterns, nil
+}
+
+// refuseSelection is --failed's refusal of the flags that select tests.
+func refuseSelection(goTestArgs []string) error {
+	for _, flag := range []string{"-run", "-list"} {
+		if hasFlag(goTestArgs, flag) {
+			return fmt.Errorf("--failed selects the tests it runs itself; drop %s", flag)
+		}
+	}
+	return nil
 }
 
 // ensureCoverProfile makes sure a -coverprofile is in play when a coverage

@@ -49,9 +49,12 @@ func markFreshness(ctx context.Context, tree []*gotestspec.Package, events []got
 // without --input. Suppressing the verdict of a real run would turn a red
 // pipeline green: --render-only makes sense only where the exit code
 // describes a rendering. A run's own verdicts are current by construction,
-// so --check-fresh has nothing to judge.
+// so --check-fresh has nothing to judge. --changed beside --input selects
+// nothing to run.
 func refuseWithoutInput(own OwnFlags, input string) bool {
 	switch {
+	case input != "" && own.Bool("--changed"):
+		fmt.Fprintln(os.Stderr, "FAIL: --changed selects the packages a run runs, and --input runs nothing")
 	case input != "":
 		return false
 	case own.Bool("--render-only"):
