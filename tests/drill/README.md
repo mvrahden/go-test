@@ -1212,6 +1212,12 @@ shards of one run do not add up to every mutant exactly once.
 | `audit-stopped-run-unnamed` | a stopped `--run` is not named among what was not compared | audit conformance: the stopped-run It finds nothing not compared |
 | `audit-stopped-run-exits-by-policy` | a stopped `--run` exits 130 only where the policy passes | audit conformance: the closing-line It sees exit 1 |
 | `audit-control-without-run-taken` | `--control` without `--run` is taken | audit conformance: the refusal It sees exit 0 |
+| `audit-stream-currency-by-commit` | a stream with input hashes is listed current or stale by commit | audit conformance: the stream-currency It finds the hashed stream stale for uncommitted changes |
+| `audit-stream-current-with-changed-inputs` | a stream whose packages' inputs changed is listed current | audit conformance: the stream-currency It finds the changed stream current |
+| `audit-stream-of-one-package-by-commit` | a stream that hashed one package is listed by commit | audit conformance: the stream-currency It finds the fresh/c stream stale |
+| `audit-one-hashed-package-unread` | a stream that hashed one package is judged without its hash | audit conformance: the stream-currency It finds the fresh/c stream stale |
+| `audit-base-stream-judged-by-hashes` | a stream of the base's run is judged by the working tree's hashes | audit conformance: the base-stream It finds it stale for changed inputs, not for the base's missing commit |
+| `audit-last-stream-wins` | of two current streams the last judges a behavior | audit conformance: the two-current-streams It finds the fresh/c rows judged by the second stream |
 
 ## Adding a mutant
 

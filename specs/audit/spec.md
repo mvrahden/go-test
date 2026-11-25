@@ -112,12 +112,25 @@ Evidence SHALL be current when the audit ran it, or when its stream stamped the 
 - **THEN** marks the evidence of the unchanged package current, though the tree has uncommitted changes
 - **AND** marks the evidence of the changed package stale, naming its inputs changed
 
+### Requirement: A stream's own currency
+Each stream SHALL be listed as current or stale as a whole. A stream of the head's run whose verdicts carry input hashes, one package's or more, SHALL be current when the head's working tree still has each hash, else stale, naming in order each package whose inputs changed; any other stream, a stream of the base's run among them, SHALL be judged by commit as its evidence is.
+
+#### Scenario: Streams with input hashes
+- **WHEN** audit is given streams with input hashes, one also as the base's run, after an uncommitted change to a package one of them ran
+- **THEN** marks the stream that ran the changed package stale, naming each package whose inputs changed
+- **AND** marks the stream of one unchanged package current, though the tree has uncommitted changes
+- **AND** judges the base's stream by commit
+
 ### Requirement: The stream that judges a behavior
 Of the streams that judge one behavior the audit SHALL take a current one before a stale one, then the first given, and name the others' verdicts.
 
 #### Scenario: Two streams of one behavior
 - **WHEN** a current and a stale stream judge one behavior
 - **THEN** states the current stream's verdict and names the stale one's among the others
+
+#### Scenario: Two current streams of one behavior
+- **WHEN** two current streams judge one behavior
+- **THEN** states the verdict of the first given and names the other's among the others
 
 ### Requirement: Assertions at run time
 With `--base-evidence=<stream>`, a stream of the base's run, a finding of class `assertions` SHALL carry, beside the counts written in source, the count each side's run reported.

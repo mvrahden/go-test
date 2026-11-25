@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditCurrency / TwoCurrentStreams / when two current streams judge one behavior / states the verdict of the first given and names the other's among the others \(
+Clause: when two current streams judge one behavior → states the verdict of the first given and names the other's among the others
+--- a/internal/gotestaudit/evidence.go
++++ b/internal/gotestaudit/evidence.go
+@@ -446,7 +446,7 @@
+ 		if js[i].verdict == VerdictNone {
+ 			continue
+ 		}
+-		if pick < 0 || trees[i].current(pkg) && !trees[pick].current(pkg) {
++		if pick <= 0 || trees[i].current(pkg) && !trees[pick].current(pkg) {
+ 			pick = i
+ 		}
+ 	}

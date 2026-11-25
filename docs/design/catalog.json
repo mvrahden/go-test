@@ -4046,7 +4046,7 @@
                       "file": "currency_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 72,
+                      "line": 114,
                       "name": "marks_the_evidence_of_the_unchanged_package_current,_though_the_tree_has_uncommitted_changes",
                       "output": [],
                       "status": "none",
@@ -4061,7 +4061,7 @@
                       "file": "currency_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 77,
+                      "line": 119,
                       "name": "marks_the_evidence_of_the_changed_package_stale,_naming_its_inputs_changed",
                       "output": [],
                       "status": "none",
@@ -4075,7 +4075,7 @@
                   "file": "currency_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 71,
+                  "line": 113,
                   "name": "audit_is_given_a_stream_with_input_hashes_after_an_uncommitted_change_to_one_of_its_packages_and_to_a_file_no_package_reads",
                   "output": [],
                   "status": "none",
@@ -4089,8 +4089,130 @@
               "file": "currency_suite_test.go",
               "focused": false,
               "kind": "method",
-              "line": 30,
+              "line": 111,
               "name": "TestAStreamWithInputHashes",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "marks the stream that ran the changed package stale, naming each package whose inputs changed",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "currency_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 129,
+                      "name": "marks_the_stream_that_ran_the_changed_package_stale,_naming_each_package_whose_inputs_changed",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "marks the stream of one unchanged package current, though the tree has uncommitted changes",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "currency_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 135,
+                      "name": "marks_the_stream_of_one_unchanged_package_current,_though_the_tree_has_uncommitted_changes",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "judges the base's stream by commit",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "currency_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 140,
+                      "name": "judges_the_base's_stream_by_commit",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when audit is given streams with input hashes, one also as the base's run, after an uncommitted change to a package one of them ran",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "currency_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 128,
+                  "name": "audit_is_given_streams_with_input_hashes,_one_also_as_the_base's_run,_after_an_uncommitted_change_to_a_package_one_of_them_ran",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AStreamsOwnCurrency",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "currency_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 127,
+              "name": "TestAStreamsOwnCurrency",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "states the verdict of the first given and names the other's among the others",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "currency_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 151,
+                      "name": "states_the_verdict_of_the_first_given_and_names_the_other's_among_the_others",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when two current streams judge one behavior",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "currency_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 150,
+                  "name": "two_current_streams_judge_one_behavior",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "TwoCurrentStreams",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "currency_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 149,
+              "name": "TestTwoCurrentStreams",
               "output": [],
               "status": "none"
             }
@@ -4102,7 +4224,7 @@
           "file": "currency_suite_test.go",
           "focused": false,
           "kind": "suite",
-          "line": 15,
+          "line": 16,
           "name": "TestAuditCurrencyTestSuite",
           "output": [],
           "status": "none"
@@ -41081,7 +41203,7 @@
     }
   ],
   "stats": {
-    "behaviors": 1195,
+    "behaviors": 1199,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

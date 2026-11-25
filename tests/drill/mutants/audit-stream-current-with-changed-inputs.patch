@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditCurrency / AStreamsOwnCurrency / when audit is given streams with input hashes, one also as the base's run, after an uncommitted change to a package one of them ran / marks the stream that ran the changed package stale, naming each package whose inputs changed \(
+Clause: when audit is given streams with input hashes, one also as the base's run, after an uncommitted change to a package one of them ran → marks the stream that ran the changed package stale, naming each package whose inputs changed
+--- a/internal/gotestaudit/evidence.go
++++ b/internal/gotestaudit/evidence.go
+@@ -187,7 +187,7 @@
+ 			changed = append(changed, pkg)
+ 		}
+ 	}
+-	if len(changed) == 0 {
++	if len(changed) != 0 {
+ 		return true, ""
+ 	}
+ 	slices.Sort(changed)

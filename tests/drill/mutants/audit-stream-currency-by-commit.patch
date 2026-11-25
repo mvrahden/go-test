@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditCurrency / AStreamsOwnCurrency / when audit is given streams with input hashes, one also as the base's run, after an uncommitted change to a package one of them ran / marks the stream that ran the changed package stale, naming each package whose inputs changed \(
+Clause: when audit is given streams with input hashes, one also as the base's run, after an uncommitted change to a package one of them ran → marks the stream that ran the changed package stale, naming each package whose inputs changed
+--- a/internal/gotestaudit/evidence.go
++++ b/internal/gotestaudit/evidence.go
+@@ -173,7 +173,7 @@
+ 		st.pkgs[p.Path] = p
+ 	}
+ 	if len(st.fresh) > 0 && !in.Ran {
+-		st.stream.Current, st.stream.Stale = streamFreshness(st.fresh)
++		_ = streamFreshness
+ 	}
+ 	return st
+ }
