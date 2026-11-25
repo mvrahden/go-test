@@ -1064,8 +1064,10 @@ signalled. On Windows, `Release` also kills what the root left running.
 │  a filter beside the suite, rerun over the kept bytes if it          │
 │  ends early. The tool's path is resolved once per run                │
 │  (`go tool -n test2json`).                                           │
-│  JSON events streamed to stdout as each suite completes.             │
-│  No batching; order depends on completion time.                      │
+│  JSON events streamed to stdout as each suite completes, or under    │
+│  --live as the converter writes them, line by line, each suite's     │
+│  lines read by a census of its own. No batching; order between       │
+│  suites depends on time.                                             │
 │                                                                      │
 ├─ RunCaptureJSON (internal) ───────────────────────────────────────────┤
 │                                                                      │

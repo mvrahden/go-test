@@ -174,7 +174,7 @@ instead of default output; `--no-color` strips ANSI codes from it.
 `--compile-parallel=<n>` bounds concurrent compilations (default NumCPU,
 halved under `-race`). `--github` emits annotations and the step summary
 (on by default in GitHub Actions). `--events-file=<path>`, with `-json` or
-in `summary`, also writes the event stream to that file. `--timeout <dur>` is the global pipeline
+in `summary`, also writes the event stream to that file; `--live` (**v1.42+**, with `-json`, or `GOTEST_LIVE=1`) writes each suite's events as they happen instead of when its process ends. `--timeout <dur>` is the global pipeline
 deadline (default 15m) and `--setup-timeout <dur>` a flat shared-fixture
 setup budget (default: what the fixtures declare, v1.34+) — `0` disables either; `--min <pct>` gates
 coverage, `--no-cache` skips the test binary cache and forces a fresh link (`gotest clean --cache`, **v1.38+**, empties it), `--debug` keeps the run's work dir and overlay, and a test run then ends

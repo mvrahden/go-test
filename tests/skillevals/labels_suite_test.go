@@ -102,6 +102,7 @@ var witnesses = []witness{
 	{file: "SKILL.md", quote: "bind each one you implement by its text", label: "v1.42+", path: "cmd/gotest/scenarios.go", literal: "func runScenarios"},
 	{file: "reference/ci.md", quote: "audit and attestation inputs", label: "v1.42+", path: "action.yml", literal: "audit-fail-on"},
 	{file: "reference/cli.md", quote: "prints the saved run's result", label: "v1.42+", path: "cmd/gotest/attest.go", literal: "func runTestResult"},
+	{file: "reference/cli.md", quote: "writes each suite's events as they happen", label: "v1.42+", path: "cmd/gotest/eventsfile.go", literal: "func liveStream"},
 	{file: "reference/cli.md", quote: "go tool gotest scenarios", label: "v1.42+", path: "cmd/gotest/scenarios.go", literal: "--unstated"},
 	{file: "reference/cli.md", quote: "its reason, as JSON", label: "v1.42+", path: "cmd/gotest/lint.go", literal: "suppressions"},
 	{file: "reference/api.md", quote: "except on an `Each` row's `T`", label: "v1.42+", path: "pkg/gotest/utils.go", literal: "row.soft = true"},

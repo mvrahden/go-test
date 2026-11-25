@@ -1157,6 +1157,8 @@ A run exits `0` when everything passed, `1` on a failed test (one that panics or
 
 To feed a JUnit consumer, run the tests through a converter that reads the events: `gotestsum --junitfile report.xml --raw-command -- go tool gotest -json ./...`. The report is red whenever the run is — a package that does not build or a shared fixture that fails included — and gotest's exit code passes through. A converter that parses the printed text instead of the events, such as `go-junit-report`, reports those failures as plain output or not at all.
 
+A `-json` run writes a suite's events when its suite process ends, all at once. `--live` (or `GOTEST_LIVE=1`) writes them as the process writes them, so a reader sees each test start and end while its suite still runs; only the suite's own events keep their order, and a package's verdict still waits for its last suite ([A live event stream](specs/cli/spec.md#requirement-a-live-event-stream)).
+
 ## Naming Conventions
 
 | Convention | Meaning |
