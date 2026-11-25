@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / names the hanging method in the stream with the line that names the deadline \(
+Clause: when --timeout expires in a --live run while one suite's method hangs after the other suite ended → names the hanging method in the stream with the line that names the deadline
+--- a/internal/gotestrunner/census.go
++++ b/internal/gotestrunner/census.go
+@@ -130,7 +130,7 @@
+ }
+ 
+ // suite opens the reading of one suite process's output.
+-func (x *verdictIndex) suite() *suiteCensus { return &suiteCensus{x: x} }
++func (x *verdictIndex) suite() *suiteCensus { x.loose.x = x; return &x.loose }
+ 
+ // stopEndedLine is what the runtime prints on a method's output when the
+ // method returned after the stop began: it did not finish. No released

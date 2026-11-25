@@ -48,3 +48,27 @@ func (s *AgentModeTestSuite) TestTheRerunCommand(t *gotest.T) {
 			main.ExportRerunCommand(dir, []string{"-tags=a b", "./...", "-args", "-flag=it's"}))
 	})
 }
+
+func (s *AgentModeTestSuite) TestWhatMakesAStreamLive(t *gotest.T) {
+	for t, r := range gotest.Each(t, []struct {
+		Desc    string
+		args    []string
+		json    bool
+		env     map[string]string
+		on      bool
+		refused bool
+	}{
+		{Desc: "nothing", json: true},
+		{Desc: "--live with -json", args: []string{"--live"}, json: true, on: true},
+		{Desc: "GOTEST_LIVE=1 with -json", json: true, env: map[string]string{"GOTEST_LIVE": "1"}, on: true},
+		{Desc: "--live=false over GOTEST_LIVE=1", args: []string{"--live=false"}, json: true, env: map[string]string{"GOTEST_LIVE": "1"}},
+		{Desc: "GOTEST_LIVE=0", json: true, env: map[string]string{"GOTEST_LIVE": "0"}},
+		{Desc: "GOTEST_LIVE=1 in a text run", env: map[string]string{"GOTEST_LIVE": "1"}},
+		{Desc: "--live in a text run", args: []string{"--live"}, refused: true},
+		{Desc: "--live=false in a text run", args: []string{"--live=false"}},
+	}) {
+		on, err := main.ExportLiveStream(r.args, r.json, r.env)
+		gotest.Equal(t, r.refused, err != nil, "err: %v", err)
+		gotest.Equal(t, r.on, on)
+	}
+}

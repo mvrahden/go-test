@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / refuses it with exit 2, naming -json \(
+Clause: when --live is given without -json → refuses it with exit 2, naming -json
+--- a/cmd/gotest/eventsfile.go
++++ b/cmd/gotest/eventsfile.go
+@@ -51,7 +51,7 @@
+ func liveStream(own OwnFlags, jsonMode bool, getenv func(string) string) (bool, error) {
+ 	if own.Given("--live") {
+ 		on := own.Bool("--live")
+-		if on && !jsonMode {
++		if !on && !jsonMode {
+ 			return false, errors.New("--live writes the go test -json stream as each suite process writes it, which a text run does not produce; add -json")
+ 		}
+ 		return on, nil

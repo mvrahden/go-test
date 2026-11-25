@@ -1,10 +1,13 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+
+	"github.com/mvrahden/go-test/internal/protocol"
 )
 
 // openEventsFile opens the file --events-file names for the run's event
@@ -40,4 +43,18 @@ func closeEvents(f *os.File) {
 	if f != nil {
 		_ = f.Close()
 	}
+}
+
+// liveStream reports whether a run writes each suite's events as its process
+// writes them: --live, else GOTEST_LIVE, only for a -json stream. --live
+// without -json is refused; the variable outside one is not read.
+func liveStream(own OwnFlags, jsonMode bool, getenv func(string) string) (bool, error) {
+	if own.Given("--live") {
+		on := own.Bool("--live")
+		if on && !jsonMode {
+			return false, errors.New("--live writes the go test -json stream as each suite process writes it, which a text run does not produce; add -json")
+		}
+		return on, nil
+	}
+	return jsonMode && protocol.SwitchOn(getenv(protocol.EnvLive)), nil
 }

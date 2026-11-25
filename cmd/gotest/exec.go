@@ -107,6 +107,7 @@ func execRun(cfg ExecConfig) (exit int, judged *gotestrunner.PipelineResult, pla
 		Only:            cfg.Only,
 		Stdout:          stdout,
 		Inputs:          plan.inputs.stamp(),
+		Live:            cfg.Live,
 	}, overlay)
 	clock.ran, clock.compile = time.Now(), result.CompileSpan
 	if err != nil {

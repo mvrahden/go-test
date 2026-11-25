@@ -112,6 +112,8 @@ Flags (gotest — use --double-dash):
   --min=<pct>             Fail if coverage < pct%% (0-100)
   --events-file=<file>    With -json, also write the go test -json event stream
                           to file as it happens
+  --live                  With -json, write each suite's events as its process
+                          writes them, not when it ends (GOTEST_LIVE=1 too)
   --setup-timeout=<dur>   Total budget for shared fixture setup (default: the fixtures' declared
                           budgets, 30s until the first reports; 0 to disable)
   --timeout=<dur>         Global pipeline deadline (default: 15m, 0 to disable)
@@ -159,6 +161,8 @@ func printUsageEnvironment() {
   GOTEST_CI=0             Opt out of CI auto-detection
   GOTEST_AGENT=0          Turn agent output off where an agent is detected
                           (1 turns it on anywhere)
+  GOTEST_LIVE=1           Write a -json run's suite events as they happen, as
+                          --live does; read by no other run
   GOTEST_CACHE_DIR=<dir>  Override the cache location (default: ~/.cache/gotest)
   GOTEST_EXCLUSIVE_LOCK=0 Let this run's Exclusive suites and groups run while
                           another gotest run of the module runs its own
@@ -208,6 +212,8 @@ Flags:
   --min=<pct>             Fail if coverage < pct% (0-100, enables -coverprofile)
   --events-file=<file>    With -json, also write the go test -json event stream
                           to file as it happens
+  --live                  With -json, write each suite's events as its process
+                          writes them, not when it ends (GOTEST_LIVE=1 too)
   --setup-timeout=<dur>   Total budget for shared fixture setup (default: the fixtures' declared
                           budgets, 30s until the first reports; 0 to disable)
   --timeout=<dur>         Global pipeline deadline (default: 15m, 0 to disable)

@@ -17,7 +17,10 @@ const (
 	// EnvAgentOutput switches a text run's agent output on or off, read as
 	// EnvCI is; unset, a detected agent turns it on.
 	EnvAgentOutput = "GOTEST_AGENT"
-	EnvCacheDir    = "GOTEST_CACHE_DIR"
+	// EnvLive switches a -json run's live event stream on or off, read as
+	// EnvCI is; unset, it is off.
+	EnvLive     = "GOTEST_LIVE"
+	EnvCacheDir = "GOTEST_CACHE_DIR"
 	// EnvExclusiveLock at 0 lets a run's exclusive scopes overlap another
 	// run's; set otherwise or unset, runs of one module take turns.
 	EnvExclusiveLock = "GOTEST_EXCLUSIVE_LOCK"
