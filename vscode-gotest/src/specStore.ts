@@ -214,10 +214,13 @@ export class SpecStore {
   // A single run's test lines thus reach the CLI as written (its package
   // lines go last); lines of several runs are stamped, and the CLI places
   // those by their stamps.
-  compose(folder: string): string {
+  // compose is the folder's kept lines as one stream; only, when given,
+  // keeps the packages it names.
+  compose(folder: string, only?: ReadonlySet<string>): string {
     const out: string[] = [];
-    for (const record of this.records.values()) {
+    for (const [pkg, record] of this.records) {
       if (record.folder !== folder) continue;
+      if (only && !only.has(pkg)) continue;
       const kept = Array.from(record.tests.values()).flat();
       kept.sort((a, b) => a.seq - b.seq);
       for (const k of kept) out.push(k.line);
