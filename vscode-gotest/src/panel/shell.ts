@@ -258,8 +258,9 @@ pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-family: va
 /* the package and its open suite stay at the top while their rows scroll */
 .ti.k-pkg[aria-expanded="true"] > .tr { position: sticky; top: 0; z-index: 3; }
 .ti.k-suite[aria-expanded="true"] > .tr { position: sticky; top: 30px; z-index: 2; }
-/* a hover or selection color may be see-through: blur what scrolls beneath */
-.ti.k-pkg[aria-expanded="true"] > .tr, .ti.k-suite[aria-expanded="true"] > .tr { -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+/* pinned rows are glass: a see-through tint over a blur of what scrolls beneath */
+.ti.k-pkg[aria-expanded="true"] > .tr, .ti.k-suite[aria-expanded="true"] > .tr { background: color-mix(in srgb, var(--vscode-editor-background) 62%, transparent); -webkit-backdrop-filter: blur(10px) saturate(140%); backdrop-filter: blur(10px) saturate(140%); border-bottom: 1px solid color-mix(in srgb, var(--vscode-foreground) 14%, transparent); }
+.ti.k-pkg[aria-expanded="true"] > .tr:hover, .ti.k-suite[aria-expanded="true"] > .tr:hover { background: color-mix(in srgb, var(--vscode-list-hoverBackground) 70%, transparent); }
 .ti.k-pkg > .tr, .ti.k-suite > .tr { height: 30px; white-space: nowrap; }
 .ti.k-suite > .tr .lbl { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ti > pre.row-out { margin: 2px 12px 6px calc(40px + var(--indent, 0px)); }
