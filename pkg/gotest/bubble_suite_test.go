@@ -133,11 +133,15 @@ func (s *BubbleHookTestSuite) TestInAHook(t *gotest.T) {
 func (s *BubbleTestSuite) FuzzInAFuzzBody(f *gotest.F) {
 	f.Add(3)
 	f.Add(0)
+	f.Add(-2)
 	f.Fuzz(func(t *gotest.T, n int) {
 		gotest.Bubble(t, func(bt *gotest.T) {
 			begin := time.Now() //nolint:fuzz-determinism // a bubble's clock starts at the same instant on every run
-			time.Sleep(time.Duration(n) * time.Hour)
-			gotest.Equal(bt, time.Duration(n)*time.Hour, time.Since(begin))
+			// n%(1<<16) keeps n hours from overflowing a Duration; a negative
+			// sleep returns at once.
+			d := time.Duration(n%(1<<16)) * time.Hour
+			time.Sleep(d)
+			gotest.Equal(bt, max(d, 0), time.Since(begin))
 		})
 	})
 }
