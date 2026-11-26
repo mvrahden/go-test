@@ -59,6 +59,9 @@ class ImportedResults {
   getResult(itemId: string): TestResult | undefined {
     return this.results.get(itemId);
   }
+  forgetResult(itemId: string): void {
+    this.results.delete(itemId);
+  }
   noteStart(): void {}
   notePaused(): void {}
 }

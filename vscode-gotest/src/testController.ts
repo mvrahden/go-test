@@ -9,6 +9,7 @@ import * as path from "node:path";
 import type { DiscoveryCache } from "./discovery.js";
 import { TestResultStore, type TestResult } from "./testResultStore.js";
 import { type PathNode, buildPathTrie, collapsePathTrie } from "./pathTrie.js";
+import { tracked } from "./runStates.js";
 
 export class GoTestController implements vscode.Disposable {
   private static readonly MAX_DYNAMIC_SUBTESTS = 100;
@@ -685,7 +686,7 @@ export class GoTestController implements vscode.Disposable {
     // the map for the rest of the session.
     this.pendingStarts.clear();
     this.pendingPaused.clear();
-    return this.controller.createTestRun(request, name);
+    return tracked(this.controller.createTestRun(request, name));
   }
 
   findItem(id: string): vscode.TestItem | undefined {
@@ -767,6 +768,11 @@ export class GoTestController implements vscode.Disposable {
 
   getResult(itemId: string): TestResult | undefined {
     return this.resultStore.get(itemId);
+  }
+
+  // forgetResult drops one item's stored verdict; its subtree's stay.
+  forgetResult(itemId: string): void {
+    if (this.resultStore.get(itemId)) this.resultStore.delete(itemId);
   }
 
   // invalidateResults marks a package's shown verdicts outdated; the stored

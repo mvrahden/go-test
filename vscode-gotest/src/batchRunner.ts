@@ -223,6 +223,8 @@ async function runBatch(config: BatchConfig): Promise<BatchResult> {
       (importPath) => pkgDirMap.get(importPath),
       workspaceDir,
       new OnceLog((m) => outputChannel.warn(m)),
+      undefined,
+      () => token.isCancellationRequested,
     );
     let streamed = "";
     progress?.streaming(() => runPiece(streamed, config));
@@ -291,7 +293,8 @@ async function runBatch(config: BatchConfig): Promise<BatchResult> {
     const narrowed = changed ? changedOf(result.stdout) : undefined;
     if (narrowed) run.appendOutput(narrowedLine(narrowed) + "\r\n");
 
-    if (token.isCancellationRequested) {
+    // A stop, ours or one the CLI was sent: what did not finish is skipped.
+    if (token.isCancellationRequested || applier.interrupted) {
       // A narrowed run skips only what it said it would run.
       const skippedPkgs = pkgInfos.filter(
         (i) =>

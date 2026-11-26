@@ -332,6 +332,7 @@ describe("a --changed batch's running state", () => {
       noteStart: () => {},
       notePaused: () => {},
       createDynamicSubtest: () => undefined,
+      forgetResult: (id: string) => results.delete(id),
     };
     const config = {
       pkgInfos: [
@@ -348,7 +349,7 @@ describe("a --changed batch's running state", () => {
       label: "runner",
       changed: true,
     } as never;
-    return { calls, cleared, config };
+    return { calls, cleared, config, results };
   }
 
   // Feeds the lines one by one, recording what the run showed after each.
@@ -427,5 +428,32 @@ describe("a --changed batch's running state", () => {
     ]);
     expect(cleared).toEqual([cart.id]);
     expect(touches(calls, shop)).toEqual([]);
+  });
+
+  it("leaves the packages an interrupt it did not ask for cut off without a verdict", async () => {
+    const { calls, config, results } = harness();
+    const lines = [
+      manifest({ Ran: 2, Unchanged: 0, Packages: [cart.id, shop.id] }),
+      '{"Action":"start","Package":"example.com/cart"}',
+      '{"Action":"start","Package":"example.com/shop"}',
+      '{"Action":"fail","Package":"example.com/cart","Elapsed":0}',
+      '{"Action":"fail","Package":"example.com/shop","Elapsed":0}',
+      '{"Action":"start","Package":"interrupted","RunLevel":true}',
+      '{"Action":"fail","Package":"interrupted","RunLevel":true}',
+      '{"Action":"fail","Package":"gotest run","RunLevel":true,"Result":{"ExitCode":130}}',
+    ];
+    vi.mocked(spawnTestProcess).mockImplementationOnce(
+      async (...args: unknown[]) => {
+        for (const l of lines) (args[7] as (l: string) => void)(l);
+        return { stdout: lines.join("\n") + "\n", stderr: "", exitCode: 130 };
+      },
+    );
+    await executeBatch(config);
+    const last = (n: Node) =>
+      calls.filter((c) => c.endsWith(" " + n.id)).at(-1);
+    expect(last(cart)).toBe(`skipped ${cart.id}`);
+    expect(last(shop)).toBe(`skipped ${shop.id}`);
+    expect(calls.filter((c) => c.startsWith("errored"))).toEqual([]);
+    expect(results.has(cart.id)).toBe(false);
   });
 });
