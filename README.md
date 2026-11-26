@@ -1102,6 +1102,7 @@ Inputs, outputs, the event stream, the fuzz and bench steps and the coverage bad
 
 ```bash
 gotest ./... -v -race          # generate overlays and run tests (default)
+gotest --failed               # rerun only what the last run here failed
 gotest bench ./...             # run BenchmarkX suite methods, serially
 gotest fuzz ./... --for=5m     # run FuzzX suite methods, budgeted
 gotest spec ./...              # behavioral specification view
@@ -1128,7 +1129,7 @@ A filtered run builds only the packages it runs, so a build or vet failure in a 
 Test binaries are stripped of their symbol table and debug information, as `go test` strips them; `-ldflags` (an argument or in `GOFLAGS`), a profile flag such as `-cpuprofile`, or `--debug` keeps both in ([How test binaries are linked](specs/cli/spec.md#requirement-how-test-binaries-are-linked)).
 `--debug` also ends a run with one line on stderr of the time each phase took, `DEBUG: phases: discover=… generate=… compile=… run=… report=… total=…`; compiling overlaps running, so `compile` is a part of `run`, not a phase after it ([Where a run's time went](specs/cli/spec.md#requirement-where-a-runs-time-went)).
 
-A run exits `0` when everything passed, `1` on a failed test (one that panics or calls `os.Exit` included — `os.Exit(0)` too, as under `go test`), a shared fixture that failed to set up or tear down, or an expired `--timeout` (a suite it stopped fails its package even when its methods passed: [A suite cut short by --timeout](specs/cli/spec.md#requirement-a-suite-cut-short-by---timeout)), `2` on a usage, generation or build error, on a text run in which a suite reports that it ran no tests ([A suite that ran no tests](specs/cli/spec.md#requirement-a-suite-that-ran-no-tests)), on a green run that writes an event stream (`-json`, `spec`, `summary`) in which a declared test never ran (a plain text run takes no census, and `-run`, `-skip` and `-list` stand it down), and when the patterns match no package, and `130` when it was interrupted. `lint` and `fuzz` state their own codes in `gotest help lint` and `gotest help fuzz`.
+A run exits `0` when everything passed, `1` on a failed test (one that panics or calls `os.Exit` included — `os.Exit(0)` too, as under `go test`), a shared fixture that failed to set up or tear down, or an expired `--timeout` (a suite it stopped fails its package even when its methods passed: [A suite cut short by --timeout](specs/cli/spec.md#requirement-a-suite-cut-short-by---timeout)), `2` on a usage, generation or build error, on a text run in which a suite reports that it ran no tests ([A suite that ran no tests](specs/cli/spec.md#requirement-a-suite-that-ran-no-tests)), on a green run in which a declared test never ran (a plain text run judges each suite by its binary's result line, and `-run`, `-skip`, `-list`, `-count=0` and `-h` after `-args` stand the census down), and when the patterns match no package, and `130` when it was interrupted. `lint` and `fuzz` state their own codes in `gotest help lint` and `gotest help fuzz`.
 
 To feed a JUnit consumer, run the tests through a converter that reads the events: `gotestsum --junitfile report.xml --raw-command -- go tool gotest -json ./...`. The report is red whenever the run is — a package that does not build or a shared fixture that fails included — and gotest's exit code passes through. A converter that parses the printed text instead of the events, such as `go-junit-report`, reports those failures as plain output or not at all.
 
@@ -1197,6 +1198,11 @@ Codex reads the same hook events from `.codex/hooks.json` (or `~/.codex/hooks.js
 Codex passes an `apply_patch` edit to its hooks in `tool_input.command`, with no file path, so `post-edit` has no file to lint there; Cursor's shell hook must return a permission decision, so it is not wired.
 
 An agent without skill support can still be pointed at the installed `SKILL.md` from its instructions file, such as `AGENTS.md`. The skill source lives in [`skills/writing-gotest-tests`](skills/writing-gotest-tests).
+
+Under an agent a run prints for it. Where `AI_AGENT` is set, or `CLAUDECODE=1`, a text run prints only what failed, whole, and ends stdout with one line that holds the verdict, the exit code, the counts and the command that reruns the failures, so `tail -1` cannot lose it ([Agent output](specs/cli/spec.md#requirement-agent-output), [The closing line](specs/cli/spec.md#requirement-the-closing-line)); `--agent=false` or `GOTEST_AGENT=0` turns it off, and `--agent` turns it on anywhere.
+Outside agent output the same line closes stderr, after go test's text on stdout.
+A suite binary that ran none of its tests, as under a `TestMain` that never calls `m.Run`, fails a text run as it fails `-json` ([The census in a text run](specs/cli/spec.md#requirement-the-census-in-a-text-run)).
+Every run leaves a record of what it failed in the gotest cache, and `gotest --failed` reruns only that, by method, in a text or `-json` run, `spec` or `summary` ([Rerunning what failed](specs/cli/spec.md#requirement-rerunning-what-failed)).
 
 Two commands give an agent the specification without the source. `gotest spec --static ./...` prints what a package promises before anything runs, and `gotest discover ./...` emits the same tree as JSON with a `behaviorsComplete` flag per method, so an agent never presents a partial list as the whole specification.
 

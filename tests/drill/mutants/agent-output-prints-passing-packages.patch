@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLIAgentOutput .* / prints on stdout the failing method's output and no line of the passing package \(
+Clause: when a text run of a failing and a passing package is made under CLAUDECODE=1 → prints on stdout the failing method's output and no line of the passing package
+--- a/internal/gotestrunner/agentoutput.go
++++ b/internal/gotestrunner/agentoutput.go
+@@ -188,7 +188,7 @@ func (a *AgentOutput) line(line []byte) {
+ 	case ev.Test == "" && (ev.Action == "pass" || ev.Action == "skip" || ev.Action == "fail"):
+ 		p := a.pkg(ev.Package)
+ 		delete(a.pkgs, ev.Package)
+-		if ev.Action == "fail" {
++		if ev.Action != "skip" {
+ 			a.flush(ev.Package, p)
+ 		}
+ 	}

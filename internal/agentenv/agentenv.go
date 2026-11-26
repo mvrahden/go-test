@@ -19,6 +19,20 @@ var known = []struct{ env, value, name string }{
 // Name is the agent of this process's environment; "" for none.
 func Name() string { return Detect(os.Getenv) }
 
+// Cause is the variable that names the agent getenv describes, as
+// NAME=value; "" for none.
+func Cause(getenv func(string) string) string {
+	if v := strings.TrimSpace(getenv(EnvAgent)); v != "" {
+		return EnvAgent + "=" + v
+	}
+	for _, k := range known {
+		if strings.TrimSpace(getenv(k.env)) == k.value {
+			return k.env + "=" + k.value
+		}
+	}
+	return ""
+}
+
 // Detect is the agent getenv describes: AI_AGENT when set, else the name a
 // tool's own variable gives; "" for none.
 func Detect(getenv func(string) string) string {

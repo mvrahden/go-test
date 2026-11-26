@@ -32,3 +32,19 @@ func (s *AgentEnvTestSuite) TestDetect(t *gotest.T) {
 		gotest.Equal(t, r.want, got)
 	}
 }
+
+func (s *AgentEnvTestSuite) TestCause(t *gotest.T) {
+	type row struct {
+		Desc string
+		env  map[string]string
+		want string
+	}
+	for t, r := range gotest.Each(t, []row{
+		{Desc: "no agent", env: map[string]string{}, want: ""},
+		{Desc: "AI_AGENT, as set", env: map[string]string{"AI_AGENT": "my-agent", "CLAUDECODE": "1"}, want: "AI_AGENT=my-agent"},
+		{Desc: "Claude Code's variable", env: map[string]string{"CLAUDECODE": "1"}, want: "CLAUDECODE=1"},
+		{Desc: "CLAUDECODE of another value", env: map[string]string{"CLAUDECODE": "0"}, want: ""},
+	}) {
+		gotest.Equal(t, r.want, agentenv.Cause(func(k string) string { return r.env[k] }))
+	}
+}

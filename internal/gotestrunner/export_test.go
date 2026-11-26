@@ -875,3 +875,57 @@ func ExportDispatchedPackages(o *OverlayResult, run, skip string, skipGroups []s
 func ExportNewSlots(n int) *slots              { return newSlots(n) }
 func ExportQueue(s *slots) chan struct{}       { return s.queue() }
 func ExportLeave(s *slots, held chan struct{}) { s.leave(held) }
+
+// ExportPackageResult is one suite result of a package, as a text run
+// records it.
+type ExportPackageResult struct {
+	Pkg    string
+	Result SuiteResult
+}
+
+// ExportTextCensus records results into a text run's collector in order,
+// one package after another, takes the census and returns its exit code,
+// its stderr, and what the run judged and failed.
+func ExportTextCensus(results []ExportPackageResult, declared DeclaredUnits, cfg PipelineConfig) (exit int, stderr string, judged *protocol.RunResult, failed []protocol.FailedUnit) { //nolint:gocritic // hugeParam: test hook
+	var stdout, errw bytes.Buffer
+	c := NewOutputCollector(RunBatchText, false, WithWriters(&stdout, &errw))
+	c.censusAside = censusAside(cfg, ClassifyGoTestArgs(cfg.GoTestArgs).RunFlags)
+	count := map[string]int{}
+	for i := range results {
+		count[results[i].Pkg]++
+	}
+	for i := range results {
+		if _, ok := c.pkgs[results[i].Pkg]; !ok {
+			c.Register(results[i].Pkg, count[results[i].Pkg])
+		}
+	}
+	seen := map[string]int{}
+	for i := range results {
+		c.RecordResult(results[i].Pkg, seen[results[i].Pkg], results[i].Result)
+		seen[results[i].Pkg]++
+	}
+	c.Finalize()
+	code := 0
+	if c.AnyFailed() {
+		code = 1
+	}
+	exit = c.takeCensus(cfg, declared, code, nil)
+	judged, failed = c.judged()
+	return exit, errw.String(), judged, failed
+}
+
+// ExportStreamFailures writes stream through a -json collector opened by a
+// manifest and returns what it judged and the units it failed.
+func ExportStreamFailures(stream string) (*protocol.RunResult, []protocol.FailedUnit) {
+	c := NewOutputCollector(RunStreamJSON, false, WithWriters(io.Discard, io.Discard), WithManifest(&protocol.Manifest{}))
+	_, _ = io.WriteString(c.jsonWriter(), stream)
+	return c.judged()
+}
+
+var ExportRerunUnits = rerunUnits
+
+var (
+	ExportRecordPathIn  = recordPathIn
+	ExportWriteRecordIn = writeRecordIn
+	ExportReadRecordIn  = readRecordIn
+)

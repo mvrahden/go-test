@@ -2,9 +2,9 @@ Expect: ^FAIL .*conformance/cli CLIRunManifest .* / closes the stream with a fai
 Clause: when a -json run of a failing and a passing package ends → closes the stream with a fail of gotest run carrying exit code 1, one package passed and one failed, two tests passed and two failed
 --- a/internal/gotestrunner/manifest.go
 +++ b/internal/gotestrunner/manifest.go
-@@ -33,7 +33,7 @@
- 	r.mu.Lock()
- 	defer r.mu.Unlock()
+@@ -41,7 +41,7 @@ func (r *runTally) count(pkg, test, action string) {
+ 		}
+ 	}
  	if test != "" {
 -		r.tests.Add(action)
 +		r.tests.Add("pass")

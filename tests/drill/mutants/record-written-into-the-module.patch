@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/cli CLIAgentOutput .* / the module holds no file it did not hold before \(
+Clause: when a text run of a failing package ends → the module holds no file it did not hold before
+--- a/internal/gotestrunner/runrecord.go
++++ b/internal/gotestrunner/runrecord.go
+@@ -162,7 +162,8 @@ func WriteRunRecord(rec protocol.RunRecord) error { //nolint:gocritic // hugePar
+ 	if err != nil {
+ 		return err
+ 	}
+-	return writeRecordIn(root, rec)
++	_ = root
++	return writeRecordIn(rec.Dir, rec)
+ }
+ 
+ func writeRecordIn(root string, rec protocol.RunRecord) error { //nolint:gocritic // hugeParam: once per run

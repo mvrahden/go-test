@@ -1,0 +1,17 @@
+Expect: ^FAIL .*conformance/cli CLIAgentOutput .* / prints no ok line and ends stdout with the closing line / --agent \(
+Clause: when a text run with no agent variable is given --agent, or GOTEST_AGENT=1 → prints no ok line and ends stdout with the closing line
+--- a/cmd/gotest/agentmode.go
++++ b/cmd/gotest/agentmode.go
+@@ -21,10 +21,10 @@ import (
+ // set. --agent=false and GOTEST_AGENT=0 turn it off whatever is detected.
+ func agentOutput(own OwnFlags, getenv func(string) string) (on bool, why string) {
+ 	if own.Given("--agent") {
+-		return own.Bool("--agent"), "--agent"
++		return own.Bool("--agent") && agentenv.Cause(getenv) != "", "--agent"
+ 	}
+ 	if v := getenv(protocol.EnvAgentOutput); v != "" {
+-		return protocol.SwitchOn(v), protocol.EnvAgentOutput + "=" + v
++		return protocol.SwitchOn(v) && agentenv.Cause(getenv) != "", protocol.EnvAgentOutput + "=" + v
+ 	}
+ 	why = agentenv.Cause(getenv)
+ 	return why != "", why

@@ -285,7 +285,7 @@ func (s *ReferenceTestSuite) TestTheConfigFieldsAreNamed(t *gotest.T) {
 // userEnv are the environment variables a user may set; the design spec
 // tables each. internalEnv are those gotest sets for its own processes.
 var (
-	userEnv     = []string{"GOTEST_CI", "GOTEST_CACHE_DIR", "GOTEST_SLOW_BUILD_THRESHOLD", "GOTEST_UPDATE_SNAPSHOTS", "GOTEST_TIMEOUT_SCALE"}
+	userEnv     = []string{"GOTEST_CI", "GOTEST_AGENT", "GOTEST_CACHE_DIR", "GOTEST_SLOW_BUILD_THRESHOLD", "GOTEST_UPDATE_SNAPSHOTS", "GOTEST_TIMEOUT_SCALE"}
 	internalEnv = []string{"GOTEST_SHARED_STATE_FILE", "GOTEST_SHARED_PROTOCOL_FD", "GOTEST_FUZZ_ECHO_INPUT", "GOTEST_CONTROL", "GOTEST_INTERNAL_INTERRUPT_CONSOLE", "GOTEST_STOP_FILE"}
 	envName     = regexp.MustCompile(`^GOTEST_[A-Z0-9_]+$`)
 	// testPlumbing are prefixes of the variables only gotest's own tests set.

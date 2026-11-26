@@ -2,12 +2,13 @@ Expect: ^FAIL .*conformance/cli .* / passes each, never naming a suite as one th
 Clause: when a text run gives the binary -test.count=0, -test.run, -test.skip, -test.list or -test.bench after -args → passes each, never naming a suite as one that ran no tests
 --- a/internal/gotestrunner/census.go
 +++ b/internal/gotestrunner/census.go
-@@ -65,7 +65,7 @@
- 		return false
+@@ -541,8 +541,7 @@ func countsZero(goTestArgs, runFlags []string) bool {
+ 	if extractFlag(runFlags, "-count") == "0" {
+ 		return true
  	}
- 	binary := goTestArgs[at+1:]
--	return hasSelectionFlag(binary, []string{"-test.bench"}) || extractFlag(binary, "-test.count") == "0"
-+	return hasSelectionFlag(binary, []string{"-test.bench"})
+-	at := slices.Index(goTestArgs, "-args")
+-	return at >= 0 && extractFlag(goTestArgs[at+1:], "-test.count") == "0"
++	return false
  }
-
- // NoteBenchmarksNotRun says how many declared benchmarks a test run leaves
+ 
+ // reportsResult reports whether a text run's suite binary printed its final

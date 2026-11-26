@@ -10,7 +10,7 @@ import (
 // selected, so it prints the names its pattern matches and nothing more. No
 // shared fixture starts, no suite runs, and there is no census or coverage.
 func runList(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, pf ParsedFlags) (PipelineResult, error) { //nolint:gocritic // hugeParam: stable API
-	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose, WithEvents(cfg.Events), WithManifest(cfg.Manifest))
+	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose, WithStdout(cfg.Stdout), WithEvents(cfg.Events), WithManifest(cfg.Manifest))
 	plan := overlay.plan()
 	collector.StdlibTestsByPkg = plan.StdlibTests()
 	collector.list = true

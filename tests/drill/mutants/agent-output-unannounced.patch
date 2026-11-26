@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLIAgentOutput .* / says first on stderr that agent output is on under CLAUDECODE=1 and that GOTEST_AGENT=0 turns it off \(
+Clause: when a text run of a failing and a passing package is made under CLAUDECODE=1 → says first on stderr that agent output is on under CLAUDECODE=1 and that GOTEST_AGENT=0 turns it off
+--- a/cmd/gotest/agentmode.go
++++ b/cmd/gotest/agentmode.go
+@@ -33,7 +33,7 @@ func agentOutput(own OwnFlags, getenv func(string) string) (on bool, why string)
+ // announceAgentOutput says on stderr that agent output is on, why, and how
+ // to turn it off.
+ func announceAgentOutput(w io.Writer, why string) {
+-	fmt.Fprintf(w, "gotest: agent output on (%s): failures only, the verdict on the last line of stdout; --agent=false or %s=0 turns it off\n", why, protocol.EnvAgentOutput)
++	_, _ = w, why
+ }
+ 
+ // safeWord is a word a shell takes as written.

@@ -112,6 +112,10 @@ Flags (gotest — use --double-dash):
                           -race/-msan/-asan)
   --group=<name>          Run only the suites of this ExclusiveGroup (repeatable)
   --skip-group=<name>     Leave the suites of this ExclusiveGroup out (repeatable)
+  --agent                 Print for a coding agent: what failed, then the verdict
+                          as stdout's last line; on under AI_AGENT or CLAUDECODE=1,
+                          off with --agent=false or GOTEST_AGENT=0
+  --failed                Rerun only what failed in the last run in this directory
   --no-harvest            Disable fuzz seed harvesting for this run
   --control=stdin         Read stop and force lines on stdin: stop is a first
                           Ctrl-C, force a second; the input's end is a stop
@@ -136,6 +140,8 @@ Everything after "-args" goes to the test binary as written.
 Environment:
   CI=true                 Auto-enables --ci when GOTEST_CI is unset
   GOTEST_CI=0             Opt out of CI auto-detection
+  GOTEST_AGENT=0          Turn agent output off where an agent is detected
+                          (1 turns it on anywhere)
   GOTEST_CACHE_DIR=<dir>  Override the cache location (default: ~/.cache/gotest)
   GOTEST_SLOW_BUILD_THRESHOLD=<duration>
                           Report a build still running after this long
@@ -192,6 +198,10 @@ Flags:
                           -race/-msan/-asan)
   --group=<name>          Run only the suites of this ExclusiveGroup (repeatable)
   --skip-group=<name>     Leave the suites of this ExclusiveGroup out (repeatable)
+  --agent                 Print for a coding agent: what failed, then the verdict
+                          as stdout's last line; on under AI_AGENT or CLAUDECODE=1,
+                          off with --agent=false or GOTEST_AGENT=0
+  --failed                Rerun only what failed in the last run in this directory
   --control=stdin         Read stop and force lines on stdin: stop is a first
                           Ctrl-C, force a second; the input's end is a stop
 
@@ -203,6 +213,12 @@ Use a bare "--" to pass unrecognized flags without validation.
 
 CI auto-detection: when the standard CI env var is set and GOTEST_CI is
 unset, --ci is enabled automatically. Set GOTEST_CI=0 to opt out.
+
+A text run ends with one verdict line: its exit code and counts, on stderr
+after go test's text, or under agent output as stdout's last line with the
+command that reruns the failures. Every run records what failed, in the
+cache, for --failed. A suite binary that ran none of its tests, as under a
+TestMain that never calls m.Run, fails the run with exit 2.
 
 Every package a pattern matches ends in a verdict. A run whose patterns
 match no package at all verified nothing: in every mode (spec, summary,
@@ -312,6 +328,7 @@ Flags:
                           -race/-msan/-asan)
   --group=<name>          Run only the suites of this ExclusiveGroup (repeatable)
   --skip-group=<name>     Leave the suites of this ExclusiveGroup out (repeatable)
+  --failed                Rerun only what failed in the last run in this directory
   --control=stdin         Read stop and force lines on stdin: stop is a first
                           Ctrl-C, force a second; the input's end is a stop
                           (not with --input=-)
@@ -387,6 +404,7 @@ Flags:
                           -race/-msan/-asan)
   --group=<name>          Run only the suites of this ExclusiveGroup (repeatable)
   --skip-group=<name>     Leave the suites of this ExclusiveGroup out (repeatable)
+  --failed                Rerun only what failed in the last run in this directory
   --control=stdin         Read stop and force lines on stdin: stop is a first
                           Ctrl-C, force a second; the input's end is a stop
                           (not with --input=-)

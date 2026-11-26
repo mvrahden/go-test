@@ -93,13 +93,16 @@ func (s *NoPackagesTestSuite) TestAPatternBesideOthersThatMatched(t *gotest.T) {
 	const notestfiles = "./cmd/gotest/testdata/unrun/notestfiles/"
 	const verdict = "?   \tgithub.com/mvrahden/go-test/cmd/gotest/testdata/unrun/notestfiles\t[no test files]\n"
 	const warning = "warning: \"" + nogo + "\" matched no packages\n"
+	// A text run closes stderr with its verdict line; nothing passed.
+	const closing = "gotest: EMPTY exit 0 | packages: 0 passed, 0 failed, 1 skipped\n"
 
 	for t, tc := range gotest.Each(t, []struct {
-		Desc string
-		args []string
+		Desc    string
+		args    []string
+		closing string
 	}{
-		{"a text run", []string{notestfiles, nogo}},
-		{"a -json run", []string{"-json", notestfiles, nogo}},
+		{"a text run", []string{notestfiles, nogo}, closing},
+		{"a -json run", []string{"-json", notestfiles, nogo}, ""},
 	}) {
 		stdout, stderr, code := s.cli.runSplit(t, tc.args...)
 
@@ -108,7 +111,7 @@ func (s *NoPackagesTestSuite) TestAPatternBesideOthersThatMatched(t *gotest.T) {
 			gotest.Contains(it, stdout, "[no test files]")
 		})
 		t.It("warns about the pattern on stderr only", func(it *gotest.T) {
-			gotest.Equal(it, warning, stderr)
+			gotest.Equal(it, warning+tc.closing, stderr)
 			gotest.NotContains(it, stdout, "matched no packages")
 		})
 	}
@@ -128,7 +131,7 @@ func (s *NoPackagesTestSuite) TestAPatternBesideOthersThatMatched(t *gotest.T) {
 		gotest.Empty(it, tools, "go.mod declares a tool")
 		stdout, stderr, code := s.cli.runSplit(it, notestfiles, "tool")
 		gotest.Equal(it, 0, code, "stderr:\n%s", stderr)
-		gotest.Equal(it, "warning: \"tool\" matched no packages\n", stderr)
+		gotest.Equal(it, "warning: \"tool\" matched no packages\n"+closing, stderr)
 		gotest.Equal(it, verdict, stdout)
 	})
 }

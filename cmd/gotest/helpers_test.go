@@ -35,7 +35,7 @@ func newCLIRunner(cli *gotestcli.BinarySharedFixture) cliRunner {
 var childTempDir string
 
 // cliEnviron is this process's environment minus the GitHub Actions
-// variables and the CI and snapshot switches, so a child CLI sees only the
+// variables, the agent ones and the CI and snapshot switches, so a child CLI sees only the
 // flags its case gives it. Its temp dir is the run's own, so its sweep
 // never reaches the real one's dirs.
 func cliEnviron() []string {
@@ -43,7 +43,8 @@ func cliEnviron() []string {
 	for _, kv := range os.Environ() {
 		name, _, _ := strings.Cut(kv, "=")
 		switch name {
-		case "CI", "GOTEST_CI", "GOTEST_UPDATE_SNAPSHOTS", "GITHUB_ACTIONS", "GITHUB_STEP_SUMMARY", "GITHUB_WORKSPACE":
+		case "CI", "GOTEST_CI", "GOTEST_UPDATE_SNAPSHOTS", "GITHUB_ACTIONS", "GITHUB_STEP_SUMMARY", "GITHUB_WORKSPACE",
+			"AI_AGENT", "CLAUDECODE", "GOTEST_AGENT":
 			continue
 		}
 		// Windows spells these in any case.

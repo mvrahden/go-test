@@ -311,3 +311,16 @@ func ExportDeclarationIndexOf(patterns []string) (gotestspec.DeclarationIndex, e
 
 // phases.go
 type ExportPhases = phases
+
+// ExportAgentOutput is whether a text run given ownArgs under env prints for
+// an agent, and why.
+func ExportAgentOutput(ownArgs []string, env map[string]string) (bool, string, error) {
+	own, err := ownOf(ownArgs)
+	if err != nil {
+		return false, "", err
+	}
+	on, why := agentOutput(own, func(k string) string { return env[k] })
+	return on, why, nil
+}
+
+var ExportRerunCommand = rerunCommand

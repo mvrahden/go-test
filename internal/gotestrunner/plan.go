@@ -212,6 +212,18 @@ type selection struct {
 	Run, Skip string // -run and -skip
 	Bench     string // -bench, for a bench run
 	Groups    groupSelection
+	// Only is --failed's: each package's own -run, "" for all its suites;
+	// a package it lacks runs nothing. Nil leaves every package to Run.
+	Only map[string]string
+}
+
+// runFilter is the -run the suites of pkg run under.
+func (sel selection) runFilter(pkg string) (filter string, selected bool) { //nolint:gocritic // hugeParam: once per suite
+	if sel.Only == nil {
+		return sel.Run, true
+	}
+	filter, selected = sel.Only[pkg]
+	return filter, selected
 }
 
 // testRun lists the suites a test run dispatches: those with a test run,
@@ -222,8 +234,12 @@ func (p *RunPlan) testRun(sel selection) []*PlannedSuite { //nolint:gocritic // 
 		if !s.Tests || !sel.Groups.selects(s.Group) {
 			continue
 		}
+		run, ok := sel.runFilter(s.Package)
+		if !ok {
+			continue
+		}
 		funcs := suiteFuncs(s.Name, s.Testless, s.FuzzNames())
-		if selectsSuite(sel.Run, funcs) && !skipsSuite(sel.Skip, funcs) {
+		if selectsSuite(run, funcs) && !skipsSuite(sel.Skip, funcs) {
 			out = append(out, s)
 		}
 	}

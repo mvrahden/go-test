@@ -2,11 +2,11 @@ Expect: ^FAIL .*conformance/cli CLIPhases .* / the last line of stderr names the
 Clause: when a passing package is run with --debug → the last line of stderr names the six spans as durations
 --- a/cmd/gotest/exec.go
 +++ b/cmd/gotest/exec.go
-@@ -16,7 +16,6 @@
+@@ -29,7 +29,6 @@ func execRun(cfg ExecConfig) (exit int, judged *gotestrunner.PipelineResult, pha
  	clock := phaseClock{start: time.Now()}
  	if cfg.Debug {
- 		// Deferred first, so it prints last: after the cleanup and the stop.
--		defer func() { fmt.Fprintln(os.Stderr, clock.phases(time.Now())) }()
+ 		// Deferred first, so it is taken last: after the cleanup and the stop.
+-		defer func() { phases = fmt.Sprint(clock.phases(time.Now())) }()
  	}
  	classified := gotestrunner.ClassifyGoTestArgs(cfg.GoTestArgs)
  	loadFlags := gotestrunner.StripNonLoadFlags(classified.BuildFlags)

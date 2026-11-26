@@ -172,7 +172,7 @@ func newStreamRun(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 	r.baseEnv = buildBaseEnv(cfg)
 
 	r.plan = overlay.plan()
-	sel := selection{Run: pf.UserRunFilter, Skip: pf.UserSkipFilter, Groups: overlay.groups}
+	sel := selection{Run: pf.UserRunFilter, Skip: pf.UserSkipFilter, Groups: overlay.groups, Only: cfg.Only}
 	r.sel = sel
 	r.win = planFixtureWindows(r.plan, overlay.SharedFixtures, sel)
 	r.win.reportSkipped()
@@ -217,10 +217,11 @@ func newStreamRun(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 		r.free(r.ledger.DoneExcept(overlay.BrokenPackages[i].PkgPath, nil))
 	}
 
-	c := NewOutputCollector(cfg.OutputMode, pf.Verbose, WithEvents(cfg.Events), WithManifest(cfg.Manifest))
+	c := NewOutputCollector(cfg.OutputMode, pf.Verbose, WithStdout(cfg.Stdout), WithEvents(cfg.Events), WithManifest(cfg.Manifest))
 	r.collector = c
 	c.StdlibTestsByPkg = r.plan.StdlibTests()
-	c.holdToTests = cfg.OutputMode == RunBatchText && !mayRunNothing(cfg.GoTestArgs, r.pf.RunFlags)
+	c.holdToTests = cfg.OutputMode == RunBatchText && !mayRunNothing(cfg.GoTestArgs, r.pf.RunFlags) && cfg.Only == nil
+	c.censusAside = censusAside(cfg, r.pf.RunFlags)
 	// The flush order holds every package the collector will report on.
 	r.noSuite = slices.Concat(overlay.NoSuitePackages, cfg.NoTestFiles)
 	order := flushOrder(cfg, overlay, r.noSuite)
@@ -291,7 +292,8 @@ func (r *streamRun) take(outcome CompileOutcome, held map[string]*scopeQueue) { 
 	cr := outcome.Result
 	traceDispatch(dispatchEvent{Kind: "intake", Package: cr.Package})
 
-	targets := suiteTargets(cr, r.selected[cr.Package], r.pf.RunFlags, r.pf.UserRunFilter)
+	filter, _ := r.sel.runFilter(cr.Package)
+	targets := suiteTargets(cr, r.selected[cr.Package], r.pf.RunFlags, filter)
 	withExec(targets, r.pf.Exec)
 
 	if len(targets) == 0 {
@@ -480,5 +482,6 @@ func (r *streamRun) finish() PipelineResult {
 	if !empty || result.ExitCode != 0 {
 		result.CapturedJSON = c.CapturedJSON()
 	}
+	result.Judged, result.Failed = c.judged()
 	return result
 }

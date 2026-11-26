@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLIAgentOutput .* / passes, noting that the census was skipped / a -json run \(
+Clause: when a text or a -json run is given -count=0 → passes, noting that the census was skipped
+--- a/internal/gotestrunner/census.go
++++ b/internal/gotestrunner/census.go
+@@ -489,7 +489,7 @@ func (c *OutputCollector) takeCensus(cfg PipelineConfig, declared DeclaredUnits,
+ // binary's, runs nothing, and nor does a binary asked for its usage.
+ func censusAside(cfg PipelineConfig, runFlags []string) string { //nolint:gocritic // hugeParam: once per run
+ 	switch {
+-	case countsZero(cfg.GoTestArgs, runFlags):
++	case false:
+ 		return "-count=0"
+ 	case asksUsage(cfg.GoTestArgs):
+ 		return "-args -h"

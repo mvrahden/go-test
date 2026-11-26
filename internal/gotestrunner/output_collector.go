@@ -59,6 +59,16 @@ type OutputCollector struct {
 	// manifest opens the JSON stream and makes the run close it; nil for a
 	// stream that is neither opened nor closed.
 	manifest *protocol.Manifest
+	// censusAside is why the census does not judge this test run beyond
+	// its patterns and groups, "" when it does (see censusAside).
+	censusAside string
+	// ran are the suites and fuzz wrappers whose binary reported a result
+	// in a text run, which keeps no stream for the census to read.
+	ran []CensusCase
+	// missing are the units the census found without a verdict; notRun is
+	// their count, nil when the census did not judge the run.
+	missing []CensusCase
+	notRun  *int
 }
 
 type pkgState struct {
@@ -78,6 +88,15 @@ type OutputOption func(*OutputCollector)
 // WithEvents tees the JSON stream into w as it is written; nil for none.
 func WithEvents(w io.Writer) OutputOption {
 	return func(c *OutputCollector) { c.events = w }
+}
+
+// WithStdout sends the JSON stream to w in place of os.Stdout; nil keeps it.
+func WithStdout(w io.Writer) OutputOption {
+	return func(c *OutputCollector) {
+		if w != nil {
+			c.stdout = w
+		}
+	}
 }
 
 // WithManifest opens the JSON stream with m, and has EndRun close it; nil for
@@ -180,6 +199,12 @@ func (c *OutputCollector) recordResultLocked(pkg string, idx int, r SuiteResult)
 	if c.holdToTests && r.ExitCode == 0 && r.Target.SuiteName != "" && !r.Target.Bench && warnsNoTests(r.Stderr) {
 		r.ExitCode = 2
 		r.Stderr = append(r.Stderr, fmt.Sprintf("gotest: %s ran no tests: the test binary holds no such function, so the generated harness was not part of the build; rerun with --debug to inspect it\n", r.Target.SuiteName)...)
+	}
+	if c.mode == RunBatchText && r.Target.SuiteName != "" && !r.Target.Bench && reportsResult(r.Stdout) {
+		c.ran = append(c.ran, CensusCase{Pkg: pkg, Path: r.Target.SuiteName})
+		for _, f := range r.Target.FuzzFuncs {
+			c.ran = append(c.ran, CensusCase{Pkg: pkg, Path: f})
+		}
 	}
 	if note != "" {
 		r.Stderr = append(r.Stderr, note...)
@@ -391,7 +416,7 @@ func (c *OutputCollector) RecordGivenUp(pkg string, idx int, suite, reason strin
 		writeJSONLine(&w, map[string]any{"Time": now, "Action": "fail", "Package": pkg, "Test": suite, "Elapsed": 0})
 		_, _ = c.jsonWriter().Write(stampBlock(w.Bytes()))
 	}
-	c.recordResultLocked(pkg, idx, SuiteResult{Stderr: []byte(reason + "\n"), ExitCode: 1})
+	c.recordResultLocked(pkg, idx, SuiteResult{Target: SuiteTarget{SuiteSpec: SuiteSpec{Package: pkg, SuiteName: suite}}, Stderr: []byte(reason + "\n"), ExitCode: 1})
 }
 
 // RecordStopped books a suite a stop kept from starting: skipped with the
@@ -400,7 +425,7 @@ func (c *OutputCollector) RecordStopped(pkg string, idx int, suite string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	skip := "--- SKIP: " + suite + " (0.00s)\n"
-	r := SuiteResult{ExitCode: 1}
+	r := SuiteResult{Target: SuiteTarget{SuiteSpec: SuiteSpec{Package: pkg, SuiteName: suite}}, ExitCode: 1}
 	if c.mode == RunBatchText {
 		r.Stdout = []byte(skip + "    run stopping\n")
 	} else {

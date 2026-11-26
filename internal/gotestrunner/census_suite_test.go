@@ -8,6 +8,7 @@ import (
 
 	"github.com/mvrahden/go-test/internal/gotestrunner"
 	"github.com/mvrahden/go-test/internal/gotestspec"
+	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -187,7 +188,6 @@ func (s *CensusTestSuite) TestEnforcementRules(t *gotest.T) {
 			{Desc: "the run is already red", mode: gotestrunner.RunCaptureJSON, code: 1},
 			{Desc: "an interrupt cut it short", mode: gotestrunner.RunCaptureJSON, code: 130, err: context.Canceled},
 			{Desc: "its deadline cut it short", mode: gotestrunner.RunCaptureJSON, err: context.DeadlineExceeded},
-			{Desc: "the text run keeps no event stream", mode: gotestrunner.RunBatchText},
 		}) {
 			code, stderr, booked := gotestrunner.ExportCensus(tc.mode, censusGreenStream, declared, nil, false, tc.code, tc.err)
 			gotest.Equal(sub, tc.code, code)
@@ -195,6 +195,77 @@ func (s *CensusTestSuite) TestEnforcementRules(t *gotest.T) {
 			gotest.Empty(sub, booked)
 		}
 	})
+}
+
+// passed is a text run's suite result whose binary printed its result line.
+func passed(suite string, fuzz ...string) gotestrunner.SuiteResult {
+	return gotestrunner.SuiteResult{Target: gotestrunner.SuiteTarget{SuiteSpec: gotestrunner.SuiteSpec{SuiteName: suite}, FuzzFuncs: fuzz}, Stdout: []byte("PASS\n")}
+}
+
+func (s *CensusTestSuite) TestTextRuns(t *gotest.T) {
+	declared := gotestrunner.DeclaredUnits{
+		Tests: []unit{
+			{Pkg: censusPkg, Path: "TestCartTestSuite/TestAdd"},
+			{Pkg: censusPkg, Path: "TestCartTestSuite/TestTotal"},
+			{Pkg: "example.com/other", Path: "TestOtherTestSuite/TestAdd"},
+		},
+		Fuzz: []unit{{Pkg: censusPkg, Path: "FuzzCartTestSuite_FuzzTrim"}},
+	}
+	silent := gotestrunner.SuiteResult{Target: gotestrunner.SuiteTarget{SuiteSpec: gotestrunner.SuiteSpec{SuiteName: "TestOtherTestSuite"}}}
+
+	t.When("every suite's binary printed its result line", func(w *gotest.T) {
+		code, stderr, judged, _ := gotestrunner.ExportTextCensus([]gotestrunner.ExportPackageResult{
+			{Pkg: censusPkg, Result: passed("TestCartTestSuite", "FuzzCartTestSuite_FuzzTrim")},
+			{Pkg: "example.com/other", Result: passed("TestOtherTestSuite")},
+		}, declared, gotestrunner.PipelineConfig{})
+		w.It("stays green and counts 0 units not run", func(it *gotest.T) {
+			gotest.Equal(it, 0, code)
+			gotest.Empty(it, stderr)
+			gotest.NotZero(it, judged.NotRun)
+			gotest.Equal(it, 0, *judged.NotRun)
+			gotest.Equal(it, 2, judged.Packages.Passed)
+		})
+	})
+
+	t.When("a suite's binary exited 0 without its result line", func(w *gotest.T) {
+		code, stderr, judged, failed := gotestrunner.ExportTextCensus([]gotestrunner.ExportPackageResult{
+			{Pkg: censusPkg, Result: passed("TestCartTestSuite", "FuzzCartTestSuite_FuzzTrim")},
+			{Pkg: "example.com/other", Result: silent},
+		}, declared, gotestrunner.PipelineConfig{})
+		w.It("exits 2 and names the suite's declared tests as never ran", func(it *gotest.T) {
+			gotest.Equal(it, 2, code)
+			gotest.Equal(it, "\nFAIL: census: 1 declared test(s) never ran\n  example.com/other TestOtherTestSuite/TestAdd\n", stderr)
+		})
+		w.It("fails the package and records the unit for --failed", func(it *gotest.T) {
+			gotest.Equal(it, 1, *judged.NotRun)
+			gotest.Equal(it, protocolTally(1, 1, 0), judged.Packages)
+			gotest.Equal(it, []protocol.FailedUnit{{Package: "example.com/other", Test: "TestOtherTestSuite/TestAdd"}}, failed)
+		})
+	})
+
+	t.When("the run gives -count=0", func(w *gotest.T) {
+		for sub, args := range gotest.Each(w, [][]string{{"-count=0"}, {"-args", "-test.count=0"}}) {
+			code, stderr, judged, _ := gotestrunner.ExportTextCensus([]gotestrunner.ExportPackageResult{{Pkg: "example.com/other", Result: silent}}, declared, gotestrunner.PipelineConfig{GoTestArgs: args})
+			gotest.Equal(sub, 0, code)
+			gotest.Contains(sub, stderr, "note: census skipped under -count=0")
+			gotest.Zero(sub, judged.NotRun)
+		}
+	})
+
+	t.When("--failed reruns one method", func(w *gotest.T) {
+		only := gotestrunner.RerunSelection([]protocol.FailedUnit{{Package: censusPkg, Test: "TestCartTestSuite/TestTotal"}})
+		code, stderr, _, _ := gotestrunner.ExportTextCensus([]gotestrunner.ExportPackageResult{
+			{Pkg: censusPkg, Result: gotestrunner.SuiteResult{Target: gotestrunner.SuiteTarget{SuiteSpec: gotestrunner.SuiteSpec{SuiteName: "TestCartTestSuite"}}}},
+		}, declared, gotestrunner.PipelineConfig{Only: only})
+		w.It("holds the run to that method alone", func(it *gotest.T) {
+			gotest.Equal(it, 2, code)
+			gotest.Equal(it, "\nFAIL: census: 1 declared test(s) never ran\n  example.com/pkg TestCartTestSuite/TestTotal\n", stderr)
+		})
+	})
+}
+
+func protocolTally(passed, failed, skipped int) protocol.Tally {
+	return protocol.Tally{Passed: passed, Failed: failed, Skipped: skipped}
 }
 
 func (s *CensusTestSuite) TestBenchRuns(t *gotest.T) {

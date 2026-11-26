@@ -14,7 +14,7 @@ Clause: when a -json run with --events-file is killed while a suite holds → ke
  	"fmt"
  	"io"
  	"os"
-@@ -203,6 +204,11 @@
+@@ -227,6 +228,11 @@ func runText(inv Invocation, own OwnFlags, goTestArgs []string, jsonMode bool, a
  	}
  	cfg.JSON = jsonMode
  	cfg.Events = eventsWriter(events)
@@ -23,6 +23,6 @@ Clause: when a -json run with --events-file is killed while a suite holds → ke
 +		defer bw.Flush()
 +		cfg.Events = bw
 +	}
- 
- 	code := enforceCoverage(coverProfile, minCoverage, Run(cfg))
- 	gotestrunner.EndRun(code)
+ 	cfg.Agent = agent
+ 	// A text run's manifest is only recorded, so it is read beside the run.
+ 	manifest := make(chan *protocol.Manifest, 1)

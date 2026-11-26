@@ -4503,6 +4503,741 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "prints on stdout the failing method's output and no line of the passing package",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "agentoutput_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 42,
+                      "name": "prints_on_stdout_the_failing_method's_output_and_no_line_of_the_passing_package",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "ends stdout with the closing line naming FAIL, exit 1, the tests counted and the command that reruns the failures",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "agentoutput_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 47,
+                      "name": "ends_stdout_with_the_closing_line_naming_FAIL,_exit_1,_the_tests_counted_and_the_command_that_reruns_the_failures",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "says first on stderr that agent output is on under CLAUDECODE=1 and that GOTEST_AGENT=0 turns it off",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "agentoutput_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 50,
+                      "name": "says_first_on_stderr_that_agent_output_is_on_under_CLAUDECODE=1_and_that_GOTEST_AGENT=0_turns_it_off",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a text run of a failing and a passing package is made under CLAUDECODE=1",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "agentoutput_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 41,
+                  "name": "a_text_run_of_a_failing_and_a_passing_package_is_made_under_CLAUDECODE=1",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AFailingRunUnderAnAgent",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "agentoutput_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 36,
+              "name": "TestAFailingRunUnderAnAgent",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "--agent=false",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "agentoutput_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 65,
+                          "name": "--agent=false",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "GOTEST_AGENT=0",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "agentoutput_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 66,
+                          "name": "GOTEST_AGENT=0",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "prints go test's text, the passing package's ok line included, and no word of agent output",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "agentoutput_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 59,
+                      "name": "prints_go_test's_text,_the_passing_package's_ok_line_included,_and_no_word_of_agent_output",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a text run under CLAUDECODE=1 is given --agent=false, or GOTEST_AGENT=0",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "agentoutput_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 58,
+                  "name": "a_text_run_under_CLAUDECODE=1_is_given_--agent=false,_or_GOTEST_AGENT=0",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AgentOutputTurnedOff",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "agentoutput_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 57,
+              "name": "TestAgentOutputTurnedOff",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "--agent",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "agentoutput_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 86,
+                          "name": "--agent",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "GOTEST_AGENT=1",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "agentoutput_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 87,
+                          "name": "GOTEST_AGENT=1",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "prints no ok line and ends stdout with the closing line",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "agentoutput_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 80,
+                      "name": "prints_no_ok_line_and_ends_stdout_with_the_closing_line",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a text run with no agent variable is given --agent, or GOTEST_AGENT=1",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "agentoutput_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 79,
+                  "name": "a_text_run_with_no_agent_variable_is_given_--agent,_or_GOTEST_AGENT=1",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AgentOutputAskedFor",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "agentoutput_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 78,
+              "name": "TestAgentOutputAskedFor",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "prints on stdout go test's text alone",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "agentoutput_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 104,
+                      "name": "prints_on_stdout_go_test's_text_alone",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "ends stderr with the closing line naming PASS, exit 0 and 1 package passed",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "agentoutput_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 107,
+                      "name": "ends_stderr_with_the_closing_line_naming_PASS,_exit_0_and_1_package_passed",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a text run of a passing package ends",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "agentoutput_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 103,
+                  "name": "a_text_run_of_a_passing_package_ends",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "APassingTextRun",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "agentoutput_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 98,
+              "name": "TestAPassingTextRun",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "a text run",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "agentoutput_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 120,
+                          "name": "a_text_run",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "a -json run",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "agentoutput_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 121,
+                          "name": "a_-json_run",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "passes, noting that the census was skipped",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "agentoutput_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 115,
+                      "name": "passes,_noting_that_the_census_was_skipped",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a text or a -json run is given -count=0",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "agentoutput_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 114,
+                  "name": "a_text_or_a_-json_run_is_given_-count=0",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ARunGivenCountZero",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "agentoutput_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 113,
+              "name": "TestARunGivenCountZero",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "its record names the failing method and exit code 1",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "agentoutput_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 164,
+                      "name": "its_record_names_the_failing_method_and_exit_code_1",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "the module holds no file it did not hold before",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "agentoutput_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 173,
+                      "name": "the_module_holds_no_file_it_did_not_hold_before",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a text run of a failing package ends",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "agentoutput_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 163,
+                  "name": "a_text_run_of_a_failing_package_ends",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "TheRecordOfAFailingRun",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "agentoutput_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 150,
+              "name": "TestTheRecordOfAFailingRun",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "runs only the failed method and exits 1",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "agentoutput_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 203,
+                      "name": "runs_only_the_failed_method_and_exits_1",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "-json --failed streams the failed method's verdict and no other method's",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "agentoutput_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 209,
+                      "name": "-json_--failed_streams_the_failed_method's_verdict_and_no_other_method's",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "spec --failed renders the failed method and no other",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "agentoutput_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 213,
+                      "name": "spec_--failed_renders_the_failed_method_and_no_other",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when --failed follows a run in which one method of a suite failed and one passed, beside a passing package",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "agentoutput_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 202,
+                  "name": "--failed_follows_a_run_in_which_one_method_of_a_suite_failed_and_one_passed,_beside_a_passing_package",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "RerunningAFailedMethod",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "agentoutput_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 190,
+              "name": "TestRerunningAFailedMethod",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "no record",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "agentoutput_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 231,
+                          "name": "no_record",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "a run that failed nothing",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "agentoutput_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 232,
+                          "name": "a_run_that_failed_nothing",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "a package that did not fail",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "agentoutput_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 233,
+                          "name": "a_package_that_did_not_fail",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "runs nothing and exits 2, saying why on stderr",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "agentoutput_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 224,
+                      "name": "runs_nothing_and_exits_2,_saying_why_on_stderr",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when --failed is given without a record, after a run that failed nothing, or with a package that did not fail",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "agentoutput_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 223,
+                  "name": "--failed_is_given_without_a_record,_after_a_run_that_failed_nothing,_or_with_a_package_that_did_not_fail",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "NothingToRerun",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "agentoutput_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 222,
+              "name": "TestNothingToRerun",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "a TestMain that never calls m.Run",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "agentoutput_unix_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 26,
+                          "name": "a_TestMain_that_never_calls_m.Run",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "-exec true",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "agentoutput_unix_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 27,
+                          "name": "-exec_true",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "fails with exit 2, naming on stderr the suite's declared test as never ran",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "agentoutput_unix_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 20,
+                      "name": "fails_with_exit_2,_naming_on_stderr_the_suite's_declared_test_as_never_ran",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "a TestMain that never calls m.Run",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "agentoutput_unix_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 38,
+                          "name": "a_TestMain_that_never_calls_m.Run",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "-exec true",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "agentoutput_unix_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 39,
+                          "name": "-exec_true",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "the closing line counts 1 test not run",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "agentoutput_unix_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 33,
+                      "name": "the_closing_line_counts_1_test_not_run",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a text run's suite binary exits 0 having run nothing, under a TestMain that never calls m.Run or under -exec true",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "agentoutput_unix_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 19,
+                  "name": "a_text_run's_suite_binary_exits_0_having_run_nothing,_under_a_TestMain_that_never_calls_m.Run_or_under_-exec_true",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ASuiteBinaryThatNeverRunsItsTests",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "agentoutput_unix_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 13,
+              "name": "TestASuiteBinaryThatNeverRunsItsTests",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLIAgentOutput",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "agentoutput_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 18,
+          "name": "TestCLIAgentOutputTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "exits 2, reports each finding under its own package and runs the third",
                       "duration": 0,
                       "excluded": false,
@@ -35064,13 +35799,13 @@
     }
   ],
   "stats": {
-    "behaviors": 1014,
+    "behaviors": 1037,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 148,
+    "suites": 149,
     "tests": 0
   }
 }
