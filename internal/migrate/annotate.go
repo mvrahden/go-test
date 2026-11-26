@@ -301,23 +301,9 @@ func (u *unit) unconvertedCall(f *ast.File, call *ast.CallExpr, tName, kind stri
 		_, _, why := u.mapAssertion(f, name, args)
 		return why
 	}
-	// on is the T the advised rewrite passes: the soft one for an assertion
-	// that went on after failing, as the migration writes it.
-	soft := base != "FailNow"
-	on := func(t string) string {
-		switch {
-		case !soft:
-			return t
-		case kind == "testing":
-			return "gotest.NewT(" + t + ").Soft()"
-		}
-		return t + ".Soft()"
-	}
-	spread := func() string {
-		if mapped && base != name && call.Ellipsis.IsValid() {
-			return name + " spreads args after its message, which gotest." + gotestName + " cannot take — rewrite as gotest." + gotestName + "(" + on("t") + ", ..., append([]any{msg}, args...)...)"
-		}
-		return ""
+	spread := ""
+	if mapped && base != name && call.Ellipsis.IsValid() {
+		spread = name + " spreads args after its message, which gotest." + gotestName + " cannot take — rewrite as gotest." + gotestName + "(t, ..., append([]any{msg}, args...)...)"
 	}
 
 	switch x := sel.X.(type) {
@@ -327,18 +313,17 @@ func (u *unit) unconvertedCall(f *ast.File, call *ast.CallExpr, tName, kind stri
 		if !ok || u.suiteVar(inner.X) == nil || (inner.Sel.Name != "Require" && inner.Sel.Name != "Assert") {
 			return ""
 		}
-		soft = soft && inner.Sel.Name == "Assert"
 		switch {
 		case !mapped:
 			return unmappedReason(name)
 		case why(call.Args) != "":
 			return why(call.Args)
-		case spread() != "":
-			return spread()
+		case spread != "":
+			return spread
 		case kind == "":
-			return "assertion " + name + " outside a migrated method — no t is in scope here; pass t in and rewrite as gotest." + gotestName + "(" + on("t") + ", ...)"
+			return "assertion " + name + " outside a migrated method — no t is in scope here; pass t in and rewrite as gotest." + gotestName + "(t, ...)"
 		}
-		return "unconverted assertion " + name + " — rewrite as gotest." + gotestName + "(" + on(tName) + ", ...)"
+		return "unconverted assertion " + name + " — rewrite as gotest." + gotestName + "(" + tName + ", ...)"
 	case *ast.Ident:
 		// assert.X(...) or require.X(...) in suite code: mapped names
 		// were rewritten where they could be, and still compile otherwise.
@@ -374,12 +359,12 @@ func (u *unit) unconvertedCall(f *ast.File, call *ast.CallExpr, tName, kind stri
 			return v.Name + ".Run has no gotest equivalent — use t.It(name, func(t *gotest.T) {...}) in a method with t"
 		case mapped && why(call.Args) != "":
 			return why(call.Args)
-		case spread() != "":
-			return spread()
+		case spread != "":
+			return spread
 		case isTestifyAssertionName(name) && mapped && kind == "":
-			return "assertion " + name + " outside a migrated method — no t is in scope here; pass t in and rewrite as gotest." + gotestName + "(" + on("t") + ", ...)"
+			return "assertion " + name + " outside a migrated method — no t is in scope here; pass t in and rewrite as gotest." + gotestName + "(t, ...)"
 		case isTestifyAssertionName(name) && mapped:
-			return "unconverted assertion " + name + " — rewrite as gotest." + gotestName + "(" + on(tName) + ", ...)"
+			return "unconverted assertion " + name + " — rewrite as gotest." + gotestName + "(" + tName + ", ...)"
 		case isTestifyAssertionName(name):
 			return unmappedReason(name)
 		}

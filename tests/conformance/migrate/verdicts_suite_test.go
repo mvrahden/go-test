@@ -119,7 +119,7 @@ func (s *MigrateVerdictsTestSuite) TestNotNilOnAnInterface(t *gotest.T) {
 			gotest.Equal(it, 1, exit, out)
 			gotest.Regexp(it, `// TODO\(gotest-migrate\): testify NotNil on interface type error fails a typed nil inside it, which gotest\.NotZero passes, and passes a non-nilable value inside it, which gotest\.NotNil fails[^\n]*\n\ts\.NotNil\(err\)\n`, out)
 			gotest.Regexp(it, `// TODO\(gotest-migrate\): testify NotNil on interface type any fails a typed nil inside it[^\n]*\n\ts\.Require\(\)\.NotNil\(v\)\n`, out)
-			gotest.Contains(it, out, "\tgotest.NotNil(t.Soft(), p)\n")
+			gotest.Contains(it, out, "\tgotest.NotNil(t, p)\n")
 		})
 	})
 }
@@ -175,7 +175,7 @@ func (s *VSuite) TestA() {
 			gotest.Regexp(it, `// TODO\(gotest-migrate\): testify NotEqual compared a \[\]int with a IDs, types it never finds equal[^\n]*\n\ts\.NotEqual\(\[\]int\{1\}, ids\)\n`, out)
 		})
 		w.It("an interface compared with a value it holds is translated with Equal instantiated with the interface", func(it *gotest.T) {
-			gotest.Contains(it, out, "\tgotest.NotEqual[error](t.Soft(), err, &failure{})\n")
+			gotest.Contains(it, out, "\tgotest.NotEqual[error](t, err, &failure{})\n")
 		})
 	})
 }
@@ -445,7 +445,7 @@ func (s *MigrateVerdictsTestSuite) TestAVendoredWorkspace(t *gotest.T) {
 			mig, err := testkit.RunCLIWithEnv(it.Context(), dir, []string{work}, "migrate", "./...")
 			gotest.NoError(it, err)
 			gotest.Equal(it, 0, mig.Exit, "stdout: %s\nstderr: %s", mig.Stdout, mig.Stderr)
-			gotest.Contains(it, readFile(it, dir, "p/a_test.go"), "gotest.True(t.Soft(), true)")
+			gotest.Contains(it, readFile(it, dir, "p/a_test.go"), "gotest.True(t, true)")
 		})
 	})
 	t.When("a workspace vendors its modules and the module cache is empty", func(w *gotest.T) {
@@ -459,7 +459,7 @@ func (s *MigrateVerdictsTestSuite) TestAVendoredWorkspace(t *gotest.T) {
 			mig, err := testkit.RunCLIWithEnv(it.Context(), dir, append(offline(it), work), "migrate", "./...")
 			gotest.NoError(it, err)
 			gotest.Equal(it, 0, mig.Exit, "stdout: %s\nstderr: %s", mig.Stdout, mig.Stderr)
-			gotest.Contains(it, readFile(it, dir, "p/a_test.go"), "gotest.True(t.Soft(), true)")
+			gotest.Contains(it, readFile(it, dir, "p/a_test.go"), "gotest.True(t, true)")
 		})
 	})
 }
@@ -477,7 +477,7 @@ func (s *MigrateVerdictsTestSuite) TestAWorkspaceTurnedOffByGoEnv(t *gotest.T) {
 			mig, err := testkit.RunCLIWithEnv(it.Context(), dir, append(offline(it), "GOENV="+goenv, "GOWORK="), "migrate", "./...")
 			gotest.NoError(it, err)
 			gotest.Equal(it, 0, mig.Exit, "stdout: %s\nstderr: %s", mig.Stdout, mig.Stderr)
-			gotest.Contains(it, readFile(it, dir, "p/a_test.go"), "gotest.True(t.Soft(), true)")
+			gotest.Contains(it, readFile(it, dir, "p/a_test.go"), "gotest.True(t, true)")
 		})
 	})
 }
@@ -581,7 +581,7 @@ func (s *MigrateVerdictsTestSuite) TestCommentsTrailingConvertedCalls(t *gotest.
 }
 `)})
 			gotest.Equal(it, 0, exit, out)
-			gotest.Contains(it, out, "func (s *VTestSuite) TestA(t *gotest.T) {\n\tgotest.Equal(t, 1, 1)              // one\n\tgotest.Equal(t.Soft(), 1, 1)       // two\n\tt.It(\"nested\", func(t *gotest.T) { // three\n\t\tgotest.Equal(t.Soft(), 1, 1) // four\n\t})\n}\n")
+			gotest.Contains(it, out, "func (s *VTestSuite) TestA(t *gotest.T) {\n\tgotest.Equal(t, 1, 1)              // one\n\tgotest.Equal(t, 1, 1)              // two\n\tt.It(\"nested\", func(t *gotest.T) { // three\n\t\tgotest.Equal(t, 1, 1) // four\n\t})\n}\n")
 		})
 	})
 }
@@ -602,10 +602,10 @@ func (s *MigrateVerdictsTestSuite) TestAssertionsWithAnExactGotestForm(t *gotest
 `)})
 			gotest.Equal(it, 0, exit, out)
 			for _, want := range []string{
-				"\tgotest.TimeWithin(t.Soft(), now, now, time.Second)\n",
-				"\tgotest.Greater(t.Soft(), 1, 0)\n",
-				"\tgotest.Less(t.Soft(), -1, 0)\n",
-				"\t\tgotest.Fail(t.Soft(), \"zero time\")\n\t\tgotest.Fail(t, \"zero time\")\n",
+				"\tgotest.TimeWithin(t, now, now, time.Second)\n",
+				"\tgotest.Greater(t, 1, 0)\n",
+				"\tgotest.Less(t, -1, 0)\n",
+				"\t\tgotest.Fail(t, \"zero time\")\n\t\tgotest.Fail(t, \"zero time\")\n",
 			} {
 				gotest.Contains(it, out, want)
 			}
@@ -627,8 +627,8 @@ func (s *MigrateVerdictsTestSuite) TestAssertionsWithAnExactGotestForm(t *gotest
 }
 
 func (s *MigrateVerdictsTestSuite) TestWhatMigrateDidNotKeep(t *gotest.T) {
-	t.When("migrate converts a suite under a runner of another name, beside a plain testify test", func(w *gotest.T) {
-		w.It("the summary counts the stdlib tests left and lists the id that changed", func(it *gotest.T) {
+	t.When("migrate converts a suite with soft assertions, under a runner of another name, beside a plain testify test", func(w *gotest.T) {
+		w.It("the summary counts the assertions that now stop the test and the stdlib tests left, and lists the id that changed", func(it *gotest.T) {
 			dir := it.TempDir()
 			gotest.NoError(it, s.Mod.Write(dir, map[string]string{"p/a_test.go": `package p
 
@@ -655,6 +655,7 @@ func TestPlain(t *testing.T) { require.True(t, true) }
 			gotest.NoError(it, err)
 			gotest.Equal(it, 0, mig.Exit, "stdout: %s\nstderr: %s", mig.Stdout, mig.Stderr)
 			gotest.Contains(it, mig.Stdout, "Not kept, check by hand:\n"+
+				"  assertions that let a test go on after failing and now stop it (s.X, s.Assert().X, assert.X): 2\n"+
 				"  stdlib tests left as they are, which gotest does not run (go test still does): 1\n"+
 				"  go test ids that changed, so a -run filter or a CI step naming the old one matches nothing:\n"+
 				"    TestHooks → TestHooksTestSuite\n")
@@ -679,63 +680,6 @@ func TestVTestSuite(t *testing.T) { suite.Run(t, new(VSuite)) }
 			gotest.NoError(it, err)
 			gotest.Equal(it, 0, mig.Exit, "stdout: %s\nstderr: %s", mig.Stdout, mig.Stderr)
 			gotest.NotContains(it, mig.Stdout, "Not kept")
-		})
-	})
-}
-
-// softSrc fails each soft assertion, then calls FailNow.
-const softSrc = `package p
-
-import (
-	"fmt"
-	"testing"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/suite"
-)
-
-type SoftSuite struct{ suite.Suite }
-
-func (s *SoftSuite) TestA() {
-	s.Equal(1, 2)
-	s.Assert().True(false)
-	assert.Equal(s.T(), "a", "b")
-	fmt.Println("RAN past the soft assertions")
-	s.Require().True(true)
-	s.FailNow("stop")
-	fmt.Println("RAN past FailNow")
-}
-
-func TestSoft(t *testing.T) { suite.Run(t, new(SoftSuite)) }
-`
-
-func (s *MigrateVerdictsTestSuite) TestAssertionsThatGoOnAfterFailing(t *gotest.T) {
-	t.When("a suite calls s.X, s.Assert().X and assert.X beside s.Require().X and FailNow", func(w *gotest.T) {
-		dir := w.TempDir()
-		gotest.NoError(w, s.Mod.Write(dir, map[string]string{"p/a_test.go": softSrc}))
-		mig, err := testkit.RunCLIWithEnv(w.Context(), dir, moduleEnv, "migrate", "./...")
-		gotest.NoError(w, err)
-		out := readFile(w, dir, "p/a_test.go")
-
-		w.It("migrate writes the first three on t.Soft() and the others on t", func(it *gotest.T) {
-			gotest.Equal(it, 0, mig.Exit, "stdout: %s\nstderr: %s", mig.Stdout, mig.Stderr)
-			gotest.Contains(it, out, "func (s *SoftTestSuite) TestA(t *gotest.T) {\n"+
-				"\tgotest.Equal(t.Soft(), 1, 2)\n"+
-				"\tgotest.True(t.Soft(), false)\n"+
-				"\tgotest.Equal(t.Soft(), \"a\", \"b\")\n"+
-				"\tfmt.Println(\"RAN past the soft assertions\")\n"+
-				"\tgotest.True(t, true)\n"+
-				"\tgotest.Fail(t, \"stop\")\n")
-		})
-
-		w.It("the migrated test goes on past a failing soft assertion and fails", func(it *gotest.T) {
-			run, err := testkit.RunCLIWithEnv(it.Context(), dir, moduleEnv, "-json", "./...")
-			gotest.NoError(it, err)
-			gotest.Equal(it, 1, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
-			gotest.Equal(it, "fail", run.Verdict("TestSoftTestSuite/TestA"), "stdout: %s", run.Stdout)
-			gotest.Contains(it, run.Stdout, "RAN past the soft assertions")
-			gotest.NotContains(it, run.Stdout, "RAN past FailNow")
-			gotest.NotContains(it, run.Stderr, "RAN past")
 		})
 	})
 }

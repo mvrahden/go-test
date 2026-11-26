@@ -566,10 +566,10 @@ func (s *MigrateCompileTestSuite) TestMappedAssertions(t *gotest.T) {
 
 	t.It("maps every assertion gotest has, the suite's own methods included", func(it *gotest.T) {
 		for _, line := range []string{
-			"gotest.NotZero(t.Soft(), x)", "gotest.Same(t.Soft(), p, q)", "gotest.NotSame(t.Soft(), p, new(int))",
-			"gotest.ElementsMatch(t.Soft(), []int{1, 2}, []int{2, 1})", "gotest.Subset(t.Soft(), []int{1, 2}, []int{1})",
-			`gotest.NotContains(t.Soft(), "abc", "z")`, `gotest.Regexp(t.Soft(), "^a", "abc")`, "gotest.InDelta(t.Soft(), 1.0, 1.05, 0.1)",
-			"gotest.JSONEq(t.Soft(), `{\"a\":1}`, `{ \"a\": 1 }`)", `gotest.Panics(t.Soft(), func() { panic("x") })`, "gotest.Equal(t.Soft(), 1, x)",
+			"gotest.NotZero(t, x)", "gotest.Same(t, p, q)", "gotest.NotSame(t, p, new(int))",
+			"gotest.ElementsMatch(t, []int{1, 2}, []int{2, 1})", "gotest.Subset(t, []int{1, 2}, []int{1})",
+			`gotest.NotContains(t, "abc", "z")`, `gotest.Regexp(t, "^a", "abc")`, "gotest.InDelta(t, 1.0, 1.05, 0.1)",
+			"gotest.JSONEq(t, `{\"a\":1}`, `{ \"a\": 1 }`)", `gotest.Panics(t, func() { panic("x") })`, "gotest.Equal(t, 1, x)",
 		} {
 			gotest.Contains(it, out, "\t"+line+"\n")
 		}
@@ -1058,8 +1058,8 @@ func (s *MigrateCompileTestSuite) TestFormattedAssertions(t *gotest.T) {
 	t.It("maps each ...f variant to its assertion, the message and args trailing", func(it *gotest.T) {
 		gotest.Contains(it, out, "\tgotest.Equal(t, 2, 1+1, \"sum of %d and %d\", 1, 1)\n")
 		gotest.Contains(it, out, "\tgotest.NoError(t, err, \"load %s\", \"x\")\n")
-		gotest.Contains(it, out, "\tgotest.True(t.Soft(), true, \"plain\")\n")
-		gotest.Contains(it, out, "\tgotest.Len(t.Soft(), []int{1}, 1, \"len %v\", 1)\n")
+		gotest.Contains(it, out, "\tgotest.True(t, true, \"plain\")\n")
+		gotest.Contains(it, out, "\tgotest.Len(t, []int{1}, 1, \"len %v\", 1)\n")
 		gotest.Contains(it, out, "\tgotest.Empty(t, \"\", \"empty\")\n")
 	})
 

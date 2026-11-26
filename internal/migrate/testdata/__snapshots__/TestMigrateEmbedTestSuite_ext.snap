@@ -65,7 +65,7 @@ func (s *ChildTestSuite) AfterEach(t *gotest.T) {
 }
 
 func (s *ChildTestSuite) TestOwn(t *gotest.T) {
-	gotest.Equal(t.Soft(), 1, s.base.n)
+	gotest.Equal(t, 1, s.base.n)
 	fmt.Println("RAN child TestOwn")
 }
 
@@ -81,7 +81,7 @@ import (
 type BaseSuite struct{}
 
 func (b *BaseSuite) TestShared(t *gotest.T) {
-	gotest.True(t.Soft(), true)
+	gotest.True(t, true)
 	fmt.Println("RAN base TestShared")
 }
 
@@ -118,7 +118,7 @@ func seeded() *ChildTestSuite { return &ChildTestSuite{base: BaseSuite{n: 4}, m:
 
 func (s *ChildTestSuite) TestLiteral(t *gotest.T) {
 	c := seeded()
-	gotest.Equal(t.Soft(), 9, c.base.n+c.m)
+	gotest.Equal(t, 9, c.base.n+c.m)
 	fmt.Println("RAN child TestLiteral")
 }
 
@@ -168,10 +168,7 @@ type RootSuite struct {
 }
 
 func (r *RootSuite) BeforeEach(t *gotest.T) { r.n = 1; fmt.Println("RAN root SetupTest") }
-func (r *RootSuite) TestRoot(t *gotest.T) {
-	gotest.Equal(t.Soft(), 1, r.n)
-	fmt.Println("RAN root TestRoot")
-}
+func (r *RootSuite) TestRoot(t *gotest.T)   { gotest.Equal(t, 1, r.n); fmt.Println("RAN root TestRoot") }
 
 type MidSuite struct {
 	base RootSuite
@@ -183,7 +180,7 @@ func (m *MidSuite) BeforeEach(t *gotest.T) {
 
 func (m *MidSuite) BeforeAll(t *gotest.T) { fmt.Println("RAN mid SetupSuite") }
 func (m *MidSuite) TestMid(t *gotest.T) {
-	gotest.Equal(t.Soft(), 1, m.base.n)
+	gotest.Equal(t, 1, m.base.n)
 	fmt.Println("RAN mid TestMid")
 }
 
@@ -204,7 +201,7 @@ func (s *LeafTestSuite) BeforeEach(t *gotest.T) {
 }
 
 func (s *LeafTestSuite) TestLeaf(t *gotest.T) {
-	gotest.Equal(t.Soft(), 1, s.base.base.n)
+	gotest.Equal(t, 1, s.base.base.n)
 	s.base.base.n = 2
 	fmt.Println("RAN leaf TestLeaf", s.base.base.n)
 }
@@ -243,7 +240,7 @@ func (s *ChildTestSuite) BeforeEach(t *gotest.T) {
 }
 
 func (s *ChildTestSuite) TestHook(t *gotest.T) {
-	gotest.Equal(t.Soft(), 2, s.m)
+	gotest.Equal(t, 2, s.m)
 	fmt.Println("RAN child TestHook")
 }
 

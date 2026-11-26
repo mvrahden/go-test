@@ -32,6 +32,9 @@ type unitFile struct {
 	// generated: the file is headed "Code generated ... DO NOT EDIT." and
 	// is left as it is; its generator owns it.
 	generated bool
+	// soft counts the assertions converted from a form that let the test
+	// go on after failing: gotest's stop it.
+	soft int
 }
 
 // skipped reports whether the migration leaves uf as it is: generated, or
@@ -86,7 +89,7 @@ type suiteDecl struct {
 	// testifyHooks names the testify hooks the suite declares.
 	testifyHooks map[string]bool
 	// setupStops: the SetupSuite testify ran on it, its own or a base's,
-	// can stop early, on a fatal assertion or call or a panic.
+	// can stop early, on an assertion, a fatal call or a panic.
 	setupStops bool
 	// st is the struct of a suite that embeds its base; embeds are the
 	// fields it does so through.
@@ -706,8 +709,8 @@ func (u *unit) setupMayStop(s *suiteDecl) bool {
 	return ok && u.mayStop(fn, map[*types.Func]bool{})
 }
 
-// mayStop reports whether calling fn can end it early: a testify assertion
-// that stopped the test, a FailNow, Fatal or Skip, a panic, or a
+// mayStop reports whether calling fn can end it early: a testify assertion,
+// which the migration makes fatal, a FailNow, Fatal or Skip, a panic, or a
 // call that can. A call into code whose body these files do not hold can,
 // when it is handed a T or a suite.
 func (u *unit) mayStop(fn *types.Func, seen map[*types.Func]bool) bool {
@@ -735,30 +738,10 @@ func (u *unit) mayStop(fn *types.Func, seen map[*types.Func]bool) bool {
 				found = true
 			}
 		}
-		found = found || u.fatalAssertion(call) || u.callMayStop(call, seen)
+		found = found || u.assertionName(call) != "" || u.callMayStop(call, seen)
 		return !found
 	})
 	return found
-}
-
-// fatalAssertion reports whether call is a testify assertion that stopped
-// the test: require's, s.Require()'s or a FailNow. The others go on, and so
-// do the soft ones migrate writes for them.
-func (u *unit) fatalAssertion(call *ast.CallExpr) bool {
-	name := u.assertionName(call)
-	if name == "" {
-		return false
-	}
-	if _, base, _ := gotestAssertion(name); base == "FailNow" {
-		return true
-	}
-	switch x := call.Fun.(*ast.SelectorExpr).X.(type) {
-	case *ast.CallExpr:
-		return x.Fun.(*ast.SelectorExpr).Sel.Name == "Require"
-	case *ast.Ident:
-		return u.isPkg(x, requirePkg)
-	}
-	return false
 }
 
 // callMayStop reports whether call reaches a function that can stop: one

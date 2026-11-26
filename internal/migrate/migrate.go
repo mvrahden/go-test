@@ -154,6 +154,9 @@ type MigrateResult struct {
 	// Helper marks a base suite no suite.Run ran, migrated as a helper
 	// type the suites embedding it call: gotest does not run it.
 	Helper bool
+	// Soft counts the file's assertions that let a test go on after
+	// failing (s.X, s.Assert().X, assert.X) and now stop it.
+	Soft int
 	// StdlibTests counts the stdlib tests left in the file, which gotest
 	// does not run.
 	StdlibTests int
@@ -530,12 +533,12 @@ func (u *unit) fileResults(uf *unitFile, shown string, changed bool, markers int
 	removed := u.unranIn(uf, shown)
 	switch {
 	case len(results) > 0:
-		results[0].StdlibTests, results[0].Removed = stdlib, removed
+		results[0].Soft, results[0].StdlibTests, results[0].Removed = uf.soft, stdlib, removed
 		return results
 	case stdlib > 0 && !changed && markers == 0:
 		return []MigrateResult{{File: shown, StdlibTests: stdlib}}
 	case changed:
-		return []MigrateResult{{File: shown, Markers: markers, RefsOnly: true, StdlibTests: stdlib, Removed: removed}}
+		return []MigrateResult{{File: shown, Markers: markers, RefsOnly: true, Soft: uf.soft, StdlibTests: stdlib, Removed: removed}}
 	case markers > 0:
 		return []MigrateResult{{File: shown, Markers: markers, StdlibTests: stdlib}}
 	}

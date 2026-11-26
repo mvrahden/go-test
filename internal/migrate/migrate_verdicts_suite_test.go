@@ -82,7 +82,7 @@ func (s *VSuite) TestA() {
 			Want: []string{
 				"\t\t// TODO(gotest-migrate): assertion Equal runs on a goroutine a go statement starts: gotest's assertions end that goroutine with FailNow, where testify's assert carried on and require was already unsafe — start it with gotest.Go and wait, or assert on the test's goroutine\n\t\ts.Equal(1, 1)\n",
 				"\t\t// TODO(gotest-migrate): assertion True runs on a goroutine a go statement starts: gotest's assertions end that goroutine with FailNow, where testify's assert carried on and require was already unsafe — start it with gotest.Go and wait, or assert on the test's goroutine\n\t\tassert.True(t.T(), true)\n",
-				"\t<-done\n\tgotest.True(t.Soft(), true)\n",
+				"\t<-done\n\tgotest.True(t, true)\n",
 			},
 		},
 		{
@@ -113,8 +113,8 @@ func (s *VSuite) TestA() {
 }
 `,
 			Want: []string{
-				"\tgotest.ElementsMatch(t.Soft(), []int{1, 2}, []int{2, 1})\n",
-				"\tgotest.Subset(t.Soft(), []point{{1, 2}, {3, 4}}, []point{{3, 4}})\n",
+				"\tgotest.ElementsMatch(t, []int{1, 2}, []int{2, 1})\n",
+				"\tgotest.Subset(t, []point{{1, 2}, {3, 4}}, []point{{3, 4}})\n",
 			},
 			Absent: []string{"compared the int elements", "compared the point elements"},
 		},
@@ -134,7 +134,7 @@ func (s *VSuite) TestA() {
 			Want: []string{
 				"\t// TODO(gotest-migrate): testify Zero on interface type error also passes for a zero value inside it, a typed nil included; gotest.Zero passes only for nil — use gotest.Zero if nil is meant\n\ts.Zero(err)\n",
 				"\t// TODO(gotest-migrate): testify Empty on interface type any judges the value inside it, so a zero number or struct counts as empty; gotest.Empty accepts only collections and pointers — convert by hand\n\ts.Empty(v)\n",
-				"\tgotest.Zero(t.Soft(), p)\n",
+				"\tgotest.Zero(t, p)\n",
 			},
 		},
 		{
@@ -170,10 +170,10 @@ func (s *VSuite) TestA() {
 }
 `,
 			Want: []string{
-				"\tgotest.Equal(t.Soft(), 0, y)\n",
-				"\tgotest.Equal(t.Soft(), 5, d)\n",
-				"\tgotest.Equal(t.Soft(), \"a\", \"a\")\n",
-				"\tgotest.Equal(t.Soft(), 1.0, f)\n",
+				"\tgotest.Equal(t, 0, y)\n",
+				"\tgotest.Equal(t, 5, d)\n",
+				"\tgotest.Equal(t, \"a\", \"a\")\n",
+				"\tgotest.Equal(t, 1.0, f)\n",
 			},
 			Absent:   []string{"TODO(gotest-migrate)"},
 			Compiles: true,
@@ -190,7 +190,7 @@ func (s *VSuite) TestA() {
 `,
 			Want: []string{
 				"\t// TODO(gotest-migrate): testify NotEqual compared http.StatusOK as int with a value of type uint16, types it never finds equal",
-				"\tgotest.Equal(t.Soft(), http.StatusOK, 200)\n",
+				"\tgotest.Equal(t, http.StatusOK, 200)\n",
 			},
 		},
 		{
@@ -212,7 +212,7 @@ func (*myErr) Error() string { return "" }
 `,
 			Want: []string{
 				"\t// TODO(gotest-migrate): testify NotEqual compared a []int with a IDs, types it never finds equal; gotest.NotEqual would convert one to the other and compare the values — convert by hand\n\ts.NotEqual([]int{1}, ids)\n",
-				"\tgotest.Equal[error](t.Soft(), err, (*myErr)(nil))\n",
+				"\tgotest.Equal[error](t, err, (*myErr)(nil))\n",
 			},
 		},
 		{
@@ -227,7 +227,7 @@ func (s *VSuite) TestA() {
 `,
 			Want: []string{
 				"\t// TODO(gotest-migrate): testify Len on *[3]int counted the array's length, nil pointer or not; gotest.Len takes no pointer — assert on len(p) with gotest.Equal\n\ts.Len(p, 3)\n",
-				"\tgotest.Len(t.Soft(), []int{1}, 1)\n",
+				"\tgotest.Len(t, []int{1}, 1)\n",
 			},
 		},
 		{
@@ -246,8 +246,8 @@ func (s *VSuite) TestA() {
 			Want: []string{
 				"\t// TODO(gotest-migrate): testify InDelta passed when both values were NaN; gotest.InDelta fails then",
 				"\t// TODO(gotest-migrate): testify InDelta passed any difference within a NaN delta; gotest.InDelta fails a NaN delta — convert by hand\n\ts.InDelta(1.0, got, eps)\n",
-				"\tgotest.InDelta(t.Soft(), 1.0, got, 0.1)\n",
-				"\tgotest.InDelta(t.Soft(), n, m, 1)\n",
+				"\tgotest.InDelta(t, 1.0, got, 0.1)\n",
+				"\tgotest.InDelta(t, n, m, 1)\n",
 			},
 		},
 		{
@@ -284,31 +284,6 @@ func (s *VSuite) TearDownSuite() { s.db.n = 0 }
 func (s *VSuite) TestA() {}
 `,
 			Want:     []string{"func (s *VTestSuite) AfterAll(t *gotest.T) { s.db.n = 0 }\n"},
-			Absent:   []string{"TODO(gotest-migrate)"},
-			Compiles: true,
-		},
-		{
-			Desc: "TearDownSuite beside a SetupSuite whose assertions go on after failing",
-			Src: `type VSuite struct {
-	suite.Suite
-	db *item
-}
-
-func (s *VSuite) SetupSuite() {
-	s.NotZero(1)
-	s.Assert().NotZero(1)
-	assert.NotZero(s.T(), 1)
-	s.db = &item{1}
-}
-
-func (s *VSuite) TearDownSuite() { s.db.n = 0 }
-
-func (s *VSuite) TestA() {}
-`,
-			Want: []string{
-				"func (s *VTestSuite) BeforeAll(t *gotest.T) {\n\tgotest.NotZero(t.Soft(), 1)\n\tgotest.NotZero(t.Soft(), 1)\n\tgotest.NotZero(t.Soft(), 1)\n",
-				"func (s *VTestSuite) AfterAll(t *gotest.T) { s.db.n = 0 }\n",
-			},
 			Absent:   []string{"TODO(gotest-migrate)"},
 			Compiles: true,
 		},
