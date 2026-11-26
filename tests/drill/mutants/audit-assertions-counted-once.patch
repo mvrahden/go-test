@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditRecord / TheTreeRecord / when audit --record runs over a module / counts the gotest assertions written in each body, and marks AssertsBy, F_ and X_ \(
+Clause: when audit --record runs over a module → counts the gotest assertions written in each body, and marks AssertsBy, F_ and X_
+--- a/internal/gotestaudit/body.go
++++ b/internal/gotestaudit/body.go
+@@ -134,7 +134,7 @@
+ 				by = true
+ 			}
+ 		case assertionFuncs[fn.Name()]:
+-			n++
++			n = 1
+ 			if polls[fn.Name()] {
+ 				return false
+ 			}

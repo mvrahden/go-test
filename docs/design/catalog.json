@@ -4161,7 +4161,7 @@
                     },
                     {
                       "children": [],
-                      "display": "counts the gotest assertions written in each body, those on t.Soft() included, and marks AssertsBy, F_ and X_",
+                      "display": "counts the gotest assertions written in each body, and marks AssertsBy, F_ and X_",
                       "duration": 0,
                       "excluded": false,
                       "external": false,
@@ -4169,7 +4169,7 @@
                       "focused": false,
                       "kind": "block",
                       "line": 76,
-                      "name": "counts_the_gotest_assertions_written_in_each_body,_those_on_t.Soft()_included,_and_marks_AssertsBy,_F__and_X_",
+                      "name": "counts_the_gotest_assertions_written_in_each_body,_and_marks_AssertsBy,_F__and_X_",
                       "output": [],
                       "status": "none",
                       "vocab": "it"

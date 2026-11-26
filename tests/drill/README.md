@@ -1087,7 +1087,7 @@ shards of one run do not add up to every mutant exactly once.
 | `counts-file-never-opened` | the runtime writes no count to the file a text run names | canary: the assertcount text run under --ci exits 0 |
 | `raw-subtest-parent-a-text-leaf` | a test that ran a subtest through `t.T().Run` writes its count as a leaf's | canary: the assertcount text run names the raw parent vacuous |
 | `audit-hash-counts-comments` | a body's hash counts its comments, so a body only commented anew hashes differently | audit conformance: the record It finds the reworded It's hashes apart |
-| `audit-soft-assertions-uncounted` | an assertion given `t.Soft()` is not counted | audit conformance: the record It counts 1 assertion where the It writes 2 |
+| `audit-assertions-counted-once` | a body's assertions count as one however many it writes | audit conformance: the record It counts 1 assertion where the It writes 2 |
 | `audit-nodeadline-read-as-default` | `NoDeadline` is recorded as the 30s default | audit conformance: the record It finds the Stock suite's SetupTimeout 30s, not none |
 | `audit-record-paths-absolute` | a record's files are absolute paths | audit conformance: the record holds the staged directory |
 | `audit-rename-base-is-the-head` | a reworded or moved behavior's base place is its head's | audit conformance: the behaviors It finds the head's path on the base side |

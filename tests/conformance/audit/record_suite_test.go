@@ -73,7 +73,7 @@ func (s *AuditRecordTestSuite) TestTheTreeRecord(t *gotest.T) {
 			gotest.Equal(it, before[order+"keeps the order irrelevant"].Hash, got[order+"ignores the order"].Hash, "layout and comments changed the hash")
 			gotest.NotEqual(it, before[negative].Hash, got[negative].Hash)
 		})
-		w.It("counts the gotest assertions written in each body, those on t.Soft() included, and marks AssertsBy, F_ and X_", func(it *gotest.T) {
+		w.It("counts the gotest assertions written in each body, and marks AssertsBy, F_ and X_", func(it *gotest.T) {
 			got := flatOf(it, s.file)
 			sum := got["CartTestSuite / Add / when both numbers are positive / returns their sum"]
 			gotest.Equal(it, 2, sum.Assertions)

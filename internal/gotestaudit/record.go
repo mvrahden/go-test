@@ -9,7 +9,7 @@ package gotestaudit
 const Schema = 1
 
 // FloorNote says what a record's assertion counts are.
-const FloorNote = "assertions counts the gotest assertion calls written in a body, those on t.Soft() and a poll's call included and the calls in a poll's callback not; a helper's calls are not followed, so the count is a floor"
+const FloorNote = "assertions counts the gotest assertion calls written in a body, a poll's call included and the calls in a poll's callback not; a helper's calls are not followed, so the count is a floor"
 
 // Record is one tree's test estate as its source declares it.
 type Record struct {

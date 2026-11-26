@@ -11,7 +11,7 @@ How `gotest audit` records the test estate a tree declares without running it, h
 #### Scenario: Recording a tree
 - **WHEN** audit --record runs over a module
 - **THEN** prints one document opening with version and schema that lists each suite, test, When, It and row with its display path, module-relative file and lines and body hash, and exits 0
-- **AND** counts the gotest assertions written in each body, those on t.Soft() included, and marks AssertsBy, F_ and X_
+- **AND** counts the gotest assertions written in each body, and marks AssertsBy, F_ and X_
 - **AND** names each suite's budgets and guard, each suppression with its rules and reason, and each snapshot file with its hash
 
 #### Scenario: Recording twice

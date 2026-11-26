@@ -16,7 +16,7 @@ func (s *CartTestSuite) TestAdd(t *gotest.T) {
 	t.When("both numbers are positive", func(w *gotest.T) {
 		w.It("returns their sum", func(it *gotest.T) {
 			gotest.Equal(it, 3, Add(1, 2))
-			gotest.Equal(it.Soft(), 5, Add(2, 3))
+			gotest.Equal(it, 5, Add(2, 3))
 		})
 		w.It("ignores the order", func(it *gotest.T) {
 			// Laid out and commented anew; the tokens are the same.
