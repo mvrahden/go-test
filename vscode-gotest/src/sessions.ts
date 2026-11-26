@@ -1,11 +1,11 @@
 // The CLI sessions this window has running: test runs, watchers, bench and
 // fuzz sessions, audits and debug preparations. Each owner adds its session
 // with the stop it already has (a run's cancel, a watcher's stop), so a
-// stop from the Sessions view takes the same path as any other stop: the
-// child's own graceful stop, its teardown grace and the force after it.
+// stop from the panel's Running block takes the same path as any other
+// stop: the child's own graceful stop, its teardown grace and the force
+// after it.
 import * as vscode from "vscode";
-import * as path from "node:path";
-import { elapsedText, tallyText, type Tally } from "./liveProgress.js";
+import type { Tally } from "./liveProgress.js";
 
 // How often a row that counts a run's events is redrawn.
 export const PROGRESS_TICK_MS = 1000;
@@ -114,83 +114,4 @@ export function linkedSession(
       cts.dispose();
     },
   };
-}
-
-// A row of the Sessions view: a folder holding sessions, or a session.
-export type SessionNode =
-  { type: "folder"; folder: string } | { type: "session"; session: Session };
-
-function clock(at: number): string {
-  const d = new Date(at);
-  const two = (v: number) => String(v).padStart(2, "0");
-  return `${two(d.getHours())}:${two(d.getMinutes())}:${two(d.getSeconds())}`;
-}
-
-// sessionItem is how a session's row reads: a test run's with its elapsed
-// time and the events it applied so far.
-export function sessionItem(
-  s: Session,
-  now = Date.now(),
-): {
-  label: string;
-  description: string;
-  tooltip: string;
-  contextValue: string;
-} {
-  const counts = s.progress
-    ? ` · ${elapsedText(now - s.startedAt)} · ${tallyText(s.progress.tally)}`
-    : "";
-  return {
-    label: `${s.kind}: ${s.target}`,
-    description:
-      (s.stopping
-        ? `stopping… (started ${clock(s.startedAt)})`
-        : `started ${clock(s.startedAt)}`) + counts,
-    tooltip: `${s.kind} in ${s.folder}\n${s.target}\nstarted ${new Date(s.startedAt).toLocaleString()}`,
-    contextValue: s.stopping ? "gotestSessionStopping" : "gotestSession",
-  };
-}
-
-// SessionsTree shows the live sessions, under their folder when the
-// window has several.
-export class SessionsTree implements vscode.TreeDataProvider<SessionNode> {
-  readonly onDidChangeTreeData: vscode.Event<void>;
-
-  constructor(private readonly all: Sessions = sessions) {
-    this.onDidChangeTreeData = all.onDidChange;
-  }
-
-  getChildren(node?: SessionNode): SessionNode[] {
-    const list = this.all.list();
-    if (node?.type === "session") return [];
-    if (node?.type === "folder")
-      return list
-        .filter((s) => s.folder === node.folder)
-        .map((session) => ({ type: "session", session }));
-    const folders = Array.from(new Set(list.map((s) => s.folder)));
-    if (folders.length > 1)
-      return folders.map((folder) => ({ type: "folder", folder }));
-    return list.map((session) => ({ type: "session", session }));
-  }
-
-  getTreeItem(node: SessionNode): vscode.TreeItem {
-    if (node.type === "folder") {
-      const item = new vscode.TreeItem(
-        path.basename(node.folder),
-        vscode.TreeItemCollapsibleState.Expanded,
-      );
-      item.tooltip = node.folder;
-      return item;
-    }
-    const v = sessionItem(node.session);
-    const item = new vscode.TreeItem(
-      v.label,
-      vscode.TreeItemCollapsibleState.None,
-    );
-    item.description = v.description;
-    item.tooltip = v.tooltip;
-    item.contextValue = v.contextValue;
-    item.id = `session-${node.session.id}`;
-    return item;
-  }
 }

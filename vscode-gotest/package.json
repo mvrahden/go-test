@@ -168,11 +168,6 @@
       {
         "command": "gotest.applyLintFix",
         "title": "Go Test: Apply lint fix"
-      },
-      {
-        "command": "gotest.stopSession",
-        "title": "Go Test: Stop Session",
-        "icon": "$(debug-stop)"
       }
     ],
     "menus": {
@@ -218,10 +213,6 @@
           "when": "false"
         },
         {
-          "command": "gotest.stopSession",
-          "when": "false"
-        },
-        {
           "command": "gotest.toggleFocus",
           "when": "false"
         },
@@ -258,13 +249,6 @@
         {
           "command": "gotest.copyTestResults",
           "when": "controllerId == gotest",
-          "group": "inline"
-        }
-      ],
-      "view/item/context": [
-        {
-          "command": "gotest.stopSession",
-          "when": "view == gotest.sessions && viewItem == gotestSession",
           "group": "inline"
         }
       ]
@@ -414,16 +398,6 @@
         "when": "gotest.active"
       }
     ],
-    "views": {
-      "test": [
-        {
-          "id": "gotest.sessions",
-          "name": "gotest Sessions",
-          "when": "gotest.hasSessions",
-          "icon": "$(pulse)"
-        }
-      ]
-    },
     "languageModelTools": [
       {
         "name": "gotest_audit",

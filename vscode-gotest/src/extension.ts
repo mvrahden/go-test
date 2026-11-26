@@ -1,7 +1,6 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
 import { setEventsDir } from "./eventsFiles.js";
-import { sessions, SessionsTree, type SessionNode } from "./sessions.js";
 import {
   DiscoveryCache,
   DiscoveryService,
@@ -381,19 +380,6 @@ export function activate(context: vscode.ExtensionContext): void {
     false,
   );
   context.subscriptions.push(changedProfile);
-
-  // The live CLI sessions, in the Testing view; hidden while there are none.
-  const sessionsView = vscode.window.createTreeView("gotest.sessions", {
-    treeDataProvider: new SessionsTree(),
-  });
-  const showSessions = () =>
-    void vscode.commands.executeCommand(
-      "setContext",
-      "gotest.hasSessions",
-      sessions.list().length > 0,
-    );
-  context.subscriptions.push(sessionsView, sessions.onDidChange(showSessions));
-  showSessions();
 
   const specViewRefreshDisposable = runner.onDidComplete((pieces) => {
     void specView.refresh(pieces);
@@ -867,13 +853,6 @@ export function registerCommands(deps: {
     vscode.commands.registerCommand("gotest.showChangeView", async () => {
       await specView.showChange();
     }),
-
-    vscode.commands.registerCommand(
-      "gotest.stopSession",
-      (node?: SessionNode) => {
-        if (node?.type === "session") sessions.stop(node.session.id);
-      },
-    ),
 
     vscode.commands.registerCommand("gotest.showRunsView", async () => {
       await specView.showRuns();

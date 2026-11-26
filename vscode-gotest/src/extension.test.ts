@@ -98,7 +98,6 @@ const NEEDS_ARGUMENTS = [
   "gotest.runFuzz",
   "gotest.runTest",
   "gotest.scaffoldTarget",
-  "gotest.stopSession",
   "gotest.toggleFocus",
   "gotest.triageCrashers",
 ];
