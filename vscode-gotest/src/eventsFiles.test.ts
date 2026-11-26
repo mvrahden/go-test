@@ -13,6 +13,7 @@ import {
   KEEP_MS,
   nextEventsFile,
   pruneEventsFiles,
+  coverFileFor,
   setEventsDir,
 } from "./eventsFiles.js";
 
@@ -52,10 +53,25 @@ describe("events files", () => {
     const then = (now - KEEP_MS - 1000) / 1000;
     utimesSync(old, then, then);
     writeFileSync(path.join(dir, "other.txt"), "");
+    // Profiles go with their streams, and one without a stream goes too.
+    const profile = (n: string) => n.replace(/\.jsonl$/, ".cover.out");
+    for (const n of [names[0], names[3], names[KEEP_FILES + 2]])
+      writeFileSync(path.join(dir, profile(n)), "");
+    writeFileSync(path.join(dir, "orphan.cover.out"), "");
     pruneEventsFiles(now);
     const left = readdirSync(dir).sort();
     expect(left).toEqual(
-      [...names.slice(3, KEEP_FILES + 2), "other.txt"].sort(),
+      [
+        ...names.slice(3, KEEP_FILES + 2),
+        profile(names[3]),
+        "other.txt",
+      ].sort(),
     );
+  });
+
+  it("keeps a run's profile beside its stream, under the same name", () => {
+    expect(
+      coverFileFor("/s/events/2026-11-26T07-26-01-547Z-9b858fbc.jsonl"),
+    ).toBe("/s/events/2026-11-26T07-26-01-547Z-9b858fbc.cover.out");
   });
 });
