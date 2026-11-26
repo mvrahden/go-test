@@ -19,7 +19,7 @@ func (s *CountTestSuite) TestTwo(t *gotest.T) {
 func (s *CountTestSuite) TestNothing(t *gotest.T) {}
 
 func (s *CountTestSuite) TestEverywhere(t *gotest.T) {
-	gotest.True(t.Soft(), true)
+	gotest.True(t, true)
 	gotest.True(t.T(), true)
 	gotest.True(gotest.NewT(t.T()), true)
 	gotest.True(gotest.NewTWithDeadline(t, time.Minute), true)

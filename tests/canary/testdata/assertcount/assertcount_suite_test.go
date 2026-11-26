@@ -14,7 +14,7 @@ import (
 type CountTestSuite struct{}
 
 func (s *CountTestSuite) TestEverywhere(t *gotest.T) {
-	gotest.True(t.Soft(), true)
+	gotest.True(t, true)
 	gotest.True(t.T(), true)
 	gotest.True(gotest.NewTWithDeadline(t, time.Minute), true)
 	wait := gotest.Go(t, func() { gotest.True(t, true) })

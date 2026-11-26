@@ -28,7 +28,7 @@ func (s *AssertionCountTestSuite) TestCountingAssertions(t *gotest.T) {
 	gotest.Equal(t, 0, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
 	count := func(test string) (string, bool) { return run.Attr(test, protocol.AttrAssertions) }
 
-	t.When("a leaf asserts on its T, a soft T, its *testing.T, Ts made from them, in a helper, on a gotest.Go goroutine, in a poll and with TimeIsNow", func(w *gotest.T) {
+	t.When("a leaf asserts on its T, its *testing.T, Ts made from them, in a helper, on a gotest.Go goroutine, in a poll and with TimeIsNow", func(w *gotest.T) {
 		w.It("reports one assertion per call, none for what the poll's R asserts", func(it *gotest.T) {
 			n, ok := count(countSuite + "TestEverywhere")
 			gotest.True(it, ok, "no count reported")

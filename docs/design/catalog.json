@@ -86,7 +86,7 @@
                       "vocab": "it"
                     }
                   ],
-                  "display": "when a leaf asserts on its T, a soft T, its *testing.T, Ts made from them, in a helper, on a gotest.Go goroutine, in a poll and with TimeIsNow",
+                  "display": "when a leaf asserts on its T, its *testing.T, Ts made from them, in a helper, on a gotest.Go goroutine, in a poll and with TimeIsNow",
                   "duration": 0,
                   "excluded": false,
                   "external": false,
@@ -94,7 +94,7 @@
                   "focused": false,
                   "kind": "block",
                   "line": 31,
-                  "name": "a_leaf_asserts_on_its_T,_a_soft_T,_its_*testing.T,_Ts_made_from_them,_in_a_helper,_on_a_gotest.Go_goroutine,_in_a_poll_and_with_TimeIsNow",
+                  "name": "a_leaf_asserts_on_its_T,_its_*testing.T,_Ts_made_from_them,_in_a_helper,_on_a_gotest.Go_goroutine,_in_a_poll_and_with_TimeIsNow",
                   "output": [],
                   "status": "none",
                   "vocab": "when"

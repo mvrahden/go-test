@@ -30,10 +30,10 @@ An assertion that fails SHALL name the line it failed at and the assertion, in a
 - **THEN** the failure names the helper's line and the caller's
 
 ### Requirement: Counting assertions
-Each assertion, MatchSnapshot and poll SHALL count once for the test of the T it is given, a soft T, a T made from it, its *testing.T and a gotest.Go goroutine's included; a poll SHALL count once whatever its *R asserts, and the hooks of a method SHALL count for the method. A leaf, a test that opened no It, When or Each row, SHALL report its count as the gotest.assertions attribute when it ends, unless it was skipped; no other test SHALL report one.
+Each assertion, MatchSnapshot and poll SHALL count once for the test of the T it is given, a T made from it, its *testing.T and a gotest.Go goroutine's included; a poll SHALL count once whatever its *R asserts, and the hooks of a method SHALL count for the method. A leaf, a test that opened no It, When or Each row, SHALL report its count as the gotest.assertions attribute when it ends, unless it was skipped; no other test SHALL report one.
 
 #### Scenario: Assertions made in every place
-- **WHEN** a leaf asserts on its T, a soft T, its *testing.T, Ts made from them, in a helper, on a gotest.Go goroutine, in a poll and with TimeIsNow
+- **WHEN** a leaf asserts on its T, its *testing.T, Ts made from them, in a helper, on a gotest.Go goroutine, in a poll and with TimeIsNow
 - **THEN** reports one assertion per call, none for what the poll's R asserts
 
 #### Scenario: Assertions made in hooks

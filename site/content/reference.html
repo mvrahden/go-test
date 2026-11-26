@@ -372,9 +372,6 @@ CacheFixture.AfterAll <span class="d">─┘</span></div>
         Assertion failures automatically trace back to the test call site. Helper functions don't need <code>t.Helper()</code> — the failure is located at the line that failed, a helper's included, and the message names the outermost caller from the test file.
       </div>
       <div class="callout">
-        A failing assertion stops the test. Hand it <code>t.Soft()</code> and it reports the failure and returns instead, so one run shows every mismatch and the test fails when it ends: <code>gotest.Equal(t.Soft(), want.Name, got.Name)</code>. Keep fatal the checks a later line dereferences (<a href="https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-soft-assertions">Soft assertions</a>).
-      </div>
-      <div class="callout">
         Every leaf counts its assertions. One that passes having made none is vacuous: the spec marks it, the run names it and <code>--ci</code> fails the run (<a href="https://github.com/mvrahden/go-test/blob/main/specs/cli/spec.md#requirement-passes-without-an-assertion-under-ci-mode">Passes without an assertion under CI mode</a>). A test that checks by other means declares it with <code>t.AssertsBy("&lt;how&gt;")</code>, and the reason shows beside it (<a href="https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-declaring-how-a-test-asserts">Declaring how a test asserts</a>).
       </div>
 
