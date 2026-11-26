@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime/coverage"
 	"slices"
 	"strings"
 )
@@ -25,11 +26,16 @@ func withCoverDir(env []string, dir string) []string {
 // data the binaries the run's tests started wrote into dir, limited to
 // pkgs. It returns how many binaries wrote counters; one that never exited
 // wrote none. Each binary's data is converted alone, so binaries built with
-// other counter modes never meet.
+// other counter modes never meet. The run's own gotest, this binary, is no
+// binary a test started: built with -cover it writes there too, and its
+// data is dropped.
 func foldChildCoverage(dir, profile string, pkgs []string) (int, error) {
 	metas, err := filepath.Glob(filepath.Join(dir, "covmeta.*"))
 	if err != nil || len(metas) == 0 {
 		return 0, err
+	}
+	if self := ownMeta(filepath.Join(filepath.Dir(dir), "covself")); self != "" {
+		metas = slices.DeleteFunc(metas, func(m string) bool { return filepath.Base(m) == self })
 	}
 	slices.Sort(metas)
 	out, err := os.OpenFile(profile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600) //nolint:gosec // G304: the profile the run wrote
@@ -71,6 +77,22 @@ func foldChildCoverage(dir, profile string, pkgs []string) (int, error) {
 		}
 	}
 	return n, out.Close()
+}
+
+// ownMeta is the name of this binary's coverage meta-data file, written
+// into dir, or "" when it was built without -cover.
+func ownMeta(dir string) string {
+	if err := os.Mkdir(dir, 0o700); err != nil {
+		return ""
+	}
+	if err := coverage.WriteMetaDir(dir); err != nil {
+		return ""
+	}
+	metas, _ := filepath.Glob(filepath.Join(dir, "covmeta.*"))
+	if len(metas) != 1 {
+		return ""
+	}
+	return filepath.Base(metas[0])
 }
 
 // runForwarding runs cmd, passing it each shutdown signal the audit gets,

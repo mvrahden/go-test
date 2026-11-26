@@ -14,8 +14,10 @@ import (
 
 // AuditChildCoverageTestSuite: audit --run counts what the binaries its
 // tests start execute, where they were built with -cover. The checkout's
-// commit holds one package; the binaries, what they run and the tests that
-// start them are untracked, so each of their lines is changed.
+// commit holds one package and greet without its empty name's branch; the
+// binaries, plain and the tests that start them are untracked, so each of
+// their lines is changed. The CLI is built with -cover, which its run must
+// not count as a binary a test started.
 type AuditChildCoverageTestSuite struct {
 	dir, checkout, tmp, cli string
 	// status is the checkout's git status before the audits.
@@ -39,13 +41,24 @@ func (s *AuditChildCoverageTestSuite) BeforeAll(t *gotest.T) {
 	s.checkout = filepath.Join(dir, "childcov")
 	gotest.NoError(t, testkit.StageModule(root, filepath.Join("..", "testdata", "audit", "childcov"), s.checkout))
 	git(t, s.checkout, "init", "-q")
-	git(t, s.checkout, "add", "go.mod", "go.work", "version")
+	// The base's greet lacks the branch, so its func line is unchanged:
+	// whether a block spans that line depends on the toolchain.
+	greet := filepath.Join(s.checkout, "greet", "greet.go")
+	head, err := os.ReadFile(greet)
+	gotest.NoError(t, err)
+	gotest.NoError(t, os.WriteFile(greet, []byte(greetBase), 0o600))
+	git(t, s.checkout, "add", "go.mod", "go.work", "version", "greet")
 	git(t, s.checkout, "-c", "user.name=gotest", "-c", "user.email=gotest@example.com", "commit", "-q", "-m", "base")
+	gotest.NoError(t, os.WriteFile(greet, head, 0o600))
 	s.status = git(t, s.checkout, "status", "--porcelain", "--untracked-files=all")
 	s.tmp = filepath.Join(dir, "tmp")
 	gotest.NoError(t, os.Mkdir(s.tmp, 0o700))
-	s.cli, err = testkit.BuildCLI(t.Context(), root, dir)
-	gotest.NoError(t, err)
+	gotest.NoError(t, os.Mkdir(filepath.Join(dir, "clicover"), 0o700))
+	s.cli = filepath.Join(dir, "gotest"+filepath.Ext(os.Args[0]))
+	build := exec.CommandContext(t.Context(), "go", "build", "-cover", "-o", s.cli, "./cmd/gotest") //nolint:gosec // G204: go tool with controlled arguments
+	build.Dir = root
+	out, err := build.CombinedOutput()
+	gotest.NoError(t, err, "%s", out)
 
 	s.both = s.audit(t, "--format=json")
 	s.left = s.leftover(t)
@@ -58,14 +71,31 @@ func (s *AuditChildCoverageTestSuite) AfterAll(t *gotest.T) {
 	}
 }
 
-// audit runs audit --run in the checkout, alone under git, with the
-// suite's own cache and GOTMPDIR, where the run makes its directory.
+// audit runs the suite's CLI's audit --run in the checkout, under env and
+// GOTMPDIR, where the run makes its directory.
 func (s *AuditChildCoverageTestSuite) audit(t *gotest.T, args ...string) testkit.Run {
-	env := append(outside(s.dir), "GOTEST_CACHE_DIR="+filepath.Join(s.dir, "cache"), "GOTMPDIR="+s.tmp)
-	run, err := testkit.RunCLIWithEnv(t.Context(), s.checkout, env, append([]string{"audit", "--base=HEAD", "--run"}, args...)...)
+	env := append(s.env(), "GOTMPDIR="+s.tmp)
+	run, err := testkit.RunBinaryWithEnv(t.Context(), s.cli, s.checkout, env, append([]string{"audit", "--base=HEAD", "--run"}, args...)...)
 	gotest.NoError(t, err)
 	return run
 }
+
+// env is the audits' environment: alone under git, with the suite's own
+// cache, and GOCOVERDIR for the CLI's own counters.
+func (s *AuditChildCoverageTestSuite) env() []string {
+	return append(outside(s.dir), "GOTEST_CACHE_DIR="+filepath.Join(s.dir, "cache"), "GOCOVERDIR="+filepath.Join(s.dir, "clicover"))
+}
+
+// greetBase is greet.go at the base commit: Hello without its empty name's
+// branch.
+const greetBase = `// Package greet is run only by the hello binary.
+package greet
+
+// Hello greets name.
+func Hello(name string) string {
+	return "hello, " + name
+}
+`
 
 // leftover lists what GOTMPDIR holds.
 func (s *AuditChildCoverageTestSuite) leftover(t *gotest.T) []string {
@@ -115,11 +145,11 @@ func (s *AuditChildCoverageTestSuite) TestABinaryBuiltWithCover(t *gotest.T) {
 	t.When("audit --run runs a test that starts a binary built with go build -cover", func(w *gotest.T) {
 		w.It("lists, of the changed lines that binary's packages hold, only those it did not execute", func(it *gotest.T) {
 			doc := readChildDoc(it, s.both, 0)
-			// hello runs greet.Hello with a name: greet.go's statements on
-			// lines 6 to 9, all but the empty name's branch on 7 and 8; and
+			// hello runs greet.Hello with a name: of greet.go's changed
+			// lines 6 to 8, all but the empty name's branch on 7 and 8; and
 			// all of cmd/hello/main.go, which is therefore not listed.
 			gotest.Equal(it, map[string][5]int{
-				"greet/greet.go":    {1, 4, 2, 7, 8},
+				"greet/greet.go":    {1, 3, 2, 7, 8},
 				"plain/plain.go":    {0, 0, 0, 0, 0},
 				"cmd/plain/main.go": {0, 0, 0, 0, 0},
 			}, doc.files())
@@ -156,7 +186,7 @@ func (s *AuditChildCoverageTestSuite) TestAnInterruptedAuditRun(t *gotest.T) {
 	gotest.NoError(t, os.Mkdir(tmp, 0o700))
 	cmd := exec.Command(s.cli, "audit", "--base=HEAD", "--run", "--format=json", "./plain/", "./cmd/plain/", "./e2e/plain/") //nolint:gosec // G204: binary built by this suite
 	cmd.Dir = s.checkout
-	cmd.Env = testkit.ChildEnv(t.TempDir(), append(outside(s.dir), "GOTEST_CACHE_DIR="+filepath.Join(s.dir, "cache"), "GOTMPDIR="+tmp, "CHILDCOV_HOLD="+hold)...)
+	cmd.Env = testkit.ChildEnv(t.TempDir(), append(s.env(), "GOTMPDIR="+tmp, "CHILDCOV_HOLD="+hold)...)
 	cmd.Stdout, cmd.Stderr = new(strings.Builder), new(strings.Builder)
 	cmd.WaitDelay = 15 * time.Second
 	tree, err := testkit.StartCLI(cmd)
