@@ -1047,7 +1047,16 @@ const runs = {};
     recorded: "<time>",
     // A live run's start is now; an imported one's is its stream's.
     ...(r.started && !r.imported ? { started: "<time>" } : {}),
-    ...(r.eventsFile ? { eventsFile: unstage(r.eventsFile) } : {}),
+    ...(r.eventsFile ? { eventsFile: slashed(unstage(r.eventsFile)) } : {}),
+    // An input hash covers the Go version and the platform.
+    ...(r.ran
+      ? {
+          ran: r.ran.map((p) => ({
+            ...p,
+            ...(p.inputHash ? { inputHash: "<hash>" } : {}),
+          })),
+        }
+      : {}),
     manifest: {
       ...r.manifest,
       ...(r.manifest.version ? { version: "<version>" } : {}),

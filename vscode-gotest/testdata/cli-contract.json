@@ -6127,7 +6127,7 @@
               {
                 "package": "auditmod/shop",
                 "status": "pass",
-                "inputHash": "15e3fbe78436fe30062c77f594af77e5"
+                "inputHash": "<hash>"
               }
             ]
           },
@@ -6174,12 +6174,12 @@
               {
                 "package": "auditmod/shop",
                 "status": "pass",
-                "inputHash": "05c0c1a55166727f7614e3cb9cb5978b"
+                "inputHash": "<hash>"
               },
               {
                 "package": "auditmod/shop/ledger",
                 "status": "skip",
-                "inputHash": "99470f23101979c6c4154a5cba2da5aa"
+                "inputHash": "<hash>"
               }
             ]
           },
