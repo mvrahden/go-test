@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -14,7 +15,11 @@ import (
 type LabelTestSuite struct{}
 
 func (s *LabelTestSuite) TestLabels(t *gotest.T) {
+	// Windows runs only a file with an executable extension.
 	bin := filepath.Join(t.TempDir(), "label")
+	if runtime.GOOS == "windows" {
+		bin += ".exe"
+	}
 	args := []string{"build", "-o", bin}
 	if os.Getenv("GOCOVERDIR") != "" {
 		args = append(args, "-cover")

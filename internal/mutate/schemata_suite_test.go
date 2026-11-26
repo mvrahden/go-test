@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -22,6 +23,13 @@ type SchemataTestSuite struct{}
 
 func (s *SchemataTestSuite) SuiteConfig() gotest.SuiteConfig {
 	return gotest.SuiteConfig{Parallel: true, Timeout: 60 * time.Second}
+}
+
+func exeSuffix() string {
+	if runtime.GOOS == "windows" {
+		return ".exe"
+	}
+	return ""
 }
 
 // mut is a mutant as the suite states it by hand.
@@ -90,7 +98,8 @@ func (f *fixture) build(t *gotest.T, pkg, out string) ([]byte, error) {
 
 func (s *SchemataTestSuite) TestEveryMutantSwitchesOnAlone(t *gotest.T) {
 	f := load(t, "run", mutate.Options{})
-	bin := filepath.Join(t.TempDir(), "run")
+	// Windows runs only a file with an executable extension.
+	bin := filepath.Join(t.TempDir(), "run"+exeSuffix())
 	out, err := f.build(t, "run", bin)
 	gotest.NoError(t, err, "%s", out)
 	runAs := func(id int) string {

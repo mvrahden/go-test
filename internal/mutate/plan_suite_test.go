@@ -2,6 +2,7 @@ package mutate_test
 
 import (
 	"context"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -150,16 +151,21 @@ func (s *PlanTestSuite) TestTheBudget(t *gotest.T) {
 }
 
 func (s *PlanTestSuite) TestRefusedBuild(t *gotest.T) {
+	// The platform's own paths, as its compiler writes them: C:\m on Windows.
+	root, err := filepath.Abs(string(filepath.Separator) + "m")
+	gotest.NoError(t, err)
+	a, b := filepath.Join(root, "a.go"), filepath.Join(root, "b.go")
+	rel := filepath.FromSlash("./a.go")
 	list := muts(
-		mutate.Mutant{File: "/m/a.go", Line: 4},
-		mutate.Mutant{File: "/m/a.go", Line: 4},
-		mutate.Mutant{File: "/m/a.go", Line: 9},
-		mutate.Mutant{File: "/m/b.go", Line: 7},
+		mutate.Mutant{File: a, Line: 4},
+		mutate.Mutant{File: a, Line: 4},
+		mutate.Mutant{File: a, Line: 9},
+		mutate.Mutant{File: b, Line: 7},
 	)
 	t.When("the compiler refuses lines of the schemata", func(w *gotest.T) {
 		w.It("names every mutant of a refused line, and the nearest above a line without one", func(it *gotest.T) {
-			out := []byte("# m\n./a.go:4:9: invalid operation\n/m/b.go:12:2: undefined: x\n./a.go:2:1: no mutant above\n")
-			gotest.Equal(it, []int{1, 2, 4}, mutate.Refused(out, "/m", list))
+			out := []byte("# m\n" + rel + ":4:9: invalid operation\n" + b + ":12:2: undefined: x\n" + rel + ":2:1: no mutant above\n")
+			gotest.Equal(it, []int{1, 2, 4}, mutate.Refused(out, root, list))
 		})
 	})
 }
