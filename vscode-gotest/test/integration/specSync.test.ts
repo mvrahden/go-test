@@ -30,9 +30,7 @@ const state = vi.hoisted(() => ({
   workspaceDir: "",
   cliPath: "",
   autoRefresh: true,
-  panels: [] as {
-    webview: { html: string; cspSource: string };
-  }[],
+  panels: [] as import("./vscodeStub.js").StubPanel[],
 }));
 
 vi.mock("vscode", async () => {
@@ -41,6 +39,7 @@ vi.mock("vscode", async () => {
 });
 
 import { SpecViewPanel } from "../../src/specView.js";
+import { shownHtml } from "./shownPanel.js";
 import { DiscoveryCache } from "../../src/discovery.js";
 import { createRecordingChannel } from "./vscodeStub.js";
 import { clearBinaryCache } from "../../src/cli.js";
@@ -146,9 +145,9 @@ function newPanel() {
   return { panel, recorder };
 }
 
-function renderedHtml(): string {
+function renderedHtml(): Promise<string> {
   expect(state.panels.length).toBeGreaterThan(0);
-  return state.panels[state.panels.length - 1].webview.html;
+  return shownHtml(state.panels[state.panels.length - 1].webview);
 }
 
 // Both resolution modes the extension actually uses. `go run` is the default
@@ -174,7 +173,7 @@ describe.each(MODES)("spec sync via $name", (mode) => {
     await panel.show();
     await panel.refresh(run("all-pass"));
 
-    const html = renderedHtml();
+    const html = await renderedHtml();
     expect(html).toContain("adds an item");
     expect(html).toContain("totals the basket");
     expect(html).toContain("2 passed");
@@ -188,7 +187,7 @@ describe.each(MODES)("spec sync via $name", (mode) => {
     await panel.show();
     await panel.refresh(run("mixed"));
 
-    const html = renderedHtml();
+    const html = await renderedHtml();
     expect(recorder.errors).toEqual([]);
     expect(html).toContain("totals the basket");
     expect(html).toContain("expected 300, got 250");
@@ -201,13 +200,13 @@ describe.each(MODES)("spec sync via $name", (mode) => {
     await panel.show();
     await panel.refresh(run("fuzz"));
 
-    const html = renderedHtml();
-    expect(html).toContain('class="node fuzz"');
+    const html = await renderedHtml();
+    expect(html).toContain('class="row k-fuzz');
     expect(html).toContain("TrimIdempotent");
     expect(html).toContain("drops surrounding spaces");
     // The row is tagged as a property backed by seeds, and the trailer counts
     // the target the way the CLI does.
-    expect(html).toContain('<span class="tag fuzz">FUZZ · 3 seeds</span>');
+    expect(html).toContain('<span class="tag t-info">FUZZ · 3 seeds</span>');
     expect(html).toContain("1 fuzz target");
     expect(recorder.errors).toEqual([]);
   });
@@ -217,11 +216,11 @@ describe.each(MODES)("spec sync via $name", (mode) => {
     await panel.show();
     await panel.refresh(run("package-failure"));
 
-    const html = renderedHtml();
+    const html = await renderedHtml();
     expect(recorder.errors).toEqual([]);
     expect(html).toContain("FAIL");
     expect(html).toContain("undefined: helper");
-    expect(html).toContain("1 failed package");
+    expect(html).toContain("package failed");
   });
 
   // The tree is the CLI's: a slash in an It is one subtest, so one row; a
@@ -231,24 +230,19 @@ describe.each(MODES)("spec sync via $name", (mode) => {
     await panel.show();
     await panel.refresh(run("labels"));
 
-    const html = renderedHtml();
+    const html = await renderedHtml();
     expect(recorder.errors).toEqual([]);
-    // A leaf carries its display and its id, in that order.
+    // A slash is one row's label, not two rows.
+    expect(html).toContain('<span class="lbl">reads a/b paths</span>');
+    expect(html).not.toContain('<span class="lbl">reads a</span>');
+    // A fast behavior shows no time, so its actions follow its label.
     expect(html).toContain(
-      '<div class="leaf block pass" data-display="reads a/b paths" data-id=',
-    );
-    expect(html).not.toContain('data-display="reads a"');
-    expect(html).toContain(
-      'data-display="keeps &lt;b&gt;&amp;&quot; text" data-id=',
-    );
-    // A fast behavior shows no time, so its actions follow its text.
-    expect(html).toContain(
-      ' keeps &lt;b&gt;&amp;" text<span class="node-actions">',
+      '<span class="lbl">keeps &lt;b&gt;&amp;&quot; text</span><span class="row-acts">',
     );
     expect(html).not.toContain("&amp;lt;");
     expect(html).not.toContain("&amp;amp;");
     // A run skips an excluded suite, and the CLI's run spec says so.
-    expect(html).toContain(" Parked — SKIPPED ");
+    expect(html).toMatch(/Parked<\/strong>(?:(?!<\/summary>)[\s\S])*SKIPPED/);
     expect(html).toContain("2 passed");
   });
 
@@ -257,12 +251,12 @@ describe.each(MODES)("spec sync via $name", (mode) => {
     await panel.show();
     await panel.refresh(run("empty"));
 
-    const html = renderedHtml();
+    const html = await renderedHtml();
     expect(recorder.errors).toEqual([]);
     // No package and no rendered node — asserted on content rather than on the
     // static template, which carries status glyphs of its own.
     expect(html).not.toContain("example.com");
-    expect(html).not.toContain('class="leaf');
+    expect(html).not.toContain('class="row leaf');
   });
 });
 
@@ -350,7 +344,7 @@ describe("a CLI that produced no spec is reported, not swallowed", () => {
       // The failure must read as a failure, not as an unhelpful parse error
       // downstream of a silently discarded exit code.
       expect(recorder.errors[0]).not.toContain("JSON");
-      expect(renderedHtml()).not.toContain("totals the basket");
+      expect(await renderedHtml()).not.toContain("totals the basket");
     },
   );
 
@@ -360,22 +354,22 @@ describe("a CLI that produced no spec is reported, not swallowed", () => {
       const { panel } = newPanel();
       await panel.show();
       await panel.refresh(run("mixed"));
-      expect(renderedHtml()).toContain("totals the basket");
-      expect(renderedHtml()).not.toContain("This view is out of date");
+      expect(await renderedHtml()).toContain("totals the basket");
+      expect(await renderedHtml()).not.toContain("This view is out of date");
 
       state.cliPath = brokenBinary;
       clearBinaryCache();
       await panel.refresh(run("all-fail"));
-      expect(renderedHtml()).toContain(
+      expect(await renderedHtml()).toContain(
         "This view is out of date: the last render failed.",
       );
-      expect(renderedHtml()).toContain("simulated toolchain failure");
-      expect(renderedHtml()).toContain("totals the basket");
+      expect(await renderedHtml()).toContain("simulated toolchain failure");
+      expect(await renderedHtml()).toContain("totals the basket");
 
       state.cliPath = "";
       clearBinaryCache();
       await panel.refresh(run("mixed"));
-      expect(renderedHtml()).not.toContain("This view is out of date");
+      expect(await renderedHtml()).not.toContain("This view is out of date");
     },
   );
 });
@@ -387,7 +381,7 @@ describe("a CLI that produced no spec is reported, not swallowed", () => {
 
 // How many times a rendered row carries this display text.
 function rows(html: string, display: string): number {
-  return html.split(`data-display="${display}"`).length - 1;
+  return html.split(`<span class="lbl">${display}</span>`).length - 1;
 }
 
 // A rerun of one cart behavior that now passes, as a -run filter on it
@@ -422,10 +416,10 @@ describe("runs kept across refreshes", () => {
     await panel.show();
 
     await panel.refresh(run("mixed"));
-    expect(renderedHtml()).toContain("1 failed");
+    expect(await renderedHtml()).toContain("1 failed");
 
     await panel.refresh(run("all-pass"));
-    const html = renderedHtml();
+    const html = await renderedHtml();
     expect(recorder.errors).toEqual([]);
     expect(html).toContain("2 passed");
     expect(html).not.toContain("1 failed");
@@ -441,7 +435,7 @@ describe("runs kept across refreshes", () => {
     await panel.refresh(run("mixed")); // a coverage run
     await panel.refresh(run("all-pass")); // a test run of the same package
 
-    const html = renderedHtml();
+    const html = await renderedHtml();
     expect(recorder.errors).toEqual([]);
     expect(rows(html, "adds an item")).toBe(1);
     expect(rows(html, "totals the basket")).toBe(1);
@@ -456,10 +450,9 @@ describe("runs kept across refreshes", () => {
     await panel.refresh(run("all-pass"));
     await panel.refresh(run("all-pass"));
 
-    const html = renderedHtml();
+    const html = await renderedHtml();
     expect(recorder.errors).toEqual([]);
-    expect(html).toContain("1 suite,");
-    expect(html).toContain("2 behaviors");
+    expect(html).toContain("2 in 1 suite, 1 package");
     expect(html).toContain("2 passed");
     expect(html).not.toContain("4 passed");
   });
@@ -471,7 +464,7 @@ describe("runs kept across refreshes", () => {
     await panel.refresh(run("all-pass"));
     await panel.refresh(run("other-package-fail"));
 
-    const html = renderedHtml();
+    const html = await renderedHtml();
     expect(recorder.errors).toEqual([]);
     expect(html).toContain("example.com/cart");
     expect(html).toContain("example.com/checkout");
@@ -499,7 +492,7 @@ describe("runs kept across refreshes", () => {
       ]),
     });
 
-    const html = renderedHtml();
+    const html = await renderedHtml();
     expect(recorder.errors).toEqual([]);
     expect(rows(html, "adds an item")).toBe(1);
     expect(rows(html, "totals the basket")).toBe(1);
@@ -555,14 +548,10 @@ describe("a branch's own verdict", () => {
       folder: state.workspaceDir,
     });
 
-    const html = renderedHtml();
+    const html = await renderedHtml();
     expect(recorder.errors).toEqual([]);
-    const summary = html.slice(
-      html.indexOf('<summary class="node suite"'),
-      html.indexOf("</summary>", html.indexOf('<summary class="node suite"')),
-    );
-    expect(summary).toContain('class="icon fail"');
-    const said = /<pre class="error-output">([^<]*)<\/pre>/.exec(html)?.[1];
+    expect(html).toContain('<summary class="row k-suite s-fail">');
+    const said = /<pre class="row-out">([^<]*)<\/pre>/.exec(html)?.[1];
     expect(said).toBe("store_test.go:40: AfterAll: close db: connection reset");
   });
 });
@@ -621,10 +610,14 @@ function discovered(patterns: string[]): Map<string, string> {
 // linked reads each row's go-to-source target from the rendered panel.
 function linked(html: string): Map<string, string> {
   const at = new Map<string, string>();
+  // A row's own Open comes before the next row's id.
   const row =
-    /data-id="([^"]+)"[^>]*>\s*<span class="icon [a-z]+" data-loc-file="([^"]+)" data-loc-line="(\d+)"/g;
+    /data-id="([^"]+)" data-pos="[^"]*"((?:(?!data-id=)[\s\S])*?)data-act="goTo" data-file="([^"]+)" data-line="(\d+)"/g;
   for (const m of html.matchAll(row)) {
-    at.set(m[1].replace(/&quot;/g, '"'), `${m[2]}:${m[3]}`);
+    at.set(
+      m[1].replace(/&quot;/g, '"').replace(/&#39;/g, "'"),
+      `${m[3]}:${m[4]}`,
+    );
   }
   return at;
 }
@@ -647,7 +640,7 @@ describe("the source under the runs", () => {
     await panel.show();
     await panel.refresh(run("declared-source"));
 
-    const html = renderedHtml();
+    const html = await renderedHtml();
     expect(recorder.errors).toEqual([]);
     const want = discovered(patterns);
     const got = linked(html);
@@ -661,41 +654,41 @@ describe("the source under the runs", () => {
     await panel.show();
     await panel.refresh(run("declared-source"));
 
-    const html = renderedHtml();
+    const html = await renderedHtml();
     expect(recorder.errors).toEqual([]);
-    const spec = JSON.parse(
-      /const SPEC_STATE = (.*);\n/.exec(html)?.[1] ?? "null",
-    ) as { stats: { notRun?: number }; packages: { path: string }[] };
+    const spec = (
+      panel as unknown as {
+        lastSpecData: {
+          stats: { notRun?: number };
+          packages: { path: string }[];
+        };
+      }
+    ).lastSpecData;
     expect(spec.stats.notRun ?? 0).toBeGreaterThan(0);
     expect(html).toContain(
-      `<span class="none">${spec.stats.notRun} not run</span>`,
+      `Not run <strong>${spec.stats.notRun!.toLocaleString("en-US")}</strong>`,
     );
-    expect(html).toContain('<span class="tag none">NOT RUN</span>');
+    expect(html).toContain('<span class="tag t-none">NOT RUN</span>');
     expect(spec.packages.map((p) => p.path)).toContain(
       "github.com/mvrahden/go-test/examples/fuzzing",
     );
   });
 
-  it("leaves out what the toolbar hides, as the CLI renders it, and counts it still", async () => {
+  it("narrows the rows to the chips pressed, and counts the rest still", async () => {
     const { panel, recorder } = newPanel();
     await panel.show();
     await panel.refresh(run("mixed"));
-    expect(renderedHtml()).toMatch(/class="leaf [a-z]+ pass"/);
+    expect(await renderedHtml()).toMatch(/class="row leaf k-[a-z]+ s-pass"/);
 
     (panel as unknown as { handleMessage(m: unknown): void }).handleMessage({
-      type: "toggleHide",
-      status: "pass",
+      type: "filters",
+      filters: ["fail"],
     });
-    await vi.waitFor(() =>
-      expect(renderedHtml()).toContain(
-        'class="filter-btn pass" data-filter="pass"',
-      ),
-    );
 
-    const html = renderedHtml();
+    const html = await renderedHtml();
     expect(recorder.errors).toEqual([]);
-    expect(html).not.toMatch(/class="leaf [a-z]+ pass"/);
-    expect(html).toMatch(/class="leaf [a-z]+ fail"/);
+    expect(html).not.toMatch(/class="row leaf k-[a-z]+ s-pass"/);
+    expect(html).toMatch(/class="row leaf k-[a-z]+ s-fail"/);
     expect(html).toContain("1 passed");
   });
 });
@@ -716,35 +709,39 @@ describe("acting on a node", () => {
     await panel.show();
     await panel.refresh(run("mixed"));
 
-    const html = renderedHtml();
+    const html = await renderedHtml();
     expect(recorder.errors).toEqual([]);
     expect(html).toContain('data-id="example.com/cart/CartTestSuite"');
     expect(html).toContain(
       'data-id="example.com/cart/CartTestSuite/totals_the_basket"',
     );
-    expect(html).toMatch(/id="rerun-failed-btn"[^>]*>Rerun failed/);
-    expect(html).not.toMatch(/id="rerun-failed-btn"[^>]*disabled/);
-
     const handle = (msg: unknown) =>
       (panel as unknown as { handleMessage(m: unknown): void }).handleMessage(
         msg,
       );
     handle({ type: "run", id: "example.com/cart/CartTestSuite/adds_an_item" });
-    handle({ type: "run", ids: ["a", "b"] });
+    handle({ type: "rerunFailed" });
     handle({ type: "debug", id: "example.com/cart/CartTestSuite" });
     expect(ran).toEqual([
       ["example.com/cart/CartTestSuite/adds_an_item"],
-      ["a", "b"],
+      ["example.com/cart/CartTestSuite/totals_the_basket"],
     ]);
     expect(debugged).toEqual(["example.com/cart/CartTestSuite"]);
   });
 
-  it("offers no rerun of failures when nothing failed", async () => {
+  it("reruns no failure when nothing failed", async () => {
     const { panel } = newPanel();
+    const ran: string[][] = [];
+    panel.setActions({
+      run: async (ids) => void ran.push(ids),
+      debug: async () => {},
+    });
     await panel.show();
     await panel.refresh(run("all-pass"));
-
-    expect(renderedHtml()).toMatch(/id="rerun-failed-btn"[^>]*disabled/);
+    (panel as unknown as { handleMessage(m: unknown): void }).handleMessage({
+      type: "rerunFailed",
+    });
+    expect(ran).toEqual([]);
   });
 });
 
@@ -765,8 +762,8 @@ describe("failure output", () => {
       await panel.refresh(run("mixed"));
 
       expect(recorder.errors).toEqual([]);
-      expect(renderedHtml()).toContain(
-        `<a class="src-link" data-loc-file="${path.join(dir, "cart_test.go")}" data-loc-line="42">cart_test.go:42</a>`,
+      expect(await renderedHtml()).toContain(
+        `<a class="src-link" href="#" data-act="goTo" data-file="${path.join(dir, "cart_test.go")}" data-line="42">cart_test.go:42</a>`,
       );
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -798,13 +795,13 @@ describe("packages discovery no longer reports", () => {
     await panel.show();
     await panel.refresh(run("all-pass"));
     await panel.refresh(run("other-package-fail"));
-    expect(renderedHtml()).toContain("adds an item");
+    expect(await renderedHtml()).toContain("adds an item");
 
     // cart was renamed: the next discovery of the folder no longer has it.
     cache.update([checkout], true, state.workspaceDir);
     await panel.show();
 
-    const html = renderedHtml();
+    const html = await renderedHtml();
     expect(recorder.errors).toEqual([]);
     expect(html).not.toContain("adds an item");
     expect(html).toContain("rejects an expired card");
@@ -820,16 +817,16 @@ describe("clearing drops the kept runs", () => {
 
     await panel.refresh(run("mixed"));
     await panel.refresh(run("other-package-fail"));
-    expect(renderedHtml()).toContain("rejects an expired card");
+    expect(await renderedHtml()).toContain("rejects an expired card");
 
     panel.clear();
-    const cleared = renderedHtml();
+    const cleared = await renderedHtml();
     expect(cleared).not.toContain("rejects an expired card");
     expect(cleared).not.toContain("totals the basket");
 
     // A later run shows only itself — the cleared runs are gone for good.
     await panel.refresh(run("all-pass"));
-    const html = renderedHtml();
+    const html = await renderedHtml();
     expect(recorder.errors).toEqual([]);
     expect(html).toContain("2 passed");
     expect(html).not.toContain("rejects an expired card");
@@ -840,13 +837,13 @@ describe("autoRefresh honours the user's setting", () => {
   it("does not repaint the panel when autoRefresh is off", async () => {
     const { panel, recorder } = newPanel();
     await panel.show();
-    const before = renderedHtml();
+    const before = await renderedHtml();
 
     state.autoRefresh = false;
     await panel.refresh(run("mixed"));
 
     expect(recorder.errors).toEqual([]);
-    expect(renderedHtml()).toBe(before);
+    expect(await renderedHtml()).toBe(before);
   });
 
   it("keeps what ran meanwhile and shows it when asked", async () => {
@@ -858,7 +855,7 @@ describe("autoRefresh honours the user's setting", () => {
     await panel.refresh(run("other-package-fail"));
     await panel.show();
 
-    const html = renderedHtml();
+    const html = await renderedHtml();
     expect(recorder.errors).toEqual([]);
     expect(html).toContain("adds an item");
     expect(html).toContain("rejects an expired card");
@@ -872,16 +869,16 @@ describe("a hidden panel", () => {
     const shown = state.panels[state.panels.length - 1] as unknown as {
       visible: boolean;
     };
-    const before = renderedHtml();
+    const before = await renderedHtml();
 
     shown.visible = false;
     await panel.refresh(run("all-pass"));
     await panel.refresh(run("other-package-fail"));
-    expect(renderedHtml()).toBe(before);
+    expect(await renderedHtml()).toBe(before);
 
     shown.visible = true;
     await panel.show();
-    const html = renderedHtml();
+    const html = await renderedHtml();
     expect(recorder.errors).toEqual([]);
     expect(html).toContain("adds an item");
     expect(html).toContain("rejects an expired card");
@@ -934,13 +931,15 @@ describe("the Spec View speaks the vocabulary the tree speaks", () => {
     await panel.show();
     await panel.refresh({ stream: captured, folder: fixturesDir });
 
-    const html = renderedHtml();
+    const html = await renderedHtml();
     expect(recorder.errors).toEqual([]);
     // The string behaviorTree.test.ts expects as this item's label in the tree.
-    expect(html).toContain('data-display="when classifying a number"');
+    expect(html).toContain(
+      '<span class="lbl">when classifying a number</span>',
+    );
     expect(html).not.toContain("when when");
     // Rows and expectations stand on their own — only a context takes a
     // connective.
-    expect(html).toContain('data-display="negative"');
+    expect(html).toContain('<span class="lbl">negative</span>');
   }, 300_000);
 });

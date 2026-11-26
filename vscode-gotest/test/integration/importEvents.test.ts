@@ -13,7 +13,7 @@ const state = vi.hoisted(() => ({
   workspaceDir: "",
   cliPath: "",
   autoRefresh: true,
-  panels: [] as { webview: { html: string; cspSource: string } }[],
+  panels: [] as import("./vscodeStub.js").StubPanel[],
   controllers: [] as unknown[],
   config: {} as Record<string, unknown>,
 }));
@@ -27,6 +27,7 @@ import { DiscoveryCache, DiscoveryService } from "../../src/discovery.js";
 import { GoTestController } from "../../src/testController.js";
 import { TestResultStore } from "../../src/testResultStore.js";
 import { SpecViewPanel } from "../../src/specView.js";
+import { shownHtml } from "./shownPanel.js";
 import { openEventsFile } from "../../src/importEvents.js";
 import { createRecordingChannel } from "./vscodeStub.js";
 import type { FakeTestController } from "./vscodeTestApi.js";
@@ -216,9 +217,9 @@ describe("opening a saved event stream", () => {
 
     expect(outcome).toBeDefined();
     expect(recorder.errors).toEqual([]);
-    expect(state.panels[state.panels.length - 1].webview.html).toContain(
-      "Imported: cut.jsonl",
-    );
+    expect(
+      await shownHtml(state.panels[state.panels.length - 1].webview),
+    ).toContain("Imported: cut.jsonl");
   }, 300_000);
 
   it("shows it in the Spec View as its own source, every package included", async () => {
@@ -238,7 +239,7 @@ describe("opening a saved event stream", () => {
       eventsFile,
     );
 
-    const html = state.panels[state.panels.length - 1].webview.html;
+    const html = await shownHtml(state.panels[state.panels.length - 1].webview);
     expect(recorder.errors).toEqual([]);
     expect(html).toMatch(
       /<option value="file:[^"]*events\.jsonl" selected>Imported: events\.jsonl<\/option>/,

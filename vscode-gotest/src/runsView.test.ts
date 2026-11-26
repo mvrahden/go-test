@@ -1,87 +1,185 @@
 import { describe, it, expect } from "vitest";
-import { buildRunsBody, RUNS_EMPTY_TEXT, type RunsView } from "./runsView.js";
-import type { RunRow } from "./runsModel.js";
+import {
+  buildRunsTab,
+  cardsOf,
+  RUNS_EMPTY_TEXT,
+  RUNS_KEPT,
+  type RunsView,
+} from "./runsView.js";
+import type { RunsEntry } from "./runsModel.js";
 
-function row(over: Partial<RunRow> = {}): RunRow {
+const now = new Date(2026, 10, 26, 9, 0);
+
+function entry(
+  id: string,
+  over: Partial<RunsEntry> = {},
+  at = new Date(2026, 10, 26, 8, 38),
+): RunsEntry {
   return {
-    id: "r1",
-    when: "14:02",
-    whenTitle: "2026-11-25T13:02:00.000Z",
-    pass: true,
-    verdict: "PASS exit 0",
-    who: "no agent",
-    commit: "abc1234",
-    args: "gotest -json ./...",
-    counts: "3 passed",
-    judges: "judges this tree: 2 current / 1 stale / 0 unknown",
-    judgesTone: "warn",
-    eventsFile: "/s/a.jsonl",
-    canOpen: true,
-    evidence: false,
+    id,
+    recorded: at.toISOString(),
+    eventsFile: `/e/${id}.jsonl`,
+    manifest: {
+      args: ["--control=stdin", "--", "-json", "./..."],
+      commit: "e50c1f36",
+    },
+    result: {
+      exitCode: 1,
+      packages: { passed: 75, failed: 1, skipped: 19 },
+      tests: { passed: 11672, failed: 4, skipped: 18 },
+    },
+    failed: [],
+    packages: { total: 95, current: 95, stale: 0, unknown: 0 },
     ...over,
   };
 }
 
-const view = (over: Partial<RunsView> = {}): RunsView => ({
-  state: { kind: "doc", rows: [row()] },
+const agentRun = (id: string, exitCode: number, minute: number) =>
+  entry(
+    id,
+    {
+      eventsFile: undefined,
+      manifest: {
+        args: [
+          "--agent=false",
+          "./pkg/gotestruntime/",
+          "-run",
+          "TestControlLinkTestSuite",
+        ],
+        commit: "e50c1f36",
+        agent: "claude-code_2_agent",
+      },
+      result: {
+        exitCode,
+        packages: {
+          passed: exitCode ? 0 : 1,
+          failed: exitCode ? 1 : 0,
+          skipped: 0,
+        },
+      },
+      packages: { total: 1, current: 1, stale: 0, unknown: 0 },
+    },
+    new Date(2026, 10, 26, 8, minute),
+  );
+
+const view = (runs: RunsEntry[], over: Partial<RunsView> = {}): RunsView => ({
+  state: { kind: "doc", doc: { version: "v1", dir: "/w", runs } },
   busy: false,
   folders: [{ path: "/w", label: "w", selected: true }],
+  head: "e50c1f36",
+  now,
+  exists: () => true,
+  chosen: () => false,
   ...over,
 });
 
-describe("buildRunsBody", () => {
-  it("lists a run with its facts, its judgement and its actions", () => {
-    const html = buildRunsBody(view());
-    expect(html).toContain('<span class="tag-chip pass">PASS exit 0</span>');
-    expect(html).toContain("gotest -json ./...");
-    expect(html).toContain(
-      '<div class="run-judges warn">judges this tree: 2 current / 1 stale / 0 unknown</div>',
+describe("the Runs tab", () => {
+  it("shows the head commit's records as cards: time, title, who, counts, verdict, freshness, command", () => {
+    const t = buildRunsTab(view([entry("r1")]));
+    expect(t.headline).toBe("One run covers this whole tree, and it failed");
+    expect(t.sub).toBe(
+      "Records for e50c1f36. A run counts for this tree while the files it read are unchanged.",
     );
-    expect(html).toContain('data-runs="open" data-key="r1"');
-    expect(html).toContain(">Use as evidence</button>");
-    expect(html).toContain('data-runs="import"');
-    expect(html).toContain('data-runs="runChanged"');
+    expect(t.cards).toEqual([
+      {
+        key: "r1",
+        time: "08:38",
+        day: "today",
+        title: "Everything",
+        who: "You, from this editor",
+        counts: "11,672 passed · 4 failed · 18 skipped",
+        verdict: "Failed",
+        tone: "fail",
+        fresh: "95 packages, current",
+        freshTone: "pass",
+        canOpen: true,
+        evidence: "none",
+        command: "gotest --control=stdin -- -json ./...",
+        commit: "e50c1f36",
+      },
+    ]);
+    expect(t.footer).toBe(RUNS_KEPT);
   });
 
-  it("marks a narrowed and an imported run, and a chosen one as evidence", () => {
-    const html = buildRunsBody(
-      view({
-        state: {
-          kind: "doc",
-          rows: [
-            row({
-              narrowed: "--changed: ran 1 package, left out 3 unchanged",
-              imported: "ci.json",
-              evidence: true,
-            }),
-          ],
-        },
-      }),
+  it("folds consecutive runs of one command, commit and source into one card", () => {
+    const runs = [
+      agentRun("a6", 1, 47),
+      agentRun("a5", 0, 46),
+      agentRun("a4", 0, 45),
+      agentRun("a3", 1, 44),
+      entry("editor"),
+      agentRun("a1", 0, 30),
+    ];
+    const cards = cardsOf(view(runs), runs);
+    expect(cards.map((c) => [c.title, c.verdict, c.runs?.length])).toEqual([
+      [
+        "pkg/gotestruntime, only ControlLink, 4 runs in a row",
+        "2 passed · 2 failed",
+        4,
+      ],
+      ["Everything", "Failed", undefined],
+      ["pkg/gotestruntime, only ControlLink", "Passed", undefined],
+    ]);
+    expect(cards[0]).toMatchObject({
+      who: "Agent (Claude Code)",
+      counts: "no test counts kept",
+      canOpen: false,
+      time: "08:47",
+      tone: "fail",
+    });
+    expect(cards[0].runs!.map((r) => r.key)).toEqual(["a6", "a5", "a4", "a3"]);
+  });
+
+  it("marks the run chosen as evidence, else the newest current one in use", () => {
+    expect(
+      buildRunsTab(view([entry("r1")], { chosen: (id) => id === "r1" }))
+        .cards[0].evidence,
+    ).toBe("chosen");
+    expect(
+      buildRunsTab(view([entry("r1")], { auto: "r1" })).cards[0].evidence,
+    ).toBe("auto");
+  });
+
+  it("puts the records of other commits under Earlier commits, naming the commit", () => {
+    const old = entry("old", {
+      manifest: { args: ["./..."], commit: "0a1b2c3d", dirty: true },
+      packages: { total: 2, current: 1, stale: 1, unknown: 0 },
+    });
+    const t = buildRunsTab(view([entry("r1"), old]));
+    expect(t.cards.map((c) => c.key)).toEqual(["r1"]);
+    expect(
+      t.earlier.map((c) => [c.key, c.commit, c.fresh, c.freshTone]),
+    ).toEqual([["old", "0a1b2c3d dirty", "1 of 2 packages stale", "warn"]]);
+    expect(buildRunsTab(view([old])).headline).toBe(
+      "No run of this commit is recorded yet",
     );
-    expect(html).toContain(">narrowed</span>");
-    expect(html).toContain("--changed: ran 1 package, left out 3 unchanged");
-    expect(html).toContain(">imported</span>");
-    expect(html).toContain('<div class="run-row chosen"');
-    expect(html).toContain('aria-pressed="true"');
   });
 
-  it("offers nothing to open for a run without its events file", () => {
-    const html = buildRunsBody(
-      view({ state: { kind: "doc", rows: [row({ canOpen: false })] } }),
+  it("says when no run matches the tree any more, and how many do", () => {
+    const stale = entry("s", {
+      packages: { total: 2, current: 1, stale: 1, unknown: 0 },
+    });
+    expect(buildRunsTab(view([stale])).headline).toBe(
+      "No run matches this tree any more",
     );
-    expect(html).not.toContain('data-runs="open"');
-    expect(html).toContain("no events file");
+    const narrow = agentRun("n", 0, 10);
+    expect(buildRunsTab(view([narrow, agentRun("m", 1, 5)])).headline).toBe(
+      "2 runs match this tree; the newest passed",
+    );
   });
 
-  it("explains an empty list: runs are recorded from the CLI and the editor alike", () => {
-    const html = buildRunsBody(view({ state: { kind: "doc", rows: [] } }));
-    expect(html).toContain("No run recorded yet");
-    expect(html).toContain(RUNS_EMPTY_TEXT.slice(0, 60));
+  it("explains an empty list, offering to import a CI run", () => {
+    const t = buildRunsTab(view([]));
+    expect(t.empty).toEqual({
+      title: "No run recorded yet",
+      text: RUNS_EMPTY_TEXT,
+      action: { act: "import", label: "Import a CI run" },
+    });
   });
 
-  it("names the release a CLI without runs needs", () => {
-    const html = buildRunsBody(
-      view({
+  it("names the release a CLI without runs needs, and shows an error as it came", () => {
+    const t = buildRunsTab(
+      view([], {
         state: {
           kind: "oldCli",
           version: "v1.41.0",
@@ -91,9 +189,25 @@ describe("buildRunsBody", () => {
         },
       }),
     );
-    expect(html).toContain("The Runs scope needs gotest v1.42.0");
-    expect(html).toContain("This folder's CLI is v1.41.0.");
-    expect(html).toContain('data-runs="upgrade"');
-    expect(html).toMatch(/data-runs="runChanged"[^>]*disabled/);
+    expect(t.empty!.title).toBe("The Runs tab needs gotest v1.42.0");
+    expect(t.empty!.text).toContain("This folder's CLI is v1.41.0.");
+    expect(t.empty!.action).toEqual({ act: "upgrade", label: "Upgrade…" });
+    expect(
+      buildRunsTab(view([], { state: { kind: "error", message: "boom" } }))
+        .error,
+    ).toBe("boom");
+    expect(
+      buildRunsTab(view([], { state: { kind: "idle" }, busy: true })).empty!
+        .text,
+    ).toBe("Reading the run records…");
+  });
+
+  it("offers the folders when there are several", () => {
+    expect(buildRunsTab(view([])).folders).toBeUndefined();
+    const two = [
+      { path: "/a", label: "a", selected: true },
+      { path: "/b", label: "b", selected: false },
+    ];
+    expect(buildRunsTab(view([], { folders: two })).folders).toEqual(two);
   });
 });

@@ -7,7 +7,13 @@ vi.mock("vscode", () => ({
   commands: {},
 }));
 
-import { buildChangeBody, type ChangeView } from "./changeView.js";
+import {
+  buildChangeTab,
+  changePackageRows,
+  hasReason,
+  ROUTINE,
+  type ChangeView,
+} from "./changeView.js";
 import { buildChangeModel, type AuditDocument } from "./auditModel.js";
 import { interpretAuditExit } from "./changeScope.js";
 
@@ -79,9 +85,38 @@ function doc(over: Partial<AuditDocument> = {}): AuditDocument {
   };
 }
 
+function docState(
+  d: AuditDocument,
+  exitCode: number | null = 0,
+  accepted: (k: string) => boolean = () => false,
+) {
+  return {
+    kind: "doc" as const,
+    model: buildChangeModel(d, accepted),
+    doc: d,
+    exitCode,
+  };
+}
+
+const finding = (
+  id: string,
+  cls: string,
+  weakens: boolean,
+  over: Partial<AuditDocument["findings"][number]> = {},
+) => ({
+  id,
+  class: cls,
+  weakens,
+  subject: "shop/cart_test.go",
+  base: "",
+  head: "",
+  location: { file: "shop/cart_test.go", line: 4, endLine: 4 },
+  ...over,
+});
+
 function view(over: Partial<ChangeView> = {}): ChangeView {
   return {
-    state: { kind: "doc", model: buildChangeModel(doc()), exitCode: 0 },
+    state: docState(doc()),
     busy: false,
     folders: [{ path: "/ws", label: "ws", selected: true }],
     baseLabel: "merge-base with origin/main (aaaa1111)",
@@ -92,62 +127,68 @@ function view(over: Partial<ChangeView> = {}): ChangeView {
   };
 }
 
-describe("buildChangeBody", () => {
-  it("shows the runs taken as evidence as chips, each with a remove", () => {
-    const html = buildChangeBody(
-      view({
-        evidence: [
-          { id: "r1", label: "14:02 abc1234", missing: false },
-          { id: "r2", label: "09:10", missing: true },
-        ],
-      }),
+describe("the Change tab", () => {
+  it("opens on how many changes need a decision, and what else the audit found", () => {
+    const t = buildChangeTab(view());
+    expect(t.headline).toBe("2 changes need your decision");
+    expect(t.sub).toBe("1 behaviors added, 1 removed, 0 changed.");
+    expect(t.head).toBe("feat/x");
+    expect(t.base).toBe("merge-base with origin/main (aaaa1111)");
+    expect(t.openCount).toBe(2);
+    const one = buildChangeTab(
+      view({ state: docState(doc({ findings: [budget] })) }),
     );
-    expect(html).toContain("Evidence from runs:");
-    expect(html).toMatch(
-      /<span class="evidence-chip" [^>]*>14:02 abc1234<button class="act" data-change="dropEvidence" data-key="r1"/,
+    expect(one.headline).toBe("1 change needs your decision");
+    expect(
+      buildChangeTab(view({ state: docState(doc({ findings: [] })) })).headline,
+    ).toBe("No change needs your decision");
+  });
+
+  it("gives each decision its kind, subject, fact and place, assertions and budgets before removals", () => {
+    const t = buildChangeTab(view());
+    expect(t.decisions).toEqual([
+      {
+        key: "f-budget",
+        kind: "Budget",
+        tone: "warn",
+        what: "Cart",
+        fact: "Timeout 10s → Timeout 1m0s",
+        where: "shop/cart_test.go:9",
+        open: undefined,
+        mark: undefined,
+        accepted: false,
+      },
+      {
+        key: "f-removed",
+        kind: "Removed",
+        tone: "fail",
+        what: "Cart › Remove",
+        fact: "gone",
+        where: "shop/cart_test.go:32",
+        open: undefined,
+        mark: undefined,
+        accepted: false,
+      },
+    ]);
+  });
+
+  it("shows the first decisions and counts the rest by kind", () => {
+    const many = Array.from({ length: 9 }, (_, i) => ({
+      ...removed,
+      id: `r${i}`,
+    }));
+    const t = buildChangeTab(
+      view({ state: docState(doc({ findings: [budget, ...many] })) }),
     );
-    expect(html).toMatch(
-      /<span class="evidence-chip missing" title="Its events file is gone/,
-    );
-    expect(buildChangeBody(view())).not.toContain("Evidence from runs:");
+    expect(t.shown).toBe(6);
+    expect(t.moreText).toBe("4 more: 4 removed");
   });
 
-  it("opens with the head, the base and the summary's counts", () => {
-    const html = buildChangeBody(view());
-    expect(html).toContain("head <b>feat/x</b> bbbb2222 ← base main aaaa1111");
-    expect(html).toContain("weakenings <b>2</b>");
-    expect(html).toContain("Base: merge-base with origin/main (aaaa1111)");
-  });
-
-  it("puts the decisions before the behaviors, in the document's order", () => {
-    const html = buildChangeBody(view());
-    const at = (s: string) => html.indexOf(s);
-    expect(at("Needs a decision")).toBeGreaterThan(-1);
-    expect(at("Needs a decision")).toBeLessThan(at("Changed behaviors"));
-    expect(at(">removed<")).toBeLessThan(at(">budget<"));
-    expect(html).toContain("2 open · 0 accepted");
-    expect(html).toContain("the only copy");
-  });
-
-  it("says that accepting is local", () => {
-    const html = buildChangeBody(view());
-    expect(html).toMatch(/class="caption"[^>]*>[^<]*never sent anywhere/);
-  });
-
-  it("offers Open diff and Run only where the editor can do them", () => {
-    const none = buildChangeBody(view());
-    expect(none).not.toContain('data-change="openDiff"');
-    expect(none).not.toContain('data-change="run"');
-    expect(none).toContain('data-change="accept"');
-    const key = budget.id;
-    const some = buildChangeBody(
-      view({ canOpen: (k) => k === key, canRun: (k) => k === key }),
-    );
-    expect(some.match(/data-change="openDiff"/g)).toHaveLength(1);
-    expect(some.match(/data-change="run"/g)).toHaveLength(1);
-  });
-
-  it("opens an evidence row that needs a decision at its source, a finding at its diff", () => {
+  it("offers Diff only where the editor can open the file, and Open for an evidence row", () => {
+    expect(buildChangeTab(view()).decisions.map((d) => d.open)).toEqual([
+      undefined,
+      undefined,
+    ]);
     const d = doc({
       streams: [{ file: "run.json", side: "head", run: null, current: true }],
       evidence: [
@@ -166,250 +207,205 @@ describe("buildChangeBody", () => {
         },
       ],
     });
-    const html = buildChangeBody(
+    const t = buildChangeTab(
       view({
-        state: { kind: "doc", model: buildChangeModel(d), exitCode: 1 },
+        state: docState(d, 1),
         canOpen: (k) => k === "e-total" || k === budget.id,
       }),
     );
-    expect(html).toMatch(
-      /data-key="e-total"[\s\S]*?<button class="act" data-change="openSource" data-key="e-total"[^>]*>Open</,
-    );
-    expect(html.match(/data-change="openDiff"/g)).toHaveLength(1);
-    expect(html).toContain('data-change="openDiff" data-key="f-budget"');
+    expect(t.decisions.map((r) => [r.key, r.open])).toEqual([
+      ["e-total", "source"],
+      ["f-budget", "diff"],
+      ["f-removed", undefined],
+    ]);
+    expect(t.exit).toBe("exit 1");
   });
 
-  it("strikes an accepted row through and moves it under the accepted", () => {
-    const model = buildChangeModel(doc(), (k) => k === removed.id);
-    const html = buildChangeBody(
-      view({ state: { kind: "doc", model, exitCode: 0 } }),
+  it("moves an accepted decision under the accepted, out of the count", () => {
+    const t = buildChangeTab(
+      view({ state: docState(doc(), 0, (k) => k === removed.id) }),
     );
-    expect(html).toContain("1 open · 1 accepted");
-    expect(html.indexOf("accepted · 1")).toBeLessThan(
-      html.indexOf('class="decision fail accepted"'),
-    );
-    expect(html).toContain(">Reopen<");
+    expect(t.openCount).toBe(1);
+    expect(t.accepted.map((r) => [r.key, r.accepted])).toEqual([
+      [removed.id, true],
+    ]);
   });
 
-  it("names an exit that is not 0, and still shows the document", () => {
-    const html = buildChangeBody(
+  it("groups the routine findings by the table, informational ones included, and leaves the rest decisions", () => {
+    const findings = [
+      finding("a1", "asserts-by", true),
+      finding("a2", "asserts-by", true),
+      finding("s-reason", "suppression", true, {
+        head: "//nolint:fail-guard // ring 0 only",
+      }),
+      finding("s-bare", "suppression", true, { head: "//nolint:fail-guard" }),
+      finding("s-info", "suppression", false, {
+        base: "//nolint:x",
+        head: "//nolint:x // why",
+      }),
+      finding("i-other", "snapshot", false, { head: "abc" }),
+      budget,
+    ];
+    const t = buildChangeTab(
       view({
-        state: {
-          kind: "doc",
-          model: buildChangeModel(
-            doc({ incomplete: ["./broken: does not compile"] }),
-          ),
-          exitCode: 2,
-        },
+        state: docState(doc({ findings })),
+        accepted: (k) => k === "s-info",
       }),
     );
-    expect(html).toContain("exit 2");
-    expect(html).toContain("Not compared");
-    expect(html).toContain("./broken: does not compile");
+    expect(t.routine.map((g) => [g.id, g.count, g.keys, g.accepted])).toEqual([
+      ["asserts-by", 2, ["a1", "a2"], 0],
+      ["suppression-reason", 1, ["s-reason"], 0],
+      ["suppression-info", 1, ["s-info"], 1],
+    ]);
+    expect(t.decisions.map((d) => d.key)).toEqual(["f-budget", "s-bare"]);
+    expect(t.sub).toMatch(/^3 more are routine and grouped below\./);
+    expect(t.lists).toEqual([
+      { title: "Information", items: ["snapshot  shop/cart_test.go:4 abc"] },
+    ]);
+    expect(ROUTINE.map((r) => r.id)).toEqual([
+      "asserts-by",
+      "suppression-reason",
+      "suppression-info",
+    ]);
   });
 
-  it("explains a CLI without audit and offers the upgrade when go.mod pins it", () => {
-    const html = buildChangeBody(
-      view({
-        state: {
-          kind: "oldCli",
-          version: "v1.41.0",
-          floor: "v1.42.0",
-          advice: "Run: go get -tool m@v1.42.0",
-          canUpgrade: true,
-        },
-      }),
-    );
-    expect(html).toContain("needs gotest v1.42.0");
-    expect(html).toContain("This folder's CLI is v1.41.0.");
-    expect(html).toContain('data-change="upgrade"');
-    const unpinned = buildChangeBody(
-      view({
-        state: {
-          kind: "oldCli",
-          floor: "v1.42.0",
-          advice: "Run: x",
-          canUpgrade: false,
-        },
-      }),
-    );
-    expect(unpinned).not.toContain('data-change="upgrade"');
+  it("knows a nolint comment that says why", () => {
+    expect(hasReason("//nolint:fail-guard // ring 0")).toBe(true);
+    expect(hasReason("//nolint:fail-guard")).toBe(false);
+    expect(hasReason("//nolint:fail-guard //")).toBe(false);
   });
 
-  it("says a folder outside git cannot be audited, with no base to choose", () => {
-    const html = buildChangeBody(view({ state: { kind: "notGit" } }));
-    expect(html).toContain("Not a git checkout");
-    expect(html).toMatch(/data-change="chooseBase"[^>]*disabled/);
-  });
-
-  it("shows the CLI's complaint when it wrote no document", () => {
-    const html = buildChangeBody(
-      view({ state: { kind: "error", message: "FAIL: <bad> ref" } }),
-    );
-    expect(html).toContain("FAIL: &lt;bad&gt; ref");
-  });
-
-  it("marks an audit in progress and holds Refresh until it ends", () => {
-    const html = buildChangeBody(view({ busy: "static" }));
-    expect(html).toContain("Auditing…");
-    expect(html).toMatch(/data-change="refresh"[^>]*disabled/);
-    expect(html).toMatch(/data-change="auditRun"[^>]*disabled/);
-    expect(html).not.toContain('data-change="cancel"');
-    expect(buildChangeBody(view())).not.toMatch(
-      /data-change="auditRun"[^>]*disabled/,
-    );
-  });
-
-  it("offers to stop an audit with a run while it runs", () => {
-    const html = buildChangeBody(view({ busy: "run" }));
-    expect(html).toContain("Auditing with a run…");
-    expect(html).toContain('data-change="cancel"');
-    expect(html).toMatch(/data-change="auditRun"[^>]*disabled/);
-  });
-
-  it("says when the last audit was stopped, over the document it keeps", () => {
-    const html = buildChangeBody(
-      view({
-        notice: "The audit was stopped; this is the last one that finished.",
-      }),
-    );
-    expect(html.indexOf("The audit was stopped")).toBeLessThan(
-      html.indexOf("Needs a decision"),
-    );
-  });
-
-  it("shows a stopped run's document as stopped, not as a failed exit", () => {
-    const d = doc({
-      incomplete: [
-        "--run: the run was stopped before its end; what it did not reach reads as not run",
-      ],
+  it("says which evidence is in use, the newest current run when none is chosen, or that nothing is proven", () => {
+    expect(buildChangeTab(view()).evidence).toEqual({
+      text: "Nothing is proven yet: no kept run matches this tree.",
+      picks: [],
+      action: { act: "auditRun", label: "Run what changed" },
     });
-    const state = { kind: "doc" as const, model: buildChangeModel(d) };
-    const stopped = buildChangeBody(
-      view({ state: { ...state, exitCode: 130, stopped: true } }),
-    );
-    expect(stopped).toContain('<span class="warn">run stopped</span>');
-    expect(stopped).not.toContain("exit 130");
-    expect(stopped).toContain("--run: the run was stopped before its end");
-    const failed = buildChangeBody(
-      view({ state: { ...state, exitCode: 130 } }),
-    );
-    expect(failed).toContain('<span class="fail">exit 130</span>');
-  });
-
-  it("asks for a newer extension for an audit schema it does not read", () => {
-    const html = buildChangeBody(
+    const current = doc({
+      streams: [{ file: "/e.jsonl", side: "head", run: null, current: true }],
+    });
+    const auto = buildChangeTab(
       view({
-        state: {
-          kind: "newSchema",
-          version: "v1.50.0",
-          schema: 2,
-          supported: 1,
-        },
-      }),
-    );
-    expect(html).toContain("schema 2; this extension reads schema 1");
-    expect(html).toMatch(/data-change="auditRun"[^>]*disabled/);
-  });
-
-  it("offers the folders to choose from when there are several", () => {
-    const one = buildChangeBody(view());
-    expect(one).not.toContain('id="change-folder"');
-    const two = buildChangeBody(
-      view({
-        folders: [
-          { path: "/a", label: "a", selected: false },
-          { path: "/b", label: "b", selected: true },
+        state: docState(current),
+        evidence: [
+          {
+            id: "r1",
+            label: "the editor run of 08:38",
+            missing: false,
+            auto: true,
+          },
         ],
       }),
     );
-    expect(two).toContain('<option value="/b" selected>b</option>');
-  });
-
-  it("names the runs that judged the change, current or stale and why, before the decisions", () => {
-    const html = buildChangeBody(
-      view({
-        state: {
-          kind: "doc",
-          model: buildChangeModel(
-            doc({
-              streams: [
-                {
-                  file: "run.json",
-                  side: "head",
-                  run: {
-                    commit: "bbbb2222",
-                    agent: "claude-code",
-                    exitCode: 1,
-                  },
-                  current: true,
-                },
-                {
-                  file: "old.json",
-                  side: "head",
-                  run: { commit: "0a1b2c3", exitCode: 0 },
-                  current: false,
-                  stale: "another commit: the stream ran 0a1b2c3",
-                },
-              ],
-            }),
-          ),
-          exitCode: 0,
-        },
-      }),
-    );
-    expect(html).toContain(
-      "evidence: 2 streams, 1 current; * marks a verdict of a stale one",
-    );
-    expect(html).toContain(
-      '>current</span> <span class="mono">run.json of bbbb2222, exit 1</span> <span class="dim">· agent claude-code</span>',
-    );
-    expect(html).toContain(
-      '>stale</span> <span class="mono">old.json of 0a1b2c3, exit 0: another commit: the stream ran 0a1b2c3</span>',
-    );
-    expect(html.indexOf('id="streams"')).toBeLessThan(
-      html.indexOf('id="decisions"'),
-    );
-    expect(buildChangeBody(view())).not.toContain('id="streams"');
-  });
-
-  it("marks each row with its evidence, and runs a behavior where it can", () => {
-    const d = doc({
-      streams: [{ file: "run.json", side: "head", run: null, current: true }],
-      evidence: [
-        {
-          id: "e-copy",
-          package: "mod/shop",
-          path: ["Cart", "Copies", "the only copy"],
-          verdict: "pass",
-          mark: "vacuous",
-          assertions: 0,
-          vacuous: true,
-          stream: 0,
-          current: true,
-          needsDecision: true,
-          why: ["added"],
-          run: "^TestCartTestSuite$/^TestCopies$/^the_only_copy$",
-        },
-      ],
+    expect(auto.evidence).toEqual({
+      text: "Proven by the editor run of 08:38, which matches this tree.",
+      picks: [],
+      action: { act: "evidence", label: "Change evidence" },
     });
-    const html = buildChangeBody(
+    const chosen = buildChangeTab(
       view({
-        state: { kind: "doc", model: buildChangeModel(d), exitCode: 0 },
-        canRun: (k) => k === "b:0",
+        state: docState(
+          doc({
+            streams: [
+              {
+                file: "/old.jsonl",
+                side: "head",
+                run: null,
+                current: false,
+                stale: "another commit",
+              },
+            ],
+          }),
+        ),
+        evidence: [
+          {
+            id: "r1",
+            label: "the run of 09:10 by Claude Code",
+            missing: false,
+          },
+          { id: "r2", label: "the terminal run of 08:00", missing: true },
+        ],
       }),
     );
-    // The decision is tagged by its mark; the behavior carries it beside.
-    expect(html).toMatch(/class="tag-chip warn"[^>]*>vacuous</);
-    expect(html).toMatch(
-      /<span class="mark warn"[^>]*>vacuous<\/span> Copies \/ the only copy/,
+    expect(chosen.evidence!.text).toBe(
+      "Proven by the run of 09:10 by Claude Code, partly from before the tree changed (/old.jsonl: another commit).",
     );
-    expect(html).toMatch(
-      /class="behavior added"[\s\S]*data-change="run" data-key="b:0"/,
+    expect(chosen.evidence!.picks).toEqual([
+      { id: "r1", label: "the run of 09:10 by Claude Code", missing: false },
+      { id: "r2", label: "the terminal run of 08:00", missing: true },
+    ]);
+    const ran = buildChangeTab(
+      view({
+        state: docState(
+          doc({
+            streams: [{ side: "head", ran: true, run: null, current: true }],
+          }),
+        ),
+      }),
+    );
+    expect(ran.evidence!.text).toBe(
+      "Proven by this audit's run, which matches this tree.",
     );
   });
 
-  it("lists the unproven lines per file, each range opening the file at it", () => {
+  it("says how the judged behaviors fared", () => {
+    const d = (over: object) =>
+      doc({
+        streams: [{ file: "e", side: "head", run: null, current: true }],
+        summary: {
+          ...doc().summary,
+          evidence: 4,
+          failing: 0,
+          notRun: 0,
+          ...over,
+        },
+      });
+    expect(buildChangeTab(view({ state: docState(d({})) })).sub).toContain(
+      "All 4 judged behaviors passed.",
+    );
+    expect(
+      buildChangeTab(view({ state: docState(d({ failing: 1, notRun: 2 })) }))
+        .sub,
+    ).toContain("Of 4 judged behaviors, 1 failing, 2 not run.");
+  });
+
+  it("lists the changed behaviors per package, their rows on request, with Run where the editor can", () => {
+    const t = buildChangeTab(view({ canRun: (k) => k === "b:0" }));
+    expect(t.packages).toEqual([
+      { pkg: "./shop", name: "shop", delta: "+1 added" },
+    ]);
+    expect(
+      changePackageRows(view({ canRun: (k) => k === "b:0" }), "./shop"),
+    ).toEqual([
+      {
+        key: "b:0",
+        suite: "Cart",
+        sign: "+",
+        change: "added",
+        text: "Copies / the only copy",
+        where: "shop/cart_test.go:49",
+        mark: undefined,
+        canOpen: false,
+        canRun: true,
+      },
+    ]);
+    expect(changePackageRows(view(), "./gone")).toEqual([]);
+  });
+
+  it("names an exit that is not 0, a stopped run as stopped, and what was not compared", () => {
+    const d = doc({ incomplete: ["./broken: does not compile"] });
+    const t = buildChangeTab(view({ state: docState(d, 2) }));
+    expect(t.exit).toBe("exit 2");
+    expect(t.lists).toEqual([
+      { title: "Not compared", items: ["./broken: does not compile"] },
+    ]);
+    const stopped = buildChangeTab(
+      view({ state: { ...docState(d, 130), stopped: true } }),
+    );
+    expect(stopped.exit).toBe("the run was stopped");
+  });
+
+  it("lists the unproven lines per file, each range a place to open", () => {
     const d = doc({
       summary: {
         ...doc().summary,
@@ -437,31 +433,91 @@ describe("buildChangeBody", () => {
           coverage: true,
           changed: 12,
           unexecuted: 8,
-          ranges: [1, 3, 5, 7, 9, 11, 13, 15].map((l) => ({
-            line: l,
-            endLine: l === 1 ? 2 : l,
-          })),
+          ranges: [{ line: 1, endLine: 2 }],
         },
       ],
     });
-    const html = buildChangeBody(
-      view({
-        state: { kind: "doc", model: buildChangeModel(d), exitCode: 0 },
-        canOpen: (k) => k.startsWith("u:"),
-      }),
-    );
-    expect(html).toContain(
+    const u = buildChangeTab(
+      view({ state: docState(d), canOpen: (k) => k.startsWith("u:") }),
+    ).unproven!;
+    expect(u.head).toBe(
       "9 of 12 changed executable lines not executed, 1 file without coverage data",
     );
-    expect(html).toMatch(
-      /shop\/ledger\.go<\/a> <span class="dim">\.\/shop<\/span> <span class="fact">no coverage data/,
+    expect(
+      u.files.map((f) => [f.file, f.coverage, f.counts, f.canOpen, f.ranges]),
+    ).toEqual([
+      ["shop/ledger.go", false, "", true, []],
+      ["shop/shop.go", true, "8 of 12", true, [{ key: "u:1:0", text: "1-2" }]],
+    ]);
+    expect(buildChangeTab(view()).unproven).toBeUndefined();
+  });
+
+  it("stands in for a document it lacks: no checkout, no base, an old CLI, a newer schema, an error", () => {
+    expect(buildChangeTab(view({ state: { kind: "notGit" } }))).toMatchObject({
+      empty: { title: "Not a git checkout" },
+      canChooseBase: false,
+      canAudit: false,
+    });
+    expect(
+      buildChangeTab(view({ state: { kind: "noBase" } })).empty!.action,
+    ).toEqual({ act: "chooseBase", label: "Choose a base…" });
+    const old = buildChangeTab(
+      view({
+        state: {
+          kind: "oldCli",
+          version: "v1.41.0",
+          floor: "v1.42.0",
+          advice: "Run: go get -tool m@v1.42.0",
+          canUpgrade: true,
+        },
+      }),
     );
-    expect(html).toContain("8 of 12:");
-    expect(html).toContain('data-change="openSource" data-key="u:1:0">1-2</a>');
-    // Past six ranges the rest fold, as the CLI's text does without -v.
-    expect(html).toMatch(/… 2 more<\/summary>[^]*data-key="u:1:7">15</);
-    expect(html).toContain("unproven <b>9 of 12 lines</b>");
-    expect(buildChangeBody(view())).not.toContain('id="unproven"');
+    expect(old.empty!.title).toBe("The Change tab needs gotest v1.42.0");
+    expect(old.empty!.text).toContain("This folder's CLI is v1.41.0.");
+    expect(old.empty!.action).toEqual({ act: "upgrade", label: "Upgrade…" });
+    expect(
+      buildChangeTab(
+        view({
+          state: {
+            kind: "oldCli",
+            floor: "v1.42.0",
+            advice: "x",
+            canUpgrade: false,
+          },
+        }),
+      ).empty!.action,
+    ).toBeUndefined();
+    expect(
+      buildChangeTab(
+        view({
+          state: {
+            kind: "newSchema",
+            version: "v1.50.0",
+            schema: 2,
+            supported: 1,
+          },
+        }),
+      ).empty!.text,
+    ).toContain("schema 2; this extension reads schema 1");
+    expect(
+      buildChangeTab(
+        view({ state: { kind: "error", message: "FAIL: <bad> ref" } }),
+      ).error,
+    ).toBe("FAIL: <bad> ref");
+  });
+
+  it("holds the audit while one runs, keeps a notice over the document, and offers the folders when there are several", () => {
+    expect(buildChangeTab(view({ busy: "static" })).canAudit).toBe(false);
+    expect(buildChangeTab(view()).canAudit).toBe(true);
+    expect(
+      buildChangeTab(view({ notice: "The audit was stopped." })).notice,
+    ).toBe("The audit was stopped.");
+    expect(buildChangeTab(view()).folders).toBeUndefined();
+    const two = [
+      { path: "/a", label: "a", selected: false },
+      { path: "/b", label: "b", selected: true },
+    ];
+    expect(buildChangeTab(view({ folders: two })).folders).toEqual(two);
   });
 });
 

@@ -69,11 +69,8 @@ import {
 } from "./auditModel.js";
 import { interpretAuditExit } from "./changeScope.js";
 import { parseCliCapabilities, RUNS_COMMAND } from "./cli.js";
-import {
-  buildRunRows,
-  parseRunsDocument,
-  type RunsDocument,
-} from "./runsModel.js";
+import { parseRunsDocument, type RunsDocument } from "./runsModel.js";
+import { cardsOf } from "./runsView.js";
 import { parseFreshness, CHECK_FRESH_ARGS } from "./freshness.js";
 import { changedOf } from "./batchRunner.js";
 
@@ -1516,11 +1513,22 @@ describe("recorded audit", () => {
 
 describe("recorded run records", () => {
   const r = golden.runs;
-  const rows = (name: string, exists: (f: string) => boolean = () => true) =>
-    buildRunRows(
-      parseRunsDocument(JSON.stringify(r[name].document)) as RunsDocument,
-      { now: new Date(), exists, evidence: () => false },
-    );
+  const rows = (name: string, exists: (f: string) => boolean = () => true) => {
+    const doc = parseRunsDocument(
+      JSON.stringify(r[name].document),
+    ) as RunsDocument;
+    return cardsOf(
+      {
+        state: { kind: "doc", doc },
+        busy: false,
+        folders: [],
+        now: new Date(),
+        exists,
+        chosen: () => false,
+      },
+      doc.runs,
+    ).map((c, i) => ({ ...c, eventsFile: doc.runs[i]?.eventsFile }));
+  };
 
   it("records exactly the stated steps", () => {
     expect(Object.keys(r).sort()).toEqual([
@@ -1544,19 +1552,16 @@ describe("recorded run records", () => {
   it("lists imported runs newest first, marked imported, with their events files", () => {
     expect(r["import-current"].exitCode).toBe(0);
     const list = rows("list-imported");
-    expect(list.map((x) => x.imported)).toEqual([
-      "current.json",
-      "uncommitted.json",
-      "another-commit.json",
-      "no-manifest.json",
+    expect(list.map((x) => x.who)).toEqual([
+      "Imported from current.json, agent (<agent>)",
+      "Imported from uncommitted.json, agent (<agent>)",
+      "Imported from another-commit.json, agent (<agent>)",
+      "Imported from no-manifest.json",
     ]);
-    expect(list[0].who).toBe("agent <agent>");
     expect(list[1].commit).toBe("HEAD_COMMIT dirty");
-    expect(list[3].args).toBe("gotest");
+    expect(list[3].command).toBe("gotest");
     // Streams without input hashes judge nothing.
-    expect(list[0].judges).toBe(
-      "judges this tree: 0 current / 0 stale / 1 unknown",
-    );
+    expect(list[0].fresh).toBe("1 package, freshness unknown");
     expect(list.every((x) => x.eventsFile?.startsWith("<proof>/"))).toBe(true);
   });
 
@@ -1580,17 +1585,13 @@ describe("recorded run records", () => {
     });
     expect(changedOf(line)).toEqual({ ran: 1, unchanged: 1, noRecord: false });
     const list = rows("list-after-changed", (f) => f.startsWith("<stage>"));
-    expect(list[0].narrowed).toBe(
-      "--changed: ran 1 package, left out 1 unchanged",
+    expect(list[0].title).toBe(
+      "Run changed: ran 1 package, left out 1 unchanged",
     );
-    expect(list[0].judges).toBe(
-      "judges this tree: 1 current / 0 stale / 0 unknown",
-    );
+    expect(list[0].fresh).toBe("1 package, current");
     // The run before it wrote its stream: openable, and stale for shop.
     expect(list[1].canOpen).toBe(true);
-    expect(list[1].judges).toBe(
-      "judges this tree: 1 current / 1 stale / 0 unknown",
-    );
-    expect(list[1].judgesTone).toBe("warn");
+    expect(list[1].fresh).toBe("1 of 2 packages stale");
+    expect(list[1].freshTone).toBe("warn");
   });
 });

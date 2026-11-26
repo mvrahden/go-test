@@ -181,9 +181,12 @@ export function activate(context: vscode.ExtensionContext): void {
     () => active.list(),
   );
   specView.setExtensionUri(context.extensionUri);
-  // The runs taken as the Change scope's evidence, chosen in the Runs scope.
+  // The runs taken as the Change tab's evidence, chosen in the Runs tab.
   const evidence = new EvidenceSelection(context.workspaceState);
-  // The panel's Change scope: the audit of each folder against its base.
+  // The panel's Runs tab lists each folder's records; the newest one that
+  // matches the tree is the Change tab's evidence when none is chosen.
+  let runsScope: RunsScope | undefined;
+  // The panel's Change tab: the audit of each folder against its base.
   // Its rows run the test the document selects, in its package.
   const changeScope = new ChangeScope({
     log: outputChannel,
@@ -204,17 +207,18 @@ export function activate(context: vscode.ExtensionContext): void {
       }
     },
     evidence,
+    defaultEvidence: (folder) =>
+      runsScope?.newestCurrent(folder) ?? Promise.resolve(undefined),
     changed: () => specView.changeChanged(),
   });
   specView.setChangeScope(changeScope);
-  // The panel's Runs scope: the folder's run records, as the CLI keeps them.
-  const runsScope = new RunsScope({
+  runsScope = new RunsScope({
     log: outputChannel,
     folders: () => active.list(),
     evidence,
     openStream: async (id, label, folder, file) => {
       const stream = await readFile(file, "utf-8");
-      await specView.openStream(id, label, { stream, folder }, "spec");
+      await specView.openStream(id, label, { stream, folder }, "now");
     },
     runChanged: async (folder) => {
       await vscode.commands.executeCommand("gotest.runChanged", folder);
@@ -870,6 +874,10 @@ export function registerCommands(deps: {
         if (node?.type === "session") sessions.stop(node.session.id);
       },
     ),
+
+    vscode.commands.registerCommand("gotest.showRunsView", async () => {
+      await specView.showRuns();
+    }),
 
     vscode.commands.registerCommand(
       "gotest.runChanged",

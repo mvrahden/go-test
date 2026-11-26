@@ -26,7 +26,7 @@ const state = vi.hoisted(() => ({
   workspaceDir: "",
   cliPath: "",
   autoRefresh: true,
-  panels: [] as { webview: { html: string; cspSource: string } }[],
+  panels: [] as import("./vscodeStub.js").StubPanel[],
 }));
 
 vi.mock("vscode", async () => {
@@ -35,6 +35,7 @@ vi.mock("vscode", async () => {
 });
 
 import { SpecViewPanel } from "../../src/specView.js";
+import { shownHtml } from "./shownPanel.js";
 import { spawnTestProcess } from "../../src/runnerUtils.js";
 import { createRecordingChannel } from "./vscodeStub.js";
 
@@ -260,11 +261,9 @@ beforeAll(async () => {
   const panel = new SpecViewPanel(panelRecorder.channel as never);
   await panel.show();
   await panel.refresh({ stream: capturedStdout, folder: repoRoot });
-  html = state.panels[state.panels.length - 1].webview.html;
-
-  spec = JSON.parse(
-    /const SPEC_STATE = (.*);\n/.exec(html)?.[1] ?? "null",
-  ) as typeof spec;
+  html = await shownHtml(state.panels[state.panels.length - 1].webview);
+  // The document the host keeps and serves the webview slices of.
+  spec = (panel as unknown as { lastSpecData: typeof spec }).lastSpecData;
 });
 
 afterAll(() => {

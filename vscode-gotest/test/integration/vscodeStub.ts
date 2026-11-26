@@ -17,7 +17,11 @@ export interface StubPanel {
     // What the webview's script would post, delivered to the panel.
     post?: (msg: unknown) => void;
     asWebviewUri: (u: unknown) => unknown;
+    // What the host posted to the webview, in order.
+    posted: unknown[];
+    postMessage: (msg: unknown) => Promise<boolean>;
   };
+  onDidChangeViewState: () => void;
   onDidDispose: () => void;
   reveal: () => void;
   dispose: () => void;
@@ -229,7 +233,13 @@ export function buildVscodeStub(state: StubState) {
               panel.webview.post = handler;
             },
             asWebviewUri: (u: unknown) => u,
+            posted: [],
+            postMessage: (msg: unknown) => {
+              panel.webview.posted.push(msg);
+              return Promise.resolve(true);
+            },
           },
+          onDidChangeViewState: () => {},
           onDidDispose: () => {},
           reveal: () => {},
           dispose: () => {},

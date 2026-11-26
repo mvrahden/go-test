@@ -284,7 +284,7 @@ describe("what the panel asks the CLI for", () => {
   const internalsOf = (panel: SpecViewPanel) => panel as unknown as Internals;
   const argsOfCall = (i: number) => buildCli.mock.calls[i][0];
 
-  it("lays the workspace's runs over what the folder's source declares, hiding what the toolbar hides", async () => {
+  it("lays the workspace's runs over what the folder's source declares, every status rendered whatever the chips", async () => {
     script.always = { stdout: [doc("example.com/a", 1, 0)], code: 0 };
     const patternsFor = vi.fn(async () => ["./...", "./examples/..."]);
     const panel = new SpecViewPanel(
@@ -295,10 +295,7 @@ describe("what the panel asks the CLI for", () => {
     );
     const internals = internalsOf(panel);
     internals.runs.merge({ stream: runOf("example.com/a"), folder: "/ws/a" });
-    internals.handleMessage({ type: "toggleHide", status: "pass" });
-    internals.handleMessage({ type: "toggleHide", status: "none" });
-    internals.handleMessage({ type: "toggleHide", status: "pass" });
-    internals.handleMessage({ type: "toggleHide", status: "skip" });
+    internals.handleMessage({ type: "filters", filters: ["fail"] });
 
     await internals.renderRuns();
 
@@ -308,7 +305,7 @@ describe("what the panel asks the CLI for", () => {
       "--input=-",
       "--format=json",
       "--render-only",
-      "--hide=none,skip",
+      "--hide=",
       "--declared",
       "./...",
       "./examples/...",
@@ -340,7 +337,7 @@ describe("what the panel asks the CLI for", () => {
     ]);
   });
 
-  it("copies what it shows as the CLI's Markdown, with the same flags", async () => {
+  it("copies what it shows as the CLI's Markdown, hiding the statuses the chips leave out", async () => {
     script.always = { stdout: ["# Behavior Specification\n"], code: 0 };
     const panel = new SpecViewPanel(
       channel,
@@ -350,9 +347,10 @@ describe("what the panel asks the CLI for", () => {
     );
     const internals = internalsOf(panel);
     internals.runs.merge({ stream: runOf("example.com/a"), folder: "/ws/a" });
-    internals.handleMessage({ type: "toggleHide", status: "pass" });
-    await vi.waitFor(() => expect(buildCli).toHaveBeenCalled());
-    buildCli.mockClear();
+    internals.handleMessage({
+      type: "filters",
+      filters: ["fail", "none", "skip", "vacuous"],
+    });
 
     await internals.copy();
 
@@ -387,7 +385,8 @@ describe("what the panel asks the CLI for", () => {
 
   it("copies what the search leaves, as the CLI's match", async () => {
     const panel = await loaded("# spec\n");
-    await copies(panel, { type: "copySpec", search: "  email " });
+    internalsOf(panel).handleMessage({ type: "search", text: "  email " });
+    await copies(panel, { type: "copySpec" });
     expect(buildCli.mock.calls.map((c) => c[0])).toEqual([
       expect.arrayContaining(["--format=md", "--match=email"]),
       expect.arrayContaining(["--format=md", "--match=email"]),
@@ -396,7 +395,7 @@ describe("what the panel asks the CLI for", () => {
 
   it("asks for no match when the search is empty", async () => {
     const panel = await loaded("# spec\n");
-    await copies(panel, { type: "copySpec", search: "" });
+    await copies(panel, { type: "copySpec" });
     expect(argsOfCall(0).some((a) => a.startsWith("--match"))).toBe(false);
   });
 
@@ -428,14 +427,14 @@ describe("what the panel asks the CLI for", () => {
 
   it("says how big the copy is", async () => {
     const panel = await loaded("x".repeat(400));
-    await copies(panel, { type: "copySpec", search: "" });
+    await copies(panel, { type: "copySpec" });
     expect(notes.info).toEqual(["Copied 801 characters (about 200 tokens)."]);
     expect(notes.warn).toEqual([]);
   });
 
   it("warns when the copy is above GitHub's comment limit", async () => {
     const panel = await loaded("x".repeat(35_000));
-    await copies(panel, { type: "copySpec", search: "" });
+    await copies(panel, { type: "copySpec" });
     await vi.waitFor(() => expect(notes.warn).toHaveLength(1));
     expect(notes.warn[0]).toContain(
       "above GitHub's 65,536-character comment limit.",

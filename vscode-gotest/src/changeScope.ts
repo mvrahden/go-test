@@ -1,8 +1,9 @@
-// The Change scope of the Spec View panel: per workspace folder, the audit
+// The panel's Change tab: per workspace folder, the audit of the working
+// tree against a base, as `gotest audit --format=json` prints it. The CLI
+// computes the document; this runs it, keeps it, and wires its rows to the
+// editor.
 import { sessions } from "./sessions.js";
-// of the working tree against a base, as `gotest audit --format=json`
-// prints it. The CLI computes the document; this runs it, keeps it, and
-// wires its rows to the editor.
+import { logFinished } from "./panel/logFinished.js";
 import * as vscode from "vscode";
 import * as path from "node:path";
 import { existsSync } from "node:fs";
@@ -28,7 +29,12 @@ import {
   type AuditLocation,
   type RunTarget,
 } from "./auditModel.js";
-import type { ChangeState, ChangeView } from "./changeView.js";
+import {
+  buildChangeTab,
+  type ChangeState,
+  type ChangeView,
+} from "./changeView.js";
+import type { EvidencePick } from "./runsModel.js";
 import { AcceptanceStore, type Memento } from "./acceptance.js";
 import type { EvidenceSelection } from "./evidence.js";
 import {
@@ -58,9 +64,11 @@ export interface ChangeScopeDeps {
   // in it through the extension's runner.
   hasPackage?: (pkg: string) => boolean;
   runTest?: (pkg: string, run: string) => Promise<void>;
-  // The runs chosen in the Runs scope; their events files are the audit's
+  // The runs chosen in the Runs tab; their events files are the audit's
   // --evidence.
   evidence?: EvidenceSelection;
+  // The newest run that matches the tree: the evidence when none is chosen.
+  defaultEvidence?: (folder: string) => Promise<EvidencePick | undefined>;
   // Called whenever what the scope shows changed.
   changed: () => void;
 }
@@ -131,6 +139,8 @@ interface FolderState {
   runs: Map<string, RunTarget>;
   cliOk: boolean;
   upgrade?: CliBelowFloorError;
+  // The run the last audit took as evidence because none was chosen.
+  autoEvidence?: EvidencePick;
   // Waiting for the folder's audit slot.
   waiters: (() => void)[];
 }
@@ -228,19 +238,38 @@ export class ChangeScope implements vscode.Disposable {
       state = {
         kind: "doc",
         model: buildChangeModel(fs.doc, (k) => accepted.has(k)),
+        doc: fs.doc,
         exitCode: fs.exitCode ?? null,
         stopped: fs.stopped,
       };
     }
+    const accepted = fs.doc
+      ? this.acceptance.accepted(folder, fs.doc.head.commit ?? "")
+      : new Set<string>();
+    const chosen = this.deps.evidence?.list(folder) ?? [];
+    const evidence =
+      chosen.length > 0
+        ? chosen.map((p) => ({
+            id: p.id,
+            label: p.label,
+            missing: !existsSync(p.file),
+          }))
+        : fs.autoEvidence
+          ? [
+              {
+                id: fs.autoEvidence.id,
+                label: fs.autoEvidence.label,
+                missing: !existsSync(fs.autoEvidence.file),
+                auto: true,
+              },
+            ]
+          : [];
     return {
       state,
       busy: fs.busy,
       folders,
-      evidence: (this.deps.evidence?.list(folder) ?? []).map((p) => ({
-        id: p.id,
-        label: p.label,
-        missing: !existsSync(p.file),
-      })),
+      evidence,
+      accepted: (k) => accepted.has(k),
       baseLabel: fs.baseLabel,
       notice: fs.notice,
       canOpen: (key) => fs.targets.has(key),
@@ -346,7 +375,7 @@ export class ChangeScope implements vscode.Disposable {
       const patterns = (await this.deps.patternsFor?.(folder)) ?? [];
       const args = ["audit", `--base=${ref}`, "--format=md"];
       if (opts.run) args.push("--run");
-      args.push(...this.evidenceArgs(folder), ...patterns);
+      args.push(...(await this.evidenceArgs(folder, fs)), ...patterns);
       let cmd;
       try {
         cmd = await buildCliCommand(args, folder, this.deps.log);
@@ -422,7 +451,7 @@ export class ChangeScope implements vscode.Disposable {
     const patterns = (await this.deps.patternsFor?.(folder)) ?? [];
     const args = ["audit", `--base=${base.ref}`, "--format=json"];
     if (mode === "run") args.push("--run");
-    args.push(...this.evidenceArgs(folder));
+    args.push(...(await this.evidenceArgs(folder, fs)));
     let cmd;
     try {
       cmd = await buildCliCommand(
@@ -453,14 +482,29 @@ export class ChangeScope implements vscode.Disposable {
     fs.state = {
       kind: "doc",
       model,
+      doc: outcome.doc,
       exitCode: outcome.exitCode,
       stopped: out.stopped,
     };
   }
 
-  // evidenceArgs are --evidence for each chosen run whose file is there.
-  private evidenceArgs(folder: string): string[] {
-    return (this.deps.evidence?.list(folder) ?? [])
+  // evidenceArgs are --evidence for each chosen run whose file is there;
+  // without a choice, the newest run that matches the tree.
+  private async evidenceArgs(
+    folder: string,
+    fs: FolderState,
+  ): Promise<string[]> {
+    const chosen = this.deps.evidence?.list(folder) ?? [];
+    fs.autoEvidence = undefined;
+    let picks = chosen;
+    if (chosen.length === 0) {
+      const auto = await this.deps.defaultEvidence?.(folder);
+      if (auto) {
+        fs.autoEvidence = auto;
+        picks = [auto];
+      }
+    }
+    return picks
       .filter((p) => existsSync(p.file))
       .map((p) => `--evidence=${p.file}`);
   }
@@ -526,6 +570,7 @@ export class ChangeScope implements vscode.Disposable {
       control,
     });
     fs.child = mc;
+    const startedAt = Date.now();
     let stdout = "";
     let stderr = "";
     let timedOut = false;
@@ -550,6 +595,7 @@ export class ChangeScope implements vscode.Disposable {
         : undefined;
     try {
       const { code } = await mc.exited;
+      logFinished("change", startedAt, code, this.deps.log);
       if (spawnError) throw spawnError;
       if (timedOut) throw new Error(`audit timed out after ${budgetSeconds}s`);
       if (this.disposed) throw new Error("audit stopped");
@@ -720,6 +766,23 @@ export class ChangeScope implements vscode.Disposable {
         await this.acceptance.toggle(folder, fs.doc.head.commit ?? "", key);
         this.deps.changed();
         return;
+      case "acceptAll": {
+        // A routine group, by its id: all of it accepted, or all reopened
+        // once every row is.
+        if (!fs.doc || !key) return;
+        const group = buildChangeTab(this.view()).routine.find(
+          (g) => g.id === key,
+        );
+        if (!group) return;
+        const head = fs.doc.head.commit ?? "";
+        const all = group.accepted === group.count;
+        const have = this.acceptance.accepted(folder, head);
+        for (const k of group.keys)
+          if (have.has(k) === all)
+            await this.acceptance.toggle(folder, head, k);
+        this.deps.changed();
+        return;
+      }
       case "run": {
         const r = fs.runs.get(key);
         if (r) await this.deps.runTest?.(r.package, r.run);

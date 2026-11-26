@@ -29,9 +29,7 @@ const state = vi.hoisted(() => ({
   workspaceDir: "",
   cliPath: "",
   autoRefresh: true,
-  panels: [] as {
-    webview: { html: string; post?: (msg: unknown) => void };
-  }[],
+  panels: [] as import("./vscodeStub.js").StubPanel[],
 }));
 
 vi.mock("vscode", async () => {
@@ -41,6 +39,7 @@ vi.mock("vscode", async () => {
 
 import { ChangeScope, STOPPED_NOTICE } from "../../src/changeScope.js";
 import { SpecViewPanel } from "../../src/specView.js";
+import { shownHtml } from "./shownPanel.js";
 import { clearBinaryCache } from "../../src/cli.js";
 import type { Memento } from "../../src/acceptance.js";
 import { createRecordingChannel } from "./vscodeStub.js";
@@ -386,25 +385,36 @@ describe.skipIf(sh)("the Change scope", () => {
     );
   }, 300_000);
 
-  it("renders in the panel when the Change scope is chosen", async () => {
+  it("renders in the panel when the Change tab is chosen", async () => {
     const { s } = scope(checkout);
     const rec = createRecordingChannel();
     const panel = new SpecViewPanel(rec.channel as never);
     panel.setChangeScope(s);
     await panel.show();
     const webview = state.panels[0].webview;
-    expect(webview.html).toContain('data-scope="change" aria-selected="false"');
-    webview.post?.({ type: "scope", scope: "change" });
+    // The document is set once and holds the tab, empty until the host posts.
+    expect(webview.html).toContain('id="tab-btn-change"');
+    expect(webview.html).not.toContain("need your decision");
+    webview.post?.({
+      type: "ready",
+      tab: "now",
+      open: [],
+      search: "",
+      filters: [],
+    });
+    webview.post?.({ type: "tab", tab: "change" });
     await vi.waitFor(
-      () => {
+      async () => {
         panel.changeChanged();
-        expect(webview.html).toContain("Needs a decision");
+        expect(await shownHtml(webview, "change")).toContain(
+          "need your decision",
+        );
       },
-      { timeout: 120_000, interval: 200 },
+      { timeout: 120_000, interval: 500 },
     );
-    expect(webview.html).toContain('data-scope="change" aria-selected="true"');
-    expect(webview.html).toContain("Changed behaviors");
-    expect(webview.html).toContain("13 open · 0 accepted");
+    const html = await shownHtml(webview, "change");
+    expect(html).toContain("Behaviors by package");
+    expect(html).toMatch(/<h1>\d+ changes? needs? your decision<\/h1>/);
     panel.dispose();
   });
 
@@ -530,6 +540,44 @@ describe.skipIf(sh)("the Change scope's evidence and its Markdown", () => {
     ]);
     await s.act({ act: "dropEvidence", key: "r1" });
     expect(evidence.list(checkout).map((p) => p.id)).toEqual(["gone"]);
+  });
+
+  it("takes the newest run that matches the tree as evidence when none is chosen, and a choice over it", async () => {
+    const store = memento();
+    const evidence = new EvidenceSelection(store);
+    const file = path.join(fixtures, "proof", "current.json");
+    const asked: string[] = [];
+    const s = new ChangeScope({
+      log: createRecordingChannel().channel as never,
+      memento: store,
+      folders: () => [checkout],
+      evidence,
+      defaultEvidence: async (folder) => {
+        asked.push(folder);
+        return { id: "auto", file, label: "the editor run of 08:38" };
+      },
+      changed: () => {},
+    });
+    await s.audit(checkout);
+    let v = s.view();
+    if (v.state.kind !== "doc") throw new Error(JSON.stringify(v.state));
+    expect(asked).toEqual([checkout]);
+    expect(v.state.model.streams.map((st) => st.text)).toEqual([
+      expect.stringContaining("current.json"),
+    ]);
+    expect(v.evidence).toEqual([
+      {
+        id: "auto",
+        label: "the editor run of 08:38",
+        missing: false,
+        auto: true,
+      },
+    ]);
+    await evidence.toggle(checkout, { id: "r1", file, label: "13:55" });
+    await s.audit(checkout);
+    v = s.view();
+    expect(asked).toEqual([checkout]);
+    expect(v.evidence).toEqual([{ id: "r1", label: "13:55", missing: false }]);
   });
 
   it("writes the audit in Markdown for the tool, in the folder's one audit slot", async () => {

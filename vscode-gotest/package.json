@@ -1,7 +1,7 @@
 {
   "name": "gotest",
   "displayName": "Go - Test Suites",
-  "description": "Specification-driven test suites for Go — Spec View, Test Explorer, coverage, and debug integration",
+  "description": "Specification-driven test suites for Go — a panel of verdicts, changes and runs, Test Explorer, coverage, and debug integration",
   "version": "0.1.0",
   "publisher": "mvrahden",
   "license": "MIT",
@@ -95,7 +95,7 @@
       },
       {
         "command": "gotest.showSpecView",
-        "title": "Go Test: Show Spec View",
+        "title": "Go Test: Show Panel (Now)",
         "icon": {
           "light": "static/spec-icon.svg",
           "dark": "static/spec-icon.svg"
@@ -103,7 +103,11 @@
       },
       {
         "command": "gotest.showChangeView",
-        "title": "Go Test: Show Change View"
+        "title": "Go Test: Show Panel (Change)"
+      },
+      {
+        "command": "gotest.showRunsView",
+        "title": "Go Test: Show Panel (Runs)"
       },
       {
         "command": "gotest.runChanged",
@@ -368,7 +372,7 @@
           "type": "boolean",
           "default": true,
           "scope": "window",
-          "description": "Auto-refresh spec view panel after test runs"
+          "description": "Render the panel's Now tab again after each test run"
         },
         "gotest.watch.autoRestart": {
           "type": "boolean",

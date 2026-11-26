@@ -24,7 +24,7 @@ const state = vi.hoisted(() => ({
   workspaceDir: "",
   cliPath: "",
   autoRefresh: true,
-  panels: [] as { webview: { html: string } }[],
+  panels: [] as import("./vscodeStub.js").StubPanel[],
   controllers: [] as unknown[],
   config: {} as Record<string, unknown>,
 }));
@@ -42,6 +42,8 @@ import { setEventsDir } from "../../src/eventsFiles.js";
 import { RunsScope } from "../../src/runsScope.js";
 import { EvidenceSelection } from "../../src/evidence.js";
 import { SpecViewPanel } from "../../src/specView.js";
+import { buildRunsTab } from "../../src/runsView.js";
+import { shownHtml } from "./shownPanel.js";
 import { clearBinaryCache } from "../../src/cli.js";
 import type { Memento } from "../../src/acceptance.js";
 import { createRecordingChannel } from "./vscodeStub.js";
@@ -139,10 +141,15 @@ function runsScope(evidence = new EvidenceSelection(memento())) {
   return { s, opened, evidence };
 }
 
+// rows are the Runs tab's cards, each with its record's events file.
 function rows(s: RunsScope) {
   const v = s.view();
   if (v.state.kind !== "doc") throw new Error(JSON.stringify(v.state));
-  return v.state.rows;
+  const doc = v.state.doc;
+  return [...buildRunsTab(v).cards, ...buildRunsTab(v).earlier].map((c) => ({
+    ...c,
+    eventsFile: doc.runs.find((r) => r.id === c.key)?.eventsFile,
+  }));
 }
 
 beforeAll(async () => {
@@ -212,18 +219,22 @@ describe.skipIf(sh)("run records", () => {
     expect(row.eventsFile?.startsWith(path.join(tmp, "events"))).toBe(true);
     expect(existsSync(row.eventsFile!)).toBe(true);
     expect(row.canOpen).toBe(true);
-    expect(row.args).toContain("--events-file=");
-    expect(row.judges).toMatch(
-      /^judges this tree: [1-9]\d* current \/ 0 stale/,
-    );
+    expect(row.command).toContain("--events-file=");
+    expect(row.fresh).toMatch(/^[1-9]\d* packages?, current$/);
+    expect(row.who).toBe("You, from this editor");
 
-    await s.act({ act: "open", key: row.id });
+    await s.act({ act: "open", key: row.key });
     expect(opened).toEqual([
-      [`run:${row.id}`, expect.any(String), mod, row.eventsFile],
+      [
+        `run:${row.key}`,
+        expect.stringMatching(/^the editor run of /),
+        mod,
+        row.eventsFile,
+      ],
     ]);
-    await s.act({ act: "evidence", key: row.id });
+    await s.act({ act: "evidence", key: row.key });
     expect(evidence.list(mod).map((p) => p.file)).toEqual([row.eventsFile]);
-    expect(rows(s)[0].evidence).toBe(true);
+    expect(rows(s)[0].evidence).toBe("chosen");
   });
 
   it("a --changed run with nothing changed leaves the package alone and says it was narrowed", async () => {
@@ -236,7 +247,7 @@ describe.skipIf(sh)("run records", () => {
     expect(stdout).toContain('"Changed"');
     const { s } = runsScope();
     await s.refresh(mod);
-    expect(rows(s)[0].narrowed).toMatch(/^--changed: ran 0 packages, left out/);
+    expect(rows(s)[0].title).toMatch(/^Run changed: ran 0 packages, left out/);
   });
 
   it("imports a saved stream among the records", async () => {
@@ -244,13 +255,11 @@ describe.skipIf(sh)("run records", () => {
     const file = path.join(audit, "proof", "current.json");
     expect(await s.importRun(mod, file)).toBe(true);
     const [row] = rows(s);
-    expect(row.imported).toBe("current.json");
-    expect(row.judges).toBe(
-      "judges this tree: 0 current / 0 stale / 1 unknown",
-    );
+    expect(row.who).toMatch(/^Imported from current\.json/);
+    expect(row.fresh).toBe("1 package, freshness unknown");
   });
 
-  it("the Spec View marks the package stale once its source changes, and not before", async () => {
+  it("the Now tab marks the package stale once its source changes, and not before", async () => {
     const panel = new SpecViewPanel(
       createRecordingChannel().channel as never,
       cache,
@@ -259,15 +268,16 @@ describe.skipIf(sh)("run records", () => {
       await panel.refresh({ stream: first, folder: mod, at: Date.now() });
       await panel.show();
       await panel.freshIdle();
-      const html = () => state.panels.at(-1)!.webview.html;
-      expect(html()).toContain("TestStockTestSuite");
-      expect(html()).not.toContain("stale: inputs changed since the run");
+      const html = () => shownHtml(state.panels.at(-1)!.webview);
+      expect(await html()).toContain("StockTestSuite");
+      expect(await html()).not.toContain("packages stale");
+      expect(await html()).not.toContain(">STALE<");
 
       appendFileSync(path.join(mod, "shop", "shop.go"), "\n// edited\n");
       panel.sourceChanged(mod);
       await panel.freshIdle();
-      expect(html()).toContain("stale: inputs changed since the run");
-      expect(html()).toContain(
+      expect(await html()).toContain(">STALE<");
+      expect(await html()).toContain(
         "1 of 1 package stale: their inputs changed since the run",
       );
     } finally {
@@ -292,8 +302,8 @@ describe.skipIf(sh)("run records", () => {
         await panel.refresh({ stream: first, folder: mod, at: Date.now() });
         await panel.show();
         await panel.freshIdle();
-        expect(state.panels.at(-1)!.webview.html).not.toContain(
-          "stale: inputs changed",
+        expect(await shownHtml(state.panels.at(-1)!.webview)).not.toContain(
+          "package stale",
         );
       } finally {
         panel.dispose();

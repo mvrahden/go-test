@@ -1,8 +1,10 @@
-// The Runs scope of the Spec View panel: per workspace folder, the run
-// records `gotest runs --format=json` lists, with what each says of the
-// tree now. The CLI keeps and judges the records; this lists them, opens
-// a run's events file, and picks runs as the Change scope's evidence.
+// The panel's Runs tab: per workspace folder, the run records `gotest runs
+// --format=json` lists, with what each says of the tree now. The CLI keeps
+// and judges the records; this lists them, opens a run's events file, and
+// picks runs as the Change tab's evidence.
 import * as vscode from "vscode";
+import { execFile } from "node:child_process";
+import { logFinished } from "./panel/logFinished.js";
 import * as path from "node:path";
 import { existsSync } from "node:fs";
 import {
@@ -19,9 +21,10 @@ import {
 import { specRenderTimeoutSeconds } from "./config.js";
 import { ManagedChild } from "./managedChild.js";
 import {
-  buildRunRows,
   evidenceLabel,
+  newestCurrent,
   parseRunsDocument,
+  type EvidencePick,
   type RunsDocument,
 } from "./runsModel.js";
 import type { RunsState, RunsView } from "./runsView.js";
@@ -31,7 +34,7 @@ export interface RunsScopeDeps {
   log: vscode.LogOutputChannel;
   folders: () => string[];
   evidence: EvidenceSelection;
-  // Shows a run's saved stream in the Spec scope.
+  // Shows a run's saved stream in the Now tab.
   openStream: (
     id: string,
     label: string,
@@ -52,6 +55,21 @@ interface FolderState {
   notice?: string;
   upgrade?: CliBelowFloorError;
   child?: ManagedChild;
+  head?: string;
+  // Who waits for the listing running now.
+  waiters: (() => void)[];
+}
+
+// headCommit is the checkout's HEAD as run records name it.
+function headCommit(dir: string): Promise<string | undefined> {
+  return new Promise((resolve) =>
+    execFile(
+      "git",
+      ["rev-parse", "--short=8", "HEAD"],
+      { cwd: dir, timeout: 15_000 },
+      (err, stdout) => resolve(err ? undefined : stdout.trim() || undefined),
+    ),
+  );
 }
 
 export type CliOutcome =
@@ -77,6 +95,7 @@ export async function runCli(
   }
   log.info(`[runs] ${cmd.bin} ${cmd.args.join(" ")} (cwd ${folder})`);
   const mc = new ManagedChild(cmd.bin, cmd.args, { cwd: folder, kind });
+  const startedAt = Date.now();
   onChild?.(mc);
   let stdout = "";
   let stderr = "";
@@ -94,6 +113,7 @@ export async function runCli(
   }, seconds * 1000);
   try {
     const { code } = await mc.exited;
+    logFinished(kind, startedAt, code, log);
     if (spawnError) return { ok: false, message: spawnError.message };
     if (timedOut)
       return { ok: false, message: `gotest timed out after ${seconds}s` };
@@ -132,7 +152,13 @@ export class RunsScope implements vscode.Disposable {
   private stateOf(folder: string): FolderState {
     let fs = this.folders.get(folder);
     if (!fs) {
-      fs = { state: { kind: "idle" }, busy: false, again: false, stale: true };
+      fs = {
+        state: { kind: "idle" },
+        busy: false,
+        again: false,
+        stale: true,
+        waiters: [],
+      };
       this.folders.set(folder, fs);
     }
     return fs;
@@ -165,20 +191,47 @@ export class RunsScope implements vscode.Disposable {
       label: path.basename(f),
       selected: f === folder,
     }));
-    if (!folder) return { state: { kind: "idle" }, busy: false, folders };
-    const fs = this.stateOf(folder);
-    let state = fs.state;
-    if (state.kind === "doc" && fs.doc) {
-      state = {
-        kind: "doc",
-        rows: buildRunRows(fs.doc, {
-          now: new Date(),
-          exists: existsSync,
-          evidence: (id) => this.deps.evidence.has(folder, id),
-        }),
+    const now = new Date();
+    const base = { now, exists: existsSync, folders };
+    if (!folder)
+      return {
+        ...base,
+        state: { kind: "idle" },
+        busy: false,
+        chosen: () => false,
       };
-    }
-    return { state, busy: fs.busy, folders, notice: fs.notice };
+    const fs = this.stateOf(folder);
+    const chosen = this.deps.evidence.list(folder);
+    return {
+      ...base,
+      state: fs.state,
+      busy: fs.busy,
+      notice: fs.notice,
+      head: fs.head,
+      chosen: (id) => chosen.some((p) => p.id === id),
+      auto:
+        chosen.length === 0
+          ? newestCurrent(fs.doc, existsSync, now)?.id
+          : undefined,
+    };
+  }
+
+  // doc is the folder's listing as last read.
+  doc(folder: string): RunsDocument | undefined {
+    return this.folders.get(folder)?.doc;
+  }
+
+  // listed resolves with the folder's listing, read again when stale.
+  async listed(folder: string): Promise<RunsDocument | undefined> {
+    const fs = this.stateOf(folder);
+    if (fs.busy) await new Promise<void>((r) => fs.waiters.push(r));
+    else if (fs.stale || !fs.doc) await this.refresh(folder);
+    return fs.doc;
+  }
+
+  // newestCurrent is the evidence an audit takes when no run is chosen.
+  async newestCurrent(folder: string): Promise<EvidencePick | undefined> {
+    return newestCurrent(await this.listed(folder), existsSync, new Date());
   }
 
   // refresh lists the folder's records, one listing at a time.
@@ -193,6 +246,7 @@ export class RunsScope implements vscode.Disposable {
     fs.stale = false;
     this.deps.changed();
     try {
+      fs.head = await headCommit(folder);
       if (await this.checkCli(folder, fs)) {
         const out = await runCli(
           folder,
@@ -204,7 +258,7 @@ export class RunsScope implements vscode.Disposable {
         const doc = out.ok ? parseRunsDocument(out.stdout) : undefined;
         if (doc) {
           fs.doc = doc;
-          fs.state = { kind: "doc", rows: [] };
+          fs.state = { kind: "doc", doc };
         } else {
           fs.state = {
             kind: "error",
@@ -220,7 +274,9 @@ export class RunsScope implements vscode.Disposable {
     if (fs.again && !this.disposed) {
       fs.again = false;
       await this.refresh(folder);
+      return;
     }
+    for (const w of fs.waiters.splice(0)) w();
   }
 
   private async checkCli(folder: string, fs: FolderState): Promise<boolean> {
@@ -309,7 +365,7 @@ export class RunsScope implements vscode.Disposable {
         return;
       case "open": {
         if (!row?.eventsFile || !existsSync(row.eventsFile)) return;
-        const label = `Run ${this.labelOf(key)}`;
+        const label = this.labelOf(key);
         await this.deps.openStream(
           `run:${row.id}`,
           label,
@@ -331,12 +387,11 @@ export class RunsScope implements vscode.Disposable {
   }
 
   private labelOf(id: string): string {
-    const v = this.view();
-    const row =
-      v.state.kind === "doc"
-        ? v.state.rows.find((r) => r.id === id)
-        : undefined;
-    return row ? evidenceLabel(row) : id;
+    const folder = this.folder;
+    const r = folder
+      ? this.doc(folder)?.runs.find((x) => x.id === id)
+      : undefined;
+    return r ? evidenceLabel(r, new Date()) : id;
   }
 
   dispose(): void {

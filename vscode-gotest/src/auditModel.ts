@@ -723,7 +723,7 @@ export function findingLine(doc: AuditDocument, f: AuditFinding): string {
 }
 
 // targetsOf lists what each row of the model opens, by the row's key: the
-// decisions and behaviors their file, an unproven file its first range and
+// findings and behaviors their file, an unproven file its first range and
 // each range its lines.
 export function targetsOf(
   doc: AuditDocument,
@@ -732,6 +732,11 @@ export function targetsOf(
   const out = new Map<string, Target>();
   const rows = [...m.open.flatMap((g) => g.rows), ...m.accepted];
   for (const r of rows) if (r.target) out.set(r.key, r.target);
+  // Informational findings open too: a routine group lists them.
+  for (const f of doc.findings) {
+    const t = findingTarget(f);
+    if (t && !out.has(f.id)) out.set(f.id, t);
+  }
   for (const p of m.behaviors)
     for (const s of p.suites)
       for (const r of s.rows) if (r.target) out.set(r.key, r.target);
