@@ -24,22 +24,20 @@ writing (v1.30.2+). Exit 0 does not run the tests: run both runners
 afterwards, and the lint pair (`lint -fix`, then `lint`). Below v1.33 a
 clean exit can still leave code that does not compile or hooks that never
 run, and a re-run exits 0 with markers left — grep for the markers and
-`go vet ./...` there. `migrate` maps assertions one-to-one by type. From
-v1.42 every soft form — `s.Assert().X`, the suite's own `s.X` inherited from
-the embedded `*assert.Assertions`, and `assert.X(s.T(), …)` — becomes
-`gotest.X(t.Soft(), …)`, which goes on after failing as testify's did, and
-`s.Require().X`, `require.X(s.T(), …)` and `FailNow` become the fatal
-`gotest.X(t, …)`; below v1.42 the soft forms became fatal too, a soft check
-turned into a hard stop. From v1.37, a translation that would change
+`go vet ./...` there. `migrate` maps assertions one-to-one by type, so
+every soft form — `s.Assert().X`, the suite's own `s.X` inherited from the
+embedded `*assert.Assertions`, and `assert.X(s.T(), …)` — becomes the fatal
+`gotest.X`, exactly as `s.Require().X` and `require.X(s.T(), …)` do: a soft
+check turns into a hard stop. From v1.37, a translation that would change
 a verdict, or what runs when, is left under a marker with its reason and
 the gotest way instead
 ([kept verdicts](https://github.com/mvrahden/go-test/blob/main/specs/migrate/spec.md#requirement-kept-verdicts)):
 read each marker, it names what to write. v1.37+ never writes
 `go.mod`/`go.sum`
 ([module files](https://github.com/mvrahden/go-test/blob/main/specs/migrate/spec.md#requirement-module-files)).
-From v1.38 its closing summary lists what was not kept: the stdlib
-tests left (gotest does not run them; below v1.42 it also counted the soft
-assertions that now stopped the test), each go test id that changed, and each base test removed
+From v1.38 its closing summary lists what was not kept: the soft
+assertions that now stop the test, the stdlib tests left (gotest does not
+run them), each go test id that changed, and each base test removed
 because testify never ran it
 ([the closing summary](https://github.com/mvrahden/go-test/blob/main/specs/migrate/spec.md#requirement-the-closing-summary));
 read it before the markers. `Fail`, `FailNow`, `WithinDuration` and
