@@ -834,6 +834,10 @@ shards of one run do not add up to every mutant exactly once.
 | `lint-rule-len-message-reads-equal` | `True(t, len(x) != 0)` is reported as a `len == 0` check | conformance: the lint It for `len(x) != 0` finds the message naming `== 0` |
 | `lint-rule-redundant-fix-drops-message` | the `assertion-redundant` fix drops the removed assertion's message | conformance: the lint `-fix` It finds the stronger assertion without the message |
 | `lint-rule-simplify-fix-drops-comments` | the `assertion-simplify` fix drops comments between the arguments | conformance: the lint `-fix` It finds the comment gone |
+| `lint-fail-guard-row-ending-guard-fixed` | `fail-guard` fixes a guard on an Each row's T that ends the method with `FailNow` or a return | conformance: the lint It for a guard that ends the method finds it reported |
+| `lint-fail-guard-row-alias-unread` | `fail-guard` reads an alias of an Each row's T as a T that halts | conformance: the lint It for a guard that ends the method finds the alias's guard reported |
+| `lint-fail-guard-row-chain-split` | `fail-guard` splits an or-chained or else-if guard on an Each row's T into assertions that all run | conformance: the lint It for a guard of several conditions finds it reported |
+| `lint-fail-guard-row-claims-a-halt` | `fail-guard` says an assertion on an Each row's T halts where `Errorf` goes on, and offers no fix | conformance: the lint It for a guard that goes on finds the `Errorf` guard without a fix |
 | `lint-rule-fail-guard-ignores-shadow` | `fail-guard` takes a local that shadows the `gotest` import for the package | conformance: the lint It for a local named `gotest` finds the guard in its scope reported |
 | `lint-erg-bare-nolint-reason-ignored` | a bare `//nolint` followed by a reason is not read as a nolint comment | conformance: the lint It for a bare nolint comment finds the line's finding reported |
 | `lint-erg-nolint-all-is-a-rule` | `//nolint:all` names a rule called `all` instead of every rule | conformance: the lint It for `nolint:all` finds the line's finding reported |

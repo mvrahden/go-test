@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint EachRowGuards .* / fail-guard leaves it unreported \(
+Clause: when an or-chained or else-if guard fails an Each row's T → fail-guard leaves it unreported
+--- a/internal/lint/eachrow.go
++++ b/internal/lint/eachrow.go
+@@ -102,7 +102,7 @@
+ // so the finding claims no difference and carries the fix.
+ func keptOnEachRow(units []failGuardUnit) bool {
+ 	u := &units[0]
+-	if len(units) > 1 || len(splitOr(u.cond)) > 1 {
++	if false {
+ 		return false
+ 	}
+ 	if u.returns || (u.label != "Fail" && u.label != "Errorf") {
