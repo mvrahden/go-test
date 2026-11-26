@@ -756,22 +756,20 @@ export async function spawnTestProcess(
     }
   });
 
+  // Each stderr line is logged as it arrives, so a slow build's notice is
+  // stamped when the CLI said it. Fuzzing also reads crasher detail off it.
+  const stderrLine = (line: string) => {
+    const trimmed = line.trim();
+    if (!trimmed) return;
+    outputChannel.warn(`[${label}] stderr: ${line.trimEnd()}`);
+    onStderrLine?.(trimmed);
+  };
   mc.child.stderr?.on("data", (chunk: string) => {
     stderr += chunk;
-
-    // Fuzzing reads crasher detail off stderr as it arrives, so it needs the
-    // same line framing stdout gets rather than one blob at the end.
-    if (onStderrLine) {
-      stderrLineBuffer += chunk;
-      const lines = stderrLineBuffer.split("\n");
-      stderrLineBuffer = lines.pop() ?? "";
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (trimmed) {
-          onStderrLine(trimmed);
-        }
-      }
-    }
+    stderrLineBuffer += chunk;
+    const lines = stderrLineBuffer.split("\n");
+    stderrLineBuffer = lines.pop() ?? "";
+    for (const line of lines) stderrLine(line);
   });
 
   mc.child.on("error", (err: Error) => {
@@ -799,19 +797,7 @@ export async function spawnTestProcess(
         onStdoutLine(remaining);
       }
     }
-    if (onStderrLine) {
-      const remaining = stderrLineBuffer.trim();
-      if (remaining) {
-        onStderrLine(remaining);
-      }
-    }
-    if (stderr) {
-      for (const line of stderr.split("\n")) {
-        if (line.trim()) {
-          outputChannel.warn(`[${label}] stderr: ${line}`);
-        }
-      }
-    }
+    stderrLine(stderrLineBuffer);
     return { stdout, stderr, exitCode: code ?? 1 };
   } finally {
     cancelListener.dispose();
