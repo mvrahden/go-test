@@ -1476,12 +1476,12 @@ func checkPollScope(pass *analysis.Pass, insp *inspector.Inspector, cl *claims) 
 				name, foreign = calleeName(innerCall.Fun), true
 			}
 			if foreign && len(innerCall.Args) > 0 {
-				if ident, ok := softBase(pass, innerCall.Args[0]).(*ast.Ident); !ok || !isTestHandle(pass, ident) {
+				if ident, ok := innerCall.Args[0].(*ast.Ident); !ok || !isTestHandle(pass, ident) {
 					name = ""
 				}
 			}
 			if name != "" && len(innerCall.Args) > 0 {
-				if ident, ok := softBase(pass, innerCall.Args[0]).(*ast.Ident); ok && ident.Name != pollParam {
+				if ident, ok := innerCall.Args[0].(*ast.Ident); ok && ident.Name != pollParam {
 					cl.add(PollScope, innerCall.Pos())
 					report(pass, PollScope, ident,
 						"use %s instead of %s in poll callback passed to %s",
@@ -1492,7 +1492,7 @@ func checkPollScope(pass *analysis.Pass, insp *inspector.Inspector, cl *claims) 
 
 			// Case 2: the outer t handed to a helper — check(t)
 			for _, arg := range innerCall.Args {
-				if ident, ok := softBase(pass, arg).(*ast.Ident); ok && isTestT(pass, ident) && ident.Name != pollParam {
+				if ident, ok := arg.(*ast.Ident); ok && isTestT(pass, ident) && ident.Name != pollParam {
 					cl.add(PollScope, innerCall.Pos())
 					report(pass, PollScope, ident,
 						"%s passed to %s in poll callback bypasses assertion recording — use %s",
@@ -1505,7 +1505,7 @@ func checkPollScope(pass *analysis.Pass, insp *inspector.Inspector, cl *claims) 
 			if !ok {
 				return true
 			}
-			ident, ok := softBase(pass, sel.X).(*ast.Ident)
+			ident, ok := sel.X.(*ast.Ident)
 			if !ok {
 				return true
 			}

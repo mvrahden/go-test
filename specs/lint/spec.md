@@ -319,27 +319,6 @@ Inside a polling callback lint SHALL report a gotest assertion whose first argum
 - **WHEN** a polling callback calls functions that only share an assertion's name
 - **THEN** lint reports the one handed the test's t and leaves those on plain values unreported
 
-### Requirement: Soft assertions
-Lint SHALL read an assertion given t.Soft() as one that goes on after failing. Inside a polling callback poll-scope SHALL report the outer t's soft form as it reports the outer t. assertion-redundant SHALL leave a pair unreported when only one of them is soft. fail-guard SHALL leave a guard whose Fail is given a soft T unreported, and SHALL rewrite a guard calling FailNow on a soft T, which still stops, to an assertion on the T it came from. Every other rewrite SHALL keep the soft T in its fix.
-
-#### Scenario: A soft T inside a poll
-- **WHEN** a polling callback asserts on the test's t.Soft(), hands it to a helper and calls Errorf on it
-- **THEN** lint reports each as a poll-scope finding that names t
-
-#### Scenario: A redundant pair of which one is soft
-- **WHEN** a fatal assertion is followed by a stronger soft one on the same operand
-- **THEN** assertion-redundant leaves the pair unreported
-- **AND** assertion-redundant reports the pair when both are soft
-
-#### Scenario: A failure guard on a soft T
-- **WHEN** a failure guard calls Fail on t.Soft()
-- **THEN** fail-guard leaves it unreported, an or-chained one too
-
-#### Scenario: A fix on a soft T
-- **WHEN** lint -fix rewrites assertions and guards on t.Soft()
-- **THEN** True(t.Soft(), a == b) becomes Equal(t.Soft(), a, b)
-- **AND** a guard calling FailNow on t.Soft() becomes an assertion on t
-
 ### Requirement: A benchmark's loop in a helper
 bench-loop SHALL read a loop as the benchmark's own when the benchmark hands its b, the escape of it or an alias of that escape to a function or method of its package that names Loop or N on that parameter, itself or through at most five further such calls. It SHALL stay silent when the benchmark hands b to a function whose body it cannot read, gotest's own apart, and SHALL report a benchmark whose helpers never loop.
 
