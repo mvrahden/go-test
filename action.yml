@@ -422,7 +422,7 @@ runs:
           args+=("--fail-on=$INPUT_AUDIT_FAIL_ON")
         fi
         if [ "${#mutate[@]}" -gt 0 ]; then
-          if "${cmd[@]}" audit --help 2>/dev/null | grep -q -- --mutate-budget; then
+          if [[ "$audit_help" == *--mutate-budget* ]]; then
             args+=("${mutate[@]}")
           else
             echo "::warning title=gotest audit::the gotest in use has no audit --mutate; the audit mutates nothing"
