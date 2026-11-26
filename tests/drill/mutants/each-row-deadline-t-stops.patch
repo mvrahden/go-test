@@ -3,12 +3,12 @@ Judge: ./tests/canary CanaryTestSuite/TestEachRowsGoOnPastAFailure
 Clause: when an assertion fails on NewTWithDeadline of an Each row's T → fails the row, and the row goes on
 --- a/pkg/gotest/t.go
 +++ b/pkg/gotest/t.go
-@@ -74,7 +74,7 @@
+@@ -77,7 +77,7 @@
  	}
  	ctx, cancel := context.WithTimeout(base.Context(), timeout)
  	base.testingTB().Cleanup(cancel)
--	return &T{t: base.t, tb: base.tb, ctx: ctx, soft: base.soft, c: base.census(), by: base.by}
-+	return &T{t: base.t, tb: base.tb, ctx: ctx, c: base.census(), by: base.by}
+-	return &T{t: base.t, tb: base.tb, ctx: ctx, soft: base.soft, c: base.census(), by: base.by, bubbled: base.bubbled}
++	return &T{t: base.t, tb: base.tb, ctx: ctx, c: base.census(), by: base.by, bubbled: base.bubbled}
  }
  
  // NewTWithContext wraps t, overriding what [T.Context] reports. Use it when the
