@@ -60,8 +60,36 @@ func markIn(dir, m string) {
 }
 
 func writeStacks(path string) {
+	_ = os.WriteFile(path, stacks(), 0o600)
+}
+
+func stacks() []byte {
 	buf := make([]byte, 1<<20)
-	_ = os.WriteFile(path, buf[:runtime.Stack(buf, true)], 0o600)
+	return buf[:runtime.Stack(buf, true)]
+}
+
+// unstartedFrame tops the stack of a goroutine watchOn started that has not
+// yet run its first instruction.
+const unstartedFrame = "\ngithub.com/mvrahden/go-test/pkg/gotestruntime.watchOn.gowrap"
+
+// writeSettledStacks writes every goroutine's stack once each goroutine
+// watchOn started runs its own function, within a bound: a dump before then
+// shows a reader as its wrapper alone.
+func writeSettledStacks(path string) {
+	dump := stacks()
+	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); dump = stacks() {
+		settled := true
+		for g := range strings.SplitSeq(string(dump), "\n\n") {
+			if _, top, _ := strings.Cut(g, ":"); strings.HasPrefix(top, unstartedFrame) {
+				settled = false
+			}
+		}
+		if settled {
+			break
+		}
+		time.Sleep(time.Millisecond)
+	}
+	_ = os.WriteFile(path, dump, 0o600)
 }
 
 // awaitLinkGate holds a gated suite process before m.Run until its scenario
@@ -163,7 +191,7 @@ func holdAs(t *gotest.T, mode, dir string, mark func(string)) {
 	case holdQuick:
 		return
 	case holdStacks:
-		writeStacks(filepath.Join(dir, "during"))
+		writeSettledStacks(filepath.Join(dir, "during"))
 		return
 	case holdGrandchild:
 		// Ignores SIGTERM, so only the group's SIGKILL ends it.
