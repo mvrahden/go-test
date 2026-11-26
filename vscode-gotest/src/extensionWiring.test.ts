@@ -177,7 +177,7 @@ describe("activation", () => {
         processRegistry: { load: async () => {}, inheritedSize: 0 },
         context: { subscriptions },
         snapshotStore: { load: async () => {}, get: () => undefined },
-        specView: { load: async () => {} },
+        panelHost: { load: async () => {} },
         active,
       } as never,
     };

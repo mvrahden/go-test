@@ -3,7 +3,7 @@
 // for what it lacks. Embedded by source (see helpers.ts); the DOM it gets is
 // the webview's, or a test's stand-in.
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { ClientState, HostMessage, Tab } from "../protocol.js";
+import type { ClientState, Depth, HostMessage, Tab } from "../protocol.js";
 import type { ChangeRender, ChangeUi } from "./renderChange.js";
 import type { CardState, NowView } from "./renderNow.js";
 import type { RunsRender, RunsUi } from "./renderRuns.js";
@@ -48,14 +48,37 @@ export function panelApp(env: AppEnv) {
     scroll: (saved.scroll || {}) as Record<string, number>,
     // Scroll positions still to apply once a tab's content is drawn.
     pendingScroll: { ...(saved.scroll || {}) } as Record<string, number>,
+    // Each package's rows, with the summary and chips they were asked under.
     trees: {} as Record<
       string,
-      { rev: number; nodes: any[]; failure?: any[]; drawn?: boolean }
+      {
+        key: string;
+        nodes: any[];
+        failure?: any[];
+        drawn?: boolean;
+      }
     >,
+    pending: {} as Record<string, string>,
     treeOpen: {} as Record<string, Record<string, boolean>>,
+    depth: (saved.depth === "suites" || saved.depth === "behaviors"
+      ? saved.depth
+      : "packages") as Depth,
+    shut: Array.isArray(saved.shut) ? saved.shut.slice() : ([] as string[]),
+    folders: (saved.folders || {}) as Record<string, boolean>,
+    deep: Array.isArray(saved.deep) ? saved.deep.slice() : ([] as string[]),
+    deepSuites: (saved.deepSuites || {}) as Record<string, string[]>,
+    // What the host found for the search on show.
+    found: undefined as
+      | {
+          query: string;
+          rev: number;
+          results: any[];
+          total: number;
+          shown: number;
+        }
+      | undefined,
     busy: {} as Record<string, boolean>,
     running: [] as any[],
-    allPackages: false,
     menu: false,
     cards: { outputs: {}, shown: {}, noSuites: false } as CardState,
     change: {
@@ -83,6 +106,11 @@ export function panelApp(env: AppEnv) {
       scroll: st.scroll,
       models: st.models,
       badges: st.badges,
+      depth: st.depth,
+      shut: st.shut,
+      folders: st.folders,
+      deep: st.deep,
+      deepSuites: st.deepSuites,
     });
 
   // --- header ---
@@ -95,11 +123,11 @@ export function panelApp(env: AppEnv) {
 
   const MENU: Record<Tab, [string, string][]> = {
     now: [
+      ["runTests", "Run all tests"],
       ["rerunFailed", "Rerun failed"],
+      ["-", ""],
       ["refresh", "Refresh"],
       ["copySpec", "Copy as Markdown"],
-      ["expandAll", "Expand all opened packages"],
-      ["collapseAll", "Collapse all packages"],
       ["clearResults", "Clear results"],
     ],
     change: [
@@ -153,9 +181,10 @@ export function panelApp(env: AppEnv) {
       menu.hidden = !st.menu;
       menu.innerHTML = MENU[st.tab]
         .filter(([id]) => id !== "cancel" || !!st.models.change?.busy)
-        .map(
-          ([id, label]) =>
-            `<button type="button" role="menuitem" class="menu-item" data-act="menuItem" data-item="${id}">${label}</button>`,
+        .map(([id, label]) =>
+          id === "-"
+            ? `<div class="menu-sep" role="separator"></div>`
+            : `<button type="button" role="menuitem" class="menu-item" data-act="menuItem" data-item="${id}">${label}</button>`,
         )
         .join("");
     }
@@ -166,16 +195,58 @@ export function panelApp(env: AppEnv) {
   // --- Now ---
 
   const pkgEls = new Map<string, { row: any; head: any; tree: any }>();
+  const folderEls = new Map<string, { wrap: any; head: any; body: any }>();
+
+  const searching = () => st.search.trim() !== "";
+  // The key a package's rows are asked under: a new summary or other chips
+  // make the rows on show out of date.
+  const treeKey = () => `${st.models.now?.rev ?? 0}|${st.filters.join(",")}`;
+
+  const isOpen = (pkg: string) =>
+    st.deep.indexOf(pkg) >= 0 ||
+    (st.depth === "packages"
+      ? st.open.indexOf(pkg) >= 0
+      : st.shut.indexOf(pkg) < 0);
+
+  const folderOpen = (f: any) =>
+    st.folders[f.key] ?? (st.depth !== "packages" || f.hot);
+
+  const needTree = (pkg: string) => {
+    const t = st.trees[pkg];
+    const key = treeKey();
+    return (!t || t.key !== key) && st.pending[pkg] !== key;
+  };
+
+  const request = (pkg: string) => {
+    if (!needTree(pkg)) return;
+    st.pending[pkg] = treeKey();
+    post({ type: "openPackage", pkg });
+  };
+
+  // Rows load as their package scrolls into view; without an observer, at once.
+  const IO = win.IntersectionObserver;
+  const io = IO
+    ? new IO(
+        (entries: any[]) => {
+          for (const e of entries) {
+            if (!e.isIntersecting) continue;
+            io.unobserve(e.target);
+            const pkg = e.target.dataset.pkg;
+            if (pkg && isOpen(pkg)) request(pkg);
+          }
+        },
+        { root: $("tab-now"), rootMargin: "400px" },
+      )
+    : undefined;
 
   const elOf = (pkg: string) => {
     let e = pkgEls.get(pkg);
     if (!e) {
       const row = doc.createElement("div");
       row.className = "pkg";
-      const head = doc.createElement("button");
-      head.setAttribute("type", "button");
+      row.dataset.pkg = pkg;
+      const head = doc.createElement("div");
       head.className = "pkg-head";
-      head.dataset.act = "togglePkg";
       head.dataset.pkg = pkg;
       const tree = doc.createElement("div");
       tree.className = "pkg-tree";
@@ -188,63 +259,190 @@ export function panelApp(env: AppEnv) {
     return e;
   };
 
+  const folderEl = (key: string) => {
+    let e = folderEls.get(key);
+    if (!e) {
+      const wrap = doc.createElement("div");
+      wrap.className = "folder";
+      const head = doc.createElement("button");
+      head.setAttribute("type", "button");
+      head.className = "folder-head";
+      head.dataset.act = "toggleFolder";
+      head.dataset.folder = key;
+      const body = doc.createElement("div");
+      body.className = "folder-body";
+      wrap.appendChild(head);
+      wrap.appendChild(body);
+      e = { wrap, head, body };
+      folderEls.set(key, e);
+    }
+    return e;
+  };
+
+  const treeOpenOf = (pkg: string) => ({
+    open: st.treeOpen[pkg] || {},
+    deep: st.deep.indexOf(pkg) >= 0,
+    deepSuites: st.deepSuites[pkg] || [],
+    depth: st.depth,
+  });
+
   const drawTree = (pkg: string) => {
     const e = pkgEls.get(pkg);
-    const t = st.trees[pkg];
     if (!e) return;
-    const open = st.open.indexOf(pkg) >= 0;
+    const open = isOpen(pkg);
     e.tree.hidden = !open;
     if (!open) return;
+    const t = st.trees[pkg];
+    if (needTree(pkg)) {
+      if (io) io.observe(e.row);
+      else request(pkg);
+    }
     if (!t) {
       if (!e.tree.innerHTML)
         e.tree.innerHTML = `<div class="dim pad">Loading the rows…</div>`;
       return;
     }
     if (t.drawn) return;
-    e.tree.innerHTML = NOW.tree(t.nodes, t.failure, st.treeOpen[pkg] || {});
+    e.tree.innerHTML = NOW.tree(t.nodes, t.failure, treeOpenOf(pkg));
     t.drawn = true;
   };
 
-  const MAX_ROWS = 10;
+  const redrawTree = (pkg: string) => {
+    if (st.trees[pkg]) st.trees[pkg].drawn = false;
+    drawTree(pkg);
+  };
+
+  const drawDepth = () => {
+    for (const d of ["packages", "suites", "behaviors"]) {
+      const b = $(`depth-${d}`);
+      if (b) b.setAttribute("aria-pressed", String(st.depth === d));
+    }
+  };
+
+  const drawFound = (m: any) => {
+    const out = $("now-found");
+    if (!out) return;
+    const f = st.found;
+    if (!f || f.query !== st.search.trim()) {
+      out.innerHTML = `<div class="dim pad" role="status">Searching…</div>`;
+      return;
+    }
+    const by = new Map(f.results.map((r: any) => [r.pkg, r.nodes]));
+    const parts = [NOW.foundNote(f.total, f.shown)];
+    for (const folder of m.folders as any[]) {
+      const rows = folder.rows.filter((r: any) => by.has(r.pkg));
+      if (rows.length === 0) continue;
+      parts.push(
+        `<div class="folder"><div class="folder-head static">${NOW.folderHead(folder, true, rows.length)}</div><div class="folder-body">${rows
+          .map(
+            (r: any) =>
+              `<div class="pkg"><div class="pkg-head static" data-pkg="${H_ESC(r.pkg)}"><span class="mono name">${H_ESC(r.name)}</span><span class="grow"></span><span class="counts t-${r.tone}">${H_ESC(r.counts)}</span></div><div class="pkg-tree" data-pkg="${H_ESC(r.pkg)}">${NOW.tree(by.get(r.pkg), undefined, { open: {}, deep: true, deepSuites: [], depth: "behaviors" })}</div></div>`,
+          )
+          .join("")}</div></div>`,
+      );
+    }
+    out.innerHTML = parts.join("");
+  };
+
+  const H_ESC = (s: string) =>
+    String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
 
   const drawPackages = (m: any) => {
     const list = $("now-packages");
     if (!list) return;
-    const rows = (m.packages as any[]).filter(
-      (r) => !m.filtering || (r.matches ?? 1) > 0,
-    );
-    const cut = !m.filtering && !st.allPackages && rows.length > MAX_ROWS + 2;
-    const visible = cut ? rows.slice(0, MAX_ROWS) : rows;
-    const keep = new Set<string>();
-    for (const r of visible) {
-      keep.add(r.pkg);
-      const e = elOf(r.pkg);
-      const open = st.open.indexOf(r.pkg) >= 0;
-      e.head.innerHTML = NOW.pkgHead(r, open);
-      e.head.setAttribute("aria-expanded", String(open));
-      if (r.title) e.head.setAttribute("title", r.title);
-      list.appendChild(e.row);
-      drawTree(r.pkg);
+    drawDepth();
+    const found = $("now-found");
+    if (searching()) {
+      list.hidden = true;
+      if (found) found.hidden = false;
+      drawFound(m);
+      return;
+    }
+    list.hidden = false;
+    if (found) {
+      found.hidden = true;
+      found.innerHTML = "";
+    }
+    const keepF = new Set<string>();
+    const keepP = new Set<string>();
+    for (const f of m.folders as any[]) {
+      const rows = f.rows.filter(
+        (r: any) => !m.filtering || (r.matches ?? 1) > 0,
+      );
+      if (m.filtering && rows.length === 0) continue;
+      const fe = folderEl(f.key);
+      const open = folderOpen(f);
+      fe.head.innerHTML = NOW.folderHead(
+        f,
+        open,
+        m.filtering ? rows.length : undefined,
+      );
+      fe.head.setAttribute("aria-expanded", String(open));
+      fe.body.hidden = !open;
+      list.appendChild(fe.wrap);
+      keepF.add(f.key);
+      if (!open) continue;
+      for (const r of rows) {
+        keepP.add(r.pkg);
+        const e = elOf(r.pkg);
+        e.head.innerHTML = NOW.pkgHead(
+          r,
+          isOpen(r.pkg),
+          st.deep.indexOf(r.pkg) >= 0,
+        );
+        if (r.title) e.head.setAttribute("title", r.title);
+        fe.body.appendChild(e.row);
+        drawTree(r.pkg);
+      }
+    }
+    for (const [key, e] of Array.from(folderEls)) {
+      if (keepF.has(key)) continue;
+      e.wrap.remove();
+      folderEls.delete(key);
     }
     for (const [pkg, e] of Array.from(pkgEls)) {
-      if (keep.has(pkg)) continue;
+      if (keepP.has(pkg)) continue;
+      io?.unobserve(e.row);
       e.row.remove();
       pkgEls.delete(pkg);
       if (st.trees[pkg]) st.trees[pkg].drawn = false;
     }
-    const more = $("now-more");
-    if (more) {
-      const hidden = rows.slice(MAX_ROWS);
-      more.innerHTML = cut
-        ? NOW.more(
-            hidden.length,
-            hidden.every((r) => r.tone === "pass"),
-          )
-        : "";
-    }
-    if (m.filtering && rows.length === 0)
+    if (m.filtering && keepP.size === 0)
       list.setAttribute("data-empty", "No behavior matches.");
     else list.removeAttribute("data-empty");
+  };
+
+  // branchPositions lists the places of a package's branches at or under a
+  // place ("" for all).
+  const branchPositions = (nodes: any[], under: string): string[] => {
+    const out: string[] = [];
+    const walk = (list: any[]) => {
+      for (const n of list) {
+        if (!n.c) continue;
+        if (!under || n.pos === under || n.pos.startsWith(under + "."))
+          out.push(n.pos);
+        walk(n.c);
+      }
+    };
+    walk(nodes);
+    return out;
+  };
+
+  const setDepth = (d: Depth) => {
+    st.depth = d;
+    st.open = [];
+    st.shut = [];
+    st.treeOpen = {};
+    st.deep = [];
+    st.deepSuites = {};
+    if (d !== "packages") st.folders = {};
+    for (const t of Object.values(st.trees)) t.drawn = false;
+    save();
+    if (st.models.now) drawPackages(st.models.now);
   };
 
   const drawNow = () => {
@@ -255,7 +453,8 @@ export function panelApp(env: AppEnv) {
       for (const p of parts) if ($(p)) $(p).hidden = true;
       // Nothing kept: the rows of what was cleared go too.
       if (m?.empty) {
-        for (const e of pkgEls.values()) e.row.remove();
+        for (const e of folderEls.values()) e.wrap.remove();
+        folderEls.clear();
         pkgEls.clear();
         st.trees = {};
         $("now-attention").innerHTML = "";
@@ -373,7 +572,11 @@ export function panelApp(env: AppEnv) {
         return;
       case "now": {
         const old = st.models.now;
-        if (old && old.rev !== msg.model.rev) st.cards.outputs = {};
+        if (old && old.rev !== msg.model.rev) {
+          st.cards.outputs = {};
+          // A search answers for one summary: ask again of the new one.
+          if (searching()) post({ type: "search", text: st.search });
+        }
         st.models.now = msg.model;
         save();
         if (st.tab === "now") drawNow();
@@ -381,11 +584,17 @@ export function panelApp(env: AppEnv) {
       }
       case "package":
         st.trees[msg.pkg] = {
-          rev: msg.rev,
+          key: st.pending[msg.pkg] ?? treeKey(),
           nodes: msg.nodes,
           failure: msg.failure,
         };
+        delete st.pending[msg.pkg];
         drawTree(msg.pkg);
+        return;
+      case "found":
+        if (msg.query !== st.search.trim()) return;
+        st.found = msg;
+        if (st.tab === "now" && st.models.now) drawPackages(st.models.now);
         return;
       case "output":
         st.cards.outputs[msg.key] = { lines: msg.lines, more: msg.more };
@@ -434,20 +643,6 @@ export function panelApp(env: AppEnv) {
     st.menu = false;
     renderHeader();
     switch (item) {
-      case "expandAll":
-        for (const p of st.open) {
-          const e = pkgEls.get(p);
-          if (!e) continue;
-          const all = e.tree.querySelectorAll("details");
-          for (let i = 0; i < all.length; i++) all[i].open = true;
-        }
-        return;
-      case "collapseAll":
-        for (const p of st.open.slice()) post({ type: "closePackage", pkg: p });
-        st.open = [];
-        save();
-        if (st.models.now) drawPackages(st.models.now);
-        return;
       case "changeRefresh":
         post({ type: "change", act: "refresh" });
         return;
@@ -496,24 +691,70 @@ export function panelApp(env: AppEnv) {
         else post({ type: "runs", act: "import" });
         return;
       case "togglePkg": {
-        const pkg = d.pkg as string;
-        const i = st.open.indexOf(pkg);
-        if (i >= 0) {
-          st.open.splice(i, 1);
-          post({ type: "closePackage", pkg });
-        } else {
-          st.open.push(pkg);
-          if (st.trees[pkg]) st.trees[pkg].drawn = false;
-          post({ type: "openPackage", pkg });
-        }
+        const pkg = el.closest("[data-pkg]")?.dataset.pkg as string;
+        if (!pkg) return;
+        const open = isOpen(pkg);
+        const list = st.depth === "packages" ? st.open : st.shut;
+        const i = list.indexOf(pkg);
+        if (st.depth === "packages" ? open : !open) {
+          if (i >= 0) list.splice(i, 1);
+        } else if (i < 0) list.push(pkg);
+        if (open) st.deep = st.deep.filter((p) => p !== pkg);
         save();
         if (st.models.now) drawPackages(st.models.now);
         return;
       }
-      case "allPackages":
-        st.allPackages = true;
-        if (st.models.now) drawPackages(st.models.now);
+      case "toggleFolder": {
+        const f = st.models.now?.folders.find((x: any) => x.key === d.folder);
+        if (!f) return;
+        st.folders[f.key] = !folderOpen(f);
+        save();
+        drawPackages(st.models.now);
         return;
+      }
+      case "depth":
+        setDepth(d.depth as Depth);
+        return;
+      case "deep": {
+        const pkg = (d.pkg ?? el.closest("[data-pkg]")?.dataset.pkg) as string;
+        if (!pkg) return;
+        const nodes = st.trees[pkg]?.nodes ?? [];
+        const closed = (under: string) => {
+          const map = (st.treeOpen[pkg] ||= {});
+          for (const pos of branchPositions(nodes, under)) map[pos] = false;
+        };
+        if (d.pos === undefined) {
+          if (st.deep.indexOf(pkg) >= 0) {
+            st.deep = st.deep.filter((p) => p !== pkg);
+            st.deepSuites[pkg] = [];
+            closed("");
+          } else {
+            // Open in its own right, so a collapse leaves its suites showing.
+            if (!isOpen(pkg)) {
+              if (st.depth === "packages") st.open.push(pkg);
+              else st.shut = st.shut.filter((p) => p !== pkg);
+            }
+            st.deep.push(pkg);
+            st.treeOpen[pkg] = {};
+          }
+        } else {
+          const list = (st.deepSuites[pkg] ||= []);
+          const i = list.indexOf(d.pos);
+          if (i >= 0) {
+            list.splice(i, 1);
+            closed(d.pos);
+          } else {
+            list.push(d.pos);
+            const map = st.treeOpen[pkg] || {};
+            for (const k of Object.keys(map))
+              if (k === d.pos || k.startsWith(d.pos + ".")) delete map[k];
+          }
+        }
+        save();
+        if (st.models.now) drawPackages(st.models.now);
+        redrawTree(pkg);
+        return;
+      }
       case "chip": {
         const s = d.status as string;
         const i = st.filters.indexOf(s);
@@ -523,6 +764,7 @@ export function panelApp(env: AppEnv) {
         if (st.models.now)
           $("now-chips").innerHTML = NOW.chips(st.models.now, st.filters);
         post({ type: "filters", filters: st.filters });
+        if (searching()) post({ type: "search", text: st.search });
         return;
       }
       case "noSuites":
@@ -616,6 +858,7 @@ export function panelApp(env: AppEnv) {
   const onClick = (e: any) => {
     const t = e.target;
     const el = t && t.closest ? t.closest("[data-act]") : null;
+    if (!el) noteBranch(t);
     if (!el) {
       if (st.menu && !(t && t.closest && t.closest("#menu"))) {
         st.menu = false;
@@ -636,8 +879,10 @@ export function panelApp(env: AppEnv) {
     win.clearTimeout(searchTimer);
     searchTimer = win.setTimeout(() => {
       st.search = t.value;
+      st.found = undefined;
       save();
-      post({ type: "search", text: st.search });
+      if (searching()) post({ type: "search", text: st.search });
+      if (st.models.now) drawPackages(st.models.now);
     }, 200);
   };
 
@@ -650,13 +895,12 @@ export function panelApp(env: AppEnv) {
       post({ type: t.dataset.scope, act: "folder", folder: t.value });
   };
 
-  const onToggle = (e: any) => {
-    const t = e.target;
-    if (!t || !t.matches || !t.matches("details.branch")) return;
-    const owner = t.closest("[data-pkg]");
-    if (!owner) return;
-    const pkg = owner.dataset.pkg;
-    (st.treeOpen[pkg] ||= {})[t.dataset.pos] = !!t.open;
+  const noteBranch = (t: any) => {
+    const sum = t && t.closest ? t.closest("summary") : null;
+    const det = sum ? sum.closest("details.branch") : null;
+    const owner = det ? det.closest("[data-pkg]") : null;
+    if (!det || !owner) return;
+    (st.treeOpen[owner.dataset.pkg] ||= {})[det.dataset.pos] = !det.open;
   };
 
   let scrollTimer: any;
@@ -699,7 +943,6 @@ export function panelApp(env: AppEnv) {
   doc.addEventListener("click", onClick);
   doc.addEventListener("input", onInput);
   doc.addEventListener("change", onChange);
-  doc.addEventListener("toggle", onToggle, true);
   doc.addEventListener("scroll", onScroll, true);
   doc.addEventListener("keydown", onKey);
   win.addEventListener("message", (e: any) => receive(e.data));
@@ -711,11 +954,12 @@ export function panelApp(env: AppEnv) {
   post({
     type: "ready",
     tab: st.tab,
-    open: st.open,
     changeOpen: Object.keys(st.change.open).filter((k) => st.change.open[k]),
     search: st.search,
     filters: st.filters,
   });
+  // A search kept across a reload asks again.
+  if (searching()) post({ type: "search", text: st.search });
 
   return { st, receive, onClick, onInput };
 }

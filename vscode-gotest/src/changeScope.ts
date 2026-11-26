@@ -3,7 +3,7 @@
 // computes the document; this runs it, keeps it, and wires its rows to the
 // editor.
 import { sessions } from "./sessions.js";
-import { logFinished } from "./panel/logFinished.js";
+import { coverFileFor } from "./eventsFiles.js";
 import * as vscode from "vscode";
 import * as path from "node:path";
 import { existsSync } from "node:fs";
@@ -141,6 +141,8 @@ interface FolderState {
   upgrade?: CliBelowFloorError;
   // The run the last audit took as evidence because none was chosen.
   autoEvidence?: EvidencePick;
+  // The run whose coverage profile the last audit passed.
+  coverage?: string;
   // Waiting for the folder's audit slot.
   waiters: (() => void)[];
 }
@@ -269,6 +271,7 @@ export class ChangeScope implements vscode.Disposable {
       busy: fs.busy,
       folders,
       evidence,
+      coverage: fs.coverage,
       accepted: (k) => accepted.has(k),
       baseLabel: fs.baseLabel,
       notice: fs.notice,
@@ -375,7 +378,10 @@ export class ChangeScope implements vscode.Disposable {
       const patterns = (await this.deps.patternsFor?.(folder)) ?? [];
       const args = ["audit", `--base=${ref}`, "--format=md"];
       if (opts.run) args.push("--run");
-      args.push(...(await this.evidenceArgs(folder, fs)), ...patterns);
+      args.push(
+        ...(await this.evidenceArgs(folder, fs, !!opts.run)),
+        ...patterns,
+      );
       let cmd;
       try {
         cmd = await buildCliCommand(args, folder, this.deps.log);
@@ -451,7 +457,7 @@ export class ChangeScope implements vscode.Disposable {
     const patterns = (await this.deps.patternsFor?.(folder)) ?? [];
     const args = ["audit", `--base=${base.ref}`, "--format=json"];
     if (mode === "run") args.push("--run");
-    args.push(...(await this.evidenceArgs(folder, fs)));
+    args.push(...(await this.evidenceArgs(folder, fs, mode === "run")));
     let cmd;
     try {
       cmd = await buildCliCommand(
@@ -493,6 +499,7 @@ export class ChangeScope implements vscode.Disposable {
   private async evidenceArgs(
     folder: string,
     fs: FolderState,
+    run = false,
   ): Promise<string[]> {
     const chosen = this.deps.evidence?.list(folder) ?? [];
     fs.autoEvidence = undefined;
@@ -504,9 +511,19 @@ export class ChangeScope implements vscode.Disposable {
         picks = [auto];
       }
     }
-    return picks
-      .filter((p) => existsSync(p.file))
-      .map((p) => `--evidence=${p.file}`);
+    const there = picks.filter((p) => existsSync(p.file));
+    const args = there.map((p) => `--evidence=${p.file}`);
+    // The first run that kept its profile gives the coverage; an audit that
+    // runs the change takes its own.
+    fs.coverage = undefined;
+    const covered = run
+      ? undefined
+      : there.find((p) => existsSync(coverFileFor(p.file)));
+    if (covered) {
+      fs.coverage = covered.label;
+      args.push(`--coverage=${coverFileFor(covered.file)}`);
+    }
+    return args;
   }
 
   // checkCli asks the folder's CLI what it can do before the first audit:
@@ -568,9 +585,9 @@ export class ChangeScope implements vscode.Disposable {
       cwd: folder,
       kind: control ? "audit-run" : "audit",
       control,
+      onFinished: (line) => this.deps.log.info(`[change] ${line}`),
     });
     fs.child = mc;
-    const startedAt = Date.now();
     let stdout = "";
     let stderr = "";
     let timedOut = false;
@@ -595,7 +612,6 @@ export class ChangeScope implements vscode.Disposable {
         : undefined;
     try {
       const { code } = await mc.exited;
-      logFinished("change", startedAt, code, this.deps.log);
       if (spawnError) throw spawnError;
       if (timedOut) throw new Error(`audit timed out after ${budgetSeconds}s`);
       if (this.disposed) throw new Error("audit stopped");

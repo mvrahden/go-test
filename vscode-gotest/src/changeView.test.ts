@@ -405,7 +405,7 @@ describe("the Change tab", () => {
     expect(stopped.exit).toBe("the run was stopped");
   });
 
-  it("lists the unproven lines per file, each range a place to open", () => {
+  it("lists the changed lines no test ran per file, each range a place to open, and the files the run did not cover", () => {
     const d = doc({
       summary: {
         ...doc().summary,
@@ -437,19 +437,60 @@ describe("the Change tab", () => {
         },
       ],
     });
-    const u = buildChangeTab(
+    const l = buildChangeTab(
       view({ state: docState(d), canOpen: (k) => k.startsWith("u:") }),
-    ).unproven!;
-    expect(u.head).toBe(
-      "9 of 12 changed executable lines not executed, 1 file without coverage data",
-    );
-    expect(
-      u.files.map((f) => [f.file, f.coverage, f.counts, f.canOpen, f.ranges]),
-    ).toEqual([
-      ["shop/ledger.go", false, "", true, []],
-      ["shop/shop.go", true, "8 of 12", true, [{ key: "u:1:0", text: "1-2" }]],
+    ).lines!;
+    expect(l.head).toBe("9 of 12 changed lines");
+    expect(l.files).toEqual([
+      {
+        key: "u:1",
+        file: "shop/shop.go",
+        canOpen: true,
+        ranges: [{ key: "u:1:0", text: "1-2" }],
+      },
     ]);
-    expect(buildChangeTab(view()).unproven).toBeUndefined();
+    expect(l.noCoverage).toBe(
+      "1 changed file has no coverage data: its package did not run in this run.",
+    );
+    expect(l.note).toBeUndefined();
+    const none = buildChangeTab(view()).lines!;
+    expect(none.head).toBeUndefined();
+    expect(none.note).toMatch(/^No coverage profile is in use/);
+    const clean = buildChangeTab(
+      view({
+        state: docState(
+          doc({
+            summary: { ...doc().summary, unproven: 0, changedLines: 4 },
+            coverage: { lines: "git diff", packages: [] },
+            unproven: [],
+          }),
+        ),
+      }),
+    ).lines!;
+    expect(clean.note).toBe("Every one of the 4 changed lines ran.");
+  });
+
+  it("says when the evidence's coverage is in use", () => {
+    const current = doc({
+      streams: [{ file: "/e.jsonl", side: "head", run: null, current: true }],
+    });
+    const t = buildChangeTab(
+      view({
+        state: docState(current),
+        evidence: [
+          {
+            id: "r1",
+            label: "the editor run of 08:38",
+            missing: false,
+            auto: true,
+          },
+        ],
+        coverage: "the editor run of 08:38",
+      }),
+    );
+    expect(t.evidence!.text).toBe(
+      "Proven by the editor run of 08:38, which matches this tree; its coverage is used too.",
+    );
   });
 
   it("stands in for a document it lacks: no checkout, no base, an old CLI, a newer schema, an error", () => {

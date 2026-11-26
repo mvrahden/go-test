@@ -9,6 +9,7 @@ import type {
   Card,
   Chip,
   FilterStatus,
+  FolderRow,
   NowModel,
   OutputLine,
   PackageRow,
@@ -29,6 +30,7 @@ import {
   type SpecNode,
   type SpecPackage,
   type SpecRun,
+  type SpecStats,
 } from "./specData.js";
 
 // How many cards of each kind the tab shows before it counts the rest.
@@ -66,7 +68,6 @@ export interface NowEnv {
   imported?: string;
   // Runs in progress: a line each and what their events said per package.
   live: { line: string; packages: ReadonlyMap<string, LivePackage> }[];
-  query: string;
   filters: ReadonlySet<FilterStatus>;
   // The flaky hint for a failed test, when the runs document can say.
   flakyOf?: (
@@ -274,8 +275,10 @@ function leafMatches(
   filters: ReadonlySet<FilterStatus>,
   stale: boolean,
   hasFailedChild: boolean,
+  // A row above it matched the search: it stands for its whole subtree.
+  above = false,
 ): boolean {
-  if (query && !n.display.toLowerCase().includes(query)) return false;
+  if (query && !above && !n.display.toLowerCase().includes(query)) return false;
   if (filters.size === 0) return true;
   if (filters.has("stale") && stale) return true;
   if (filters.has("vacuous") && n.vacuous) return true;
@@ -299,9 +302,11 @@ export function matchCount(
     (node, ctx) => {
       const leaf = node.children.length === 0;
       const own = !leaf && isFailedRow(node, ctx.hasFailedChild);
+      const above =
+        query !== "" && ctx.labels.some((l) => l.toLowerCase().includes(query));
       if (
         (leaf || own) &&
-        leafMatches(node, query, filters, stale, ctx.hasFailedChild)
+        leafMatches(node, query, filters, stale, ctx.hasFailedChild, above)
       )
         n++;
     },
@@ -313,8 +318,7 @@ export function matchCount(
 // buildNowModel lays out the Now tab.
 export function buildNowModel(env: NowEnv): NowModel {
   const doc = env.doc;
-  const query = env.query.trim().toLowerCase();
-  const filtering = query !== "" || env.filters.size > 0;
+  const filtering = env.filters.size > 0;
   const packages = doc?.packages ?? [];
   const livePkgs = new Map<string, LivePackage>();
   for (const run of env.live)
@@ -444,7 +448,7 @@ export function buildNowModel(env: NowEnv): NowModel {
             ? "freshness unknown"
             : undefined,
     };
-    if (filtering) row.matches = matchCount(p, query, env.filters, stale);
+    if (filtering) row.matches = matchCount(p, "", env.filters, stale);
     rows.push(row);
   }
 
@@ -492,11 +496,13 @@ export function buildNowModel(env: NowEnv): NowModel {
       });
     }
   }
-  rows.sort(
-    (a, b) =>
-      Number(b.tone === "fail") - Number(a.tone === "fail") ||
-      behaviorsOf(packages, b.pkg) - behaviorsOf(packages, a.pkg) ||
-      (a.name < b.name ? -1 : a.name > b.name ? 1 : 0),
+  const folders = foldersOf(
+    rows,
+    packages,
+    groupNames(
+      rows.map((r) => r.pkg),
+      env.modulePaths,
+    ),
   );
 
   const stats = doc?.stats;
@@ -574,14 +580,131 @@ export function buildNowModel(env: NowEnv): NowModel {
       ...(stats ? moreTotals(stats) : []),
       ...(doc?.groups ?? []).map(groupText),
     ],
-    packages: rows,
+    folders,
     filtering,
     failed: failed + liveFailed,
   };
 }
 
-function behaviorsOf(packages: SpecPackage[], pkg: string): number {
-  return packages.find((p) => p.path === pkg)?.stats?.behaviors ?? 0;
+// hot is a row that needs looking at: failed or stale.
+const hot = (r: PackageRow) => r.tone === "fail" || !!r.stale;
+
+const byName = (a: { name: string }, b: { name: string }) =>
+  a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
+
+// groupNames names each package's folder: the first path element below its
+// module's root; a package at the root, and every package of a module other
+// than the one with the most packages, under the module's last element.
+export function groupNames(
+  packages: string[],
+  modulePaths: string[],
+): Map<string, string> {
+  const mods = [...modulePaths].sort((a, b) => b.length - a.length);
+  const modOf = (p: string) =>
+    mods.find((m) => p === m || p.startsWith(m + "/")) ?? "";
+  const counts = new Map<string, number>();
+  for (const p of packages)
+    counts.set(modOf(p), (counts.get(modOf(p)) ?? 0) + 1);
+  let primary = "";
+  let most = -1;
+  for (const [m, n] of counts) if (n > most) [primary, most] = [m, n];
+  const out = new Map<string, string>();
+  for (const p of packages) {
+    const m = modOf(p);
+    const tail = m.slice(m.lastIndexOf("/") + 1);
+    if (!m) out.set(p, p.split("/")[0]);
+    else if (m !== primary || p === m) out.set(p, tail);
+    else out.set(p, p.slice(m.length + 1).split("/")[0]);
+  }
+  return out;
+}
+
+// sumStats adds packages' counts for their folder.
+function sumStats(list: (SpecStats | undefined)[]): SpecStats {
+  const sum: SpecStats = {
+    suites: 0,
+    behaviors: 0,
+    tests: 0,
+    passed: 0,
+    failed: 0,
+    skipped: 0,
+    notRun: 0,
+    vacuous: 0,
+    failedPackages: 0,
+  };
+  for (const s of list) {
+    if (!s) continue;
+    sum.suites += s.suites;
+    sum.behaviors += s.behaviors;
+    sum.passed += s.passed;
+    sum.failed += s.failed;
+    sum.skipped += s.skipped;
+    sum.notRun! += s.notRun ?? 0;
+    sum.vacuous! += s.vacuous ?? 0;
+    sum.failedPackages! += s.failedPackages ?? 0;
+  }
+  return sum;
+}
+
+// foldersOf groups the rows by folder: folders holding a failed or stale
+// package first, the rest in path order; inside each the same.
+function foldersOf(
+  rows: PackageRow[],
+  packages: SpecPackage[],
+  group: Map<string, string>,
+): FolderRow[] {
+  const by = new Map<string, PackageRow[]>();
+  for (const r of rows) {
+    const g = group.get(r.pkg) ?? r.name;
+    by.set(g, [...(by.get(g) ?? []), r]);
+  }
+  const stats = new Map(packages.map((p) => [p.path, p.stats]));
+  const out: FolderRow[] = Array.from(by, ([name, list]) => {
+    list.sort((a, b) => Number(hot(b)) - Number(hot(a)) || byName(a, b));
+    const c = countsText({
+      path: name,
+      status: "",
+      duration: 0,
+      nodes: [],
+      stats: sumStats(list.map((r) => stats.get(r.pkg))),
+    });
+    const anyHot = list.some(hot);
+    return {
+      key: name,
+      name,
+      packages: list.length,
+      counts: c.text,
+      tone: list.some((r) => r.tone === "fail")
+        ? "fail"
+        : anyHot
+          ? "warn"
+          : c.tone,
+      hot: anyHot,
+      rows: list,
+    };
+  });
+  return out.sort((a, b) => Number(b.hot) - Number(a.hot) || byName(a, b));
+}
+
+// leafCounts words the leaves under a row by status.
+function leafCounts(n: SpecNode): { text: string; tone: Tone } {
+  const c = { pass: 0, fail: 0, skip: 0, none: 0 } as Record<string, number>;
+  const walk = (x: SpecNode) => {
+    if (x.children.length === 0 || x.kind === "fuzz")
+      c[x.status in c ? x.status : "none"]++;
+    else x.children.forEach(walk);
+  };
+  walk(n);
+  const parts = [
+    c.fail ? `${num(c.fail)} failed` : "",
+    c.pass ? `${num(c.pass)} passed` : "",
+    c.skip ? `${num(c.skip)} skipped` : "",
+    c.none ? `${num(c.none)} not run` : "",
+  ].filter(Boolean);
+  return {
+    text: parts.join(" · "),
+    tone: c.fail ? "fail" : c.pass ? "pass" : "none",
+  };
 }
 
 function pkgDirOf(
@@ -724,7 +847,9 @@ function tagsOf(n: SpecNode): TreeNode["tags"] {
     else if (n.assertions !== undefined)
       tags.push({ text: countNoun(n.assertions, "assertion") });
   }
-  if (n.status === "none") tags.push({ text: "NOT RUN" });
+  // A leaf says it in its status word.
+  if (n.status === "none" && n.children.length > 0)
+    tags.push({ text: "NOT RUN" });
   return tags.length > 0 ? tags : undefined;
 }
 
@@ -757,16 +882,26 @@ export function packageTree(
     list: SpecNode[],
     parentBase: string | null | undefined,
     pos: number[],
+    above: boolean,
   ): TreeNode[] => {
     const out: TreeNode[] = [];
     list.forEach((n, i) => {
       const base = itemIdOf(pkg.path, parentBase, n);
       const here = [...pos, i];
-      const kids = rec(n.children, base, here);
+      const matched =
+        above || (query !== "" && n.display.toLowerCase().includes(query));
+      const kids = rec(n.children, base, here, matched);
       const hasFailedChild = n.children.some((c) => c.status === "fail");
       const self =
         n.children.length === 0 || isFailedRow(n, hasFailedChild)
-          ? leafMatches(n, query, opts.filters, opts.stale, hasFailedChild)
+          ? leafMatches(
+              n,
+              query,
+              opts.filters,
+              opts.stale,
+              hasFailedChild,
+              above,
+            )
           : false;
       if (narrow && kids.length === 0 && !self) return;
       const loc = sourceOf(n, pkg.dir);
@@ -787,11 +922,15 @@ export function packageTree(
         if (own.length > 0) t.out = outputLines(own, outDir, ROW_LINES);
       }
       if (kids.length > 0) t.c = kids;
+      if (pos.length === 0 && n.children.length > 0) {
+        const c = leafCounts(n);
+        if (c.text) [t.n, t.nt] = [c.text, c.tone];
+      }
       out.push(t);
     });
     return out;
   };
-  const nodes = rec(pkg.nodes, null, []);
+  const nodes = rec(pkg.nodes, null, [], false);
   const failure =
     (pkg.stats?.failedPackages ?? 0) > 0
       ? outputLines(
@@ -874,4 +1013,66 @@ export function failedIds(doc: SpecData | undefined): {
     );
   }
   return { ids, ancestors };
+}
+
+// The most a search answer carries: leaves, and bytes of rows.
+export const FOUND_LEAVES = 300;
+export const FOUND_BYTES = 150_000;
+
+const leavesIn = (nodes: TreeNode[]): number =>
+  nodes.reduce((n, x) => n + (x.c ? leavesIn(x.c) : 1), 0);
+
+// searchFound is what a search finds: per package, in the order the tab
+// lists them, the rows that match with the rows above them, until the
+// leaves or the bytes would pass their bound; total counts every match.
+export function searchFound(
+  doc: SpecData | undefined,
+  query: string,
+  order: string[],
+  opts: {
+    dirOf: (pkg: string) => string | undefined;
+    filters: ReadonlySet<FilterStatus>;
+    staleOf: (pkg: string) => boolean;
+  },
+  limits = { leaves: FOUND_LEAVES, bytes: FOUND_BYTES },
+): {
+  results: { pkg: string; nodes: TreeNode[] }[];
+  total: number;
+  shown: number;
+} {
+  const q = query.trim().toLowerCase();
+  const results: { pkg: string; nodes: TreeNode[] }[] = [];
+  let total = 0;
+  let shown = 0;
+  let bytes = 0;
+  let full = false;
+  if (!q || !doc) return { results, total, shown };
+  for (const pkg of order) {
+    const p = doc.packages.find((x) => x.path === pkg);
+    if (!p) continue;
+    const n = matchCount(p, q, opts.filters, opts.staleOf(pkg));
+    if (n === 0) continue;
+    total += n;
+    if (full) continue;
+    const tree = packageTree(doc, pkg, {
+      dirOf: opts.dirOf,
+      query: q,
+      filters: opts.filters,
+      stale: opts.staleOf(pkg),
+    });
+    if (!tree) continue;
+    const size = JSON.stringify(tree.nodes).length;
+    const leaves = leavesIn(tree.nodes);
+    if (
+      shown > 0 &&
+      (shown + leaves > limits.leaves || bytes + size > limits.bytes)
+    ) {
+      full = true;
+      continue;
+    }
+    results.push({ pkg, nodes: tree.nodes });
+    shown += leaves;
+    bytes += size;
+  }
+  return { results, total, shown };
 }

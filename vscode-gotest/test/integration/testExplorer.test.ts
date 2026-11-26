@@ -363,7 +363,7 @@ describe("the coverage entry point", () => {
       token as never,
     );
 
-    // The stream reaches the Spec View through the same callback the extension
+    // The stream reaches the panel through the same callback the extension
     // wires up, so a coverage run keeps the panel current too.
     expect(handedOn).toContain(pkg("table"));
 
@@ -380,7 +380,7 @@ describe("the coverage entry point", () => {
 
 describe("the watch entry point", () => {
   // This used to keep a cycle's run open until the next cycle started, so
-  // the Explorer and the Spec View showed a save's verdict one save late.
+  // the Explorer and the panel showed a save's verdict one save late.
   // The CLI says when a cycle is over; that is when its run ends.
   it("ends a cycle's run at the CLI's watch-end and hands that cycle on", async () => {
     const cycles: string[] = [];

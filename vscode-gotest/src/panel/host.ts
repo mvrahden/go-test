@@ -37,6 +37,7 @@ import {
   liveFailures,
   nodeAt,
   packageTree,
+  searchFound,
   type SourceOption,
 } from "./nowModel.js";
 import { Poster, type Channel } from "./poster.js";
@@ -56,7 +57,6 @@ import {
   interpretSpecExit,
   type SpecData,
 } from "./specData.js";
-import { logFinished } from "./logFinished.js";
 
 // The kept runs on disk, so a reload does not forget the packages that ran
 // before it.
@@ -72,12 +72,12 @@ export const RUNNING_TICK_MS = 1000;
 
 const GITHUB_COMMENT_LIMIT = 65536;
 
-export interface SpecViewActions {
+export interface PanelActions {
   run(ids: string[]): Promise<void>;
   debug(id: string): Promise<void>;
 }
 
-// What show() takes: a tab, or the Spec scope's old name for Now.
+// What show() takes: a tab, or the old name for Now.
 export type Scope = Tab | "spec";
 const toTab = (s: Scope): Tab => (s === "spec" ? "now" : s);
 
@@ -132,7 +132,7 @@ function currentBranch(dir: string): Promise<string | undefined> {
   );
 }
 
-export class SpecViewPanel implements vscode.Disposable {
+export class PanelHost implements vscode.Disposable {
   private panel: vscode.WebviewPanel | undefined;
   private disposables: vscode.Disposable[] = [];
   private extensionUri: vscode.Uri | undefined;
@@ -156,12 +156,11 @@ export class SpecViewPanel implements vscode.Disposable {
   private renderError: string | undefined;
   private rendering: Promise<void> = Promise.resolve();
   private renderBusy = 0;
-  private actions: SpecViewActions | undefined;
+  private actions: PanelActions | undefined;
   private change: ChangeScope | undefined;
   private runsScope: RunsScope | undefined;
   // What the webview shows and asked for.
   private tab: Tab = "now";
-  private readonly open = new Set<string>();
   private query = "";
   private readonly filters = new Set<FilterStatus>();
   private readonly sent = new Set<Tab>();
@@ -312,7 +311,7 @@ export class SpecViewPanel implements vscode.Disposable {
   }
 
   // setActions connects Run and Debug to the Test Explorer.
-  setActions(actions: SpecViewActions): void {
+  setActions(actions: PanelActions): void {
     this.actions = actions;
   }
 
@@ -354,7 +353,6 @@ export class SpecViewPanel implements vscode.Disposable {
     this.wirePanel();
     const stored = parseStoredState(state);
     if (stored.tab) this.tab = stored.tab;
-    for (const p of stored.open) this.open.add(p);
     this.query = stored.search;
     for (const f of stored.filters) this.filters.add(f);
     if (stored.folder) this.change?.select(stored.folder);
@@ -380,7 +378,7 @@ export class SpecViewPanel implements vscode.Disposable {
     if (this.extensionUri)
       localResourceRoots.push(vscode.Uri.joinPath(this.extensionUri, "static"));
     this.panel = vscode.window.createWebviewPanel(
-      "gotestSpecView",
+      "gotestPanel",
       "Go Test",
       vscode.ViewColumn.Beside,
       {
@@ -540,7 +538,6 @@ export class SpecViewPanel implements vscode.Disposable {
           : `Ran ${r.label} · ${tallyText(r.tally)} · rendering`,
         packages: r.packages,
       })),
-      query: this.query,
       filters: this.filters,
       flakyOf: (pkg, test, hash) => this.flakyOf(pkg, test, hash, eventsFile),
     });
@@ -583,11 +580,11 @@ export class SpecViewPanel implements vscode.Disposable {
     ];
   }
 
-  // sendTree posts one package's rows as the search and the chips leave them.
+  // sendTree posts one package's rows as the chips leave them.
   private sendTree(pkg: string): void {
     const tree = packageTree(this.lastSpecData, pkg, {
       dirOf: (p) => this.cache?.getPackage(p)?.dir,
-      query: this.query,
+      query: "",
       filters: this.filters,
       stale: this.freshness.get(this.selected ?? "")?.get(pkg) === "stale",
     });
@@ -600,9 +597,20 @@ export class SpecViewPanel implements vscode.Disposable {
     });
   }
 
-  private sendOpenTrees(): void {
-    if (this.tab !== "now") return;
-    for (const p of this.open) this.sendTree(p);
+  // sendFound answers a search with the rows it finds, bounded, in the
+  // order the tab lists the packages.
+  private sendFound(): void {
+    const query = this.query.trim();
+    const order = this.nowModel().folders.flatMap((f) =>
+      f.rows.map((r) => r.pkg),
+    );
+    const stale = this.freshness.get(this.selected ?? "");
+    const found = searchFound(this.lastSpecData, query, order, {
+      dirOf: (p) => this.cache?.getPackage(p)?.dir,
+      filters: this.filters,
+      staleOf: (p) => stale?.get(p) === "stale",
+    });
+    this.post({ type: "found", query, rev: this.rev, ...found });
   }
 
   // The item ids above each row a button acted on: a behavior's name may
@@ -647,14 +655,10 @@ export class SpecViewPanel implements vscode.Disposable {
     switch (msg.type) {
       case "ready": {
         if (isTab(msg.tab)) this.tab = msg.tab;
-        this.open.clear();
-        for (const p of Array.isArray(msg.open) ? msg.open : [])
-          if (typeof p === "string") this.open.add(p);
         this.query = typeof msg.search === "string" ? msg.search : "";
         this.setFilters(msg.filters);
         this.sent.clear();
         this.poster.mark(this.tab, "badges");
-        if (this.lastSpecData) this.sendOpenTrees();
         this.tabShown();
         return;
       }
@@ -665,21 +669,15 @@ export class SpecViewPanel implements vscode.Disposable {
         return;
       case "openPackage":
         if (typeof msg.pkg !== "string") return;
-        this.open.add(msg.pkg);
         this.sendTree(msg.pkg);
-        return;
-      case "closePackage":
-        if (typeof msg.pkg === "string") this.open.delete(msg.pkg);
         return;
       case "search":
         this.query = typeof msg.text === "string" ? msg.text : "";
-        this.markNow();
-        this.sendOpenTrees();
+        if (this.query.trim()) this.sendFound();
         return;
       case "filters":
         this.setFilters(msg.filters);
         this.markNow();
-        this.sendOpenTrees();
         return;
       case "run": {
         const id = this.actOn(msg);
@@ -822,7 +820,6 @@ export class SpecViewPanel implements vscode.Disposable {
     this.persist();
     if (this.unranFolders().length > 0) this.stale = true;
     this.markNow();
-    this.sendOpenTrees();
     if (this.stale && this.isVisible()) void this.render();
   }
 
@@ -930,8 +927,8 @@ export class SpecViewPanel implements vscode.Disposable {
     const mc = new ManagedChild(cmd.bin, cmd.args, {
       cwd: folder,
       kind: "spec",
+      onFinished: (line) => this.outputChannel.info(`[fresh] ${line}`),
     });
-    const startedAt = Date.now();
     slot.child = mc;
     let stdout = "";
     mc.child.stdout?.on("data", (c: string) => (stdout += c));
@@ -944,8 +941,7 @@ export class SpecViewPanel implements vscode.Disposable {
       specRenderTimeoutSeconds(folder) * 1000,
     );
     try {
-      const { code } = await mc.exited;
-      logFinished("fresh", startedAt, code, this.outputChannel);
+      await mc.exited;
     } finally {
       clearTimeout(budget);
       mc.dispose();
@@ -979,7 +975,7 @@ export class SpecViewPanel implements vscode.Disposable {
     return (
       vscode.workspace
         .getConfiguration("gotest")
-        .get<boolean>("specView.autoRefresh") ?? true
+        .get<boolean>("panel.autoRefresh") ?? true
     );
   }
 
@@ -1013,7 +1009,6 @@ export class SpecViewPanel implements vscode.Disposable {
       const folder = this.renderFolders()[0];
       if (folder) this.branch = await currentBranch(folder);
       this.markNow();
-      this.sendOpenTrees();
       this.checkFreshSoon(this.renderFolders(), 0);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
@@ -1209,8 +1204,8 @@ export class SpecViewPanel implements vscode.Disposable {
     const mc = new ManagedChild(cmd.bin, cmd.args, {
       cwd: workspaceDir,
       kind: "spec",
+      onFinished: (line) => this.outputChannel.info(`[spec] ${line}`),
     });
-    const startedAt = Date.now();
     track?.add(mc);
     let stdout = "";
     let stderr = "";
@@ -1239,7 +1234,6 @@ export class SpecViewPanel implements vscode.Disposable {
     mc.child.stdin?.end();
     try {
       const { code } = await mc.exited;
-      logFinished("spec", startedAt, code, this.outputChannel);
       if (spawnError) throw spawnError;
       if (timedOut)
         throw new Error(`spec render timed out after ${budgetSeconds}s`);

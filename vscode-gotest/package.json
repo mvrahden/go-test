@@ -352,7 +352,7 @@
           "scope": "resource",
           "description": "Run gotest lint on the package of a saved _test.go file and show its findings as diagnostics. Rules are configured in .gotest.yml."
         },
-        "gotest.specView.autoRefresh": {
+        "gotest.panel.autoRefresh": {
           "type": "boolean",
           "default": true,
           "scope": "window",

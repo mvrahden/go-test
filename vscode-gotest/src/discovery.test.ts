@@ -65,7 +65,7 @@ vi.mock("./cli.js", async (importOriginal) => ({
   clearBinaryCache: mockClearBinaryCache,
   scopedConfig: () => ({ get: () => undefined }),
   // Used by capture.js on a failed exit. A stub, not a copy: what it filters
-  // out is pinned in specView.test.ts, where the real one interprets an exit.
+  // out is pinned in panel/specData.test.ts, where the real one interprets an exit.
   stripGoRunExitEcho: (stderr: string) => stderr.trim(),
 }));
 

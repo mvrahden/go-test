@@ -1,8 +1,8 @@
 // The spec render used to have no budget, no kill path and no cancellation: a
-// wedged CLI left the Spec View waiting forever with nothing able to end it.
+// wedged CLI left the panel waiting forever with nothing able to end it.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { SpawnScript } from "./scriptedSpawn.test-support.js";
+import type { SpawnScript } from "../scriptedSpawn.test-support.js";
 
 const { script, mockKill, buildCli } = vi.hoisted(() => ({
   script: { once: [], always: undefined, calls: [] } as SpawnScript,
@@ -46,24 +46,24 @@ vi.mock("vscode", () => ({
   },
 }));
 
-vi.mock("./cli.js", () => ({
+vi.mock("../cli.js", () => ({
   buildCliCommand: buildCli,
   offerCliUpgrade: () => false,
   stripGoRunExitEcho: (s: string) => s,
 }));
 
-vi.mock("./gomod.js", () => ({ readModulePath: async () => undefined }));
+vi.mock("../gomod.js", () => ({ readModulePath: async () => undefined }));
 
 vi.mock("node:child_process", async () => {
   const { createScriptedSpawn } =
-    await import("./scriptedSpawn.test-support.js");
+    await import("../scriptedSpawn.test-support.js");
   return { spawn: createScriptedSpawn(script, mockKill) };
 });
 
-import { SpecViewPanel } from "./specView.js";
+import { PanelHost } from "./host.js";
 
 // runSpec is private; the behaviour under test is its process handling.
-function render(panel: SpecViewPanel, input: string): Promise<string> {
+function render(panel: PanelHost, input: string): Promise<string> {
   return (
     panel as unknown as {
       runSpec(s: string, folder: undefined, format: string): Promise<string>;
@@ -91,7 +91,7 @@ describe("spec render process handling", () => {
 
   it("gives up on a CLI that never answers, and ends it", async () => {
     script.always = { neverExits: true };
-    const panel = new SpecViewPanel(channel, undefined as never);
+    const panel = new PanelHost(channel, undefined as never);
 
     const p = render(panel, "{}");
     const settled = expect(p).rejects.toThrow("spec render timed out");
@@ -102,7 +102,7 @@ describe("spec render process handling", () => {
 
   it("escalates to SIGKILL when the CLI ignores SIGTERM", async () => {
     script.always = { neverExits: true, ignoresSigterm: true };
-    const panel = new SpecViewPanel(channel, undefined as never);
+    const panel = new PanelHost(channel, undefined as never);
 
     const p = render(panel, "{}");
     const settled = expect(p).rejects.toThrow("spec render timed out");
@@ -114,7 +114,7 @@ describe("spec render process handling", () => {
 
   it("does not signal a render that answered in time", async () => {
     script.always = { stdout: ['{"tree":[]}'], code: 0 };
-    const panel = new SpecViewPanel(channel, undefined as never);
+    const panel = new PanelHost(channel, undefined as never);
 
     await expect(render(panel, "{}")).resolves.toContain("tree");
     await vi.advanceTimersByTimeAsync(200_000);
@@ -158,7 +158,7 @@ describe("which CLI renders a package", () => {
       { stdout: [doc("example.com/a", 2, 0)], code: 0 },
       { stdout: [doc("example.com/b", 1, 1)], code: 0 },
     ];
-    const panel = new SpecViewPanel(channel, undefined as never);
+    const panel = new PanelHost(channel, undefined as never);
     const internals = panel as unknown as {
       runs: { merge(p: { stream: string; folder: string }): void };
       renderRuns(): Promise<{
@@ -182,7 +182,7 @@ describe("which CLI renders a package", () => {
 });
 
 describe("the runs the panel keeps across a reload", () => {
-  const runs = (panel: SpecViewPanel) =>
+  const runs = (panel: PanelHost) =>
     (panel as unknown as { runs: { packages: string[] } }).runs.packages;
 
   it("come back from storage, and never over a run merged first", async () => {
@@ -192,15 +192,15 @@ describe("the runs the panel keeps across a reload", () => {
     const path = await import("node:path");
     const dir = mkdtempSync(path.join(tmpdir(), "gotest-specruns-"));
     try {
-      const before = new SpecViewPanel(channel, undefined as never, dir);
+      const before = new PanelHost(channel, undefined as never, dir);
       await before.refresh({ stream: runOf("example.com/a"), folder: "/ws" });
       await before.flush();
 
-      const after = new SpecViewPanel(channel, undefined as never, dir);
+      const after = new PanelHost(channel, undefined as never, dir);
       await after.load();
       expect(runs(after)).toEqual(["example.com/a"]);
 
-      const raced = new SpecViewPanel(channel, undefined as never, dir);
+      const raced = new PanelHost(channel, undefined as never, dir);
       await raced.refresh({ stream: runOf("example.com/b"), folder: "/ws" });
       await raced.load();
       expect(runs(raced)).toEqual(["example.com/b"]);
@@ -245,7 +245,7 @@ describe("a kept-runs file of the wrong shape", () => {
           path.join(dir, "specRuns.json"),
           JSON.stringify({ version: 1, data }),
         );
-        const panel = new SpecViewPanel(channel, undefined as never, dir);
+        const panel = new PanelHost(channel, undefined as never, dir);
         await expect(panel.load()).resolves.toBeUndefined();
         const runs = (panel as unknown as { runs: { packages: string[] } })
           .runs;
@@ -277,17 +277,17 @@ describe("what the panel asks the CLI for", () => {
     copy(): Promise<void>;
   };
   // copies runs the panel's copy as the webview's message asks for it.
-  const copies = async (panel: SpecViewPanel, msg: unknown) => {
+  const copies = async (panel: PanelHost, msg: unknown) => {
     internalsOf(panel).handleMessage(msg);
     await vi.waitFor(() => expect(notes.info.length).toBeGreaterThan(0));
   };
-  const internalsOf = (panel: SpecViewPanel) => panel as unknown as Internals;
+  const internalsOf = (panel: PanelHost) => panel as unknown as Internals;
   const argsOfCall = (i: number) => buildCli.mock.calls[i][0];
 
   it("lays the workspace's runs over what the folder's source declares, every status rendered whatever the chips", async () => {
     script.always = { stdout: [doc("example.com/a", 1, 0)], code: 0 };
     const patternsFor = vi.fn(async () => ["./...", "./examples/..."]);
-    const panel = new SpecViewPanel(
+    const panel = new PanelHost(
       channel,
       undefined as never,
       undefined,
@@ -314,14 +314,14 @@ describe("what the panel asks the CLI for", () => {
 
   it("renders an imported stream as it is, without the source under it", async () => {
     script.always = { stdout: [doc("example.com/a", 1, 0)], code: 0 };
-    const panel = new SpecViewPanel(
+    const panel = new PanelHost(
       channel,
       undefined as never,
       undefined,
       async () => ["./..."],
     );
     const internals = internalsOf(panel);
-    const imported = new (await import("./specStore.js")).SpecStore();
+    const imported = new (await import("../specStore.js")).SpecStore();
     imported.merge({ stream: runOf("example.com/a"), folder: "/ws" });
     internals.imports.set("ci", { label: "ci.json", runs: imported });
     internals.selected = "ci";
@@ -339,7 +339,7 @@ describe("what the panel asks the CLI for", () => {
 
   it("copies what it shows as the CLI's Markdown, hiding the statuses the chips leave out", async () => {
     script.always = { stdout: ["# Behavior Specification\n"], code: 0 };
-    const panel = new SpecViewPanel(
+    const panel = new PanelHost(
       channel,
       undefined as never,
       undefined,
@@ -366,11 +366,11 @@ describe("what the panel asks the CLI for", () => {
     expect(clipboard.text).toBe("# Behavior Specification\n");
   });
 
-  async function loaded(md: string): Promise<SpecViewPanel> {
+  async function loaded(md: string): Promise<PanelHost> {
     notes.info = [];
     notes.warn = [];
     script.always = { stdout: [md], code: 0 };
-    const panel = new SpecViewPanel(channel, undefined as never);
+    const panel = new PanelHost(channel, undefined as never);
     internalsOf(panel).runs.merge({
       stream: runOf("example.com/pkg"),
       folder: "/ws/a",

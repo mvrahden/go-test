@@ -1,6 +1,6 @@
 // Run records against the real CLI: an editor run that leaves a record with
 // its events file, the Runs scope that lists, opens and takes it as evidence,
-// a --changed run that leaves what did not change alone, and the Spec View
+// a --changed run that leaves what did not change alone, and the panel
 // that marks a package stale once its source changed. A staged module, a
 // cache of its own; only the editor is stubbed.
 
@@ -41,7 +41,7 @@ import { executeBatch } from "../../src/batchRunner.js";
 import { setEventsDir } from "../../src/eventsFiles.js";
 import { RunsScope } from "../../src/runsScope.js";
 import { EvidenceSelection } from "../../src/evidence.js";
-import { SpecViewPanel } from "../../src/specView.js";
+import { PanelHost } from "../../src/panel/host.js";
 import { buildRunsTab } from "../../src/runsView.js";
 import { shownHtml } from "./shownPanel.js";
 import { clearBinaryCache } from "../../src/cli.js";
@@ -260,7 +260,7 @@ describe.skipIf(sh)("run records", () => {
   });
 
   it("the Now tab marks the package stale once its source changes, and not before", async () => {
-    const panel = new SpecViewPanel(
+    const panel = new PanelHost(
       createRecordingChannel().channel as never,
       cache,
     );
@@ -294,7 +294,7 @@ describe.skipIf(sh)("run records", () => {
       const v = s.view();
       expect(v.state).toMatchObject({ kind: "oldCli", floor: "v1.42.0" });
 
-      const panel = new SpecViewPanel(
+      const panel = new PanelHost(
         createRecordingChannel().channel as never,
         cache,
       );

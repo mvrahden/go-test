@@ -1,6 +1,6 @@
 // What the panel's webview shows, read the way the webview reads it: the
-// host's posted messages replayed through the webview's own app, every
-// package opened, into a stand-in DOM.
+// host's posted messages replayed through the webview's own app at the
+// Behaviors depth, every package's rows asked for, into a stand-in DOM.
 import { panelApp } from "../../src/panel/client/app.js";
 import { clientHelpers } from "../../src/panel/client/helpers.js";
 import { renderChange } from "../../src/panel/client/renderChange.js";
@@ -24,7 +24,7 @@ const REGIONS = [
   "now-total",
   "now-groups",
   "now-packages",
-  "now-more",
+  "now-found",
   "now-empty",
   "change-ctx",
   "change-body",
@@ -46,11 +46,12 @@ export async function shownHtml(
   const nows = webview.posted.filter(
     (m) => (m as HostMessage).type === "now",
   ) as Extract<HostMessage, { type: "now" }>[];
-  const pkgs = nows.at(-1)?.model.packages.map((p) => p.pkg) ?? [];
+  const pkgs =
+    nows.at(-1)?.model.folders.flatMap((f) => f.rows.map((r) => r.pkg)) ?? [];
   for (const pkg of pkgs) webview.post?.({ type: "openPackage", pkg });
   const H = clientHelpers();
   const dom = fakeDom();
-  dom.setState({ tab, open: pkgs });
+  dom.setState({ tab, depth: "behaviors" });
   const app = panelApp({
     vscode: dom.vscode,
     document: dom.document,
@@ -61,9 +62,6 @@ export async function shownHtml(
     RUNS: renderRuns(H),
   });
   for (const m of webview.posted) app.receive(m as HostMessage);
-  const all = new FakeEl("button");
-  all.dataset.act = "allPackages";
-  app.onClick({ target: all, preventDefault() {} });
   for (const t of ["now", "change", "runs"] as Tab[])
     app.receive({ type: "tab", tab: t });
   return REGIONS.map((id) => dom.el(id).allHtml()).join("\n");

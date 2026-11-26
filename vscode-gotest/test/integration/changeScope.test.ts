@@ -17,6 +17,7 @@ import {
   cpSync,
   mkdtempSync,
   readFileSync,
+  copyFileSync,
   readdirSync,
   realpathSync,
   rmSync,
@@ -38,7 +39,7 @@ vi.mock("vscode", async () => {
 });
 
 import { ChangeScope, STOPPED_NOTICE } from "../../src/changeScope.js";
-import { SpecViewPanel } from "../../src/specView.js";
+import { PanelHost } from "../../src/panel/host.js";
 import { shownHtml } from "./shownPanel.js";
 import { clearBinaryCache } from "../../src/cli.js";
 import type { Memento } from "../../src/acceptance.js";
@@ -388,7 +389,7 @@ describe.skipIf(sh)("the Change scope", () => {
   it("renders in the panel when the Change tab is chosen", async () => {
     const { s } = scope(checkout);
     const rec = createRecordingChannel();
-    const panel = new SpecViewPanel(rec.channel as never);
+    const panel = new PanelHost(rec.channel as never);
     panel.setChangeScope(s);
     await panel.show();
     const webview = state.panels[0].webview;
@@ -578,6 +579,39 @@ describe.skipIf(sh)("the Change scope's evidence and its Markdown", () => {
     v = s.view();
     expect(asked).toEqual([checkout]);
     expect(v.evidence).toEqual([{ id: "r1", label: "13:55", missing: false }]);
+  });
+
+  it("passes the coverage profile kept beside the evidence run's stream, and says it is in use", async () => {
+    const dir = mkdtempSync(path.join(tmp, "kept-"));
+    const events = path.join(dir, "run.jsonl");
+    copyFileSync(path.join(fixtures, "proof", "current.json"), events);
+    const profile = path.join(dir, "run.cover.out");
+    writeFileSync(profile, "mode: atomic\nauditmod/shop/shop.go:3.1,4.2 1 1\n");
+    const store = memento();
+    const s = new ChangeScope({
+      log: createRecordingChannel().channel as never,
+      memento: store,
+      folders: () => [checkout],
+      evidence: new EvidenceSelection(store),
+      defaultEvidence: async () => ({
+        id: "auto",
+        file: events,
+        label: "the editor run of 08:38",
+      }),
+      changed: () => {},
+    });
+    await s.audit(checkout);
+    const v = s.view();
+    if (v.state.kind !== "doc") throw new Error(JSON.stringify(v.state));
+    expect(v.state.doc.coverage?.profile).toBe(profile);
+    expect(v.coverage).toBe("the editor run of 08:38");
+    rmSync(profile);
+    await s.audit(checkout);
+    const without = s.view();
+    if (without.state.kind !== "doc")
+      throw new Error(JSON.stringify(without.state));
+    expect(without.state.doc.coverage).toBeUndefined();
+    expect(without.coverage).toBeUndefined();
   });
 
   it("writes the audit in Markdown for the tool, in the folder's one audit slot", async () => {

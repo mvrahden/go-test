@@ -38,7 +38,7 @@ vi.mock("vscode", async () => {
   return buildVscodeStub(state as never);
 });
 
-import { SpecViewPanel } from "../../src/specView.js";
+import { PanelHost } from "../../src/panel/host.js";
 import { shownHtml } from "./shownPanel.js";
 import { DiscoveryCache } from "../../src/discovery.js";
 import { createRecordingChannel } from "./vscodeStub.js";
@@ -141,7 +141,7 @@ beforeEach(() => {
 
 function newPanel() {
   const recorder = createRecordingChannel();
-  const panel = new SpecViewPanel(recorder.channel as never);
+  const panel = new PanelHost(recorder.channel as never);
   return { panel, recorder };
 }
 
@@ -271,7 +271,7 @@ describe("CLI resolution is the mode the test intends", () => {
       ...recorder.channel,
       debug: (m: string) => debug.push(m),
     };
-    const panel = new SpecViewPanel(channel as never);
+    const panel = new PanelHost(channel as never);
     state.cliPath = "";
     await panel.show();
     await panel.refresh(run("mixed"));
@@ -292,7 +292,7 @@ describe("CLI resolution is the mode the test intends", () => {
         ...recorder.channel,
         debug: (m: string) => debug.push(m),
       };
-      const panel = new SpecViewPanel(channel as never);
+      const panel = new PanelHost(channel as never);
       state.cliPath = prebuiltBinary;
       await panel.show();
       await panel.refresh(run("mixed"));
@@ -315,7 +315,7 @@ describe("CLI resolution is the mode the test intends", () => {
         warn: (m: string) => warnings.push(m),
         debug: (m: string) => debug.push(m),
       };
-      const panel = new SpecViewPanel(channel as never);
+      const panel = new PanelHost(channel as never);
       state.cliPath = realBinary; // reports a working-tree pseudo-version
       await panel.show();
       await panel.refresh(run("mixed"));
@@ -626,7 +626,7 @@ describe("the source under the runs", () => {
   const patterns = ["./examples/search", "./examples/fuzzing"];
   const declaredPanel = () => {
     const recorder = createRecordingChannel();
-    const panel = new SpecViewPanel(
+    const panel = new PanelHost(
       recorder.channel as never,
       undefined,
       undefined,
@@ -757,7 +757,7 @@ describe("failure output", () => {
         dir,
       );
       const recorder = createRecordingChannel();
-      const panel = new SpecViewPanel(recorder.channel as never, cache);
+      const panel = new PanelHost(recorder.channel as never, cache);
       await panel.show();
       await panel.refresh(run("mixed"));
 
@@ -791,7 +791,7 @@ describe("packages discovery no longer reports", () => {
     ]);
     cache.update([cart, checkout], true, state.workspaceDir);
     const recorder = createRecordingChannel();
-    const panel = new SpecViewPanel(recorder.channel as never, cache);
+    const panel = new PanelHost(recorder.channel as never, cache);
     await panel.show();
     await panel.refresh(run("all-pass"));
     await panel.refresh(run("other-package-fail"));
@@ -886,12 +886,12 @@ describe("a hidden panel", () => {
 });
 
 // Tier 2 with the source present. The Test Explorer labels a behavior from
-// discovery; the Spec View labels the same behavior from a replay of the run's
+// discovery; the panel labels the same behavior from a replay of the run's
 // stream. The two share no code path, so they are the pair that can drift —
 // and did: a replay rendered "classifying a number" while the tree next to it
 // said "when classifying a number". The fixture streams above name packages no
 // checkout can load, so only this case exercises the replay reading source.
-describe("the Spec View speaks the vocabulary the tree speaks", () => {
+describe("the panel speaks the vocabulary the tree speaks", () => {
   const fixturesDir = path.join(extensionDir, "testdata", "fixtures");
   let savedGoWork: string | undefined;
   let captured = "";

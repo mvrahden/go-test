@@ -6,7 +6,7 @@
 // extension's reading of it were each tested in isolation and never together.
 //
 // Two variants are recorded per stream: the gating form, whose exit code CI
-// depends on, and the --render-only form the Spec View sends. The `spec`
+// depends on, and the --render-only form the panel sends. The `spec`
 // runs replay a stream with --declared or --hide.
 
 import { describe, it, expect, vi } from "vitest";
@@ -52,7 +52,7 @@ vi.mock("vscode", () => {
   };
 });
 
-import { interpretSpecExit } from "./specView.js";
+import { interpretSpecExit } from "./panel/specData.js";
 import { parseTestEvents } from "./outputParser.js";
 import { DiscoveryCache, parseDiscoverOutput } from "./discovery.js";
 import { parseBenchReport } from "./benchReport.js";
@@ -314,7 +314,7 @@ const EXPECTED: Record<
     packages: ["example.com/broken:fail"],
   },
   // A stream with no events holds no verdict: the gating form must not pass
-  // it as green. The Spec View renders it anyway, under --render-only.
+  // it as green. The panel renders it anyway, under --render-only.
   empty: {
     gatingExitCode: 2,
     gatingStderr:
@@ -332,7 +332,7 @@ const EXPECTED: Record<
     packages: ["example.com/checkout:fail"],
   },
   // The one stream naming a package of this repository. Every other case
-  // pins the name-only fallback; this one pins what the Spec View actually
+  // pins the name-only fallback; this one pins what the panel actually
   // gets in a workspace: the label the developer wrote, spoken in its
   // vocabulary, with `vocab` on the wire — and nothing on stderr while the
   // package loads.
@@ -362,7 +362,7 @@ const EXPECTED: Record<
     packages: ["example.com/excluded:pass", "example.com/plain:pass"],
   },
   // An It whose label holds a slash and one holding markup, beside an
-  // excluded suite: the Spec View renders this tree as the CLI built it.
+  // excluded suite: the panel renders this tree as the CLI built it.
   labels: {
     gatingExitCode: 0,
     goRunEpilogue: "",
@@ -444,7 +444,7 @@ describe("recorded CLI contract", () => {
 
       it("leaves go run with nothing to append under --render-only", () => {
         // With no non-zero exit there is no epilogue, so the hazard that broke
-        // the Spec View cannot arise on this path at all.
+        // the panel cannot arise on this path at all.
         expect(recorded.renderOnly.goRun.exitCode).toBe(0);
         expect(recorded.renderOnly.goRun.stderr).toBe("");
         expect(recorded.renderOnly.goRun.stdoutMatchesDirect).toBe(true);
@@ -520,7 +520,7 @@ describe("recorded CLI contract", () => {
       expect(reading.children[0].children).toEqual([]);
     });
 
-    it("sends labels raw, for the Spec View to escape once", () => {
+    it("sends labels raw, for the panel to escape once", () => {
       expect(reading.children[1].display).toBe('keeps <b>&" text');
     });
 

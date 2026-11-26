@@ -202,7 +202,7 @@ export function buildVscodeStub(state: StubState) {
         get: (key: string, fallback?: unknown) => {
           if (state.config && key in state.config) return state.config[key];
           if (key === "cliPath") return state.cliPath;
-          if (key === "specView.autoRefresh") return state.autoRefresh;
+          if (key === "panel.autoRefresh") return state.autoRefresh;
           if (key === "buildTags") return "";
           if (key === "modulePath") return undefined;
           return fallback;

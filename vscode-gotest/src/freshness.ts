@@ -1,4 +1,4 @@
-// Whether the verdicts the Spec View shows still belong to the working tree,
+// Whether the verdicts the panel shows still belong to the working tree,
 // as `gotest spec --check-fresh` judges them by each package's input hash.
 // The CLI decides; this reads its answer and words it for the panel.
 

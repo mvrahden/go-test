@@ -1,4 +1,4 @@
-// The Spec View's kept runs, rendered by the real CLI: a whole run of the
+// The panel's kept runs, rendered by the real CLI: a whole run of the
 // twins fixture, then a rerun of part of it, merged as the panel merges
 // them. Every row that ran must render with its verdict.
 
@@ -92,7 +92,7 @@ afterAll(() => {
   if (tmp) rmSync(tmp, { recursive: true, force: true });
 });
 
-describe("the Spec View's kept runs, rendered by the CLI", () => {
+describe("the panel's kept runs, rendered by the CLI", () => {
   it("renders a whole run as it ran, stamped or as plain go test wrote it", () => {
     const whole = run();
     // A plain go test -json file carries no stamps: only its order places it.
@@ -186,7 +186,7 @@ function copy(composed: string, ...extra: string[]): string {
   );
 }
 
-describe("the Spec View's Copy, rendered by the CLI", () => {
+describe("the panel's Copy, rendered by the CLI", () => {
   it("copying after typing a search holds only the matching behaviors", () => {
     const whole = run();
     const all = copy(whole);

@@ -14,6 +14,7 @@ import type {
   ChangeBehaviorView,
   ChangeTab,
   DecisionView,
+  LinesView,
   Picker,
   RoutineGroupView,
 } from "./panel/protocol.js";
@@ -57,6 +58,8 @@ export interface ChangeView {
   // Which rows' buttons do something here.
   canRun: (key: string) => boolean;
   canOpen: (key: string) => boolean;
+  // The run whose coverage profile the audit took, when it took one.
+  coverage?: string;
   // Whether a row is accepted here, informational ones included.
   accepted?: (key: string) => boolean;
 }
@@ -197,6 +200,7 @@ function evidenceLine(
     labels.length === 1
       ? labels[0]
       : `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
+  const covered = view.coverage ? "; its coverage is used too" : "";
   const matches =
     streams.length === 0
       ? ""
@@ -212,9 +216,51 @@ function evidenceLine(
             )
             .join("; ")})`;
   return {
-    text: `Proven by ${who}${matches}.`,
+    text: `Proven by ${who}${matches}${covered}.`,
     picks: shown.map(({ id, label, missing }) => ({ id, label, missing })),
     action: { act: "evidence", label: "Change evidence" },
+  };
+}
+
+// linesOf words the changed lines no test ran, from the coverage the audit
+// had: its run's, or the profile of the run taken as evidence.
+export function linesOf(
+  view: ChangeView,
+  doc: AuditDocument,
+  m: ChangeModel,
+): LinesView {
+  if (!doc.coverage)
+    return {
+      files: [],
+      note: "No coverage profile is in use, so no changed line is checked: the run taken as evidence kept none.",
+    };
+  const s = doc.summary;
+  const changed = s.changedLines ?? 0;
+  const files = (m.unproven?.files ?? []).filter(
+    (f) => f.coverage && f.ranges.length > 0,
+  );
+  const without = (m.unproven?.files ?? []).filter((f) => !f.coverage).length;
+  const lines = (n: number) => `${n} changed line${n === 1 ? "" : "s"}`;
+  return {
+    head: `${s.unproven} of ${lines(changed)}`,
+    files: files.map((f) => ({
+      key: f.key,
+      file: f.file,
+      canOpen: view.canOpen(f.key),
+      ranges: f.ranges,
+    })),
+    noCoverage:
+      without > 0
+        ? without === 1
+          ? "1 changed file has no coverage data: its package did not run in this run."
+          : `${without} changed files have no coverage data: their packages did not run in this run.`
+        : undefined,
+    note:
+      files.length === 0 && without === 0
+        ? changed === 0
+          ? "No changed production line to check."
+          : `Every one of the ${lines(changed)} ran.`
+        : undefined,
   };
 }
 
@@ -431,16 +477,7 @@ export function buildChangeTab(view: ChangeView): ChangeTab {
       name: p.pkg.replace(/^\.\//, ""),
       delta: deltaText(p.suites.flatMap((x) => x.rows)),
     })),
-    unproven: m.unproven
-      ? {
-          head: m.unproven.head,
-          source: m.unproven.source,
-          files: m.unproven.files.map((f) => ({
-            ...f,
-            canOpen: view.canOpen(f.key),
-          })),
-        }
-      : undefined,
+    lines: linesOf(view, doc, m),
     lists,
     exit,
     openCount: open,

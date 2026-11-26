@@ -10,12 +10,53 @@ import { renderNow } from "./renderNow.js";
 import { renderRuns } from "./renderRuns.js";
 import { fakeDom, FakeEl } from "./fakeDom.test-support.js";
 import { buildShell, panelScript } from "../shell.js";
-import type { ChangeTab, NowModel, RunCard, RunsTab } from "../protocol.js";
+import type {
+  ChangeTab,
+  FolderRow,
+  NowModel,
+  RunCard,
+  RunsTab,
+  TreeNode,
+} from "../protocol.js";
 
 const H = clientHelpers();
 const NOW = renderNow(H);
 const CHANGE = renderChange(H);
 const RUNS = renderRuns(H);
+
+const pkgRow = (i: number) => ({
+  pkg: `m/p${i}`,
+  name: `p${i}`,
+  counts: `${i} passed`,
+  tone: i === 0 ? ("fail" as const) : ("pass" as const),
+  time: "1s",
+});
+
+// Two folders: a holds the failed p0, b the rest.
+function folders(map = (r: ReturnType<typeof pkgRow>) => r): FolderRow[] {
+  return [
+    {
+      key: "a",
+      name: "a",
+      packages: 3,
+      counts: "1 failed",
+      tone: "fail",
+      hot: true,
+      rows: [0, 1, 2].map(pkgRow).map(map),
+    },
+    {
+      key: "b",
+      name: "b",
+      packages: 11,
+      counts: "60 passed",
+      tone: "pass",
+      hot: false,
+      rows: Array.from({ length: 11 }, (_, i) => pkgRow(i + 3)).map(map),
+    },
+  ];
+}
+
+const OPEN = { open: {}, deep: false, deepSuites: [], depth: "packages" };
 
 function nowModel(over: Partial<NowModel> = {}): NowModel {
   return {
@@ -45,13 +86,7 @@ function nowModel(over: Partial<NowModel> = {}): NowModel {
     ],
     total: "13 in 2 suites, 14 packages",
     groups: [],
-    packages: Array.from({ length: 14 }, (_, i) => ({
-      pkg: `m/p${i}`,
-      name: `p${i}`,
-      counts: `${i} passed`,
-      tone: i === 0 ? ("fail" as const) : ("pass" as const),
-      time: "1s",
-    })),
+    folders: folders(),
     filtering: false,
     failed: 1,
     ...over,
@@ -179,8 +214,8 @@ describe("the Now markup", () => {
     );
     expect(html).toContain('data-status="pass" aria-pressed="false"');
     expect(
-      NOW.tree([{ d: "x", k: "block", s: "fail", pos: "0" }], undefined, {}),
-    ).toContain('<span class="sr">failed</span>');
+      NOW.tree([{ d: "x", k: "block", s: "fail", pos: "0" }], undefined, OPEN),
+    ).toContain('<span class="sw s-fail">FAIL</span>');
   });
 
   it("says the view is out of date when the last render failed, its reason's first line escaped, with a retry", () => {
@@ -344,12 +379,32 @@ describe("the Runs markup", () => {
   });
 });
 
+// A stand-in observer: the test says which rows came into view.
+class FakeIO {
+  static last: FakeIO | undefined;
+  seen = new Set<FakeEl>();
+  constructor(readonly cb: (entries: unknown[]) => void) {
+    FakeIO.last = this;
+  }
+  observe(el: FakeEl) {
+    this.seen.add(el);
+  }
+  unobserve(el: FakeEl) {
+    this.seen.delete(el);
+  }
+  show(els: FakeEl[]) {
+    this.cb(els.map((target) => ({ target, isIntersecting: true })));
+  }
+}
+
 function app(
   saved: unknown = null,
   initial: { tab?: "now" | "change" | "runs" } = {},
 ) {
   const dom = fakeDom();
   dom.setState(saved);
+  (dom.window as { IntersectionObserver?: unknown }).IntersectionObserver =
+    FakeIO;
   const a = panelApp({
     vscode: dom.vscode,
     document: dom.document,
@@ -385,11 +440,11 @@ describe("the webview's app", () => {
       {
         type: "ready",
         tab: "runs",
-        open: ["m/p1"],
         changeOpen: ["./shop"],
         search: "cart",
         filters: ["fail"],
       },
+      { type: "search", text: "cart" },
     ]);
     expect(dom.el("search").value).toBe("cart");
   });
@@ -429,68 +484,276 @@ describe("the webview's app", () => {
     expect(dom.el("badge-now").textContent).toBe("");
   });
 
-  it("shows ten package rows and the rest behind one button; a filter shows all that match", () => {
+  const folderEl = (dom: ReturnType<typeof fakeDom>, i: number) =>
+    dom.el("now-packages").children[i];
+  const pkgEl = (dom: ReturnType<typeof fakeDom>, f: number, i: number) =>
+    folderEl(dom, f).children[1].children[i];
+  // A click on a package's chevron, as the button in its head.
+  const toggle = (a: ReturnType<typeof panelApp>, row: FakeEl) =>
+    click(a, button({ act: "togglePkg" }, row.children[0]));
+
+  it("groups packages under folders, a failing folder open, the rest closed with their counts", () => {
     const { dom, a } = app();
     a.receive({ type: "now", model: nowModel() });
-    expect(dom.el("now-packages").children).toHaveLength(10);
-    expect(dom.el("now-more").innerHTML).toContain(
-      "4 more packages, all passed",
+    expect(dom.el("now-packages").children).toHaveLength(2);
+    expect(folderEl(dom, 0).children[0].innerHTML).toContain(
+      'a <span class="dim">3 packages</span>',
     );
-    click(a, button({ act: "allPackages" }));
-    expect(dom.el("now-packages").children).toHaveLength(14);
+    expect(folderEl(dom, 0).children[1].children).toHaveLength(3);
+    expect(folderEl(dom, 1).children[1].hidden).toBe(true);
+    expect(folderEl(dom, 1).children[1].children).toHaveLength(0);
+    click(a, button({ act: "toggleFolder", folder: "b" }));
+    expect(folderEl(dom, 1).children[1].children).toHaveLength(11);
+    expect(dom.state()!.folders).toEqual({ b: true });
     const filtered = nowModel({
       filtering: true,
-      packages: nowModel().packages.map((p, i) => ({ ...p, matches: i % 2 })),
+      folders: folders((r) => ({ ...r, matches: Number(r.pkg.slice(3)) % 2 })),
     });
     a.receive({ type: "now", model: filtered });
-    expect(dom.el("now-packages").children).toHaveLength(7);
+    expect(folderEl(dom, 0).children[1].children).toHaveLength(1);
+    expect(folderEl(dom, 0).children[0].innerHTML).toContain("1 of 3 packages");
   });
 
-  it("opens a package by asking the host for its rows, and draws them when they come", () => {
+  it("opens a package when its rows come into view, and draws them when they arrive", () => {
     const { dom, a } = app();
     a.receive({ type: "now", model: nowModel() });
     dom.posted.length = 0;
-    const head = dom.el("now-packages").children[2].children[0];
-    click(a, head);
-    expect(dom.posted).toEqual([{ type: "openPackage", pkg: "m/p2" }]);
+    const row = pkgEl(dom, 0, 2);
+    toggle(a, row);
     expect(dom.state()!.open).toEqual(["m/p2"]);
-    const tree = dom.el("now-packages").children[2].children[1];
-    expect(tree.hidden).toBe(false);
-    expect(tree.innerHTML).toContain("Loading the rows…");
+    expect(row.children[1].hidden).toBe(false);
+    expect(row.children[1].innerHTML).toContain("Loading the rows…");
+    expect(dom.posted).toEqual([]);
+    FakeIO.last!.show([row]);
+    expect(dom.posted).toEqual([{ type: "openPackage", pkg: "m/p2" }]);
     a.receive({
       type: "package",
       pkg: "m/p2",
       rev: 1,
       nodes: [{ d: "adds", k: "block", s: "pass", pos: "0" }],
     });
-    expect(tree.innerHTML).toContain("adds");
-    click(a, head);
-    expect(dom.posted.at(-1)).toEqual({ type: "closePackage", pkg: "m/p2" });
-    expect(tree.hidden).toBe(true);
+    expect(row.children[1].innerHTML).toContain("adds");
+    toggle(a, row);
+    expect(row.children[1].hidden).toBe(true);
   });
 
-  it("keeps an opened package's rows in place when a new summary comes, only its head changing", () => {
+  it("opens every package at the Suites and Behaviors depths, asking only for the rows in view", () => {
+    const { dom, a } = app();
+    a.receive({ type: "now", model: nowModel() });
+    dom.posted.length = 0;
+    click(a, button({ act: "depth", depth: "behaviors" }));
+    expect(dom.el("depth-behaviors").getAttribute("aria-pressed")).toBe("true");
+    expect(dom.state()!.depth).toBe("behaviors");
+    // Every folder opens, every package waits for its rows to come into view.
+    expect(folderEl(dom, 1).children[1].children).toHaveLength(11);
+    expect(FakeIO.last!.seen.size).toBe(14);
+    expect(dom.posted).toEqual([]);
+    FakeIO.last!.show([pkgEl(dom, 0, 0), pkgEl(dom, 0, 1)]);
+    expect(dom.posted).toEqual([
+      { type: "openPackage", pkg: "m/p0" },
+      { type: "openPackage", pkg: "m/p1" },
+    ]);
+    const nodes: TreeNode[] = [
+      {
+        d: "Cart",
+        k: "suite",
+        s: "pass",
+        pos: "0",
+        n: "2 passed",
+        nt: "pass",
+        c: [
+          {
+            d: "M",
+            k: "method",
+            s: "pass",
+            pos: "0.0",
+            c: [{ d: "adds", k: "block", s: "pass", pos: "0.0.0" }],
+          },
+        ],
+      },
+    ];
+    a.receive({ type: "package", pkg: "m/p0", rev: 1, nodes });
+    const tree = pkgEl(dom, 0, 0).children[1].innerHTML;
+    expect(tree).toMatch(/<details class="branch" data-pos="0" open>/);
+    expect(tree).toMatch(/<details class="branch" data-pos="0.0" open>/);
+    expect(tree).toContain('<span class="counts t-pass">2 passed</span>');
+    expect(tree).toContain('<span class="sw s-pass">pass</span>');
+    click(a, button({ act: "depth", depth: "suites" }));
+    expect(pkgEl(dom, 0, 0).children[1].innerHTML).toMatch(
+      /<details class="branch" data-pos="0">/,
+    );
+    // A new summary makes the rows on show out of date: asked again in view.
+    dom.posted.length = 0;
+    a.receive({ type: "now", model: { ...nowModel(), rev: 2 } });
+    FakeIO.last!.show([pkgEl(dom, 0, 0)]);
+    expect(dom.posted).toEqual([{ type: "openPackage", pkg: "m/p0" }]);
+  });
+
+  it("expands everything in a package, or a suite, with the button beside its name, and collapses it again", () => {
+    const { dom, a } = app();
+    a.receive({ type: "now", model: nowModel() });
+    const nodes = [
+      {
+        d: "Cart",
+        k: "suite",
+        s: "pass",
+        pos: "0",
+        c: [
+          {
+            d: "M",
+            k: "method",
+            s: "pass",
+            pos: "0.0",
+            c: [{ d: "x", k: "block", s: "pass", pos: "0.0.0" }],
+          },
+        ],
+      },
+      {
+        d: "Stock",
+        k: "suite",
+        s: "pass",
+        pos: "1",
+        c: [{ d: "y", k: "block", s: "pass", pos: "1.0" }],
+      },
+    ];
+    const row = pkgEl(dom, 0, 1);
+    expect(row.children[0].innerHTML).toContain(
+      'aria-label="Expand everything in p1"',
+    );
+    click(a, button({ act: "deep", pkg: "m/p1" }));
+    expect(dom.state()!.deep).toEqual(["m/p1"]);
+    expect(row.children[0].innerHTML).toContain(
+      'aria-pressed="true" aria-label="Collapse everything in p1"',
+    );
+    a.receive({ type: "package", pkg: "m/p1", rev: 1, nodes });
+    expect(row.children[1].innerHTML.match(/ open>/g)).toHaveLength(3);
+    click(a, button({ act: "deep", pkg: "m/p1" }));
+    expect(row.children[1].innerHTML).not.toContain(" open>");
+    // The package stays open at its suites; a suite's own button opens that
+    // suite through.
+    expect(row.children[1].hidden).toBe(false);
+    const suiteBtn = button({ act: "deep", pos: "0" }, row.children[1]);
+    click(a, suiteBtn);
+    expect(dom.state()!.deepSuites).toEqual({ "m/p1": ["0"] });
+    const html = row.children[1].innerHTML;
+    expect(html).toMatch(/data-pos="0" open>/);
+    expect(html).toMatch(/data-pos="0.0" open>/);
+    expect(html).toMatch(/data-pos="1">/);
+  });
+
+  it("keeps a package's rows in place when a new summary comes, only its head changing", () => {
     const { dom, a } = app({ open: ["m/p0"] });
     a.receive({ type: "now", model: nowModel() });
+    FakeIO.last!.show([pkgEl(dom, 0, 0)]);
     a.receive({
       type: "package",
       pkg: "m/p0",
       rev: 1,
       nodes: [{ d: "kept", k: "block", s: "pass", pos: "0" }],
     });
-    const row = dom.el("now-packages").children[0];
+    const row = pkgEl(dom, 0, 0);
     a.receive({
       type: "now",
       model: nowModel({
-        packages: nowModel().packages.map((p) => ({
-          ...p,
-          counts: "live " + p.counts,
-        })),
+        folders: folders((r) => ({ ...r, counts: "live " + r.counts })),
       }),
     });
-    expect(dom.el("now-packages").children[0]).toBe(row);
+    expect(pkgEl(dom, 0, 0)).toBe(row);
     expect(row.children[0].innerHTML).toContain("live 0 passed");
     expect(row.children[1].innerHTML).toContain("kept");
+  });
+
+  it("shows what a search finds, open in place under its folders, and the list as it was once cleared", () => {
+    const { dom, a } = app({ depth: "suites" });
+    a.receive({ type: "now", model: nowModel() });
+    const box = dom.el("search");
+    box.value = "adds";
+    a.onInput({ target: box });
+    dom.flushTimers();
+    expect(dom.posted.at(-1)).toEqual({ type: "search", text: "adds" });
+    expect(dom.el("now-packages").hidden).toBe(true);
+    expect(dom.el("now-found").innerHTML).toContain("Searching…");
+    a.receive({
+      type: "found",
+      query: "other",
+      rev: 1,
+      results: [],
+      total: 0,
+      shown: 0,
+    });
+    expect(dom.el("now-found").innerHTML).toContain("Searching…");
+    a.receive({
+      type: "found",
+      query: "adds",
+      rev: 1,
+      results: [
+        {
+          pkg: "m/p4",
+          nodes: [
+            {
+              d: "Cart",
+              k: "suite",
+              s: "pass",
+              pos: "0",
+              c: [{ d: "adds <it>", k: "block", s: "pass", pos: "0.0" }],
+            },
+          ],
+        },
+      ],
+      total: 40,
+      shown: 1,
+    });
+    const found = dom.el("now-found").innerHTML;
+    expect(found).toContain("40 matches; the first 1 show.");
+    expect(found).toContain('b <span class="dim">1 of 11 packages</span>');
+    expect(found).toContain("adds &lt;it&gt;");
+    expect(found).toMatch(/data-pos="0" open>/);
+    expect(found).not.toContain("p5");
+    box.value = "";
+    a.onInput({ target: box });
+    dom.flushTimers();
+    expect(dom.el("now-packages").hidden).toBe(false);
+    expect(dom.el("now-found").hidden).toBe(true);
+    expect(dom.state()!.depth).toBe("suites");
+  });
+
+  it("asks a search again of a new summary and of other chips", () => {
+    const { dom, a } = app({ search: "adds" });
+    expect(dom.posted.at(-1)).toEqual({ type: "search", text: "adds" });
+    a.receive({ type: "now", model: nowModel() });
+    dom.posted.length = 0;
+    a.receive({ type: "now", model: { ...nowModel(), rev: 2 } });
+    click(a, button({ act: "chip", status: "fail" }));
+    expect(dom.posted).toEqual([
+      { type: "search", text: "adds" },
+      { type: "filters", filters: ["fail"] },
+      { type: "search", text: "adds" },
+    ]);
+  });
+
+  it("offers Run all tests first in More actions, then Rerun failed, then the rest", () => {
+    const { dom, a } = app();
+    click(a, button({ act: "menu" }));
+    const menu = dom.el("menu").innerHTML;
+    const items = [...menu.matchAll(/data-item="([^"]+)">([^<]+)</g)].map(
+      (m) => m[2],
+    );
+    expect(items).toEqual([
+      "Run all tests",
+      "Rerun failed",
+      "Refresh",
+      "Copy as Markdown",
+      "Clear results",
+    ]);
+    expect(menu.indexOf('role="separator"')).toBeGreaterThan(
+      menu.indexOf("Rerun failed"),
+    );
+    expect(menu.indexOf('role="separator"')).toBeLessThan(
+      menu.indexOf("Refresh"),
+    );
+    dom.posted.length = 0;
+    click(a, button({ act: "menuItem", item: "runTests" }));
+    expect(dom.posted).toEqual([{ type: "runTests" }]);
   });
 
   it("sends Run and Debug with the row's item, package and place", () => {
@@ -542,6 +805,10 @@ describe("the webview's app", () => {
     dom.flushTimers();
     expect(dom.posted.at(-1)).toEqual({ type: "search", text: "cart" });
     expect(dom.state()!.search).toBe("cart");
+    box.value = "";
+    a.onInput({ target: box });
+    dom.flushTimers();
+    expect(dom.posted.at(-1)).toEqual({ type: "search", text: "cart" });
   });
 
   it("routes a Change or Runs button by its scope, and a run's Stop by its session", () => {

@@ -125,7 +125,7 @@ export interface DiscoverBehavior {
   name: string;
   // The label to show: the description as the developer wrote it, spoken in its
   // vocabulary, and the same string `gotest spec` renders for this node. Do not re-derive it from the
-  // name here, or the test tree and the spec view will drift apart.
+  // name here, or the test tree and the panel will drift apart.
   display: string;
   // Which call declared it: "when" | "it" | "each".
   kind?: string;

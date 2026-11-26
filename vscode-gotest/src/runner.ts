@@ -336,7 +336,7 @@ export class TestRunner {
         this.activeRun = undefined;
       }
       cts.dispose();
-      // Ended before the Spec View takes the finished run.
+      // Ended before the panel takes the finished run.
       progress?.end();
       if (this._lastJsonOutput) {
         this._onDidComplete.fire(this._lastPieces);

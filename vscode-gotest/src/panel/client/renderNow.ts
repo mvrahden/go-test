@@ -2,6 +2,7 @@
 // webview by source (see helpers.ts).
 import type {
   Card,
+  FolderRow,
   NowModel,
   OutputLine,
   PackageRow,
@@ -10,6 +11,15 @@ import type {
 import type { Helpers } from "./helpers.js";
 
 export type NowView = ReturnType<typeof renderNow>;
+
+// How a tree opens: rows toggled by hand, everything under a package or a
+// suite, else what the depth opens; a failed branch opens by itself.
+export interface TreeOpen {
+  open: Record<string, boolean>;
+  deep: boolean;
+  deepSuites: string[];
+  depth: string;
+}
 
 export interface CardState {
   // Full output fetched per card key, and which cards show it.
@@ -128,12 +138,38 @@ export function renderNow(h: Helpers) {
   };
 
   // pkgHead is the inside of a package row's button.
-  const pkgHead = (r: PackageRow, open: boolean): string => {
+  const CHEV = (open: boolean) =>
+    `<svg class="chev${open ? " open" : ""}" aria-hidden="true" width="12" height="12" viewBox="0 0 12 12"><path d="M4 2l4 4-4 4"/></svg>`;
+
+  // deepButton expands, or collapses, everything under a package or suite.
+  const deepButton = (
+    name: string,
+    pressed: boolean,
+    d: Record<string, string>,
+  ): string => {
+    const label = `${pressed ? "Collapse" : "Expand"} everything in ${name}`;
+    const path = pressed
+      ? `<path d="M3 6l4-4 4 4"/><path d="M3 12l4-4 4 4"/>`
+      : `<path d="M3 2l4 4 4-4"/><path d="M3 8l4 4 4-4"/>`;
+    return `<button type="button" class="deep${pressed ? " on" : ""}" data-act="deep"${h.data(d)} aria-pressed="${pressed}" aria-label="${esc(label)}" title="${esc(label)}"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6">${path}</svg></button>`;
+  };
+
+  // folderHead is the inside of a folder's button.
+  const folderHead = (f: FolderRow, open: boolean, shown?: number): string =>
+    `${CHEV(open)}<span class="folder-name">${esc(f.name)} <span class="dim">${
+      shown === undefined
+        ? `${f.packages} ${f.packages === 1 ? "package" : "packages"}`
+        : `${shown} of ${f.packages} ${f.packages === 1 ? "package" : "packages"}`
+    }</span></span><span class="counts t-${f.tone}">${esc(f.counts)}</span>`;
+
+  // pkgHead is a package's row: its chevron and name open one level, the
+  // button beside the name everything.
+  const pkgHead = (r: PackageRow, open: boolean, deep: boolean): string => {
     const counts =
       r.matches !== undefined
         ? `${r.matches.toLocaleString("en-US")} ${r.matches === 1 ? "match" : "matches"} · ${r.counts}`
         : r.counts;
-    return `<svg class="chev${open ? " open" : ""}" aria-hidden="true" width="12" height="12" viewBox="0 0 12 12"><path d="M4 2l4 4-4 4"/></svg><span class="mono name">${esc(r.name)}</span><span class="counts t-${r.tone}">${esc(counts)}${r.note ? ` <span class="dim">· ${esc(r.note)}</span>` : ""}</span><span class="dim time">${esc(r.time)}</span>`;
+    return `<button type="button" class="pkg-toggle" data-act="togglePkg" aria-expanded="${open}">${CHEV(open)}<span class="mono name">${esc(r.name)}</span></button>${deepButton(r.name, deep, { pkg: r.pkg })}<span class="grow"></span><span class="counts t-${r.tone}">${esc(counts)}${r.note ? ` <span class="dim">· ${esc(r.note)}</span>` : ""}</span><span class="dim time">${esc(r.time)}</span>`;
   };
 
   const tagHtml = (n: TreeNode): string =>
@@ -150,36 +186,73 @@ export function renderNow(h: Helpers) {
         : ""
     }${branch ? button("Copy", "copyNode", {}, "act") : ""}</span>`;
 
-  const BOLD = new Set(["suite", "fixture", "method", "test", "fuzz"]);
+  const BOLD = new Set(["suite", "fixture", "test", "fuzz"]);
 
-  const node = (n: TreeNode, open: Record<string, boolean>): string => {
+  const WORD: Record<string, string> = {
+    pass: "pass",
+    fail: "FAIL",
+    skip: "skip",
+    none: "not run",
+  };
+
+  const node = (n: TreeNode, o: TreeOpen, deepAbove: boolean): string => {
     const label = BOLD.has(n.k) ? `<strong>${esc(n.d)}</strong>` : esc(n.d);
     const time = n.t ? ` <span class="dim dur">${esc(n.t)}</span>` : "";
     const out = n.out ? `<pre class="row-out">${lines(n.out)}</pre>` : "";
     const ids = `${n.id ? ` data-id="${esc(n.id)}"` : ""} data-pos="${esc(n.pos)}"`;
     if (!n.c)
-      return `<div class="row leaf k-${esc(n.k)} s-${esc(n.s)}"${ids}>${icon(n.s)} <span class="lbl">${label}</span>${tagHtml(n)}${time}${acts(n, false)}</div>${out}`;
-    const isOpen = open[n.pos] ?? n.s === "fail";
-    return `<details class="branch"${ids}${isOpen ? " open" : ""}><summary class="row k-${esc(n.k)} s-${esc(n.s)}">${icon(n.s)} <span class="lbl">${label}</span>${tagHtml(n)}${time}${acts(n, true)}</summary>${out}${n.c
-      .map((c) => node(c, open))
+      return `<div class="row leaf k-${esc(n.k)} s-${esc(n.s)}"${ids}><span class="sw s-${esc(n.s)}">${WORD[n.s] ?? esc(n.s)}</span> <span class="lbl">${label}</span>${tagHtml(n)}${time}${acts(n, false)}</div>${out}`;
+    const top = !n.pos.includes(".");
+    const suiteDeep = top && o.deepSuites.indexOf(n.pos) >= 0;
+    const deep = deepAbove || suiteDeep;
+    const isOpen =
+      o.open[n.pos] ??
+      (deep ||
+        (o.depth === "behaviors"
+          ? true
+          : o.depth === "suites"
+            ? false
+            : n.s === "fail"));
+    const counts = n.n
+      ? `<span class="grow"></span><span class="counts t-${n.nt ?? "none"}">${esc(n.n)}</span>`
+      : "";
+    const deepBtn = top ? deepButton(n.d, suiteDeep, { pos: n.pos }) : "";
+    return `<details class="branch"${ids}${isOpen ? " open" : ""}><summary class="row k-${esc(n.k)} s-${esc(n.s)}">${icon(n.s)} <span class="lbl">${label}</span>${deepBtn}${tagHtml(n)}${time}${acts(n, true)}${counts}</summary>${out}${n.c
+      .map((c) => node(c, o, deep))
       .join("")}</details>`;
   };
 
   const tree = (
     nodes: TreeNode[],
     failure: OutputLine[] | undefined,
-    open: Record<string, boolean>,
+    o: TreeOpen,
   ): string => {
     const fail = failure
       ? `<div class="row s-fail">${icon("fail")} <strong>The package failed</strong></div><pre class="row-out">${lines(failure)}</pre>`
       : "";
     if (!fail && nodes.length === 0)
       return `<div class="dim pad">No rows to show.</div>`;
-    return fail + nodes.map((n) => node(n, open)).join("");
+    return fail + nodes.map((n) => node(n, o, o.deep)).join("");
   };
 
-  const more = (hidden: number, allPassed: boolean): string =>
-    `<button type="button" class="pkg-more" data-act="allPackages">${hidden.toLocaleString("en-US")} more ${hidden === 1 ? "package" : "packages"}${allPassed ? ", all passed" : ""}. <span class="link-text">Show them</span></button>`;
+  // foundNote says how many rows a search found and how many it shows.
+  const foundNote = (total: number, shown: number): string =>
+    total === 0
+      ? `<div class="dim pad">No behavior matches.</div>`
+      : `<div class="dim found-note">${total.toLocaleString("en-US")} ${total === 1 ? "match" : "matches"}${
+          shown < total
+            ? `; the first ${shown.toLocaleString("en-US")} show. Search for more of a name to see the rest.`
+            : ""
+        }</div>`;
 
-  return { context, chips, attention, card, pkgHead, tree, more };
+  return {
+    context,
+    chips,
+    attention,
+    card,
+    folderHead,
+    pkgHead,
+    tree,
+    foundNote,
+  };
 }

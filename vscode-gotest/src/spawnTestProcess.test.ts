@@ -1,7 +1,7 @@
 // A test run's output is the developer's own text, and it arrives in whatever
 // pieces the pipe delivers. Decoding each piece on its own would replace any
 // character a read boundary splits with U+FFFD — in the captured stdout the
-// spec view renders, and in the line events the Test Explorer maps to results.
+// panel renders, and in the line events the Test Explorer maps to results.
 
 import { describe, it, expect, vi } from "vitest";
 import type { SpawnScript, FakeChild } from "./scriptedSpawn.test-support.js";

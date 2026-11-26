@@ -1,4 +1,4 @@
-// The Spec View's memory of runs: the newest go test -json lines for every
+// The panel's memory of runs: the newest go test -json lines for every
 // test of every package it has seen, kept as the raw stream so the CLI can
 // render it. A package is one record no matter how many producers reported
 // it, and inside a package every test path of every suite instance keeps the

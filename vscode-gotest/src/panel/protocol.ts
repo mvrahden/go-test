@@ -89,6 +89,18 @@ export interface PackageRow {
   empty?: boolean;
 }
 
+// A folder of packages: the first path element below a module's root.
+export interface FolderRow {
+  key: string;
+  name: string;
+  packages: number;
+  counts: string;
+  tone: Tone;
+  // Holds a failed or stale package.
+  hot: boolean;
+  rows: PackageRow[];
+}
+
 export interface NowModel {
   rev: number;
   empty?: { title: string; text: string };
@@ -100,7 +112,7 @@ export interface NowModel {
   noSuites?: { text: string; names: string[] };
   total: string;
   groups: string[];
-  packages: PackageRow[];
+  folders: FolderRow[];
   filtering: boolean;
   failed: number;
 }
@@ -118,6 +130,9 @@ export interface TreeNode {
   tags?: { text: string; tone?: Tone }[];
   out?: OutputLine[];
   c?: TreeNode[];
+  // A suite's counts, and their tone.
+  n?: string;
+  nt?: Tone;
 }
 
 export interface Mark {
@@ -160,18 +175,20 @@ export interface ChangeBehaviorView {
   canRun: boolean;
 }
 
-export interface UnprovenView {
-  head: string;
-  source: string;
+// The changed lines no test ran, as the coverage profile in use says.
+export interface LinesView {
+  // "N of M changed lines", when a profile is in use.
+  head?: string;
   files: {
     key: string;
     file: string;
-    pkg: string;
-    counts: string;
-    coverage: boolean;
     canOpen: boolean;
     ranges: { key: string; text: string }[];
   }[];
+  // Changed files whose packages the profile's run did not run.
+  noCoverage?: string;
+  // Said instead, when every changed line ran or no profile is in use.
+  note?: string;
 }
 
 export interface Picker {
@@ -210,7 +227,7 @@ export interface ChangeTab {
   accepted: DecisionView[];
   routine: RoutineGroupView[];
   packages: { pkg: string; name: string; delta: string }[];
-  unproven?: UnprovenView;
+  lines?: LinesView;
   lists: { title: string; items: string[] }[];
   exit?: string;
   openCount: number;
@@ -270,6 +287,15 @@ export type HostMessage =
       failure?: OutputLine[];
     }
   | { type: "output"; key: string; lines: OutputLine[]; more?: number }
+  | {
+      type: "found";
+      query: string;
+      rev: number;
+      results: { pkg: string; nodes: TreeNode[] }[];
+      // Every match, and the leaves the results carry.
+      total: number;
+      shown: number;
+    }
   | { type: "change"; model: ChangeTab }
   | { type: "changePackage"; pkg: string; rows: ChangeBehaviorView[] }
   | { type: "runs"; model: RunsTab }
@@ -283,4 +309,14 @@ export interface ClientState {
   search: string;
   filters: FilterStatus[];
   scroll: Partial<Record<Tab, number>>;
+  depth: Depth;
+  // Packages closed at a depth that opens them, folders as toggled, and the
+  // packages and suites expanded all the way.
+  shut: string[];
+  folders: Record<string, boolean>;
+  deep: string[];
+  deepSuites: Record<string, string[]>;
 }
+
+// How far the behavior list opens: packages only, their suites, or all.
+export type Depth = "packages" | "suites" | "behaviors";

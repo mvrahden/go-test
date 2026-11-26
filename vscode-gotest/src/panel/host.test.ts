@@ -52,7 +52,7 @@ vi.mock("node:child_process", async () => {
   };
 });
 
-import { SpecViewPanel } from "./host.js";
+import { PanelHost } from "./host.js";
 import { COALESCE_MS } from "./poster.js";
 import { LiveRuns } from "../liveProgress.js";
 import { Sessions } from "../sessions.js";
@@ -196,7 +196,7 @@ async function setup(visible = true) {
   const sessions = new Sessions();
   const fake = fakePanel(visible);
   panels.push(fake);
-  const panel = new SpecViewPanel(
+  const panel = new PanelHost(
     channel,
     undefined,
     undefined,
@@ -252,7 +252,7 @@ describe("the panel's host", () => {
 
   it("restores a panel with one document, on the tab and with the packages the webview kept", async () => {
     const fake = fakePanel();
-    const panel = new SpecViewPanel(
+    const panel = new PanelHost(
       channel,
       undefined,
       undefined,
@@ -291,7 +291,7 @@ describe("the panel's host", () => {
       HostMessage,
       { type: "now" }
     >;
-    expect(last.model.packages[0].counts).toContain("running");
+    expect(last.model.folders[0].rows[0].counts).toContain("running");
     run.end();
   });
 
@@ -379,7 +379,7 @@ describe("the panel's host", () => {
     expect(after.model.context.live).toBeUndefined();
   });
 
-  it("sends a package's rows only when it is opened, again on a new render, and a row's output on request", async () => {
+  it("sends a package's rows only when they are asked for, and a row's output on request", async () => {
     const { panel, fake } = await setup();
     await panel.refresh({
       stream: line({ Action: "fail" }) + "\n",
@@ -393,8 +393,13 @@ describe("the panel's host", () => {
       { type: "package" }
     >[];
     expect(pkgMsg.nodes[0].c!.map((n) => n.d)).toEqual(["a", "b"]);
+    // A new render posts a new summary; the webview asks for rows again.
+    const nows = ofType(fake, "now").length;
     fake.send!({ type: "refresh" });
-    await vi.waitFor(() => expect(ofType(fake, "package")).toHaveLength(2));
+    await vi.waitFor(() =>
+      expect(ofType(fake, "now").length).toBeGreaterThan(nows),
+    );
+    expect(ofType(fake, "package")).toHaveLength(1);
     fake.send!({ type: "output", key: "k", pkg: "m/a", pos: "0.0" });
     expect(ofType(fake, "output").at(-1)).toMatchObject({
       type: "output",
@@ -415,18 +420,41 @@ describe("the panel's host", () => {
     });
     fake.send!({ type: "openPackage", pkg: "m/a" });
     fake.send!({ type: "filters", filters: ["fail", "bogus"] });
+    fake.send!({ type: "openPackage", pkg: "m/a" });
     const last = ofType(fake, "package").at(-1) as Extract<
       HostMessage,
       { type: "package" }
     >;
     expect(last.nodes[0].c!.map((n) => n.d)).toEqual(["a"]);
-    fake.send!({ type: "search", text: "b" });
     await vi.advanceTimersByTimeAsync(COALESCE_MS);
     const now = ofType(fake, "now").at(-1) as Extract<
       HostMessage,
       { type: "now" }
     >;
-    expect(now.model.packages[0].matches).toBe(0);
+    expect(now.model.folders[0].rows[0].matches).toBe(1);
+    // A search is answered with what it finds, the chips still narrowing.
+    fake.send!({ type: "search", text: "B" });
+    const found = ofType(fake, "found").at(-1) as Extract<
+      HostMessage,
+      { type: "found" }
+    >;
+    expect([found.query, found.total, found.results]).toEqual(["B", 0, []]);
+    fake.send!({ type: "filters", filters: [] });
+    fake.send!({ type: "search", text: "B" });
+    const again = ofType(fake, "found").at(-1) as Extract<
+      HostMessage,
+      { type: "found" }
+    >;
+    expect(
+      again.results.map((r) => [r.pkg, r.nodes[0].c!.map((n) => n.d)]),
+    ).toEqual([["m/a", ["b"]]]);
+    // Opened rows are not narrowed by a search: only the chips narrow them.
+    fake.send!({ type: "openPackage", pkg: "m/a" });
+    const rows = ofType(fake, "package").at(-1) as Extract<
+      HostMessage,
+      { type: "package" }
+    >;
+    expect(rows.nodes[0].c!.map((n) => n.d)).toEqual(["a", "b"]);
   });
 
   it("runs a row by its item and notes the ids above it; Rerun failed runs the narrowest failed rows", async () => {

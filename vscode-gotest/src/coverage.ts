@@ -466,7 +466,7 @@ export class CoverageRunner implements vscode.Disposable {
       await this.store.flush();
       await this.controller.saveResults();
 
-      // Ended before the Spec View takes the finished run.
+      // Ended before the panel takes the finished run.
       progress.end();
       if (pieces.some((p) => p.stream)) {
         this.onJsonOutput(pieces);

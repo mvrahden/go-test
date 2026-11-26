@@ -87,7 +87,7 @@ import { sessions } from "./sessions.js";
 
 const batch = vi.mocked(executeBatch);
 
-// result is a batch's outcome: its stdout and the piece the Spec View keeps.
+// result is a batch's outcome: its stdout and the piece the panel keeps.
 function result(stdout: string, folder = "/ws") {
   return { stdout, piece: { stream: stdout, folder } };
 }

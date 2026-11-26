@@ -130,6 +130,38 @@ export function renderChange(h: Helpers) {
           })
           .join("")}</div>`,
       );
+    if (m.lines) {
+      const l = m.lines;
+      const open = (
+        key: string,
+        text: string,
+        ok: boolean,
+        cls = "link mono",
+      ) =>
+        ok
+          ? button(text, "openSource", { key, scope: "change" }, cls)
+          : `<span class="mono">${esc(text)}</span>`;
+      const rows = l.files.map(
+        (f) =>
+          `<div class="line-row"><span class="mono">${esc(f.file)}</span><span class="ranges">${f.ranges
+            .slice(0, 6)
+            .map((r) => open(r.key, r.text, f.canOpen, "link mono warn-link"))
+            .join(
+              ", ",
+            )}${f.ranges.length > 6 ? ` <span class="dim">+${f.ranges.length - 6} more</span>` : ""}</span>${f.canOpen ? button("Open", "openSource", { key: f.key, scope: "change" }) : ""}</div>`,
+      );
+      if (l.noCoverage)
+        rows.push(
+          `<div class="line-row note"><span class="dim">${esc(l.noCoverage)}</span>${button("Run what changed", "auditRun", { scope: "change" })}</div>`,
+        );
+      if (l.note)
+        rows.push(
+          `<div class="line-row note"><span class="dim">${esc(l.note)}</span>${l.head ? "" : button("Run what changed", "auditRun", { scope: "change" })}</div>`,
+        );
+      parts.push(
+        `<div class="section-head">${h.section("Changed lines no test ran")}${l.head ? `<span class="t-warn">${esc(l.head)}</span>` : ""}</div><div class="list">${rows.join("")}</div><p class="dim footnote">Per-file percentages and line gutters stay in VS Code's Test Coverage view.</p>`,
+      );
+    }
     if (m.packages.length > 0)
       parts.push(
         `${h.section("Behaviors by package")}<div class="list">${m.packages
@@ -144,25 +176,6 @@ export function renderChange(h: Helpers) {
           })
           .join("")}</div>`,
       );
-    if (m.unproven) {
-      const u = m.unproven;
-      const link = (key: string, text: string, ok: boolean) =>
-        ok
-          ? button(text, "openSource", { key, scope: "change" }, "link mono")
-          : `<span class="mono">${esc(text)}</span>`;
-      parts.push(
-        `${h.section("Unproven lines")}<div class="dim">${esc(u.head)}. ${esc(u.source)}</div>${u.files
-          .map(
-            (f) =>
-              `<div class="behavior">${link(f.key, f.file, f.canOpen)} <span class="dim">${esc(f.pkg)}</span> ${
-                f.coverage
-                  ? `<span class="dim">${esc(f.counts)}:</span> ${f.ranges.map((r) => link(r.key, r.text, f.canOpen)).join(", ")}`
-                  : `<span class="dim">no coverage data</span>`
-              }</div>`,
-          )
-          .join("")}`,
-      );
-    }
     for (const l of m.lists)
       parts.push(
         `<details class="extra"><summary>${esc(l.title)} <span class="dim">${l.items.length}</span></summary><ul class="plain">${l.items

@@ -12,6 +12,7 @@ vi.mock("vscode", () => ({
   commands: {},
 }));
 
+import { PanelHost } from "./host.js";
 import {
   addStats,
   sourceOf,
@@ -23,15 +24,14 @@ import {
   encodeStateForScript,
   itemIdOf,
   nearestItemId,
-  SpecViewPanel,
   declaredTests,
   formatRanAt,
   combineSpecData,
   provenanceText,
   groupText,
-} from "./specView.js";
-import { parseStoredState } from "./panel/host.js";
-import type { DiscoverPackage } from "./types.js";
+} from "./specData.js";
+import { parseStoredState } from "../panel/host.js";
+import type { DiscoverPackage } from "../types.js";
 import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import * as path from "node:path";
@@ -306,19 +306,19 @@ describe("the kept runs on disk", () => {
         },
       ],
     });
-  const keptBy = (panel: SpecViewPanel) =>
+  const keptBy = (panel: PanelHost) =>
     (panel as unknown as { runs: { size: number } }).runs.size;
 
   it("restore drops a store of the previous version", async () => {
     const dir = mkdtempSync(path.join(tmpdir(), "gotest-specruns-"));
     try {
       writeFileSync(path.join(dir, "specRuns.json"), file(1));
-      const old = new SpecViewPanel(channel, undefined, dir);
+      const old = new PanelHost(channel, undefined, dir);
       await old.load();
       expect(keptBy(old)).toBe(0);
 
       writeFileSync(path.join(dir, "specRuns.json"), file(2));
-      const current = new SpecViewPanel(channel, undefined, dir);
+      const current = new PanelHost(channel, undefined, dir);
       await current.load();
       expect(keptBy(current)).toBe(1);
     } finally {

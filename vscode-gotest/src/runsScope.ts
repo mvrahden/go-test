@@ -4,7 +4,6 @@
 // picks runs as the Change tab's evidence.
 import * as vscode from "vscode";
 import { execFile } from "node:child_process";
-import { logFinished } from "./panel/logFinished.js";
 import * as path from "node:path";
 import { existsSync } from "node:fs";
 import {
@@ -94,8 +93,11 @@ export async function runCli(
     };
   }
   log.info(`[runs] ${cmd.bin} ${cmd.args.join(" ")} (cwd ${folder})`);
-  const mc = new ManagedChild(cmd.bin, cmd.args, { cwd: folder, kind });
-  const startedAt = Date.now();
+  const mc = new ManagedChild(cmd.bin, cmd.args, {
+    cwd: folder,
+    kind,
+    onFinished: (line) => log.info(`[${kind}] ${line}`),
+  });
   onChild?.(mc);
   let stdout = "";
   let stderr = "";
@@ -113,7 +115,6 @@ export async function runCli(
   }, seconds * 1000);
   try {
     const { code } = await mc.exited;
-    logFinished(kind, startedAt, code, log);
     if (spawnError) return { ok: false, message: spawnError.message };
     if (timedOut)
       return { ok: false, message: `gotest timed out after ${seconds}s` };

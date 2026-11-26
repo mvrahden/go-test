@@ -12,6 +12,8 @@ import {
   fullOutput,
   nodeAt,
   packageTree,
+  searchFound,
+  FOUND_LEAVES,
   shortNames,
   shortDuration,
   type NowEnv,
@@ -26,6 +28,7 @@ import {
 } from "./specData.js";
 import {
   MESSAGE_BUDGET,
+  type PackageRow,
   type FilterStatus,
   type TreeNode,
 } from "./protocol.js";
@@ -93,7 +96,6 @@ function env(doc: SpecData | undefined, over: Partial<NowEnv> = {}): NowEnv {
     now: new Date(2026, 10, 11, 16, 5).getTime(),
     sources: [],
     live: [],
-    query: "",
     filters: new Set(),
     ...over,
   };
@@ -113,6 +115,11 @@ const treeOf = (
     stale,
   })!;
 
+const OPEN = { open: {}, deep: false, deepSuites: [], depth: "packages" };
+
+const rowsOf = (m: { folders: { rows: PackageRow[] }[] }) =>
+  m.folders.flatMap((f) => f.rows);
+
 const flat = (nodes: TreeNode[]): TreeNode[] =>
   nodes.flatMap((n) => [n, ...flat(n.c ?? [])]);
 
@@ -126,7 +133,7 @@ describe("a package's rows", () => {
     ]);
     const t = treeOf(doc, "example.com/p");
     expect(t.nodes.map((n) => n.s)).toEqual(["pass", "fail"]);
-    const html = NOW.tree(t.nodes, undefined, {});
+    const html = NOW.tree(t.nodes, undefined, OPEN);
     expect(html).toMatch(
       /<details class="branch" data-id="[^"]+" data-pos="0">/,
     );
@@ -146,7 +153,7 @@ describe("a package's rows", () => {
     ]);
     const rows = flat(treeOf(doc, "example.com/p").nodes);
     expect(rows.map((r) => r.pos)).toEqual(["0", "0.0", "1", "1.0", "1.0.0"]);
-    const html = NOW.tree(treeOf(doc, "example.com/p").nodes, undefined, {});
+    const html = NOW.tree(treeOf(doc, "example.com/p").nodes, undefined, OPEN);
     expect(html.match(/data-act="copyNode"/g)).toHaveLength(3);
   });
 
@@ -187,11 +194,14 @@ describe("a package's rows", () => {
       ),
     ]);
     const [leaf] = treeOf(doc, "example.com/p").nodes[0].c!;
-    expect(leaf.tags).toEqual([{ text: "NOT RUN" }]);
+    expect(leaf.tags).toBeUndefined();
     expect(leaf.t).toBeUndefined();
-    expect(NOW.tree([leaf], undefined, {})).toContain(
-      '<span class="sr">not run</span>',
+    expect(NOW.tree([leaf], undefined, OPEN)).toContain(
+      '<span class="sw s-none">not run</span>',
     );
+    expect(treeOf(doc, "example.com/p").nodes[0].tags).toEqual([
+      { text: "NOT RUN" },
+    ]);
   });
 
   it("link a row to the source the CLI names, and no row without a position", () => {
@@ -427,7 +437,7 @@ describe("a package's rows", () => {
         ]),
       ]),
     ]);
-    const html = NOW.tree(treeOf(doc, "example.com/p").nodes, undefined, {});
+    const html = NOW.tree(treeOf(doc, "example.com/p").nodes, undefined, OPEN);
     expect(html).toContain("&lt;b&gt;bold&lt;/b&gt;");
     expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
     expect(html).not.toContain("<script>");
@@ -564,7 +574,7 @@ describe("the Now summary", () => {
 
   it("lists every package failed first, then by behaviors, with the CLI's counts and time", () => {
     const m = buildNowModel(env(failing(), { modulePaths: ["example.com/m"] }));
-    expect(m.packages.map((r) => [r.name, r.counts, r.tone, r.time])).toEqual([
+    expect(rowsOf(m).map((r) => [r.name, r.counts, r.tone, r.time])).toEqual([
       ["run", "1 failed · 1 passed", "fail", "11s"],
       ["big", "900 passed", "pass", "1m 39s"],
       ["small", "3 passed", "pass", "<1s"],
@@ -595,9 +605,9 @@ describe("the Now summary", () => {
         freshnessOf: (p) => fresh[p],
       }),
     );
-    const big = m.packages.find((r) => r.name === "big")!;
+    const big = rowsOf(m).find((r) => r.name === "big")!;
     expect(big).toMatchObject({ stale: true, tone: "warn", note: "stale" });
-    expect(m.packages.find((r) => r.name === "small")!.note).toBe(
+    expect(rowsOf(m).find((r) => r.name === "small")!.note).toBe(
       "freshness unknown",
     );
     expect(m.cards.map((c) => c.kind)).toEqual(["failed", "stale"]);
@@ -619,10 +629,12 @@ describe("the Now summary", () => {
         neverRan: (p) => p === "example.com/m/small",
       }),
     );
-    expect(m.packages.map((r) => r.title).filter(Boolean)).toEqual([
-      "last run 14:32",
-    ]);
-    expect(m.packages.find((r) => r.pkg === "example.com/m/small")!.note).toBe(
+    expect(
+      rowsOf(m)
+        .map((r) => r.title)
+        .filter(Boolean),
+    ).toEqual(["last run 14:32"]);
+    expect(rowsOf(m).find((r) => r.pkg === "example.com/m/small")!.note).toBe(
       "declared, not run yet",
     );
     expect(m.context.lastRun).toBe("Last run 14:32, from a terminal.");
@@ -657,14 +669,71 @@ describe("the Now summary", () => {
     );
   });
 
-  it("counts a search's and the chips' matches per package", () => {
-    const m = buildNowModel(
-      env(failing(), { query: "reads", filters: new Set(["fail"]) }),
-    );
+  it("counts the chips' matches per package", () => {
+    const m = buildNowModel(env(failing(), { filters: new Set(["fail"]) }));
     expect(m.filtering).toBe(true);
-    expect(m.packages.map((r) => r.matches)).toEqual([1, 0, 0]);
+    expect(rowsOf(m).map((r) => r.matches)).toEqual([1, 0, 0]);
   });
 
+  it("groups packages by their first path element below the module, a failing or stale folder first", () => {
+    const p = (path: string, failed = 0) =>
+      pkg(
+        path,
+        [
+          node("TestXTestSuite", failed ? "fail" : "pass", [
+            node("x", failed ? "fail" : "pass"),
+          ]),
+        ],
+        {
+          stats: stats({ behaviors: 1, passed: 1 - failed, failed }),
+        },
+      );
+    const doc = docOf([
+      p("m/cmd/gotest"),
+      p("m/internal/b"),
+      p("m/internal/a"),
+      p("m/pkg/z", 1),
+      p("m/pkg/a"),
+      p("m"),
+      p("m/examples/shop"),
+      p("m/examples/cart"),
+    ]);
+    const m = buildNowModel(env(doc, { modulePaths: ["m", "m/examples"] }));
+    expect(
+      m.folders.map((f) => [
+        f.name,
+        f.packages,
+        f.counts,
+        f.hot,
+        f.rows.map((r) => r.name),
+      ]),
+    ).toEqual([
+      ["pkg", 2, "1 failed · 1 passed", true, ["pkg/z", "pkg/a"]],
+      ["cmd", 1, "1 passed", false, ["cmd/gotest"]],
+      ["examples", 2, "2 passed", false, ["examples/cart", "examples/shop"]],
+      ["internal", 2, "2 passed", false, ["internal/a", "internal/b"]],
+      ["m", 1, "1 passed", false, ["m"]],
+    ]);
+  });
+
+  it("gives each suite row its counts", () => {
+    const doc = docOf([
+      pkg("p", [
+        node("TestATestSuite", "fail", [
+          node("a", "fail"),
+          node("b", "pass"),
+          node("c", "skip"),
+          node("M", "none", [node("d", "none")]),
+        ]),
+      ]),
+    ]);
+    const [suite] = treeOf(doc, "p").nodes;
+    expect([suite.n, suite.nt]).toEqual([
+      "1 failed · 1 passed · 1 skipped · 1 not run",
+      "fail",
+    ]);
+    expect(suite.c!.find((c) => c.d === "M")!.n).toBeUndefined();
+  });
   it("counts the cards it leaves out", () => {
     const leaves = Array.from({ length: CARD_LIMIT.vacuous + 3 }, (_, i) =>
       node(`v${i}`, "pass", [], { vacuous: true }),
@@ -710,7 +779,7 @@ describe("the Now summary", () => {
         live: [{ line: "Running", packages: run.packages }],
       }),
     );
-    const row = m.packages.find((r) => r.name === "run")!;
+    const row = rowsOf(m).find((r) => r.name === "run")!;
     expect(row).toMatchObject({
       counts: "running · 1 failed · 1 passed",
       tone: "fail",
@@ -765,11 +834,122 @@ describe("the Now summary", () => {
     const m = buildNowModel(env(doc, { modulePaths: ["example.com/mod"] }));
     const size = JSON.stringify({ type: "now", model: m }).length;
     expect(size).toBeLessThan(MESSAGE_BUDGET);
-    const one = JSON.stringify({
-      type: "package",
-      ...treeOf(doc, packages[0].path),
-    }).length;
-    expect(one).toBeLessThan(MESSAGE_BUDGET);
+    // At the Behaviors depth every package in view asks for its rows, one
+    // message each: none of them is above the bound.
+    for (const p of packages) {
+      const one = JSON.stringify({
+        type: "package",
+        ...treeOf(doc, p.path),
+      }).length;
+      expect(one).toBeLessThan(MESSAGE_BUDGET);
+    }
+  });
+});
+
+describe("a search", () => {
+  const doc = docOf([
+    pkg("p/a", [
+      node(
+        "TestCartTestSuite",
+        "pass",
+        [node("adds an item", "pass"), node("totals", "pass")],
+        { display: "Cart" },
+      ),
+    ]),
+    pkg("p/b", [
+      node(
+        "TestStockTestSuite",
+        "pass",
+        [node("counts items", "pass"), node("reserves", "pass")],
+        { display: "Stock" },
+      ),
+    ]),
+    pkg("p/c", [node("TestOtherTestSuite", "pass", [node("nothing", "pass")])]),
+  ]);
+  const opts = {
+    dirOf: () => undefined,
+    filters: new Set<FilterStatus>(),
+    staleOf: () => false,
+  };
+  const order = ["p/b", "p/a", "p/c"];
+
+  it("finds the matching rows with the rows above them, in the order the tab lists packages", () => {
+    const f = searchFound(doc, "ITEM", order, opts);
+    expect(f.total).toBe(2);
+    expect(f.shown).toBe(2);
+    expect(
+      f.results.map((r) => [r.pkg, flat(r.nodes).map((n) => n.d)]),
+    ).toEqual([
+      ["p/b", ["Stock", "counts items"]],
+      ["p/a", ["Cart", "adds an item"]],
+    ]);
+  });
+
+  it("takes a matching suite as its whole subtree, and the chips still narrow it", () => {
+    expect(
+      flat(searchFound(doc, "cart", order, opts).results[0].nodes).map(
+        (n) => n.d,
+      ),
+    ).toEqual(["Cart", "adds an item", "totals"]);
+    const none = searchFound(doc, "cart", order, {
+      ...opts,
+      filters: new Set<FilterStatus>(["fail"]),
+    });
+    expect(none).toEqual({ results: [], total: 0, shown: 0 });
+    expect(searchFound(doc, "  ", order, opts)).toEqual({
+      results: [],
+      total: 0,
+      shown: 0,
+    });
+  });
+
+  it("stops at its bound in leaves and in bytes, and still counts every match", () => {
+    const byLeaves = searchFound(doc, "s", order, opts, {
+      leaves: 2,
+      bytes: 1e6,
+    });
+    expect(byLeaves.results.map((r) => r.pkg)).toEqual(["p/b"]);
+    expect([byLeaves.shown, byLeaves.total]).toEqual([2, 5]);
+    const byBytes = searchFound(doc, "s", order, opts, {
+      leaves: 1e6,
+      bytes: 10,
+    });
+    expect(byBytes.results).toHaveLength(1);
+  });
+
+  it("stays within the message budget on a large document", () => {
+    const big = docOf(
+      Array.from({ length: 76 }, (_, p) =>
+        pkg(
+          `m/p${p}`,
+          Array.from({ length: 10 }, (_, s) =>
+            node(
+              `TestS${s}TestSuite`,
+              "pass",
+              Array.from({ length: 15 }, (_, b) =>
+                node(
+                  `behavior ${b} that keeps a long name like the real ones do`,
+                  "pass",
+                  [],
+                  { file: "x_test.go", line: b },
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    const f = searchFound(
+      big,
+      "behavior",
+      big.packages.map((p) => p.path),
+      opts,
+    );
+    expect(f.total).toBe(76 * 150);
+    expect(f.shown).toBeLessThanOrEqual(FOUND_LEAVES);
+    expect(
+      JSON.stringify({ type: "found", query: "behavior", rev: 1, ...f }).length,
+    ).toBeLessThan(MESSAGE_BUDGET);
   });
 });
 

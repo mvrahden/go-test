@@ -119,7 +119,7 @@ describe("the specification is in the tree before anything runs", () => {
 
   // The label is what a human reads: the developer's own text spoken in its
   // vocabulary, and the same string `gotest spec` renders for this node, so the
-  // tree and the spec view never spell one behavior two ways. The id stays the
+  // tree and the panel never spell one behavior two ways. The id stays the
   // subtest name, which is what filters and stored results key on.
   it("labels a behavior with the text the developer wrote, not the subtest name", () => {
     const when = controller.findItem(
