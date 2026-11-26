@@ -45,11 +45,12 @@ invocation runs tests — there is NO `test` subcommand:
   `--changed` (v1.42+) runs only the packages whose input hash, a digest
   of the source and build flags their verdict judged, differs from the
   record's, or that failed or ran narrowed in it; the closing line ends
-  `changed only: N ran, M unchanged`. A hash sees no file read outside
+  `changed only: N ran, M unchanged`, and a `-json` run's opening
+  manifest lists the packages it runs. A hash sees no file read outside
   `testdata`, nor the environment: finish with a full run
   ([Running what changed](https://github.com/mvrahden/go-test/blob/main/specs/cli/spec.md#requirement-running-what-changed)).
-  `go tool gotest runs` lists the kept runs with how many of each run's
-  packages are still current, and `runs --import=<file>` keeps a CI run's
+  `go tool gotest runs` lists the kept runs with the packages each judged
+  (verdict and input hash) and how many are still current, and `runs --import=<file>` keeps a CI run's
   saved stream among them; `spec --input=<file> --check-fresh` marks the
   stale packages of a saved stream.
 - `go tool gotest spec ./...` — run + render the behavioral spec view.

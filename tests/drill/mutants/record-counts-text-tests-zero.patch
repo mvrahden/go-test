@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLIAgentOutput .* / its record holds no test counts \(
+Clause: when a text run of a failing package ends → its record holds no test counts
+--- a/internal/gotestrunner/runrecord.go
++++ b/internal/gotestrunner/runrecord.go
+@@ -84,7 +84,7 @@
+ 		res, failed := c.starts.run.snapshot(c.runLevel)
+ 		return &res, narrowFailures(append(failed, c.vacuousUnits()...))
+ 	}
+-	res := protocol.RunResult{NotRun: c.notRun, Vacuous: c.vacuous}
++	res := protocol.RunResult{Tests: &protocol.Tally{}, NotRun: c.notRun, Vacuous: c.vacuous}
+ 	var failed []protocol.FailedUnit
+ 	missed := map[string]bool{}
+ 	for _, m := range c.missing {

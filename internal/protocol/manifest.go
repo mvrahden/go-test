@@ -31,6 +31,8 @@ type Changed struct {
 	Unchanged int `json:"Unchanged"`
 	// NoRecord marks a run that found no record and ran everything.
 	NoRecord bool `json:"NoRecord,omitempty"`
+	// Packages are the import paths it runs, sorted: Ran of them.
+	Packages []string `json:"Packages"`
 }
 
 // InputHashField is the field a package's verdict event carries its input
@@ -42,9 +44,10 @@ const InputHashField = "InputHash"
 type RunResult struct {
 	ExitCode int `json:"ExitCode"`
 	// Packages counts each package by its last verdict; Tests counts every
-	// test verdict, subtests included.
-	Packages Tally `json:"Packages"`
-	Tests    Tally `json:"Tests"`
+	// test verdict, subtests included, nil for a text run, which keeps no
+	// test verdicts.
+	Packages Tally  `json:"Packages"`
+	Tests    *Tally `json:"Tests,omitempty"`
 	// NotRun is how many declared units the census found without a verdict;
 	// absent when the census did not judge the run.
 	NotRun *int `json:"NotRun,omitempty"`

@@ -60,7 +60,7 @@ func RecordOfStream(stream []byte) (protocol.RunRecord, error) {
 		rec.Result = *closed
 	} else {
 		rec.Result = res
-		if res.Packages.Failed > 0 || res.Tests.Failed > 0 {
+		if res.Packages.Failed > 0 || res.Tests != nil && res.Tests.Failed > 0 {
 			rec.Result.ExitCode = 1
 		}
 	}

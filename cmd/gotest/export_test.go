@@ -489,3 +489,6 @@ func ExportMutate(files []gotestaudit.ProdFile, budget time.Duration, suite stri
 	a.judge(doc, m, b)
 	return doc, nil
 }
+
+// ExportNarrowedTo is the Changed of a run that runs pkgs.
+var ExportNarrowedTo = narrowedTo

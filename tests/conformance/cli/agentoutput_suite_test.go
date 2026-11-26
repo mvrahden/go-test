@@ -170,6 +170,15 @@ func (s *CLIAgentOutputTestSuite) TestTheRecordOfAFailingRun(t *gotest.T) {
 			gotest.Equal(it, 1, rec.Result.ExitCode)
 			gotest.Equal(it, []struct{ Package, Test string }{{"recordmod/failing", "TestFailingTestSuite/TestFails"}}, rec.Failed)
 		})
+		w.It("its record holds no test counts", func(it *gotest.T) {
+			gotest.Len(it, records, 1)
+			data, err := os.ReadFile(records[0])
+			gotest.NoError(it, err)
+			var rec struct{ Result map[string]json.RawMessage }
+			gotest.NoError(it, json.Unmarshal(data, &rec))
+			gotest.Contains(it, rec.Result, "Packages")
+			gotest.NotContains(it, rec.Result, "Tests")
+		})
 		w.It("the module holds no file it did not hold before", func(it *gotest.T) {
 			gotest.Equal(it, before, files(it, module))
 		})

@@ -100,8 +100,8 @@ func ClosingOf(res *protocol.RunResult, code int, countTests bool) Closing {
 		return c
 	}
 	c.NotRun, c.Vacuous, c.Packages = res.NotRun, res.Vacuous, res.Packages
-	if countTests {
-		tests := res.Tests
+	if countTests && res.Tests != nil {
+		tests := *res.Tests
 		if res.NotRun != nil {
 			tests.Failed = max(0, tests.Failed-*res.NotRun)
 		}
