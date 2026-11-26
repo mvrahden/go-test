@@ -3,19 +3,24 @@ package lint
 import (
 	"go/ast"
 	"go/token"
+	"go/types"
 	"strings"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/ast/inspector"
 )
 
-func checkRedundantAssertion(pass *analysis.Pass, insp *inspector.Inspector, cl *claims) {
+func checkRedundantAssertion(pass *analysis.Pass, insp *inspector.Inspector, cl *claims, rows map[types.Object]bool) {
 	insp.Preorder([]ast.Node{(*ast.BlockStmt)(nil)}, func(n ast.Node) {
 		block := n.(*ast.BlockStmt)
 		for i := 0; i < len(block.List)-1; i++ {
 			first := extractAssertionCall(pass, block.List[i])
 			second := extractAssertionCall(pass, block.List[i+1])
 			if first == nil || second == nil {
+				continue
+			}
+			// Removing one changes what halts when only one is on an Each row's T.
+			if onDifferentRows(pass, rows, first.call.Args[0], second.call.Args[0]) {
 				continue
 			}
 			if cl.anyWithin(first.call.Pos(), first.call.End()) || cl.anyWithin(second.call.Pos(), second.call.End()) {

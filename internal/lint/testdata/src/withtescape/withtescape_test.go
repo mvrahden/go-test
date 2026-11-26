@@ -278,3 +278,16 @@ func (s *EscapeFuzzTestSuite) FuzzViaHelper(f *gotest.F) {
 func fuzzHelper(f *testing.F) {
 	f.Add("s") // want `Add is available on gotest.F — f.F\(\).Add skips the seed buffer: a struct seed panics inside testing, and the Add-after-Fuzz check is bypassed`
 }
+
+// An assertion given an Each row's T() halts the method, given the row it
+// goes on: no fix there. The outer t keeps its fix.
+type EachEscapeTestSuite struct{}
+
+func (s *EachEscapeTestSuite) TestRowEscape(t *gotest.T) {
+	for row, err := range gotest.Each(t, []error{nil}) {
+		gotest.NoError(row.T(), err)
+		r := row
+		gotest.NoError(r.T(), err)
+		gotest.NoError(t.T(), err) // want `pass gotest.T directly to NoError — unnecessary T escape`
+	}
+}

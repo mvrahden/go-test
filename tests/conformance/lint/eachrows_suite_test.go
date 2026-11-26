@@ -6,8 +6,8 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-// EachRowGuardsTestSuite: fail-guard rewrites a guard on an Each row's T only
-// where the assertion, which goes on there too, keeps what the guard did.
+// EachRowGuardsTestSuite: on an Each row's T, where an assertion goes on, a
+// rule fixes a guard or an assertion only where the fix keeps what halts.
 type EachRowGuardsTestSuite struct{}
 
 func (s *EachRowGuardsTestSuite) SuiteConfig() gotest.SuiteConfig {
@@ -30,6 +30,20 @@ func (s *EachRowGuardsTestSuite) TestFailureGuards(t *gotest.T) {
 			got := findingsOf(ruleFindings(it, ".", eachRowsPkg), "fail-guard ")
 			gotest.Empty(it, findingsAt(got, "rows_suite_test.go:40:"))
 			gotest.Empty(it, findingsAt(got, "rows_suite_test.go:43:"))
+		})
+	})
+	t.When("an assertion is given an Each row's T()", func(w *gotest.T) {
+		w.It("t-escape leaves it unreported and still fixes one given the outer t.T()", func(it *gotest.T) {
+			got, fixable := lintFindings(it, ".", eachRowsPkg)
+			want := []string{"t-escape escapes_suite_test.go:16:18: pass gotest.T directly to NoError — unnecessary T escape"}
+			gotest.Equal(it, want, findingsOf(got, "t-escape "))
+			gotest.Equal(it, want, findingsOf(fixable, "t-escape "))
+		})
+	})
+	t.When("a redundant pair splits between an Each row's T and another T", func(w *gotest.T) {
+		w.It("assertion-redundant leaves it unreported and still reports a pair on one T", func(it *gotest.T) {
+			gotest.Equal(it, []string{"assertion-redundant escapes_suite_test.go:26:3: Error is redundant before ErrorContains — ErrorContains already checks for non-nil error"},
+				findingsOf(ruleFindings(it, ".", eachRowsPkg), "assertion-redundant "))
 		})
 	})
 	t.When("a guard of one condition calls Fail or Errorf on an Each row's T", func(w *gotest.T) {

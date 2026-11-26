@@ -240,6 +240,17 @@ fail-guard SHALL leave unreported a guard whose failing call is given an Each ro
 - **WHEN** a guard of one condition calls Fail or Errorf on an Each row's T
 - **THEN** fail-guard reports it with a fix and no claim that an assertion halts
 
+### Requirement: Escapes and redundant pairs on an Each row
+t-escape SHALL leave unreported a gotest assertion given `row.T()`, where row is an Each row's T or a plain alias of it: the assertion halts the method there and goes on given the row. assertion-redundant SHALL leave unreported a pair whose assertions are given different T's of which exactly one is an Each row's T.
+
+#### Scenario: An assertion given a row's T()
+- **WHEN** an assertion is given an Each row's T()
+- **THEN** t-escape leaves it unreported and still fixes one given the outer t.T()
+
+#### Scenario: A redundant pair across a row's T
+- **WHEN** a redundant pair splits between an Each row's T and another T
+- **THEN** assertion-redundant leaves it unreported and still reports a pair on one T
+
 ### Requirement: Rules skip what is not gotest's
 Lint's gotest rules, generation-rejects among them, SHALL leave a testify suite to the testify rule, SHALL leave calls through a user type's own T method unreported, SHALL leave a failure guard unreported where a local variable shadows the gotest import, and SHALL leave calls through a user type's own B or F method unreported.
 

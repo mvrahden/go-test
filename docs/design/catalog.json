@@ -26584,7 +26584,7 @@
                   "children": [
                     {
                       "children": [],
-                      "display": "fail-guard reports it with a fix and no claim that an assertion halts",
+                      "display": "t-escape leaves it unreported and still fixes one given the outer t.T()",
                       "duration": 0,
                       "excluded": false,
                       "external": false,
@@ -26592,6 +26592,68 @@
                       "focused": false,
                       "kind": "block",
                       "line": 36,
+                      "name": "t-escape_leaves_it_unreported_and_still_fixes_one_given_the_outer_t.T()",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when an assertion is given an Each row's T()",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "eachrows_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 35,
+                  "name": "an_assertion_is_given_an_Each_row's_T()",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "assertion-redundant leaves it unreported and still reports a pair on one T",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "eachrows_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 44,
+                      "name": "assertion-redundant_leaves_it_unreported_and_still_reports_a_pair_on_one_T",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a redundant pair splits between an Each row's T and another T",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "eachrows_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 43,
+                  "name": "a_redundant_pair_splits_between_an_Each_row's_T_and_another_T",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "fail-guard reports it with a fix and no claim that an assertion halts",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "eachrows_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 50,
                       "name": "fail-guard_reports_it_with_a_fix_and_no_claim_that_an_assertion_halts",
                       "output": [],
                       "status": "none",
@@ -26605,7 +26667,7 @@
                   "file": "eachrows_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 35,
+                  "line": 49,
                   "name": "a_guard_of_one_condition_calls_Fail_or_Errorf_on_an_Each_row's_T",
                   "output": [],
                   "status": "none",
@@ -35002,7 +35064,7 @@
     }
   ],
   "stats": {
-    "behaviors": 1012,
+    "behaviors": 1014,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

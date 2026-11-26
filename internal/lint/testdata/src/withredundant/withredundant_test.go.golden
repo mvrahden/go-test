@@ -145,3 +145,21 @@ func TestConversionOperand(t *testing.T) {
 	gotest.NotNil(t, []byte(s))
 	gotest.NotEmpty(t, []byte(s))
 }
+
+// === a pair split between an Each row's T and another T stays: removing
+// either one changes what halts ===
+
+type RowPairsTestSuite struct{}
+
+func (s *RowPairsTestSuite) TestRowPairs(t *gotest.T) {
+	for row, err := range gotest.Each(t, []error{nil}) {
+		gotest.Error(t, err)
+		gotest.ErrorContains(row, err, "boom")
+		gotest.Error(row, err)
+		gotest.ErrorContains(t, err, "boom")
+		// want `Error is redundant before ErrorContains`
+		gotest.ErrorContains(row, err, "boom")
+		// want `Error is redundant before ErrorContains`
+		gotest.ErrorContains(t, err, "boom")
+	}
+}

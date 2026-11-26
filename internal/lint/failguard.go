@@ -19,13 +19,12 @@ import (
 // into sequential assertions, where halting on the first failure reproduces
 // the original short-circuit evaluation. On an Each row's T an assertion
 // goes on, so there only a guard the rewrite keeps as it is gets reported.
-func checkFailGuard(pass *analysis.Pass, insp *inspector.Inspector, cl *claims) {
+func checkFailGuard(pass *analysis.Pass, insp *inspector.Inspector, cl *claims, rows map[types.Object]bool) {
 	// else-branch if-statements belong to their parent's chain and must never
 	// be reported standalone: replacing one would leave `else <expr>` behind.
 	// Preorder visits parents first, so marking suffices.
 	elseChild := map[*ast.IfStmt]bool{}
 	readSource := cachedSource(pass)
-	var rows map[types.Object]bool
 
 	insp.Preorder([]ast.Node{(*ast.IfStmt)(nil)}, func(n ast.Node) {
 		ifStmt := n.(*ast.IfStmt)
@@ -44,9 +43,6 @@ func checkFailGuard(pass *analysis.Pass, insp *inspector.Inspector, cl *claims) 
 		// finding tells the sharper story.
 		if cl.anyWithin(ifStmt.Pos(), ifStmt.End()) {
 			return
-		}
-		if rows == nil {
-			rows = eachRowVars(pass, insp)
 		}
 		if onEachRow(pass, rows, units) && !keptOnEachRow(units) {
 			return

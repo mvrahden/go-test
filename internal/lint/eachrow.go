@@ -85,6 +85,15 @@ func isRowVar(pass *analysis.Pass, rows map[types.Object]bool, e ast.Expr) bool 
 	return ok && rows[pass.TypesInfo.Uses[id]]
 }
 
+// onDifferentRows reports whether exactly one of two different T's is an
+// Each row's T.
+func onDifferentRows(pass *analysis.Pass, rows map[types.Object]bool, a, b ast.Expr) bool {
+	if sameExprText(pass, a, b) {
+		return false
+	}
+	return isRowVar(pass, rows, a) != isRowVar(pass, rows, b)
+}
+
 // onEachRow reports whether a branch of the guard fails an Each row's T.
 func onEachRow(pass *analysis.Pass, rows map[types.Object]bool, units []failGuardUnit) bool {
 	for _, u := range units {
