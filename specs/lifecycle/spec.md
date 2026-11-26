@@ -55,11 +55,27 @@ A FailFast suite SHALL stop at the first failing method, failing it and the run 
 - **THEN** skips the method after it and runs the shared fixture's AfterAll before gotest exits
 
 ### Requirement: Each rows
-Every row of an Each table SHALL be its own subtest with its own verdict and a soft T: a row whose assertion fails SHALL fail that row and the method, and the rows after it SHALL still run. A row that calls FailNow or skips SHALL end the method there, a row that ends the method's own T SHALL end the method with that verdict alone, and a loop that breaks SHALL leave the method running.
+Every row of an Each table SHALL be its own subtest with its own verdict. An assertion that fails on a row's T, in a helper given it, on NewTWithDeadline of it or in Eventually given it SHALL fail the row and the method and let the row and the rows after it run; an It on it SHALL give its body a T that stops. A row that calls FailNow or skips SHALL end the method there, one that ends the method's own T SHALL end it with that verdict alone, and a loop that breaks SHALL leave the method running.
 
 #### Scenario: A row fails
 - **WHEN** one row of an Each table fails
 - **THEN** fails that row and the method, and the rows after it still run
+
+#### Scenario: A helper fails in a row
+- **WHEN** an assertion fails in a helper an Each row hands its T
+- **THEN** the failure names the helper's line, and the row goes on
+
+#### Scenario: An It in a row
+- **WHEN** an It runs on an Each row's T
+- **THEN** an assertion that fails in its body ends the It there, and the row goes on
+
+#### Scenario: A deadline on a row's T
+- **WHEN** an assertion fails on NewTWithDeadline of an Each row's T
+- **THEN** fails the row, and the row goes on
+
+#### Scenario: A poll in a row
+- **WHEN** Eventually is given an Each row's T and no poll passes
+- **THEN** fails the row, and the row goes on
 
 #### Scenario: A row stops
 - **WHEN** a row of an Each table calls FailNow

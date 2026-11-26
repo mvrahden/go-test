@@ -6,8 +6,9 @@ import (
 )
 
 // EachRowsTestSuite: every row of an Each table is its own subtest with its
-// own verdict; a failing assertion in a row lets the next row run, and a row
-// that leaves early ends the method there.
+// own verdict; a failing assertion in a row, a helper's, a deadline T's or
+// a poll's included, lets the row and the next row run, and a row that leaves
+// early ends the method there.
 type EachRowsTestSuite struct{}
 
 func (s *EachRowsTestSuite) SuiteConfig() gotest.SuiteConfig {
@@ -27,6 +28,34 @@ func (s *EachRowsTestSuite) TestRowsAreSubtests(t *gotest.T) {
 			gotest.Contains(it, run.Markers, "row third")
 			gotest.Contains(it, run.Markers, "after the loop")
 			gotest.Regexp(it, `eachrows_suite_test\.go:\d+: True failed`, run.Stdout)
+		})
+	})
+	t.When("an assertion fails in a helper an Each row hands its T", func(w *gotest.T) {
+		w.It("the failure names the helper's line, and the row goes on", func(it *gotest.T) {
+			gotest.Equal(it, "fail", run.Verdict("TestEachRowsTestSuite/TestAHelperInARow/first"))
+			gotest.Regexp(it, `eachrows_suite_test\.go:90: eachrows_suite_test\.go:\d+: True failed`, run.Stdout)
+			gotest.Contains(it, run.Markers, "after the helper")
+		})
+	})
+	t.When("an It runs on an Each row's T", func(w *gotest.T) {
+		w.It("an assertion that fails in its body ends the It there, and the row goes on", func(it *gotest.T) {
+			gotest.Equal(it, "fail", run.Verdict("TestEachRowsTestSuite/TestAnItInARow/first/stops"))
+			gotest.NotContains(it, run.Markers, "after the failure in the It")
+			gotest.Contains(it, run.Markers, "after the It")
+		})
+	})
+	t.When("an assertion fails on NewTWithDeadline of an Each row's T", func(w *gotest.T) {
+		w.It("fails the row, and the row goes on", func(it *gotest.T) {
+			gotest.Equal(it, "fail", run.Verdict("TestEachRowsTestSuite/TestADeadlineInARow/first"))
+			gotest.Contains(it, run.Stdout, "message: the deadline T fails")
+			gotest.Contains(it, run.Markers, "after the deadline T")
+		})
+	})
+	t.When("Eventually is given an Each row's T and no poll passes", func(w *gotest.T) {
+		w.It("fails the row, and the row goes on", func(it *gotest.T) {
+			gotest.Equal(it, "fail", run.Verdict("TestEachRowsTestSuite/TestEventuallyInARow/first"))
+			gotest.Regexp(it, `Eventually failed after 50ms`, run.Stdout)
+			gotest.Contains(it, run.Markers, "after Eventually")
 		})
 	})
 	t.When("a row of an Each table calls FailNow", func(w *gotest.T) {
