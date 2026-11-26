@@ -1,6 +1,7 @@
 package gotestaudit
 
 import (
+	"bytes"
 	"cmp"
 	"context"
 	"crypto/sha256"
@@ -184,12 +185,24 @@ func brokenPackage(b *gotestgen.BrokenPackage) (Package, module) {
 		if root != "" {
 			e = strings.ReplaceAll(e, root+string(filepath.Separator), "")
 		}
-		errs = append(errs, e)
+		errs = append(errs, slashPositions(e))
 	}
 	if len(errs) == 0 {
 		errs = append(errs, "the package does not compile")
 	}
 	return Package{Path: b.PkgPath, Module: m.path, Dir: m.rel(b.Dir), Unreadable: errs}, m
+}
+
+// slashPositions writes the file a line opens with slash-separated: the
+// compiler writes it with backslashes on Windows.
+func slashPositions(e string) string {
+	lines := strings.Split(e, "\n")
+	for i, line := range lines {
+		if end := strings.Index(line, ".go:"); end > 0 && !strings.Contains(line[:end], ": ") {
+			lines[i] = filepath.ToSlash(line[:end]) + line[end:]
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 // snapshotsIn lists the baselines MatchSnapshot keeps beside a package's
@@ -202,7 +215,9 @@ func snapshotsIn(pkgDir string, m module) []Snapshot {
 		if err != nil {
 			continue
 		}
-		sum := sha256.Sum256(data)
+		// MatchSnapshot reads a CRLF baseline as its LF one, as a Windows
+		// checkout or git archive under core.autocrlf writes it.
+		sum := sha256.Sum256(bytes.ReplaceAll(data, []byte("\r\n"), []byte("\n")))
 		out = append(out, Snapshot{Module: m.path, File: m.rel(f), SHA256: hex.EncodeToString(sum[:])})
 	}
 	return out
