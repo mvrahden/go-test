@@ -29515,6 +29515,191 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "fail-guard leaves it unreported, through an alias and inside a closure too",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "eachrows_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 21,
+                      "name": "fail-guard_leaves_it_unreported,_through_an_alias_and_inside_a_closure_too",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a guard on an Each row's T ends the method",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "eachrows_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 20,
+                  "name": "a_guard_on_an_Each_row's_T_ends_the_method",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "fail-guard leaves it unreported",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "eachrows_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 29,
+                      "name": "fail-guard_leaves_it_unreported",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when an or-chained or else-if guard fails an Each row's T",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "eachrows_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 28,
+                  "name": "an_or-chained_or_else-if_guard_fails_an_Each_row's_T",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "t-escape leaves it unreported and still fixes one given the outer t.T()",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "eachrows_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 36,
+                      "name": "t-escape_leaves_it_unreported_and_still_fixes_one_given_the_outer_t.T()",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when an assertion is given an Each row's T()",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "eachrows_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 35,
+                  "name": "an_assertion_is_given_an_Each_row's_T()",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "assertion-redundant leaves it unreported and still reports a pair on one T",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "eachrows_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 44,
+                      "name": "assertion-redundant_leaves_it_unreported_and_still_reports_a_pair_on_one_T",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a redundant pair splits between an Each row's T and another T",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "eachrows_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 43,
+                  "name": "a_redundant_pair_splits_between_an_Each_row's_T_and_another_T",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "fail-guard reports it with a fix and no claim that an assertion halts",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "eachrows_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 50,
+                      "name": "fail-guard_reports_it_with_a_fix_and_no_claim_that_an_assertion_halts",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a guard of one condition calls Fail or Errorf on an Each row's T",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "eachrows_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 49,
+                  "name": "a_guard_of_one_condition_calls_Fail_or_Errorf_on_an_Each_row's_T",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "FailureGuards",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "eachrows_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 19,
+              "name": "TestFailureGuards",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "EachRowGuards",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "eachrows_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 11,
+          "name": "TestEachRowGuardsTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "ends each past its posn, at the end of the call and of the function's signature",
                       "duration": 0,
                       "excluded": false,
@@ -39247,13 +39432,13 @@
     }
   ],
   "stats": {
-    "behaviors": 1140,
+    "behaviors": 1145,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 160,
+    "suites": 161,
     "tests": 0
   }
 }
