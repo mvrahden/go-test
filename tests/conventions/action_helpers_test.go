@@ -64,7 +64,7 @@ func runActionStep(t *gotest.T, script, dir string, bins map[string]string, env 
 	output, envFile := filepath.Join(base, "output"), filepath.Join(base, "env")
 	cmd := exec.CommandContext(t.Context(), "bash", "--noprofile", "--norc", "-eo", "pipefail", "-c", script) //nolint:gosec // G204: the action's own script
 	cmd.Dir = dir
-	cmd.Env = append(stepEnviron(), "PWD="+dir,
+	cmd.Env = append(stepEnviron(t), "PWD="+dir,
 		"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
 		"RUNNER_TEMP="+temp, "RUNNER_OS=Linux",
 		"GITHUB_OUTPUT="+output, "GITHUB_ENV="+envFile, "GITHUB_STEP_SUMMARY="+filepath.Join(base, "summary"))
@@ -101,11 +101,19 @@ func unixActionGuard() string {
 
 // stepEnviron is this process's environment without what the Action passes
 // its own steps: under CI these tests run inside it, and a step under test
-// would otherwise read the outer run's inputs.
-func stepEnviron() []string {
+// would otherwise read the outer run's inputs, exports and any variable a
+// step's env: sets, such as EVENT_NAME.
+func stepEnviron(t *gotest.T) []string {
+	stepVars := map[string]bool{}
+	for _, st := range readAction(t).Runs.Steps {
+		for name := range st.Env {
+			stepVars[name] = true
+		}
+	}
 	var env []string
 	for _, kv := range os.Environ() {
-		if strings.HasPrefix(kv, "INPUT_") || strings.HasPrefix(kv, "GOTEST_BIN=") || strings.HasPrefix(kv, "GOTEST_CMD=") {
+		name, _, _ := strings.Cut(kv, "=")
+		if strings.HasPrefix(name, "INPUT_") || name == "GOTEST_BIN" || name == "GOTEST_CMD" || stepVars[name] {
 			continue
 		}
 		env = append(env, kv)
