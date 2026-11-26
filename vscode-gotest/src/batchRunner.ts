@@ -23,7 +23,11 @@ import {
   markFailedRun,
 } from "./runnerUtils.js";
 import { coverOf, type RunPiece } from "./specStore.js";
-import { nextEventsFile, pruneEventsFiles } from "./eventsFiles.js";
+import {
+  coverFileFor,
+  nextEventsFile,
+  pruneEventsFiles,
+} from "./eventsFiles.js";
 import { liveResults } from "./config.js";
 import type { RunProgress } from "./liveProgress.js";
 import {
@@ -75,7 +79,7 @@ export function liveEnv(
 
 export interface BatchResult {
   stdout: string;
-  // The run as the Spec View keeps it.
+  // The run as the panel keeps it.
   piece: RunPiece;
 }
 
@@ -179,16 +183,22 @@ async function runBatch(config: BatchConfig): Promise<BatchResult> {
     cliPkgArgs = wildcards ?? importPaths;
   }
   let coverFile: string | undefined;
+  // A profile kept beside the run's stream outlives the run; one in a
+  // temporary directory goes with it.
+  let coverKept = false;
 
   try {
-    if (coverage) {
+    // The stream on disk too, so the run's record names a file to open.
+    const eventsFile = nextEventsFile();
+    if (coverage && eventsFile) {
+      coverFile = coverFileFor(eventsFile);
+      coverKept = true;
+    } else if (coverage) {
       const tmpDir = await mkdtemp(path.join(tmpdir(), "gotest-cov-"));
       coverFile = path.join(tmpDir, "cover.out");
     }
 
     const gotestArgs: string[] = [];
-    // The stream on disk too, so the run's record names a file to open.
-    const eventsFile = nextEventsFile();
     if (eventsFile) gotestArgs.push(`--events-file=${eventsFile}`);
     if (changed) gotestArgs.push("--changed");
     const goTestArgs: string[] = ["-json", "-count=1", ...cliPkgArgs];
@@ -434,7 +444,7 @@ async function runBatch(config: BatchConfig): Promise<BatchResult> {
     return { stdout: "", piece: runPiece("", config) };
   } finally {
     pruneEventsFiles();
-    if (coverFile) {
+    if (coverFile && !coverKept) {
       rm(path.dirname(coverFile), { recursive: true, force: true }).catch(
         () => {},
       );
