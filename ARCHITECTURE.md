@@ -1514,7 +1514,7 @@ miscounts test functions embedded in string fixtures.
   budget caps the rest. The rows without that proof are ring-1 behaviors.
 - The extension's runs use `-json` and inherit the census: the missing
   units arrive in the stream as failed tests, so the Test Explorer marks
-  the method and the Spec View names it. Nothing in the editor knows the
+  the method and the editor's panel names it. Nothing in the editor knows the
   census exists.
 
 The migration that established this found a real defect the stdlib tests could

@@ -257,7 +257,7 @@ those are your job, below.
    is valid")`, never `t.When("when email is valid")`; `t.It("creates the
    user")`, never `t.It("it creates the user")`. The spec renders every
    `When` label as `when <condition>` on every surface (terminal, JSON,
-   discovery, the editor's tree and Spec View) and the ✓/✗ glyph plays
+   discovery, the editor's tree and panel) and the ✓/✗ glyph plays
    the role of "it", so the word in the source is said twice. A `When`
    that opens with its own connective (`with …`, `given …`, `after …`,
    `if …`, …) is rendered as written. The `behavior-wording` rule flags
