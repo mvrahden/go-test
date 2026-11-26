@@ -105,8 +105,9 @@ func unixActionGuard() string {
 // step's env: sets, such as EVENT_NAME.
 func stepEnviron(t *gotest.T) []string {
 	stepVars := map[string]bool{}
-	for _, st := range readAction(t).Runs.Steps {
-		for name := range st.Env {
+	steps := readAction(t).Runs.Steps
+	for i := range steps {
+		for name := range steps[i].Env {
 			stepVars[name] = true
 		}
 	}
