@@ -145,7 +145,7 @@ export class TestRunner {
       });
 
       // A narrowed run starts nothing up front: a package it leaves out
-      // keeps its verdict, and one it runs is marked as its events come.
+      // keeps its verdict, and the batch marks the ones the CLI runs.
       if (!narrow) {
         for (const item of items) {
           const whole = options?.filter === undefined;

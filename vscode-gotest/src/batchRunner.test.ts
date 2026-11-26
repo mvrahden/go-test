@@ -272,3 +272,160 @@ describe("a batch's live stream", () => {
     expect(progress.pieces()[0].folder).toBe("/w");
   });
 });
+
+describe("a --changed batch's running state", () => {
+  interface Node {
+    id: string;
+    label: string;
+    parent?: Node;
+    tags: { id: string }[];
+    kids: Map<string, Node>;
+    children: {
+      forEach: (fn: (n: Node) => void) => void;
+      get: (id: string) => Node | undefined;
+    };
+  }
+  function node(id: string, parent?: Node, tags: string[] = []): Node {
+    const kids = new Map<string, Node>();
+    const n: Node = {
+      id,
+      label: id.split("/").pop()!,
+      parent,
+      tags: tags.map((t) => ({ id: t })),
+      kids,
+      children: {
+        forEach: (fn) => kids.forEach(fn),
+        get: (k) => kids.get(k),
+      },
+    };
+    parent?.kids.set(id, n);
+    return n;
+  }
+  const root = node("dir:pkgs");
+  const cart = node("example.com/cart", root, ["package"]);
+  const cartSuite = node("example.com/cart/CartSuite", cart);
+  const cartAdd = node("example.com/cart/CartSuite/TestAdd", cartSuite);
+  const shop = node("example.com/shop", root, ["package"]);
+  const shopSuite = node("example.com/shop/ShopSuite", shop);
+  const all = [root, cart, cartSuite, cartAdd, shop, shopSuite];
+
+  function harness() {
+    const calls: string[] = [];
+    const cleared: string[] = [];
+    const say = (what: string) => (i: Node) => calls.push(`${what} ${i.id}`);
+    const run = {
+      appendOutput: () => {},
+      started: say("started"),
+      enqueued: say("enqueued"),
+      passed: say("passed"),
+      failed: say("failed"),
+      skipped: say("skipped"),
+      errored: say("errored"),
+    };
+    const results = new Map<string, string>();
+    const controller = {
+      findItem: (id: string) => all.find((n) => n.id === id),
+      clearResults: (i: Node) => cleared.push(i.id),
+      recordResult: (id: string, status: string) => results.set(id, status),
+      getResult: (id: string) =>
+        results.has(id) ? { status: results.get(id) } : undefined,
+      noteStart: () => {},
+      notePaused: () => {},
+      createDynamicSubtest: () => undefined,
+    };
+    const config = {
+      pkgInfos: [
+        { importPath: cart.id, items: [cart], dir: "/w/cart" },
+        { importPath: shop.id, items: [shop], dir: "/w/shop" },
+      ],
+      filter: undefined,
+      workspaceDir: "/w",
+      testFlags: [],
+      run,
+      token: { isCancellationRequested: false },
+      controller,
+      outputChannel: { info: () => {}, warn: () => {}, error: () => {} },
+      label: "runner",
+      changed: true,
+    } as never;
+    return { calls, cleared, config };
+  }
+
+  // Feeds the lines one by one, recording what the run showed after each.
+  function stream(lines: string[], calls: string[]) {
+    const after: string[][] = [];
+    vi.mocked(spawnTestProcess).mockImplementationOnce(
+      async (...args: unknown[]) => {
+        const onLine = args[7] as (l: string) => void;
+        for (const l of lines) {
+          onLine(l);
+          after.push([...calls]);
+        }
+        return { stdout: lines.join("\n") + "\n", stderr: "", exitCode: 0 };
+      },
+    );
+    return after;
+  }
+
+  const cartEvents = [
+    '{"Action":"start","Package":"example.com/cart"}',
+    '{"Action":"run","Package":"example.com/cart","Test":"TestCartSuite","Gotest":{"Subtest":"TestCartSuite"}}',
+    '{"Action":"pass","Package":"example.com/cart","Test":"TestCartSuite"}',
+    '{"Action":"pass","Package":"example.com/cart"}',
+  ];
+  const touches = (calls: string[], n: Node) =>
+    calls.filter((c) => c.endsWith(" " + n.id) || c.includes(" " + n.id + "/"));
+
+  it("marks the packages the manifest lists as running before their events, and leaves the rest alone", async () => {
+    const { calls, cleared, config } = harness();
+    const after = stream(
+      [manifest({ Ran: 1, Unchanged: 1, Packages: [cart.id] }), ...cartEvents],
+      calls,
+    );
+    await executeBatch(config);
+
+    expect(after[0]).toEqual([
+      `started ${cart.id}`,
+      `enqueued ${cartSuite.id}`,
+      `enqueued ${cartAdd.id}`,
+      `started ${root.id}`,
+    ]);
+    expect(cleared).toEqual([cart.id]);
+    expect(touches(calls, shop)).toEqual([]);
+    // The method no event resolved ends skipped, as in a full run.
+    expect(calls).toContain(`skipped ${cartAdd.id}`);
+  });
+
+  it("errors a package it said it would run that never reported, not one it left out", async () => {
+    const { calls, config } = harness();
+    vi.mocked(spawnTestProcess).mockImplementationOnce(
+      async (...args: unknown[]) => {
+        const line = manifest({ Ran: 1, Unchanged: 1, Packages: [cart.id] });
+        (args[7] as (l: string) => void)(line);
+        return { stdout: line + "\n", stderr: "build broke", exitCode: 2 };
+      },
+    );
+    await executeBatch(config);
+    expect(calls).toContain(`errored ${cart.id}`);
+    expect(touches(calls, shop)).toEqual([]);
+  });
+
+  it("marks a package at its own start event when the manifest lists none", async () => {
+    const { calls, cleared, config } = harness();
+    const after = stream(
+      [manifest({ Ran: 1, Unchanged: 1 }), ...cartEvents],
+      calls,
+    );
+    await executeBatch(config);
+
+    expect(after[0]).toEqual([]);
+    expect(after[1]).toEqual([
+      `started ${cart.id}`,
+      `enqueued ${cartSuite.id}`,
+      `enqueued ${cartAdd.id}`,
+      `started ${root.id}`,
+    ]);
+    expect(cleared).toEqual([cart.id]);
+    expect(touches(calls, shop)).toEqual([]);
+  });
+});

@@ -10,6 +10,8 @@ import { readModulePath } from "./gomod.js";
 import {
   OnceLog,
   StreamApplier,
+  enqueueDescendants,
+  startAncestors,
   getPackageItem,
   skipUnresolved,
   spawnTestProcess,
@@ -225,6 +227,27 @@ async function runBatch(config: BatchConfig): Promise<BatchResult> {
     let streamed = "";
     progress?.streaming(() => runPiece(streamed, config));
 
+    // A --changed run starts nothing up front; a package is marked running
+    // once the CLI says it runs it: in the run's manifest, or, from a CLI
+    // whose manifest lists none, at the package's own start event.
+    const infoByPath = new Map(pkgInfos.map((p) => [p.importPath, p]));
+    const marked = new Set<string>();
+    const markRunning = (paths: readonly string[]) => {
+      const started: vscode.TestItem[] = [];
+      for (const importPath of paths) {
+        const info = infoByPath.get(importPath);
+        if (!info || marked.has(importPath)) continue;
+        marked.add(importPath);
+        for (const item of info.items) {
+          controller.clearResults(item);
+          run.started(item);
+          enqueueDescendants(run, item);
+          started.push(item);
+        }
+      }
+      if (started.length > 0) startAncestors(run, started);
+    };
+
     const handleStdoutLine = (line: string) => {
       streamed += line + "\n";
       let event: TestEvent;
@@ -233,6 +256,14 @@ async function runBatch(config: BatchConfig): Promise<BatchResult> {
         if (!event.Action) return;
       } catch {
         return;
+      }
+      if (changed && event.Action === "start") {
+        const listed = event.Manifest?.Changed?.Packages;
+        if (event.RunLevel) {
+          if (Array.isArray(listed)) markRunning(listed);
+        } else if (!event.Test) {
+          markRunning([event.Package]);
+        }
       }
       const applied = applier.apply([event]);
       if (applied.length > 0) onResults?.(applied);
@@ -261,9 +292,12 @@ async function runBatch(config: BatchConfig): Promise<BatchResult> {
     if (narrowed) run.appendOutput(narrowedLine(narrowed) + "\r\n");
 
     if (token.isCancellationRequested) {
-      const skippedPkgs = changed
-        ? []
-        : pkgInfos.filter((i) => !applier.reported.has(i.importPath));
+      // A narrowed run skips only what it said it would run.
+      const skippedPkgs = pkgInfos.filter(
+        (i) =>
+          !applier.reported.has(i.importPath) &&
+          (!changed || marked.has(i.importPath)),
+      );
       if (skippedPkgs.length > 0) {
         outputChannel.info(
           `[${label}] cancelled, skipping ${skippedPkgs.length} remaining package(s)`,
@@ -288,7 +322,10 @@ async function runBatch(config: BatchConfig): Promise<BatchResult> {
       let attributed = false;
       for (const info of pkgInfos) {
         // A narrowed run left the package out; it did not fail.
-        if (applier.reported.has(info.importPath) || changed) {
+        if (
+          applier.reported.has(info.importPath) ||
+          (changed && !marked.has(info.importPath))
+        ) {
           continue;
         }
 
@@ -328,6 +365,13 @@ async function runBatch(config: BatchConfig): Promise<BatchResult> {
         },
         controller,
       );
+    }
+
+    // What a narrowed run marked and no event resolved, as a full run does.
+    for (const importPath of marked) {
+      for (const item of infoByPath.get(importPath)!.items) {
+        skipUnresolved(run, item, controller);
+      }
     }
 
     if (coverFile && coverage) {
