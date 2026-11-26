@@ -11,7 +11,10 @@ wrap them (or manual fails) in guards — `if err != nil { gotest.Fail(t,
 …) }` and `if got != want { t.Fatal(…) }` are `fail-guard` lint errors;
 write `gotest.NoError(t, err)` / `gotest.Equal(t, want, got)` directly.
 An `Each` row's `t` is the exception (v1.42+): a failing assertion on it
-fails the row and returns, and the row and the rows after it go on.
+fails the row and returns, and the row and the rows after it go on. So a
+guard on a row's `t` that calls `FailNow` or returns, or that chains
+conditions, is no assertion in disguise: `fail-guard` leaves it alone
+([Failure guards on an Each row](https://github.com/mvrahden/go-test/blob/main/specs/lint/spec.md#requirement-failure-guards-on-an-each-row)).
 `Equal`/`NotEqual` take the EXPECTED value first. The linter does not
 check the order of an `Equal` you write; it only puts the constant first
 when it rewrites a `True(t, a == b)` or a guard into one.
