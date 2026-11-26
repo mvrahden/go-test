@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLIRunManifest .* / closes the stream with a fail of gotest run carrying exit code 1, one package passed and one failed, two tests passed and two failed \(
+Clause: when a -json run of a failing and a passing package ends → closes the stream with a fail of gotest run carrying exit code 1, one package passed and one failed, two tests passed and two failed
+--- a/internal/gotestrunner/manifest.go
++++ b/internal/gotestrunner/manifest.go
+@@ -33,7 +33,7 @@
+ 	r.mu.Lock()
+ 	defer r.mu.Unlock()
+ 	if test != "" {
+-		r.tests.Add(action)
++		r.tests.Add("pass")
+ 		return
+ 	}
+ 	if _, ok := r.packages[pkg]; !ok {

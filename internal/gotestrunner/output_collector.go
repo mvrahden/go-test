@@ -56,6 +56,9 @@ type OutputCollector struct {
 	runLevel map[string]bool
 	// events receives a copy of the JSON stream; nil for none.
 	events io.Writer
+	// manifest opens the JSON stream and makes the run close it; nil for a
+	// stream that is neither opened nor closed.
+	manifest *protocol.Manifest
 }
 
 type pkgState struct {
@@ -77,6 +80,12 @@ func WithEvents(w io.Writer) OutputOption {
 	return func(c *OutputCollector) { c.events = w }
 }
 
+// WithManifest opens the JSON stream with m, and has EndRun close it; nil for
+// neither.
+func WithManifest(m *protocol.Manifest) OutputOption {
+	return func(c *OutputCollector) { c.manifest = m }
+}
+
 func NewOutputCollector(mode RunMode, verbose bool, opts ...OutputOption) *OutputCollector {
 	c := &OutputCollector{
 		mode:     mode,
@@ -89,6 +98,14 @@ func NewOutputCollector(mode RunMode, verbose bool, opts ...OutputOption) *Outpu
 	}
 	for _, opt := range opts {
 		opt(c)
+	}
+	if c.gate == &exitGate {
+		// A stream of an earlier run in this process is not this run's.
+		liveStream.Store(nil)
+	}
+	if c.manifest != nil && mode != RunBatchText {
+		// The manifest is the stream's first event.
+		c.jsonTarget()
 	}
 	return c
 }
@@ -581,6 +598,9 @@ func (c *OutputCollector) jsonTarget() io.Writer {
 			w = io.MultiWriter(w, c.events)
 		}
 		c.starts = &startWriter{w: w, started: map[string]bool{}, gate: c.gate, runLevel: c.runLevel}
+		if c.manifest != nil {
+			c.starts.open(c.manifest)
+		}
 		if c.gate == &exitGate {
 			liveStream.Store(c.starts)
 		}
@@ -599,6 +619,8 @@ type startWriter struct {
 	gate    *writeGate
 	// runLevel is the collector's: the packages the run booked for itself.
 	runLevel map[string]bool
+	// run tallies a stream its manifest opened; nil for one without.
+	run *runTally
 }
 
 func (s *startWriter) Write(p []byte) (int, error) {
@@ -633,8 +655,10 @@ func (s *startWriter) writeLine(line []byte) {
 		Time    json.RawMessage
 		Action  string
 		Package string
+		Test    string
 	}
 	if json.Unmarshal(line, &ev) == nil && ev.Package != "" {
+		s.run.count(ev.Package, ev.Test, ev.Action)
 		switch {
 		case !s.started[ev.Package] && ev.Action == "start":
 			s.started[ev.Package] = true

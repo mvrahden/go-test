@@ -49,6 +49,22 @@ type goTestEvent struct {
 		Repeat   int    `json:",omitempty"`
 		Instance int    `json:",omitempty"`
 	} `json:",omitempty"`
+	// Manifest and Result are gotest's own: what the run was, on its start,
+	// and what it judged, on its verdict.
+	Manifest *struct {
+		Version   string
+		GoVersion string `json:",omitempty"`
+		Args      []string
+		Commit    string `json:",omitempty"`
+		Dirty     *bool  `json:",omitempty"`
+		Agent     string `json:",omitempty"`
+	} `json:",omitempty"`
+	Result *struct {
+		ExitCode int
+		Packages struct{ Passed, Failed, Skipped int }
+		Tests    struct{ Passed, Failed, Skipped int }
+		NotRun   *int `json:",omitempty"`
+	} `json:",omitempty"`
 }
 
 var goTestActions = []string{"start", "run", "pause", "cont", "pass", "bench", "fail", "output", "skip", "build-output", "build-fail", "attr"}
@@ -117,7 +133,7 @@ func (s *JSONStreamTestSuite) TestABuildFailureTakesGoTestsShape(t *gotest.T) {
 			diagnostics += ev.Output
 		case ev.Action == "build-fail":
 			builds = append(builds, ev)
-		case ev.Action == "fail" && ev.Test == "":
+		case ev.Action == "fail" && ev.Test == "" && !ev.RunLevel:
 			verdict = ev
 		case ev.Action == "output" && ev.Test == "":
 			gotest.NotContains(t, ev.Output, ":", "a diagnostic left the build events: %s", ev.Output)

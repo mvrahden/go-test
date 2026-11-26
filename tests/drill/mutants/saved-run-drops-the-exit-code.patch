@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLIRunManifest .* / summary --format=json of the run's saved stream names the same run \(
+Clause: when spec --format=json renders a live run of a failing package → summary --format=json of the run's saved stream names the same run
+--- a/internal/gotestspec/run.go
++++ b/internal/gotestspec/run.go
+@@ -31,7 +31,7 @@
+ 		if ev.Manifest != nil && !ok {
+ 			r.Manifest, ok = *ev.Manifest, true
+ 		}
+-		if ev.Result != nil {
++		if ev.Result != nil && ev.Time.IsZero() {
+ 			code := ev.Result.ExitCode
+ 			r.ExitCode = &code
+ 		}

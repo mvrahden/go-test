@@ -5,7 +5,13 @@ invocation runs tests — there is NO `test` subcommand:
 
 - `go tool gotest ./...` — run suites (never stdlib tests; those need
   `go test`). Passthrough flags work: `-v`, `-race`, `-count`, `-run`,
-  `-json` (streams `go test -json` events incl. every subtest name).
+  `-json` (streams `go test -json` events incl. every subtest name; v1.42+
+  the first and last event belong to the package `gotest run`, marked
+  `RunLevel`: its start's `Manifest` names the CLI and Go versions, the
+  arguments, the commit and dirty flag and the agent (`AI_AGENT`, else
+  `claude-code` under `CLAUDECODE=1`); its verdict's `Result` carries the
+  exit code and the counts. `spec`/`summary --format=json` repeat them as
+  `run`).
   `-o` is refused with exit 2, and so are (v1.38+) `-c`, `-n`, `-overlay`,
   `-fuzz` (use `gotest fuzz`), and a profile flag (`-cpuprofile`, `-trace`, …) on a run
   that starts more than one suite process. `-run '^Test<Suite>$'` reaches

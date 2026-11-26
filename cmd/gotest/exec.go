@@ -10,6 +10,7 @@ import (
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
+	"github.com/mvrahden/go-test/internal/protocol"
 )
 
 func Run(cfg ExecConfig) int { //nolint:gocritic // hugeParam: stable API
@@ -67,6 +68,7 @@ func Run(cfg ExecConfig) int { //nolint:gocritic // hugeParam: stable API
 		PackageOrder:    pkgs.Order,
 		Groups:          cfg.Groups,
 		SkipGroups:      cfg.SkipGroups,
+		Manifest:        manifestIf(cfg.JSON),
 	}, overlay)
 	clock.ran, clock.compile = time.Now(), result.CompileSpan
 	if err != nil {
@@ -119,6 +121,14 @@ func sumStdlibTests(byPkg map[string]int) (int, string) {
 		pkgs = append(pkgs[:3], fmt.Sprintf("… %d more", len(byPkg)-3))
 	}
 	return total, strings.Join(pkgs, ", ")
+}
+
+// manifestIf is the run's manifest when its stream is asked for, else nil.
+func manifestIf(stream bool) *protocol.Manifest {
+	if !stream {
+		return nil
+	}
+	return runManifest()
 }
 
 func modeFromJSON(jsonMode bool) gotestrunner.RunMode {

@@ -52,6 +52,10 @@ type TestEvent struct {
 	RunLevel bool `json:"RunLevel"`
 	// Gotest says where the test sits, when gotest's runner wrote the event.
 	Gotest *protocol.Stamp `json:"Gotest,omitempty"`
+	// Manifest and Result are the run's own: its start says what it was,
+	// its verdict what it judged (protocol.RunPackage).
+	Manifest *protocol.Manifest  `json:"Manifest,omitempty"`
+	Result   *protocol.RunResult `json:"Result,omitempty"`
 }
 
 // ParseEvents reads one event per line, a line of any length; blank and

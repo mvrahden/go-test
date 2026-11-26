@@ -14,7 +14,7 @@ Clause: when a -json run with --events-file is killed while a suite holds → ke
  	"fmt"
  	"io"
  	"os"
-@@ -196,6 +197,11 @@
+@@ -203,6 +204,11 @@
  	}
  	cfg.JSON = jsonMode
  	cfg.Events = eventsWriter(events)
@@ -24,5 +24,5 @@ Clause: when a -json run with --events-file is killed while a suite holds → ke
 +		cfg.Events = bw
 +	}
  
- 	return enforceCoverage(coverProfile, minCoverage, Run(cfg))
- }
+ 	code := enforceCoverage(coverProfile, minCoverage, Run(cfg))
+ 	gotestrunner.EndRun(code)

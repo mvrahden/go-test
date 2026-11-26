@@ -215,7 +215,7 @@ The Markdown spec SHALL be an outline: a header with the counts, the runs' time 
 - **THEN** the header names what is hidden
 
 ### Requirement: The checkout a report was made in
-The spec of a live run SHALL name the checkout's branch, its commit and whether it has uncommitted changes. A spec rendered from a saved stream (--input) SHALL name no checkout: the stream does not say where it was made, and the checkout it is read in may be another.
+The Markdown and terminal spec of a live run SHALL name the checkout's branch, its commit and whether it has uncommitted changes. One rendered from a saved stream (--input) SHALL name no checkout: the checkout it is read in may be another than the one the run was made in. The JSON document names the run its stream records instead ([The run a document renders](../cli/spec.md#requirement-the-run-a-document-renders)).
 
 #### Scenario: Where a report was made
 - **WHEN** the Markdown spec is rendered in a checkout

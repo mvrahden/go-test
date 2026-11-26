@@ -1183,6 +1183,24 @@
       "events": [
         {
           "Action": "start",
+          "Package": "gotest run",
+          "RunLevel": true,
+          "Manifest": {
+            "Version": "dev (source checkout)",
+            "GoVersion": "<go>",
+            "Args": [
+              "-json",
+              "./cmd/gotest/testdata/unrun/notestfiles/",
+              "./cmd/gotest/testdata/unrun/nosuites/",
+              "./cmd/gotest/testdata/unrun/excluded/",
+              "./cmd/gotest/testdata/census/plain/"
+            ],
+            "Commit": "<commit>",
+            "Dirty": "<dirty>"
+          }
+        },
+        {
+          "Action": "start",
           "Package": "github.com/mvrahden/go-test/cmd/gotest/testdata/unrun/excluded"
         },
         {
@@ -1346,6 +1364,26 @@
           "Action": "pass",
           "Elapsed": 0,
           "Package": "github.com/mvrahden/go-test/cmd/gotest/testdata/census/plain"
+        },
+        {
+          "Action": "pass",
+          "Package": "gotest run",
+          "Elapsed": 0,
+          "RunLevel": true,
+          "Result": {
+            "ExitCode": 0,
+            "Packages": {
+              "Passed": 2,
+              "Failed": 0,
+              "Skipped": 2
+            },
+            "Tests": {
+              "Passed": 3,
+              "Failed": 0,
+              "Skipped": 1
+            },
+            "NotRun": 0
+          }
         }
       ]
     },
@@ -1357,6 +1395,19 @@
       "exitCode": 1,
       "stderr": "FAIL: DownSharedFixture.BeforeAll failed after 1 attempt(s): the fixture would not come up\nFAIL: shared fixture setup failed: one or more shared fixtures failed\nTestDownTestSuite never ran: shared fixture DownSharedFixture did not come up\n",
       "events": [
+        {
+          "Action": "start",
+          "Package": "gotest run",
+          "RunLevel": true,
+          "Manifest": {
+            "Version": "dev (source checkout)",
+            "GoVersion": "<go>",
+            "Args": [
+              "-json",
+              "./..."
+            ]
+          }
+        },
         {
           "Action": "start",
           "Package": "gotest.runlevel/down"
@@ -1412,6 +1463,25 @@
           "Action": "fail",
           "Package": "shared fixtures",
           "RunLevel": true
+        },
+        {
+          "Action": "fail",
+          "Package": "gotest run",
+          "Elapsed": 0,
+          "RunLevel": true,
+          "Result": {
+            "ExitCode": 1,
+            "Packages": {
+              "Passed": 0,
+              "Failed": 2,
+              "Skipped": 0
+            },
+            "Tests": {
+              "Passed": 0,
+              "Failed": 1,
+              "Skipped": 0
+            }
+          }
         }
       ],
       "spec": {

@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/cli CLIRunManifest .* / names the agent AI_AGENT names, and claude-code under CLAUDECODE=1 alone \(
+Clause: when a -json run is made under an agent → names the agent AI_AGENT names, and claude-code under CLAUDECODE=1 alone
+--- a/internal/agentenv/agentenv.go
++++ b/internal/agentenv/agentenv.go
+@@ -22,9 +22,6 @@
+ // Detect is the agent getenv describes: AI_AGENT when set, else the name a
+ // tool's own variable gives; "" for none.
+ func Detect(getenv func(string) string) string {
+-	if v := strings.TrimSpace(getenv(EnvAgent)); v != "" {
+-		return v
+-	}
+ 	for _, k := range known {
+ 		if strings.TrimSpace(getenv(k.env)) == k.value {
+ 			return k.name

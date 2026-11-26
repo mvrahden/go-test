@@ -2,12 +2,13 @@ Expect: ^FAIL .*internal/gotestrunner .*ExitWrites
 Judge: ./internal/gotestrunner ExitWritesTestSuite/TestAnExitGotestMakesItself
 --- a/internal/gotestrunner/abandon.go
 +++ b/internal/gotestrunner/abandon.go
-@@ -137,9 +137,7 @@
- // first.
+@@ -137,10 +137,7 @@
+ // first, and a stream its manifest opened is closed with code.
  func Exit(code int, hurry <-chan struct{}) {
  	if exitGate.end(writeBound, hurry) {
 -		if s := liveStream.Load(); s != nil {
 -			s.bookExit()
+-			s.end(code)
 -		}
 +		_ = liveStream.Load()
  	}

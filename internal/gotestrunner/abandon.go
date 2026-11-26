@@ -134,11 +134,12 @@ const writeBound = time.Second
 // event on its way to stdout and the events file gets there first, within
 // writeBound or until hurry closes, and no other starts.
 // A -json stream that does not hold the run's interruption yet is given it
-// first.
+// first, and a stream its manifest opened is closed with code.
 func Exit(code int, hurry <-chan struct{}) {
 	if exitGate.end(writeBound, hurry) {
 		if s := liveStream.Load(); s != nil {
 			s.bookExit()
+			s.end(code)
 		}
 	}
 	osExit(code)

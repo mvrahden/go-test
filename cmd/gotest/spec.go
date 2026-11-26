@@ -161,13 +161,14 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		PackageOrder:    pkgs.Order,
 		Groups:          cfg.Groups,
 		SkipGroups:      cfg.SkipGroups,
+		Manifest:        runManifest(),
 	}, overlay)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
 
-	code := result.ExitCode
+	code, coverageFailure := coverageVerdict(coverProfile, minCoverage, result.ExitCode)
 	events, err := gotestspec.ParseEvents(bytes.NewReader(result.CapturedJSON))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: parsing test events: %s\n", err)
@@ -199,9 +200,23 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		w = f
 	}
 
-	renderSpec(w, tree, format, noColor, view.options, liveRun)
+	renderSpec(w, tree, format, noColor, append(slices.Clone(view.options), runOptions(events, &code)...), liveRun)
+	fmt.Fprint(os.Stderr, coverageFailure)
+	return code
+}
 
-	return enforceCoverage(coverProfile, minCoverage, code)
+// runOptions name the run events record, with code as its exit code when
+// not nil; none for a stream with no manifest.
+func runOptions(events []gotestspec.TestEvent, code *int) []gotestspec.RenderOption {
+	run, ok := gotestspec.RunOf(events)
+	if !ok {
+		return nil
+	}
+	if code != nil {
+		c := *code
+		run.ExitCode = &c
+	}
+	return []gotestspec.RenderOption{gotestspec.WithRun(&run)}
 }
 
 // renderSpec renders tree in format, under the view's options; live says
@@ -333,7 +348,7 @@ func runSpecFromInput(input, format, output string, noColor, renderOnly bool, so
 		w = of
 	}
 
-	renderSpec(w, tree, format, noColor, view, savedStream)
+	renderSpec(w, tree, format, noColor, append(slices.Clone(view), runOptions(events, nil)...), savedStream)
 
 	// The same exit rule as `summary --input`: a renderer fed a failing stream
 	// must not exit 0 — in a pipe without pipefail this exit code is the only

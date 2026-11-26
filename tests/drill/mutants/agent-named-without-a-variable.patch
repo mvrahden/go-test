@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLIRunManifest .* / names no agent without either \(
+Clause: when a -json run is made under an agent → names no agent without either
+--- a/internal/agentenv/agentenv.go
++++ b/internal/agentenv/agentenv.go
+@@ -26,7 +26,7 @@
+ 		return v
+ 	}
+ 	for _, k := range known {
+-		if strings.TrimSpace(getenv(k.env)) == k.value {
++		if strings.TrimSpace(getenv(k.env)) != "0" {
+ 			return k.name
+ 		}
+ 	}

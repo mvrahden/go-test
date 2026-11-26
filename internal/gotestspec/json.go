@@ -11,11 +11,27 @@ import (
 // it: the CLI that produced the document, so a consumer streaming a large
 // tree can gate on the producer before reading the rest.
 type jsonRoot struct {
-	Version  string        `json:"version"`
+	Version string `json:"version"`
+	// Run is the run the document renders, as its stream recorded it;
+	// absent for a document of no run, or of a stream that says nothing.
+	Run      *jsonRun      `json:"run,omitempty"`
 	Packages []jsonPackage `json:"packages"`
 	Stats    jsonStats     `json:"stats"`
 	// Groups is what each named ExclusiveGroup took; absent without one.
 	Groups []jsonGroup `json:"groups,omitempty"`
+}
+
+type jsonRun struct {
+	// Version is the CLI that made the run, which may not be the one that
+	// renders it.
+	Version   string   `json:"version,omitempty"`
+	GoVersion string   `json:"goVersion,omitempty"`
+	Args      []string `json:"args,omitempty"`
+	Commit    string   `json:"commit,omitempty"`
+	Dirty     *bool    `json:"dirty,omitempty"`
+	Agent     string   `json:"agent,omitempty"`
+	// ExitCode is absent for a stream that ended before the run closed it.
+	ExitCode *int `json:"exitCode,omitempty"`
 }
 
 type jsonGroup struct {
@@ -102,6 +118,7 @@ func RenderJSON(w io.Writer, packages []*Package, opts ...RenderOption) {
 		Version:  about.ResolvedVersion(),
 		Packages: []jsonPackage{},
 		Stats:    jsonStats(stats),
+		Run:      cfg.run.json(),
 	}
 
 	// Every package stays, with its stats: hiding leaves out rows, never a

@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mvrahden/go-test/internal/agentenv"
 	"github.com/mvrahden/go-test/internal/proctree"
 	"github.com/mvrahden/go-test/internal/protocol"
 )
@@ -231,7 +232,7 @@ func MarkerOrderOf(got []string, markers ...string) bool {
 }
 
 // childEnv is the CLI's environment: the caller's, minus the GitHub Actions
-// variables, the CI switches and the snapshot update switch, plus the marker
+// variables, the CI switches, the agent's variables and the snapshot update switch, plus the marker
 // directory, so a run under test sees only the flags it was given. Its gotest
 // cache uses the drill's private worker root when supplied, otherwise the
 // marker directory; neither fills the user's cache.
@@ -246,6 +247,8 @@ func childEnv(markerDir string) []string {
 			strings.HasPrefix(kv, "GOTEST_CI="),
 			strings.HasPrefix(kv, "CI="),
 			strings.HasPrefix(kv, "GOTEST_CANARY_DIR="),
+			strings.HasPrefix(kv, agentenv.EnvAgent+"="),
+			strings.HasPrefix(kv, "CLAUDECODE="),
 			strings.HasPrefix(kv, protocol.EnvCacheDir+"="):
 			continue
 		}

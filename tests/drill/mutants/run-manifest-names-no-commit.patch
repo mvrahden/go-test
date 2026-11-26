@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/cli CLIRunManifest .* / names the checkout's commit and whether it has uncommitted changes \(
+Expect: ^FAIL .*conformance/cli CLIRunManifest .* / its run names the commit, the go command's version and exit code 1, after version \(
+Clause: when a -json run is made in a checkout → names the checkout's commit and whether it has uncommitted changes
+Clause: when spec --format=json renders a live run of a failing package → its run names the commit, the go command's version and exit code 1, after version
+--- a/cmd/gotest/provenance.go
++++ b/cmd/gotest/provenance.go
+@@ -47,7 +47,7 @@
+ 	wg.Go(func() { p = readProvenance(cwd) })
+ 	wg.Go(func() { m.GoVersion = goVersion(cwd) })
+ 	wg.Wait()
+-	if p.Commit != "" {
++	if p.Commit != "" && p.Branch == "" {
+ 		dirty := p.Dirty
+ 		m.Commit, m.Dirty = p.Commit, &dirty
+ 	}

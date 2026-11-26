@@ -6,8 +6,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 
+	"github.com/mvrahden/go-test/internal/about"
+	"github.com/mvrahden/go-test/internal/agentenv"
 	"github.com/mvrahden/go-test/internal/gotestspec"
+	"github.com/mvrahden/go-test/internal/protocol"
 )
 
 // readProvenance is the checkout dir is in: its branch, its commit and
@@ -27,6 +31,38 @@ func readProvenance(dir string) gotestspec.Provenance {
 		return gotestspec.Provenance{}
 	}
 	return gotestspec.Provenance{Branch: branch, Commit: commit, Dirty: status != ""}
+}
+
+// runManifest is what a -json run opens its stream with: this CLI, the Go
+// the go command runs, the run's arguments, the checkout it was made in and
+// the agent it runs under. A fact it cannot learn is left out.
+func runManifest() *protocol.Manifest {
+	m := &protocol.Manifest{Version: about.ResolvedVersion(), Args: append([]string{}, os.Args[1:]...), Agent: agentenv.Name()}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return m
+	}
+	var wg sync.WaitGroup
+	var p gotestspec.Provenance
+	wg.Go(func() { p = readProvenance(cwd) })
+	wg.Go(func() { m.GoVersion = goVersion(cwd) })
+	wg.Wait()
+	if p.Commit != "" {
+		dirty := p.Dirty
+		m.Commit, m.Dirty = p.Commit, &dirty
+	}
+	return m
+}
+
+// goVersion is the version of the go command in dir, "" when it cannot say.
+func goVersion(dir string) string {
+	cmd := exec.Command("go", "env", "GOVERSION")
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
 }
 
 // git runs git in dir and returns its trimmed output.

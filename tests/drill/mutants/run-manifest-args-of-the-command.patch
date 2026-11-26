@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLIRunManifest .* / opens the stream with a RunLevel start of gotest run naming the CLI's version, the go command's version and the run's arguments \(
+Clause: when a -json run is made in a checkout → opens the stream with a RunLevel start of gotest run naming the CLI's version, the go command's version and the run's arguments
+--- a/cmd/gotest/provenance.go
++++ b/cmd/gotest/provenance.go
+@@ -37,7 +37,7 @@
+ // the go command runs, the run's arguments, the checkout it was made in and
+ // the agent it runs under. A fact it cannot learn is left out.
+ func runManifest() *protocol.Manifest {
+-	m := &protocol.Manifest{Version: about.ResolvedVersion(), Args: append([]string{}, os.Args[1:]...), Agent: agentenv.Name()}
++	m := &protocol.Manifest{Version: about.ResolvedVersion(), Args: append([]string{}, os.Args[2:]...), Agent: agentenv.Name()}
+ 	cwd, err := os.Getwd()
+ 	if err != nil {
+ 		return m
