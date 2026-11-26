@@ -201,7 +201,7 @@ AfterAll <span class="d">(via t.Cleanup — always runs)</span></div>
 }</pre>
       </div>
       <div class="callout">
-        Each entry becomes a subtest. Uses the <code>Desc</code> or <code>Name</code> field for the test name, falls back to <code>#0</code>, <code>#1</code>, etc. A row's <code>t</code> is soft: a failing assertion fails the row and the method while the rows after it still run, so one run reports every failing row; a row that calls <code>FailNow</code> or skips ends the method there (<a href="https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-each-rows">Each rows</a>).
+        Each entry becomes a subtest. Uses the <code>Desc</code> or <code>Name</code> field for the test name, falls back to <code>#0</code>, <code>#1</code>, etc. A failing assertion on a row's <code>t</code> fails the row and the method while the row and the rows after it still run, so one run reports every failing row; a row that calls <code>FailNow</code> or skips ends the method there (<a href="https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-each-rows">Each rows</a>).
       </div>
 
       <h3>Snapshot testing</h3>
@@ -370,9 +370,6 @@ CacheFixture.AfterAll <span class="d">─┘</span></div>
       <p class="lead">Type-safe generics with compile-time checking. Zero external dependencies. Works with <code>*gotest.T</code>, <code>*testing.T</code>, <code>*gotest.B</code> and <code>*gotest.F</code>.</p>
       <div class="callout">
         Assertion failures automatically trace back to the test call site. Helper functions don't need <code>t.Helper()</code> — the failure is located at the line that failed, a helper's included, and the message names the outermost caller from the test file.
-      </div>
-      <div class="callout">
-        A failing assertion stops the test. Hand it <code>t.Soft()</code> and it reports the failure and returns instead, so one run shows every mismatch and the test fails when it ends: <code>gotest.Equal(t.Soft(), want.Name, got.Name)</code>. Keep fatal the checks a later line dereferences (<a href="https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-soft-assertions">Soft assertions</a>).
       </div>
 
       <h3>Equality &amp; identity</h3>

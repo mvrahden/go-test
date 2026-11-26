@@ -77,9 +77,7 @@ The linter catches direct misuse (`t.T()` escapes even inside closures,
 outer-`t` in poll callbacks, testify idioms, focus leftovers, and
 `fail-guard`: any `if cond { gotest.Fail(t, …) }` or `if err != nil {
 t.Fatal(err) }` guard — assertions halt on failure, so state them
-directly: `gotest.NoError(t, err)`, never a guarded fail). To see every
-mismatch in one run, hand the independent checks `t.Soft()` (v1.42+):
-they report and go on; keep fatal what a later line dereferences. Fixes can
+directly: `gotest.NoError(t, err)`, never a guarded fail). Fixes can
 compose — a rewritten guard may itself be simplifiable; from v1.33 one
 `-fix` applies those too, below it re-run the pair until plain `lint` is
 clean. When two findings share a construct
