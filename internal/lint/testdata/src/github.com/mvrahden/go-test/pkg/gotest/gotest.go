@@ -2,6 +2,7 @@ package gotest
 
 import (
 	"context"
+	"iter"
 	"testing"
 	"time"
 )
@@ -86,6 +87,7 @@ type testingT interface {
 func Eventually(t testingT, waitFor, tick time.Duration, fn func(poll *R))   {}
 func Consistently(t testingT, waitFor, tick time.Duration, fn func(poll *R)) {}
 
+func Each[E any](t *T, entries []E) iter.Seq2[*T, E]                          { return nil }
 func Fail(t testingT, msgAndArgs ...any)                                      {}
 func True(t testingT, value bool, msgAndArgs ...any)                          {}
 func False(t testingT, value bool, msgAndArgs ...any)                         {}

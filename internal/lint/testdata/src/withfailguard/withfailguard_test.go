@@ -384,3 +384,68 @@ func TestShadowedGotest(t *testing.T) {
 	}
 	_ = gotest
 }
+
+// === an Each row's T goes on after a failure: guards that end the method or
+// split into several assertions stay unreported, the rest keep their fix ===
+
+type rowEntry struct {
+	p   *node
+	err error
+}
+
+type EachGuardTestSuite struct{}
+
+func (s *EachGuardTestSuite) TestRowGuards(t *gotest.T) {
+	entries := []rowEntry{{}}
+	for row, e := range gotest.Each(t, entries) {
+		if e.err != nil {
+			row.FailNow()
+		}
+		if e.p == nil {
+			gotest.Fail(row, "no node")
+			return
+		}
+		if e.err != nil {
+			row.Errorf("boom")
+			return
+		}
+		if e.p == nil || e.p.v != 1 {
+			gotest.Fail(row, "wrong node")
+		}
+		if e.p == nil {
+			gotest.Fail(row, "no node")
+		} else if e.p.v != 1 {
+			gotest.Fail(row, "wrong node")
+		}
+		r := row
+		var again = (r)
+		if e.err != nil {
+			again.FailNow()
+		}
+		func() {
+			if e.err != nil {
+				r.FailNow()
+			}
+		}()
+		{
+			if e.p == nil {
+				gotest.Fail(row, "no node")
+				return
+			}
+		}
+		if e.err != nil { // want `^use NoError instead of if\+Fail for error nil check$`
+			gotest.Fail(row, "unexpected error")
+		}
+		if e.err != nil { // want `^use NoError instead of if\+Errorf for error nil check$`
+			row.Errorf("unexpected: %v", e)
+		}
+		if e.err != nil { // want `use NoError instead of if\+FailNow for error nil check`
+			t.FailNow()
+		}
+	}
+	for row := range gotest.Each[rowEntry](t, entries) {
+		if entries[0].err != nil {
+			row.FailNow()
+		}
+	}
+}

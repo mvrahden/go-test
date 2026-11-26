@@ -225,6 +225,21 @@ An assertion rewrite SHALL leave the test's verdict as it was, and lint SHALL of
 - **THEN** the first is removed only where the second fails on every input the first fails
 - **AND** operands that call a function or receive from a channel are left unreported, since each assertion evaluates its own
 
+### Requirement: Failure guards on an Each row
+fail-guard SHALL leave unreported a guard whose failing call is given an Each row's T, the first variable of a `range gotest.Each` loop or a plain alias of it, where the guard ends the method with FailNow or a return or holds more than one condition, as an or-chain or an else-if chain. A guard of one condition whose Fail or Errorf goes on SHALL be reported with its fix and no claim that an assertion halts.
+
+#### Scenario: A guard that ends the method
+- **WHEN** a guard on an Each row's T ends the method
+- **THEN** fail-guard leaves it unreported, through an alias and inside a closure too
+
+#### Scenario: A guard of several conditions
+- **WHEN** an or-chained or else-if guard fails an Each row's T
+- **THEN** fail-guard leaves it unreported
+
+#### Scenario: A guard that goes on
+- **WHEN** a guard of one condition calls Fail or Errorf on an Each row's T
+- **THEN** fail-guard reports it with a fix and no claim that an assertion halts
+
 ### Requirement: Rules skip what is not gotest's
 Lint's gotest rules, generation-rejects among them, SHALL leave a testify suite to the testify rule, SHALL leave calls through a user type's own T method unreported, SHALL leave a failure guard unreported where a local variable shadows the gotest import, and SHALL leave calls through a user type's own B or F method unreported.
 

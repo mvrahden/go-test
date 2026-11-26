@@ -17,25 +17,15 @@ import (
 // failing assertion (both funnel through Errorf+FailNow), so the rewrite
 // preserves control flow: ||-chained conditions and else-if chains decompose
 // into sequential assertions, where halting on the first failure reproduces
-// the original short-circuit evaluation.
+// the original short-circuit evaluation. On an Each row's T an assertion
+// goes on, so there only a guard the rewrite keeps as it is gets reported.
 func checkFailGuard(pass *analysis.Pass, insp *inspector.Inspector, cl *claims) {
 	// else-branch if-statements belong to their parent's chain and must never
 	// be reported standalone: replacing one would leave `else <expr>` behind.
 	// Preorder visits parents first, so marking suffices.
 	elseChild := map[*ast.IfStmt]bool{}
-
-	sourceCache := map[string][]byte{}
-	readSource := func(name string) []byte {
-		if content, ok := sourceCache[name]; ok {
-			return content
-		}
-		content, err := passSource(pass, name)
-		if err != nil {
-			content = nil
-		}
-		sourceCache[name] = content
-		return content
-	}
+	readSource := cachedSource(pass)
+	var rows map[types.Object]bool
 
 	insp.Preorder([]ast.Node{(*ast.IfStmt)(nil)}, func(n ast.Node) {
 		ifStmt := n.(*ast.IfStmt)
@@ -53,6 +43,12 @@ func checkFailGuard(pass *analysis.Pass, insp *inspector.Inspector, cl *claims) 
 		// An integrity rule already owns a call inside this guard — its
 		// finding tells the sharper story.
 		if cl.anyWithin(ifStmt.Pos(), ifStmt.End()) {
+			return
+		}
+		if rows == nil {
+			rows = eachRowVars(pass, insp)
+		}
+		if onEachRow(pass, rows, units) && !keptOnEachRow(units) {
 			return
 		}
 
@@ -230,6 +226,7 @@ func extractHaltingUnit(pass *analysis.Pass, body *ast.BlockStmt) *failGuardUnit
 			qual:    assertionQualifier(call.Fun),
 			label:   "Fail",
 			halting: true,
+			returns: hasReturn,
 		}
 	}
 
@@ -273,6 +270,22 @@ func extractHaltingUnit(pass *analysis.Pass, body *ast.BlockStmt) *failGuardUnit
 		unit.forceReport = true
 	}
 	return unit
+}
+
+// cachedSource reads a file of the pass once, nil when unreadable.
+func cachedSource(pass *analysis.Pass) func(string) []byte {
+	cache := map[string][]byte{}
+	return func(name string) []byte {
+		if content, ok := cache[name]; ok {
+			return content
+		}
+		content, err := passSource(pass, name)
+		if err != nil {
+			content = nil
+		}
+		cache[name] = content
+		return content
+	}
 }
 
 // spanComments partitions the comments inside the if-statement's span:
