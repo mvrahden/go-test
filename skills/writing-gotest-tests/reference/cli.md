@@ -67,8 +67,10 @@ invocation runs tests — there is NO `test` subcommand:
   cannot fix), and `-diff` is no preview: alone it only lists findings,
   and `-fix -diff` prints one pass with headers `git apply` rejects.
   `-rules` lists the rules (`-rules -json` as a document);
+  `-suppressions` lists every `//nolint` reaching a gotest rule, with
+  its reason, as JSON (v1.42+);
   `-disable-nolint` ignores `//nolint` comments.
-  Integrity rules yield only to `//nolint:<rule>` (on the line, directly
+  Integrity rules yield only to `//nolint:<rule> // <reason>` (on the line, directly
   above it, or file-wide trailing the `package` line); others
   also to `.gotest.yml` `lint.skip` / `-skip-<rule>`. A plain finding
   line ends with its rule, `file:line:col: message (rule)` (v1.38+);

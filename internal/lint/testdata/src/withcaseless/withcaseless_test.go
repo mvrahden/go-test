@@ -7,7 +7,7 @@ type HelperTestSuite struct{ prefix string } // want `suite HelperTestSuite decl
 func (h *HelperTestSuite) name(n string) string { return h.prefix + n }
 
 // SuppressedTestSuite is refused too; the directive silences the report.
-type SuppressedTestSuite struct{} //nolint:generation-rejects
+type SuppressedTestSuite struct{} //nolint:generation-rejects // the suppression under test
 
 type ExcludedTestSuite struct{}
 

@@ -6,11 +6,11 @@ Clause: when a suite declares methods named exactly Test, Benchmark and Fuzz →
 Clause: when a test file declares a generic suite with a case → lint reports the suite no alias instantiates at its declaration
 --- a/internal/lint/lint.go
 +++ b/internal/lint/lint.go
-@@ -285,7 +285,6 @@
+@@ -292,7 +292,6 @@
  	checkSuiteDeclaration(pass, insp, reached)
  	checkNoEmbedding(pass, insp, reached)
  	checkFixtureHookCall(pass, insp)
 -	checkDroppedCase(pass, insp, suites)
  
  	checkOrphanedFiles(pass)
- 	checkNolintIDs(pass)
+ 	checkNolint(pass)

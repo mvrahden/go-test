@@ -74,7 +74,7 @@ func (s *FuzzDeterminismTestSuite) FuzzHelperChain(f *gotest.F) {
 func (s *FuzzDeterminismTestSuite) FuzzSuppressed(f *gotest.F) {
 	f.Add("seed")
 	f.Fuzz(func(t *gotest.T, in string) {
-		now := time.Now() //nolint:fuzz-determinism
+		now := time.Now() //nolint:fuzz-determinism // the suppression under test
 		gotest.NotZero(t, now)
 		gotest.Equal(t, in, in)
 	})
@@ -130,7 +130,7 @@ func (s *FuzzNoOracleTestSuite) FuzzSkipfClean(f *gotest.F) {
 
 func (s *FuzzNoOracleTestSuite) FuzzSuppressed(f *gotest.F) {
 	f.Add("seed")
-	f.Fuzz(func(t *gotest.T, in string) { //nolint:fuzz-no-oracle
+	f.Fuzz(func(t *gotest.T, in string) { //nolint:fuzz-no-oracle // the suppression under test
 		_ = strings.TrimSpace(in)
 	})
 }
@@ -167,7 +167,7 @@ func (s *FuzzSeedTestSuite) FuzzSeedThroughAlias(f *gotest.F) {
 	f.Fuzz(func(t *gotest.T, in string) { gotest.Equal(t, in, in) })
 }
 
-func (s *FuzzSeedTestSuite) FuzzSuppressed(f *gotest.F) { //nolint:fuzz-seed
+func (s *FuzzSeedTestSuite) FuzzSuppressed(f *gotest.F) { //nolint:fuzz-seed // the suppression under test
 	f.Fuzz(func(t *gotest.T, in string) {
 		trimmed := strings.TrimSpace(in)
 		gotest.Equal(t, trimmed, strings.TrimSpace(trimmed))
@@ -178,7 +178,7 @@ func (s *FuzzSeedTestSuite) FuzzSuppressed(f *gotest.F) { //nolint:fuzz-seed
 // doc comment (last line of the block) rather than on the same line as the
 // declaration — the doc-comment suppression path.
 //
-//nolint:fuzz-seed
+//nolint:fuzz-seed // the suppression under test
 func (s *FuzzSeedTestSuite) FuzzDocSuppressed(f *gotest.F) {
 	f.Fuzz(func(t *gotest.T, in string) {
 		trimmed := strings.TrimSpace(in)
@@ -200,7 +200,7 @@ func (s *FuzzSeedTestSuite) FuzzUnrelatedComment(f *gotest.F) { // want `fuzz ta
 // declaration by a blank line, so it is not an attached doc comment and
 // must not suppress the diagnostic.
 //
-//nolint:fuzz-seed
+//nolint:fuzz-seed // the suppression under test
 
 func (s *FuzzSeedTestSuite) FuzzBlankLineSeparated(f *gotest.F) { // want `fuzz target FuzzSeedTestSuite.FuzzBlankLineSeparated declares no seeds — coverage-guided exploration starts blind \(table-test harvesting may still seed it\)`
 	f.Fuzz(func(t *gotest.T, in string) {

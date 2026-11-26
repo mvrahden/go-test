@@ -1,6 +1,6 @@
 //go:build linux || darwin
 
-package canary_test //nolint:fail-guard
+package canary_test //nolint:fail-guard // ring 0: raw checks only, never a gotest assertion
 
 import (
 	"errors"

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / exits 0 with the finding as additional context and no permission decision \(
+Clause: when an agent edits a test file whose package has a lint finding, in a module that requires gotest → exits 0 with the finding as additional context and no permission decision
+--- a/cmd/gotest/hook.go
++++ b/cmd/gotest/hook.go
+@@ -145,7 +145,7 @@
+ 	cmd.Stdout, cmd.Stderr = &out, &out
+ 	err = cmd.Run()
+ 	var exitErr *exec.ExitError
+-	if err == nil || ctx.Err() != nil || !errors.As(err, &exitErr) {
++	if err == nil || ctx.Err() != nil || errors.As(err, &exitErr) {
+ 		return ""
+ 	}
+ 	text := strings.TrimSpace(out.String())

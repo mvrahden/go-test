@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterSuppressions / Reasons / when a nolint comment naming only another linter's rule gives no reason / lint leaves the comment without a reason to that linter \(
+Clause: when a nolint comment naming only another linter's rule gives no reason → lint leaves the comment without a reason to that linter
+--- a/internal/lint/nolint.go
++++ b/internal/lint/nolint.go
+@@ -56,7 +56,7 @@
+ 		return true
+ 	}
+ 	for _, id := range ids {
+-		if id == "all" || Known(Rule(id)) {
++		if id != "" {
+ 			return true
+ 		}
+ 	}

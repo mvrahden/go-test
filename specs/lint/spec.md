@@ -54,6 +54,35 @@ A nolint comment with no rule or with all SHALL suppress every rule on its line;
 - **THEN** lint leaves the comment unreported
 - **AND** an entry that is no linter name is refused with exit 2, naming it
 
+### Requirement: A nolint comment gives its reason
+A nolint comment that can suppress one of lint's rules, one naming no rule, all or a rule of lint's, SHALL be reported under nolint-reason at the comment unless a reason follows its rules after ` //`, and SHALL not suppress that report. A nolint comment naming only other linters' rules SHALL be left to those linters.
+
+#### Scenario: A nolint comment without a reason
+- **WHEN** a nolint comment naming a rule of lint's gives no reason
+- **THEN** lint reports the comment under nolint-reason at the comment and still honours its suppression
+- **AND** the comment cannot suppress that finding, even naming nolint-reason
+
+#### Scenario: A reason after the rules
+- **WHEN** a nolint comment gives a reason after its rules
+- **THEN** lint leaves the comment unreported, bare or naming rules
+
+#### Scenario: Another linter's comment without a reason
+- **WHEN** a nolint comment naming only another linter's rule gives no reason
+- **THEN** lint leaves the comment without a reason to that linter
+
+### Requirement: The suppression list
+`gotest lint -suppressions` SHALL print instead of the findings one JSON document that opens with `version` and lists in `suppressions`, sorted by `module`, `file`, `line` and `col`, each nolint comment that can suppress one of lint's rules once: its `file` relative to the module root, its `rules` sorted (`all` for a bare comment), its `reason` and whether it suppressed a finding in the run (`suppressed`). It SHALL exit 0, and SHALL refuse -json, -fix, -diff and a driver-only flag with exit 2.
+
+#### Scenario: Listing the suppressions
+- **WHEN** lint -suppressions runs over a package with nolint comments
+- **THEN** prints one document opening with version that lists each comment reaching a rule of lint's once, sorted by file and position, with its module, module-relative file, rules and reason, and exits 0
+- **AND** marks as suppressed exactly the comments that suppressed a finding
+- **AND** leaves out a comment naming only another linter's rule, and prints nothing on stderr
+
+#### Scenario: Another output asked for beside it
+- **WHEN** lint -suppressions is given with -json or -fix
+- **THEN** lint refuses the pair with exit 2, naming the other flag
+
 ### Requirement: Generated files
 Lint SHALL report a generated file only when git tracks it or when it lies outside a git repository, and SHALL say so where git cannot tell.
 

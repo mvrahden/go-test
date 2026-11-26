@@ -35,7 +35,7 @@ func (s *ParserBenchTestSuite) BenchmarkWithN(b *testing.B) {
 	}
 }
 
-func (s *ParserBenchTestSuite) BenchmarkSuppressed(b *gotest.B) { //nolint:bench-loop
+func (s *ParserBenchTestSuite) BenchmarkSuppressed(b *gotest.B) { //nolint:bench-loop // the suppression under test
 	_ = 1
 }
 
@@ -115,7 +115,7 @@ func (s *CacheBenchTestSuite) BenchmarkNInsideLoop(b *testing.B) { // want `benc
 // line of the block) rather than on the same line as the declaration — the
 // doc-comment suppression path.
 //
-//nolint:bench-fixture-io
+//nolint:bench-fixture-io // the suppression under test
 func (s *CacheBenchTestSuite) BenchmarkDocSuppressed(b *gotest.B) {
 	for b.Loop() {
 		_ = s.fixture
@@ -176,6 +176,6 @@ func (s *WaitBenchTestSuite) BenchmarkSleepAboveLoop(b *gotest.B) {
 // BenchmarkSleepSuppressed opts out per line — a deliberate settle.
 func (s *WaitBenchTestSuite) BenchmarkSleepSuppressed(b *gotest.B) {
 	for b.Loop() {
-		time.Sleep(time.Millisecond) //nolint:bench-wait
+		time.Sleep(time.Millisecond) //nolint:bench-wait // the suppression under test
 	}
 }

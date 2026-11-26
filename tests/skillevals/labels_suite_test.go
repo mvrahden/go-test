@@ -95,6 +95,8 @@ var witnesses = []witness{
 	{file: "reference/fixtures.md", quote: "the hook and the error (v1.38+)", label: "v1.38+", path: "specs/fixtures/spec.md", literal: "### Requirement: What a failed fixture BeforeAll or AfterAll says"},
 	{file: "reference/fixtures.md", quote: "refuses (v1.38+) an embedded", label: "v1.38+", path: "internal/gotestast/transfer.go", literal: "an interface the state cannot carry"},
 	{file: "reference/cli.md", quote: "incl. every subtest name", label: "v1.42+", path: "internal/protocol/manifest.go", literal: "RunPackage"},
+	{file: "SKILL.md", quote: "Write the reason", label: "v1.42+", path: "internal/lint/lint.go", literal: "nolint-reason"},
+	{file: "reference/cli.md", quote: "its reason, as JSON", label: "v1.42+", path: "cmd/gotest/lint.go", literal: "suppressions"},
 }
 
 var (

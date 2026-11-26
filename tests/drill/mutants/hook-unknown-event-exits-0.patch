@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / when gotest hook runs an event it does not know / exits 1 and names the events it takes on stderr \(
+Clause: when gotest hook runs an event it does not know → exits 1 and names the events it takes on stderr
+--- a/cmd/gotest/hook.go
++++ b/cmd/gotest/hook.go
+@@ -65,7 +65,7 @@
+ 	event, known := hookEvents[args[0]]
+ 	if !known {
+ 		fmt.Fprintf(stderr, "FAIL: unknown hook event %q; gotest hook takes post-edit, pre-shell or stop\n", args[0])
+-		return 1
++		return 0
+ 	}
+ 	data, err := io.ReadAll(stdin)
+ 	if err != nil {

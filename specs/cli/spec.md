@@ -683,3 +683,36 @@ A run SHALL execute every suite it selects, whether or not anything changed sinc
 #### Scenario: Nothing changed between two runs
 - **WHEN** a package is run twice with nothing changed in between
 - **THEN** the second run executes its tests again and marks nothing cached
+
+### Requirement: An agent's hook events
+`gotest hook <event>` SHALL read a coding agent's hook event as JSON on stdin and never block the agent: it SHALL exit 0, writing nothing or one JSON object whose hookSpecificOutput carries additionalContext and no permission decision, and SHALL exit 1, never 2, on an event it does not know. The stop event SHALL write nothing.
+
+#### Scenario: An event gotest hook does not know
+- **WHEN** gotest hook runs an event it does not know
+- **THEN** exits 1 and names the events it takes on stderr
+
+#### Scenario: The stop event
+- **WHEN** gotest hook runs the stop event
+- **THEN** exits 0 and writes nothing
+
+### Requirement: Lint findings after an agent's edit
+After an agent edits a `_test.go` file in a module that is gotest or requires it, `gotest hook post-edit` SHALL lint the file's package and return what lint reports as additional context. It SHALL write nothing for a package lint finds clean, for a file that is not a test file, outside such a module, and when the lint does not finish within a minute.
+
+#### Scenario: An edited test file with a lint finding
+- **WHEN** an agent edits a test file whose package has a lint finding, in a module that requires gotest
+- **THEN** exits 0 with the finding as additional context and no permission decision
+
+#### Scenario: An edit lint has nothing to say about
+- **WHEN** an agent edits a clean test file, a file that is not a test, or a test file in a module without gotest
+- **THEN** exits 0 and writes nothing
+
+### Requirement: A note before go test skips the suites
+Before an agent's shell command runs `go test`, after environment assignments, `env` or a `cd` included, over packages that declare gotest suites in a module that uses gotest, `gotest hook pre-shell` SHALL add a note that go test does not run them, with the command line rewritten to run `go tool gotest` where go.mod declares the tool, else `gotest`. It SHALL write nothing for go test over packages without suites, under -c, -n, -o or -fuzz, outside such a module, and for any other command.
+
+#### Scenario: go test over gotest suites
+- **WHEN** an agent is about to run go test, after an environment assignment or a cd, over packages that declare gotest suites
+- **THEN** exits 0 with a note giving the command line with gotest in place of go test, and no permission decision
+
+#### Scenario: A command that runs no suite
+- **WHEN** an agent is about to run go test over packages with only stdlib tests, or a command other than go test
+- **THEN** exits 0 and writes nothing

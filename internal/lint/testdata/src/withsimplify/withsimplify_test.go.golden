@@ -1,4 +1,4 @@
-package withsimplify //nolint:stdlib-test
+package withsimplify //nolint:stdlib-test // stdlib tests are this fixture's input
 
 import (
 	"errors"

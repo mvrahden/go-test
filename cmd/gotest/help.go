@@ -48,6 +48,8 @@ func showHelp(topic string) {
 		printRefactorHelp()
 	case "skill":
 		printSkillHelp()
+	case "hook":
+		printHookHelp()
 	case "generate":
 		printGenerateHelp()
 	case "prepare":
@@ -83,6 +85,7 @@ Subcommands:
   migrate     Convert testify/suite tests to go-test format
   refactor    Source code refactoring tools
   skill       Install the agent skill matching this version
+  hook        Answer a coding agent's hook event (post-edit, pre-shell, stop)
   generate    Run code generation only (no test execution)
   prepare     Start shared fixtures for debug (blocks until SIGTERM)
   clean       Remove orphaned generated files
@@ -850,6 +853,12 @@ Flags:
   -rules                  Print the rules above and lint nothing; with -json,
                           one document opening with version, then each rule's
                           id, tier, scope, skippable, fixable and description
+  -suppressions           Print the //nolint comments that reach gotest's rules
+                          as one JSON document on stdout in place of the
+                          findings, and exit 0: each one's module, file from
+                          the module root, line, col, rules, reason and
+                          whether it suppressed a finding (not with -json,
+                          -fix or -diff)
   --github                Print the findings as GitHub ::error annotations in
                           place of the plain-text report, and append a findings
                           table to $GITHUB_STEP_SUMMARY. Implied when
@@ -860,11 +869,13 @@ Flags:
 
 Each finding line ends with its rule: file:line:col: message (rule).
 
-Suppress individual diagnostics with //nolint comments:
-  //nolint:stdlib-test             Same line, or a comment block of its own
+Suppress individual diagnostics with //nolint comments, each giving its
+reason after " //" (nolint-reason reports one that gives none):
+  //nolint:stdlib-test // why      Same line, or a comment block of its own
                                    ending on the line directly above
-  package foo //nolint:stdlib-test  Suppress for entire file
-  //nolint // reason               Every rule (so does //nolint:all)
+  package foo //nolint:stdlib-test // why
+                                   Suppress for entire file
+  //nolint // why                  Every rule (so does //nolint:all // why)
 
 A pattern that matches no package while others do only warns on stderr,
   warning: "<pattern>" matched no packages

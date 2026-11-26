@@ -4074,6 +4074,435 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "exits 1 and names the events it takes on stderr",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "agenthook_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 56,
+                      "name": "exits_1_and_names_the_events_it_takes_on_stderr",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when gotest hook runs an event it does not know",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "agenthook_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 53,
+                  "name": "gotest_hook_runs_an_event_it_does_not_know",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "exits 0 and writes nothing",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "agenthook_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 66,
+                      "name": "exits_0_and_writes_nothing",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when gotest hook runs the stop event",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "agenthook_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 63,
+                  "name": "gotest_hook_runs_the_stop_event",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "Events",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "agenthook_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 52,
+              "name": "TestEvents",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "exits 0 with the finding as additional context and no permission decision",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "agenthook_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 79,
+                      "name": "exits_0_with_the_finding_as_additional_context_and_no_permission_decision",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when an agent edits a test file whose package has a lint finding, in a module that requires gotest",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "agenthook_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 75,
+                  "name": "an_agent_edits_a_test_file_whose_package_has_a_lint_finding,_in_a_module_that_requires_gotest",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "a clean test file",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "agenthook_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 97,
+                          "name": "a_clean_test_file",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "a file that is not a test",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "agenthook_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 98,
+                          "name": "a_file_that_is_not_a_test",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "a test file in a module without gotest",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "agenthook_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 99,
+                          "name": "a_test_file_in_a_module_without_gotest",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "exits 0 and writes nothing",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "agenthook_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 91,
+                      "name": "exits_0_and_writes_nothing",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when an agent edits a clean test file, a file that is not a test, or a test file in a module without gotest",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "agenthook_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 90,
+                  "name": "an_agent_edits_a_clean_test_file,_a_file_that_is_not_a_test,_or_a_test_file_in_a_module_without_gotest",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AfterAnEdit",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "agenthook_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 74,
+              "name": "TestAfterAnEdit",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "every package",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "agenthook_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 122,
+                          "name": "every_package",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "an environment assignment and flags",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "agenthook_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 123,
+                          "name": "an_environment_assignment_and_flags",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "a cd before it",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "agenthook_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 124,
+                          "name": "a_cd_before_it",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "a module that declares the tool",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "agenthook_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 125,
+                          "name": "a_module_that_declares_the_tool",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "exits 0 with a note giving the command line with gotest in place of go test, and no permission decision",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "agenthook_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 115,
+                      "name": "exits_0_with_a_note_giving_the_command_line_with_gotest_in_place_of_go_test,_and_no_permission_decision",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when an agent is about to run go test, after an environment assignment or a cd, over packages that declare gotest suites",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "agenthook_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 114,
+                  "name": "an_agent_is_about_to_run_go_test,_after_an_environment_assignment_or_a_cd,_over_packages_that_declare_gotest_suites",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "a package with only stdlib tests",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "agenthook_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 153,
+                          "name": "a_package_with_only_stdlib_tests",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "a standard-library package",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "agenthook_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 154,
+                          "name": "a_standard-library_package",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "a test binary built, not run",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "agenthook_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 155,
+                          "name": "a_test_binary_built,_not_run",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "a module without gotest",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "agenthook_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 156,
+                          "name": "a_module_without_gotest",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "a command other than go test",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "agenthook_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 157,
+                          "name": "a_command_other_than_go_test",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "exits 0 and writes nothing",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "agenthook_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 147,
+                      "name": "exits_0_and_writes_nothing",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when an agent is about to run go test over packages with only stdlib tests, or a command other than go test",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "agenthook_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 146,
+                  "name": "an_agent_is_about_to_run_go_test_over_packages_with_only_stdlib_tests,_or_a_command_other_than_go_test",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "BeforeAShellCommand",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "agenthook_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 113,
+              "name": "TestBeforeAShellCommand",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLIAgentHook",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "agenthook_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 17,
+          "name": "TestCLIAgentHookTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "exits 2, reports each finding under its own package and runs the third",
                       "duration": 0,
                       "excluded": false,
@@ -29140,6 +29569,251 @@
           "name": "TestLinterRulesTestSuite",
           "output": [],
           "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lint reports the comment under nolint-reason at the comment and still honours its suppression",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "suppressions_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 25,
+                      "name": "lint_reports_the_comment_under_nolint-reason_at_the_comment_and_still_honours_its_suppression",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "the comment cannot suppress that finding, even naming nolint-reason",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "suppressions_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 28,
+                      "name": "the_comment_cannot_suppress_that_finding,_even_naming_nolint-reason",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a nolint comment naming a rule of lint's gives no reason",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "suppressions_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 24,
+                  "name": "a_nolint_comment_naming_a_rule_of_lint's_gives_no_reason",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lint leaves the comment unreported, bare or naming rules",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "suppressions_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 33,
+                      "name": "lint_leaves_the_comment_unreported,_bare_or_naming_rules",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a nolint comment gives a reason after its rules",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "suppressions_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 32,
+                  "name": "a_nolint_comment_gives_a_reason_after_its_rules",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lint leaves the comment without a reason to that linter",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "suppressions_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 41,
+                      "name": "lint_leaves_the_comment_without_a_reason_to_that_linter",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a nolint comment naming only another linter's rule gives no reason",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "suppressions_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 40,
+                  "name": "a_nolint_comment_naming_only_another_linter's_rule_gives_no_reason",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "Reasons",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "suppressions_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 23,
+              "name": "TestReasons",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "prints one document opening with version that lists each comment reaching a rule of lint's once, sorted by file and position, with its module, module-relative file, rules and reason, and exits 0",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "suppressions_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 72,
+                      "name": "prints_one_document_opening_with_version_that_lists_each_comment_reaching_a_rule_of_lint's_once,_sorted_by_file_and_position,_with_its_module,_module-relative_file,_rules_and_reason,_and_exits_0",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "marks as suppressed exactly the comments that suppressed a finding",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "suppressions_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 95,
+                      "name": "marks_as_suppressed_exactly_the_comments_that_suppressed_a_finding",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "leaves out a comment naming only another linter's rule, and prints nothing on stderr",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "suppressions_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 103,
+                      "name": "leaves_out_a_comment_naming_only_another_linter's_rule,_and_prints_nothing_on_stderr",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when lint -suppressions runs over a package with nolint comments",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "suppressions_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 71,
+                  "name": "lint_-suppressions_runs_over_a_package_with_nolint_comments",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lint refuses the pair with exit 2, naming the other flag",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "suppressions_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 112,
+                      "name": "lint_refuses_the_pair_with_exit_2,_naming_the_other_flag",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when lint -suppressions is given with -json or -fix",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "suppressions_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 111,
+                  "name": "lint_-suppressions_is_given_with_-json_or_-fix",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "List",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "suppressions_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 60,
+              "name": "TestList",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "LinterSuppressions",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "suppressions_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 13,
+          "name": "TestLinterSuppressionsTestSuite",
+          "output": [],
+          "status": "none"
         }
       ],
       "output": [],
@@ -34050,13 +34724,13 @@
     }
   ],
   "stats": {
-    "behaviors": 981,
+    "behaviors": 1004,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 145,
+    "suites": 147,
     "tests": 0
   }
 }

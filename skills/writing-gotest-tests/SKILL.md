@@ -87,12 +87,15 @@ it says before expecting style suggestions there.
 Suppression follows rule tiers: integrity rules (`poll-scope`,
 `suite-lifecycle`, `focus`, …) can never be skipped project-wide; style
 and migration rules can, via `.gotest.yml` `lint.skip` or `-skip-<rule>`
-flags. Any rule yields to a `//nolint:<rule>` comment on the finding's
-line or on a line of its own directly above it — and to one trailing the
-`package` line itself (`package shop_test //nolint:stdlib-test`), which
+flags. Any rule yields to a `//nolint:<rule> // <reason>` comment on the
+finding's line or on a line of its own directly above it — and to one
+trailing the `package` line itself
+(`package shop_test //nolint:stdlib-test // <reason>`), which
 covers the whole FILE (not the package), whatever the tier; on the line
-above `package` it suppresses nothing. The `stdlib-test` rule flags every
-stdlib `TestXxx(*testing.T)` (not `Benchmark`, `Fuzz` or `Example`
+above `package` it suppresses nothing. Write the reason (v1.42+:
+`nolint-reason` reports a comment without one, and `gotest lint
+-suppressions` lists every comment with its reason for review). The
+`stdlib-test` rule flags every stdlib `TestXxx(*testing.T)` (not `Benchmark`, `Fuzz` or `Example`
 functions — those show only in the runner's note) — when a stdlib test is
 intentional (assertion-layer tests, benchmarks-adjacent code), mark it
 that way, or the lint run fails. The linter does NOT catch: plain `defer`

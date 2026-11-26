@@ -7,4 +7,4 @@ type StubTestSuite struct{}
 
 func (s *StubTestSuite) FuzzShown(f *gotest.F) {}
 
-func (s *StubTestSuite) FuzzQuiet(f *gotest.F) {} //nolint:fuzz-seed
+func (s *StubTestSuite) FuzzQuiet(f *gotest.F) {} //nolint:fuzz-seed // suppressed, so only the rejection is left

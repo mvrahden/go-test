@@ -3,11 +3,16 @@ package lint
 import (
 	"cmp"
 	"context"
+	"encoding/json"
 	"fmt"
 	"go/ast"
 	"go/token"
 	"io"
+	"path/filepath"
 	"slices"
+	"strings"
+
+	"github.com/mvrahden/go-test/internal/about"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/checker"
@@ -33,7 +38,22 @@ type Result struct {
 	// Unapplied names the fixes Fix dropped because their result does not
 	// compile; their findings stay in Findings.
 	Unapplied []Finding
-	graph     *checker.Graph
+	// Suppressions are the gotest nolint comments of the analyzed files,
+	// sorted by module, file and position.
+	Suppressions []Suppression
+	graph        *checker.Graph
+}
+
+// Suppression is one nolint comment that can suppress a gotest rule.
+type Suppression struct {
+	Module string   `json:"module"` // module path; "" outside a module
+	File   string   `json:"file"`   // slash-separated, relative to the module root
+	Line   int      `json:"line"`
+	Col    int      `json:"col"`
+	Rules  []string `json:"rules"`  // the ids named, sorted; "all" for a bare one
+	Reason string   `json:"reason"` // "" when it gives none
+	// Suppressed says the comment suppressed a finding in this run.
+	Suppressed bool `json:"suppressed"`
 }
 
 // PrintJSON writes the findings in the go/analysis driver's -json format.
@@ -89,11 +109,13 @@ func analyze(ctx context.Context, t *Targets, overlay map[string][]byte) (*Resul
 func newResult(graph *checker.Graph) (*Result, error) {
 	res := &Result{graph: graph}
 	seen := map[Finding]bool{}
+	seenDirective := map[token.Position]int{} // → index in res.Suppressions
 	fixFiles := map[string]bool{}
 	for _, act := range graph.Roots {
 		if act.Err != nil {
 			return nil, fmt.Errorf("analyze %s: %w", act.Package.PkgPath, act.Err)
 		}
+		res.addSuppressions(act, seenDirective)
 		generated := generatedFiles(act.Package.Fset, act.Package.Syntax)
 		for _, d := range act.Diagnostics {
 			pos := act.Package.Fset.Position(d.Pos)
@@ -130,6 +152,14 @@ func newResult(graph *checker.Graph) (*Result, error) {
 			cmp.Compare(a.Message, b.Message),
 		)
 	})
+	slices.SortFunc(res.Suppressions, func(a, b Suppression) int {
+		return cmp.Or(
+			cmp.Compare(a.Module, b.Module),
+			cmp.Compare(a.File, b.File),
+			cmp.Compare(a.Line, b.Line),
+			cmp.Compare(a.Col, b.Col),
+		)
+	})
 	for file := range fixFiles {
 		res.FixFiles = append(res.FixFiles, file)
 	}
@@ -164,4 +194,62 @@ func fixEdits(fset *token.FileSet, d *analysis.Diagnostic, generated map[string]
 		files = append(files, name)
 	}
 	return files
+}
+
+// addSuppressions adds the nolint comments act's pass listed. A file both
+// variants of a package hold is listed once, suppressing where either did.
+func (r *Result) addSuppressions(act *checker.Action, seen map[token.Position]int) {
+	pr, _ := act.Result.(*passResult)
+	if pr == nil {
+		return
+	}
+	module, root := "", ""
+	if m := act.Package.Module; m != nil {
+		module, root = m.Path, m.Dir
+	}
+	for _, d := range pr.Directives {
+		pos := act.Package.Fset.Position(d.Pos)
+		key := token.Position{Filename: pos.Filename, Line: pos.Line, Column: pos.Column}
+		if i, ok := seen[key]; ok {
+			r.Suppressions[i].Suppressed = r.Suppressions[i].Suppressed || d.Used
+			continue
+		}
+		seen[key] = len(r.Suppressions)
+		r.Suppressions = append(r.Suppressions, Suppression{
+			Module:     module,
+			File:       moduleRelative(root, pos.Filename),
+			Line:       pos.Line,
+			Col:        pos.Column,
+			Rules:      d.Rules,
+			Reason:     d.Reason,
+			Suppressed: d.Used,
+		})
+	}
+}
+
+// moduleRelative is file relative to root, slash-separated; file itself
+// where root does not hold it.
+func moduleRelative(root, file string) string {
+	if root != "" {
+		if rel, err := filepath.Rel(root, file); err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			return filepath.ToSlash(rel)
+		}
+	}
+	return filepath.ToSlash(file)
+}
+
+// suppressionsDocument is what gotest lint -suppressions prints. Version
+// opens it: the CLI that produced the document.
+type suppressionsDocument struct {
+	Version      string        `json:"version"`
+	Suppressions []Suppression `json:"suppressions"`
+}
+
+// WriteSuppressionsJSON writes the run's suppressions as one document.
+func (r *Result) WriteSuppressionsJSON(w io.Writer) error {
+	doc := suppressionsDocument{Version: about.ResolvedVersion(), Suppressions: r.Suppressions}
+	if doc.Suppressions == nil {
+		doc.Suppressions = []Suppression{}
+	}
+	return json.NewEncoder(w).Encode(doc)
 }

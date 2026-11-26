@@ -1065,16 +1065,16 @@ Catch common mistakes in test suites with static analysis:
 gotest lint ./...
 ```
 
-Thirty-four rules in three tiers:
+Thirty-five rules in three tiers:
 
-- **Integrity** — violations can make test outcomes unreliable or leak resources: committed `F_` prefixes, value receivers on suite methods, lifecycle hook typos, `BeforeAll` without `AfterAll`, `X_` prefixes on lifecycle hooks, wrong test signatures, suite-lifecycle bypasses via `t.T()` (`Cleanup`/`Parallel`/`Run`) and via `b.B()` or `f.F()` (`Cleanup`), outer `t` inside `Eventually`/`Consistently` callbacks, `Nil`/`Empty` assertions on types their runtime guards reject, reads of shared fixtures a suite never declared (window scheduling only starts what is declared), suites and fixtures declared inside a `type ( … )` block (the fix gives each its own declaration), embedded suites, fixtures or hook-carrying types and suite-typed fields, direct calls of a lifecycle hook the harness already calls, `Test`, `Benchmark` and `Fuzz` methods no suite runs (on a type without the `TestSuite` suffix, named just `Test`, or on a generic suite without an alias; [Cases that never run](specs/lint/spec.md#requirement-cases-that-never-run)), every other shape the generator rejects, `//nolint` comments naming no rule a linter knows, and generated files checked into version control.
+- **Integrity** — violations can make test outcomes unreliable or leak resources: committed `F_` prefixes, value receivers on suite methods, lifecycle hook typos, `BeforeAll` without `AfterAll`, `X_` prefixes on lifecycle hooks, wrong test signatures, suite-lifecycle bypasses via `t.T()` (`Cleanup`/`Parallel`/`Run`) and via `b.B()` or `f.F()` (`Cleanup`), outer `t` inside `Eventually`/`Consistently` callbacks, `Nil`/`Empty` assertions on types their runtime guards reject, reads of shared fixtures a suite never declared (window scheduling only starts what is declared), suites and fixtures declared inside a `type ( … )` block (the fix gives each its own declaration), embedded suites, fixtures or hook-carrying types and suite-typed fields, direct calls of a lifecycle hook the harness already calls, `Test`, `Benchmark` and `Fuzz` methods no suite runs (on a type without the `TestSuite` suffix, named just `Test`, or on a generic suite without an alias; [Cases that never run](specs/lint/spec.md#requirement-cases-that-never-run)), every other shape the generator rejects, `//nolint` comments naming no rule a linter knows or giving no reason, and generated files checked into version control.
 - **Expressiveness** — the test is correct but its syntax can be improved: simplifiable assertions (`True(t, a == b)` → `Equal`, `Len(t, x, 0)` → `Empty`, …), redundant assertions, `if cond { Fail(...) }` guards that an assertion expresses directly, unnecessary `t.T()`, `b.B()` and `f.F()` escapes, `When("when …")`/`It("it …")` descriptions that spell the word the spec already supplies, and a literal negative `SuiteConfig`/`FixtureConfig` timeout (every negative disables the deadline; the fix writes `gotest.NoDeadline`, keeping the old meaning). `-fix` applies the safe rewrites in one run, overlapping ones included (an assertion counts as redundant only when the arguments of both are plain names, fields, elements or literals, so removing it cannot skip a call), then reports what it could not fix (exit 3 while findings remain); `-diff` prints exactly what `-fix` would write, as a unified diff with paths relative to the current directory, and writes nothing — `gotest lint -diff ./... | git apply` applies it (a file outside that directory needs `git apply --unsafe-paths`; a symlink is named by the file it leads to, which `-fix` writes).
 - **Migration** — adoption aids for codebases moving to gotest: stdlib test functions and testify imports; coexistence is legitimate.
 
 `gotest lint -rules` lists them, and `gotest lint -rules -json` gives each rule's tier, scope, whether it can be skipped or fixed, and its description as a document an editor or a script reads ([The rules](specs/lint/spec.md#requirement-the-rules)).
 
 Each finding line ends with its rule in parentheses, `file:line:col: message (rule)`, the id `//nolint:<rule>` takes.
-Suppress per line with `//nolint:<rule>` (on the same line, or in a comment block of its own ending on the line directly above — a comment trailing other code does not reach the next line); expressiveness and migration rules can also be disabled project-wide via `.gotest.yml` (`lint.skip`). See the [design spec](docs/design/spec.md#linter) for the full rule table.
+Suppress per line with `//nolint:<rule> // <reason>` (on the same line, or in a comment block of its own ending on the line directly above — a comment trailing other code does not reach the next line); expressiveness and migration rules can also be disabled project-wide via `.gotest.yml` (`lint.skip`). A suppression gives its reason after ` //`, and `gotest lint -suppressions` lists every one, with its reason and whether it suppressed anything, as a JSON document an auditor can diff between two trees ([A nolint comment gives its reason](specs/lint/spec.md#requirement-a-nolint-comment-gives-its-reason), [The suppression list](specs/lint/spec.md#requirement-the-suppression-list)). See the [design spec](docs/design/spec.md#linter) for the full rule table.
 Inside GitHub Actions (or with `--github`), the plain-text report is replaced: findings are printed as `::error` annotations, which GitHub shows inline on the PR, and appended as a table to the step summary; `--github=false` keeps the plain report inside GitHub Actions. (The standalone `gotest-lint` binary was retired; `gotest lint` accepts the same targets and driver flags.)
 
 `gotest lint` is the reference driver, and `pkg/lint` exports the analyzer for two others. golangci-lint runs it as a module plugin, `github.com/mvrahden/go-test/pkg/lint/golangci`, named in `.custom-gcl.yml` at the gotest version your `go.mod` requires and enabled as `gotestlint` with the settings `skip` and `nolint-allow`; `go vet -vettool` runs it through a small `main` around `unitchecker`. The [`pkg/lint` package documentation](https://pkg.go.dev/github.com/mvrahden/go-test/pkg/lint) shows both setups and what each driver leaves out.
@@ -1111,6 +1111,7 @@ gotest scaffold ./pkg/user.Svc # generate suite skeleton from type
 gotest lint ./...              # static analysis for test suites
 gotest refactor toggle-focus user_test.go UserTestSuite  # toggle an F_ prefix on a suite (or Suite.Method)
 gotest skill install           # install the agent skill matching this version
+gotest hook pre-shell          # answer a coding agent's hook event on stdin (the plugin wires it)
 gotest migrate ./...           # convert testify/suite to go-test
 gotest generate ./...          # run code generation only (no tests)
 gotest clean ./...             # remove orphaned generated files
@@ -1171,6 +1172,29 @@ Agents with a plugin system can install it as a plugin instead. A plugin carries
 | GitHub Copilot CLI | `copilot plugin marketplace add mvrahden/go-test`, then `copilot plugin install gotest@go-test` |
 | VS Code with Copilot Chat | included in the [gotest extension](vscode-gotest) |
 | Any other agent | `npx skills add mvrahden/go-test` |
+
+The Claude Code plugin also carries hooks that call `gotest hook` ([An agent's hook events](specs/cli/spec.md#requirement-an-agents-hook-events)).
+After the agent edits a `_test.go` file, it hands the agent what `gotest lint` reports for that package ([Lint findings after an agent's edit](specs/cli/spec.md#requirement-lint-findings-after-an-agents-edit)).
+Before the agent runs `go test` over suites, which `go test` does not run, it names the gotest command line that does ([A note before go test skips the suites](specs/cli/spec.md#requirement-a-note-before-go-test-skips-the-suites)); the command still runs.
+The hooks use `go tool gotest` where `go.mod` declares the tool and the `gotest` on `PATH` otherwise, download nothing, and do nothing where neither knows the `hook` command.
+They need `sh`, which Claude Code on Windows has through Git Bash.
+
+Codex reads the same hook events from `.codex/hooks.json` (or `~/.codex/hooks.json`), which you trust once with `/hooks`. In a module that declares the tool, this gives Codex the note before `go test`:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [{ "type": "command", "command": "GOPROXY=off go tool gotest hook pre-shell", "timeout": 30 }]
+      }
+    ]
+  }
+}
+```
+
+Codex passes an `apply_patch` edit to its hooks in `tool_input.command`, with no file path, so `post-edit` has no file to lint there; Cursor's shell hook must return a permission decision, so it is not wired.
 
 An agent without skill support can still be pointed at the installed `SKILL.md` from its instructions file, such as `AGENTS.md`. The skill source lives in [`skills/writing-gotest-tests`](skills/writing-gotest-tests).
 

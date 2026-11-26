@@ -834,6 +834,14 @@ shards of one run do not add up to every mutant exactly once.
 | `lint-erg-unknown-nolint-silent` | a nolint comment naming an unknown rule is never reported | conformance: the lint It for an unknown rule finds no `nolint-unknown` finding |
 | `lint-erg-unknown-nolint-suppressible` | the unknown-rule finding goes through nolint suppression | conformance: the lint It for `nolint:all,not-a-rule` finds the comment silencing its own finding |
 | `lint-erg-foreign-nolint-unknown` | a golangci-lint linter's id counts as an unknown rule | conformance: the lint It for another linter's rule finds a `nolint-unknown` finding |
+| `lint-nolint-reason-silent` | a nolint comment without a reason is never reported | conformance: the lint It for a comment without a reason finds no `nolint-reason` finding |
+| `lint-nolint-reason-suppressible` | the `nolint-reason` finding goes through nolint suppression | conformance: the lint It for `nolint:nolint-reason,stdlib-test` finds the comment silencing its own finding |
+| `lint-nolint-reason-unread` | the reason after a nolint comment's rules is dropped | conformance: the lint It for a reason after the rules finds `nolint-reason` findings on reasoned comments |
+| `lint-nolint-reason-foreign` | a comment naming only another linter's rule needs a reason too | conformance: the lint It for another linter's comment finds a `nolint-reason` finding |
+| `lint-suppressions-unsorted` | `-suppressions` sorts files in reverse | conformance: the lint It for the list finds `nolint_test.go` before `a_test.go` |
+| `lint-suppressions-never-used` | `-suppressions` marks no comment as having suppressed a finding | conformance: the lint It for `suppressed` finds every entry false |
+| `lint-suppressions-foreign-listed` | `-suppressions` lists a comment naming only another linter's rule | conformance: the lint It for foreign comments finds the `gosec` comment listed |
+| `lint-suppressions-beside-accepted` | `-suppressions` takes `-json` and `-fix` beside it | conformance: the lint It for the pair sees exit 0, not 2 |
 | `lint-erg-generated-untracked-reported` | `generated-file` reports a generated file git does not track | conformance: the lint It for an untracked generated file finds it reported |
 | `lint-erg-git-failure-reads-as-outside` | `generated-file` reads every git failure as lying outside a repository | conformance: the lint It for an unreadable repository finds the plain checked-in finding |
 | `lint-erg-generated-tracked-dropped` | `generated-file` treats every file in a git repository as untracked | conformance: the lint It for a staged generated file finds no finding |
@@ -1014,6 +1022,12 @@ shards of one run do not add up to every mutant exactly once.
 | `spec-stdlib-twin-read-as-runs` | a stdlib test both test packages declare is not marked a twin, so its two halves read as two runs | spec conformance: a replayed stdlib twin shows its external half marked, once and under -count=2 |
 | `test-variants-built-for-export-data` | the package loader asks for types in its listing with tests, so go list builds every test variant and test main | pkgload: the load with tests asks for types |
 | `run-books-a-cached-result` | a suite that ran before is booked passed without running again | cli conformance: a package run twice runs its tests again and marks nothing cached |
+| `hook-unknown-event-exits-0` | `gotest hook` answers an event it does not know with exit 0 | cli conformance: an unknown hook event exits 1 and names the events |
+| `hook-stop-writes-a-note` | the stop hook event writes a note | cli conformance: the stop event exits 0 and writes nothing |
+| `hook-lint-findings-dropped` | `gotest hook post-edit` drops the findings lint reports | cli conformance: an edited test file with a finding gets it as additional context |
+| `hook-lints-any-go-file` | `gotest hook post-edit` lints the package of any edited `.go` file, not only of a test file | cli conformance: an edited file that is not a test gets no answer |
+| `hook-note-keeps-go-test` | the `pre-shell` note gives the command line with `go test` left in it | cli conformance: the note's command line runs gotest in place of go test |
+| `hook-note-for-stdlib-tests` | a test file without a suite counts as declaring one | cli conformance: go test over a package with only stdlib tests gets no note |
 
 ## Adding a mutant
 

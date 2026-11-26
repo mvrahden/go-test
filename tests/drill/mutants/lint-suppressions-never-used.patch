@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterSuppressions / List / when lint -suppressions runs over a package with nolint comments / marks as suppressed exactly the comments that suppressed a finding \(
+Clause: when lint -suppressions runs over a package with nolint comments → marks as suppressed exactly the comments that suppressed a finding
+--- a/internal/lint/nolint.go
++++ b/internal/lint/nolint.go
+@@ -112,7 +112,7 @@
+ 					Pos:    c.Pos(),
+ 					Rules:  slices.Compact(rules),
+ 					Reason: reason,
+-					Used:   used[c.Pos()],
++					Used:   used[c.End()],
+ 				})
+ 			}
+ 		}

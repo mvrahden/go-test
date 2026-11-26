@@ -1,6 +1,6 @@
 // Ring 0: raw checks only, so a broken assertion engine cannot pass its own
 // tests. No gotest.* assertion may appear in this file.
-package gotest_test //nolint:fail-guard
+package gotest_test //nolint:fail-guard // ring 0: raw checks only, never a gotest assertion
 
 import (
 	"fmt"

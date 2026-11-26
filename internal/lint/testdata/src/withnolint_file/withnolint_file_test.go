@@ -1,4 +1,4 @@
-package withnolint_file //nolint:stdlib-test
+package withnolint_file //nolint:stdlib-test // stdlib tests are this fixture's input
 
 import "testing"
 

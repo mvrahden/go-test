@@ -3,7 +3,7 @@
 // verdicts outside gotest's reporting stack: it runs the built CLI over
 // fixture packages and checks exit codes, the raw go test -json stream and
 // marker files against a checked-in golden list, with plain Go only.
-package canary_test //nolint:fail-guard
+package canary_test //nolint:fail-guard // ring 0: raw checks only, never a gotest assertion
 
 import (
 	"bufio"

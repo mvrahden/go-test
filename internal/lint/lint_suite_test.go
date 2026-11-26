@@ -35,6 +35,7 @@ var diagnosticFixtures = []string{
 	"withtestify",
 	"withtestifysuite",
 	"withnolint",
+	"withnolintreason",
 	"withforeign",
 	"withpollscope",
 	"withcleanup",
@@ -206,6 +207,27 @@ func (s *LintTestSuite) TestParseNolint(t *gotest.T) {
 						gotest.True(it, rules[r])
 					}
 				}
+			})
+		})
+	}
+}
+
+func (s *LintTestSuite) TestNolintReason(t *gotest.T) {
+	tests := []struct {
+		desc, text, want string
+	}{
+		{"a rule and a reason", "//nolint:stdlib-test // legacy test", "legacy test"},
+		{"a bare comment and a reason", "//nolint // legacy test", "legacy test"},
+		{"a spaced comment and a reason", "// nolint:focus //  why  ", "why"},
+		{"a reason holding slashes", "//nolint:focus // a // b", "a // b"},
+		{"no reason", "//nolint:stdlib-test", ""},
+		{"an empty reason", "//nolint:stdlib-test //", ""},
+		{"slashes without a space before them", "//nolint:focus// why", ""},
+	}
+	for _, tc := range tests {
+		t.When(tc.desc, func(w *gotest.T) {
+			w.It("reads the reason after the rules", func(it *gotest.T) {
+				gotest.Equal(it, tc.want, lint.ExportNolintReason(tc.text))
 			})
 		})
 	}

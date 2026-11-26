@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterSuppressions / Reasons / when a nolint comment naming a rule of lint's gives no reason / lint reports the comment under nolint-reason at the comment and still honours its suppression \(
+Clause: when a nolint comment naming a rule of lint's gives no reason → lint reports the comment under nolint-reason at the comment and still honours its suppression
+--- a/internal/lint/nolint.go
++++ b/internal/lint/nolint.go
+@@ -36,7 +36,7 @@
+ 						Message:  "unknown rule " + id + " in nolint comment",
+ 					})
+ 				}
+-				if ok && reason == "" && reachesGotest(ids) {
++				if ok && reason == "-" && reachesGotest(ids) {
+ 					pass.Report(analysis.Diagnostic{
+ 						Pos:      c.Pos(),
+ 						End:      c.End(),

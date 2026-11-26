@@ -2,7 +2,7 @@
 // tests. No gotest.* assertion may appear in this file or its siblings that
 // carry this header. Event parsing, tree building and stats decide which
 // nodes count as failures, which is what every replay verdict rests on.
-package gotestspec_test //nolint:fail-guard
+package gotestspec_test //nolint:fail-guard // ring 0: raw checks only, never a gotest assertion
 
 import (
 	"strings"

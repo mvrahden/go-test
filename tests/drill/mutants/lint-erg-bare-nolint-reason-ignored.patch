@@ -2,13 +2,13 @@ Expect: ^FAIL .*conformance/lint LinterErgonomics .* / a bare nolint comment sup
 Clause: when a nolint comment names no rule → a bare nolint comment suppresses every rule on its line
 --- a/internal/lint/lint.go
 +++ b/internal/lint/lint.go
-@@ -427,9 +427,6 @@
- 		return nil, true
+@@ -497,9 +497,6 @@
+ 		return nil, "", true
  	}
  	if rest[0] != ':' {
--		if reason := strings.TrimLeft(rest, " \t"); reason != rest && strings.HasPrefix(reason, "//") {
--			return nil, true
+-		if after := strings.TrimLeft(rest, " \t"); after != rest && strings.HasPrefix(after, "//") {
+-			return nil, strings.TrimSpace(after[2:]), true
 -		}
- 		return nil, false
+ 		return nil, "", false
  	}
  	rest = rest[1:]

@@ -10,4 +10,4 @@ func (s *ResultTestSuite) TestLoads(t *gotest.T) error { return nil } // want `T
 
 func (s ResultTestSuite) TestByValue(t *gotest.T) {} // want `suite method ResultTestSuite.TestByValue should use a pointer receiver`
 
-func (s *ResultTestSuite) TestSuppressed(t *gotest.T) int { return 0 } //nolint:generation-rejects
+func (s *ResultTestSuite) TestSuppressed(t *gotest.T) int { return 0 } //nolint:generation-rejects // the suppression under test

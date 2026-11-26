@@ -1,4 +1,4 @@
-package withpollscope //nolint:stdlib-test
+package withpollscope //nolint:stdlib-test // stdlib tests are this fixture's input
 
 import (
 	"bytes"

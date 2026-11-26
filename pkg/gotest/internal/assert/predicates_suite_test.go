@@ -1,7 +1,7 @@
 // Ring 0: raw checks only (see ring0_suite_test.go). The predicates decide
 // what counts as nil, empty, contained, panicking, a length or equal JSON for
 // every assertion that asks; a wrong answer here passes tests that should fail.
-package assert_test //nolint:fail-guard
+package assert_test //nolint:fail-guard // ring 0: raw checks only, never a gotest assertion
 
 import (
 	"encoding/json"

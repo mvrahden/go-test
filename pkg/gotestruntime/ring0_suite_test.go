@@ -2,7 +2,7 @@
 // tests. No gotest.* assertion may appear in this file or its siblings that
 // carry this header. The runtime decides lifecycle order, teardown, retries
 // and exit codes, which every suite's verdict rests on.
-package gotestruntime_test //nolint:fail-guard
+package gotestruntime_test //nolint:fail-guard // ring 0: raw checks only, never a gotest assertion
 
 import (
 	"cmp"

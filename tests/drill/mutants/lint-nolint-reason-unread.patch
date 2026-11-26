@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterSuppressions / Reasons / when a nolint comment gives a reason after its rules / lint leaves the comment unreported, bare or naming rules \(
+Clause: when a nolint comment gives a reason after its rules → lint leaves the comment unreported, bare or naming rules
+--- a/internal/lint/lint.go
++++ b/internal/lint/lint.go
+@@ -504,7 +504,7 @@
+ 	}
+ 	rest = rest[1:]
+ 	if idx := strings.Index(rest, " //"); idx >= 0 {
+-		rest, reason = rest[:idx], strings.TrimSpace(rest[idx+3:])
++		rest = rest[:idx]
+ 	}
+ 	for _, id := range strings.Split(rest, ",") {
+ 		if id = strings.TrimSpace(id); id != "" {

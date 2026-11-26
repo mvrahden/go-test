@@ -8,6 +8,12 @@ import (
 
 var ExportParseNolint = parseNolint
 
+// ExportNolintReason is the reason a nolint comment gives.
+func ExportNolintReason(text string) string {
+	_, reason, _ := nolintIDs(text)
+	return reason
+}
+
 func ExportSetDisableNolint(v bool) { cfg.disableNolint = v }
 
 func ExportSetSkip(r Rule, v bool) { *cfg.skip[r] = v }

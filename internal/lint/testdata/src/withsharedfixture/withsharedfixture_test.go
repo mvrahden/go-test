@@ -30,7 +30,7 @@ func (s *UndeclaredTestSuite) TestReadsPackageFixture(t *gotest.T) {
 }
 
 func (s *UndeclaredTestSuite) TestSuppressed(t *gotest.T) {
-	gotest.NotZero(t, packageCache.Addr) //nolint:shared-fixture-undeclared
+	gotest.NotZero(t, packageCache.Addr) //nolint:shared-fixture-undeclared // the suppression under test
 }
 
 // PartialTestSuite declares the cache but also reads the queue.
