@@ -10,6 +10,13 @@ Assertions ARE the control flow: they halt the test on failure, so never
 wrap them (or manual fails) in guards — `if err != nil { gotest.Fail(t,
 …) }` and `if got != want { t.Fatal(…) }` are `fail-guard` lint errors;
 write `gotest.NoError(t, err)` / `gotest.Equal(t, want, got)` directly.
+An `Each` row's `t` is the exception (v1.42+): a failing assertion on it
+fails the row and returns, and the row and the rows after it go on. So a
+guard on a row's `t` that calls `FailNow` or returns, or that chains
+conditions, is no assertion in disguise: `fail-guard` leaves it alone
+([Failure guards on an Each row](https://github.com/mvrahden/go-test/blob/main/specs/lint/spec.md#requirement-failure-guards-on-an-each-row)),
+as `t-escape` does an assertion given `row.T()`, which halts
+([Escapes and redundant pairs on an Each row](https://github.com/mvrahden/go-test/blob/main/specs/lint/spec.md#requirement-escapes-and-redundant-pairs-on-an-each-row)).
 `Equal`/`NotEqual` take the EXPECTED value first. The linter does not
 check the order of an `Equal` you write; it only puts the constant first
 when it rewrites a `True(t, a == b)` or a guard into one.
@@ -33,7 +40,7 @@ when it rewrites a `True(t, a == b)` or a guard into one.
 | `Fail` | unconditional failure (Errorf + FailNow) — never as an if-guard body; state the assertion instead (`fail-guard`) |
 | `MatchSnapshot` | `(t, value, name...)` — `value` is a string (a named string type too), `[]byte`, `encoding.TextMarshaler`, `fmt.Stringer`, `json.Marshaler`, `error` or `io.Reader`; a nil value or nil pointer fails as such, and any other type fails with a list of the common ones (string, `[]byte`, `encoding.TextMarshaler`, `fmt.Stringer`, `json.Marshaler`, `error`); golden snapshots in `testdata/__snapshots__/<TestName>.snap` beside the test file (`<TestName>_ext.snap` for an external `_test` package); the trailing strings name several snapshots in one test, they are not a message. Update via `go tool gotest ./... --update-snapshots` — which writes in CI too; CI only refuses to create a missing baseline |
 | `Must[T]` | panic-on-error value extraction, for setup code |
-| `Each[E]` | table driver: `for t, tc := range gotest.Each(t, entries)` — subtest names come from a `Desc` or `Name` string field |
+| `Each[E]` | table driver: `for t, tc := range gotest.Each(t, entries)` — subtest names come from a `Desc` or `Name` string field; a failing row goes on and so do the rows after it (v1.42+) |
 
 The poll handle `*gotest.R` intentionally satisfies testify's `TestingT`
 contract (`Errorf`+`FailNow`) — its surface is `Errorf`, `FailNow`,

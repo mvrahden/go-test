@@ -1,0 +1,14 @@
+Expect: eachfailing: a row stopped at a failure on its deadline T
+Judge: ./tests/canary CanaryTestSuite/TestEachRowsGoOnPastAFailure
+Clause: when an assertion fails on NewTWithDeadline of an Each row's T → fails the row, and the row goes on
+--- a/pkg/gotest/t.go
++++ b/pkg/gotest/t.go
+@@ -70,7 +70,7 @@
+ 	}
+ 	ctx, cancel := context.WithTimeout(base.Context(), timeout)
+ 	base.testingTB().Cleanup(cancel)
+-	return &T{t: base.t, tb: base.tb, ctx: ctx, soft: base.soft}
++	return &T{t: base.t, tb: base.tb, ctx: ctx}
+ }
+ 
+ // NewTWithContext wraps t, overriding what [T.Context] reports. Use it when the

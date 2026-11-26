@@ -167,7 +167,7 @@ A node SHALL be failed when a node beneath it failed, and a package SHALL be fai
 
 #### Scenario: A live run under its declared specification
 - **WHEN** a run of a package is rendered with --declared
-- **THEN** shows the rows of a table after its failing row as not run
+- **THEN** shows the rows of a table after a row that stopped the method as not run
 - **AND** reads a method the X_ prefix excludes as skipped
 - **AND** counts what did not run as not run and exits as without --declared
 - **AND** under -count lays the declared specification over every run

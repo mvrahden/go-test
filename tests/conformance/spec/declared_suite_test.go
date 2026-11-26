@@ -274,7 +274,7 @@ func (s *SpecDeclaredTestSuite) TestWhereTheSourceDeclaresANode(t *gotest.T) {
 func (s *SpecDeclaredTestSuite) TestALiveRunUnderItsDeclaredSpecification(t *gotest.T) {
 	const pkg = "../testdata/specnotrun/"
 	t.When("a run of a package is rendered with --declared", func(w *gotest.T) {
-		w.It("shows the rows of a table after its failing row as not run", func(it *gotest.T) {
+		w.It("shows the rows of a table after a row that stopped the method as not run", func(it *gotest.T) {
 			doc := specJSON(it, 1, "--declared", pkg)
 			gotest.Len(it, doc.Packages, 1)
 			nodes := doc.Packages[0].Nodes

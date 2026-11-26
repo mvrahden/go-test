@@ -24,6 +24,8 @@ type T struct {
 	t   *testing.T
 	tb  testing.TB
 	ctx context.Context
+	// soft makes a failing assertion record its failure and return.
+	soft bool
 }
 
 // T returns the underlying *testing.T. It is nil when a suite hook runs under
@@ -68,7 +70,7 @@ func NewTWithDeadline[TB *testing.T | *T](t TB, timeout time.Duration) *T {
 	}
 	ctx, cancel := context.WithTimeout(base.Context(), timeout)
 	base.testingTB().Cleanup(cancel)
-	return &T{t: base.t, tb: base.tb, ctx: ctx}
+	return &T{t: base.t, tb: base.tb, ctx: ctx, soft: base.soft}
 }
 
 // NewTWithContext wraps t, overriding what [T.Context] reports. Use it when the

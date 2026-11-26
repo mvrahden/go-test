@@ -97,6 +97,9 @@ var witnesses = []witness{
 	{file: "reference/cli.md", quote: "incl. every subtest name", label: "v1.42+", path: "internal/protocol/manifest.go", literal: "RunPackage"},
 	{file: "SKILL.md", quote: "Write the reason", label: "v1.42+", path: "internal/lint/lint.go", literal: "nolint-reason"},
 	{file: "reference/cli.md", quote: "its reason, as JSON", label: "v1.42+", path: "cmd/gotest/lint.go", literal: "suppressions"},
+	{file: "reference/api.md", quote: "except on an `Each` row's `T`", label: "v1.42+", path: "pkg/gotest/utils.go", literal: "row.soft = true"},
+	{file: "reference/assertions.md", quote: "An `Each` row's `t` is the exception", label: "v1.42+", path: "pkg/gotest/utils.go", literal: "row.soft = true"},
+	{file: "reference/assertions.md", quote: "a failing row goes on and so do the rows after it", label: "v1.42+", path: "pkg/gotest/utils.go", literal: "row.soft = true"},
 }
 
 var (

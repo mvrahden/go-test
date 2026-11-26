@@ -22052,15 +22052,15 @@
                   "children": [
                     {
                       "children": [],
-                      "display": "fails that row and the method, and the rows after it never run",
+                      "display": "fails that row and the method, and the rows after it still run",
                       "duration": 0,
                       "excluded": false,
                       "external": false,
                       "file": "eachrows_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 21,
-                      "name": "fails_that_row_and_the_method,_and_the_rows_after_it_never_run",
+                      "line": 22,
+                      "name": "fails_that_row_and_the_method,_and_the_rows_after_it_still_run",
                       "output": [],
                       "status": "none",
                       "vocab": "it"
@@ -22073,8 +22073,163 @@
                   "file": "eachrows_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 20,
+                  "line": 21,
                   "name": "one_row_of_an_Each_table_fails",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the failure names the helper's line, and the row goes on",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "eachrows_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 34,
+                      "name": "the_failure_names_the_helper's_line,_and_the_row_goes_on",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when an assertion fails in a helper an Each row hands its T",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "eachrows_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 33,
+                  "name": "an_assertion_fails_in_a_helper_an_Each_row_hands_its_T",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "an assertion that fails in its body ends the It there, and the row goes on",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "eachrows_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 41,
+                      "name": "an_assertion_that_fails_in_its_body_ends_the_It_there,_and_the_row_goes_on",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when an It runs on an Each row's T",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "eachrows_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 40,
+                  "name": "an_It_runs_on_an_Each_row's_T",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "fails the row, and the row goes on",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "eachrows_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 48,
+                      "name": "fails_the_row,_and_the_row_goes_on",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when an assertion fails on NewTWithDeadline of an Each row's T",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "eachrows_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 47,
+                  "name": "an_assertion_fails_on_NewTWithDeadline_of_an_Each_row's_T",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "fails the row, and the row goes on",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "eachrows_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 55,
+                      "name": "fails_the_row,_and_the_row_goes_on",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when Eventually is given an Each row's T and no poll passes",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "eachrows_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 54,
+                  "name": "Eventually_is_given_an_Each_row's_T_and_no_poll_passes",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "fails that row and the method there, and the rows after it never run",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "eachrows_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 62,
+                      "name": "fails_that_row_and_the_method_there,_and_the_rows_after_it_never_run",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a row of an Each table calls FailNow",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "eachrows_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 61,
+                  "name": "a_row_of_an_Each_table_calls_FailNow",
                   "output": [],
                   "status": "none",
                   "vocab": "when"
@@ -22090,7 +22245,7 @@
                       "file": "eachrows_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 31,
+                      "line": 72,
                       "name": "skips_that_row_and_the_method_from_there,_and_the_rows_after_it_never_run",
                       "output": [],
                       "status": "none",
@@ -22104,7 +22259,7 @@
                   "file": "eachrows_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 30,
+                  "line": 71,
                   "name": "one_row_of_an_Each_table_skips",
                   "output": [],
                   "status": "none",
@@ -22121,7 +22276,7 @@
                       "file": "eachrows_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 41,
+                      "line": 82,
                       "name": "the_method_skips_or_fails_there,_with_no_failure_of_its_own",
                       "output": [],
                       "status": "none",
@@ -22135,7 +22290,7 @@
                   "file": "eachrows_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 40,
+                  "line": 81,
                   "name": "a_row_of_an_Each_table_skips_or_fatally_fails_the_method's_own_T",
                   "output": [],
                   "status": "none",
@@ -22152,7 +22307,7 @@
                       "file": "eachrows_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 50,
+                      "line": 91,
                       "name": "stops_at_the_break_and_the_method_goes_on",
                       "output": [],
                       "status": "none",
@@ -22166,7 +22321,7 @@
                   "file": "eachrows_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 49,
+                  "line": 90,
                   "name": "the_loop_over_an_Each_table_breaks",
                   "output": [],
                   "status": "none",
@@ -22180,7 +22335,7 @@
               "file": "eachrows_suite_test.go",
               "focused": false,
               "kind": "method",
-              "line": 17,
+              "line": 18,
               "name": "TestRowsAreSubtests",
               "output": [],
               "status": "none"
@@ -22193,7 +22348,7 @@
           "file": "eachrows_suite_test.go",
           "focused": false,
           "kind": "suite",
-          "line": 11,
+          "line": 12,
           "name": "TestEachRowsTestSuite",
           "output": [],
           "status": "none"
@@ -26359,6 +26514,191 @@
     {
       "duration": 0,
       "nodes": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "fail-guard leaves it unreported, through an alias and inside a closure too",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "eachrows_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 21,
+                      "name": "fail-guard_leaves_it_unreported,_through_an_alias_and_inside_a_closure_too",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a guard on an Each row's T ends the method",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "eachrows_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 20,
+                  "name": "a_guard_on_an_Each_row's_T_ends_the_method",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "fail-guard leaves it unreported",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "eachrows_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 29,
+                      "name": "fail-guard_leaves_it_unreported",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when an or-chained or else-if guard fails an Each row's T",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "eachrows_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 28,
+                  "name": "an_or-chained_or_else-if_guard_fails_an_Each_row's_T",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "t-escape leaves it unreported and still fixes one given the outer t.T()",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "eachrows_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 36,
+                      "name": "t-escape_leaves_it_unreported_and_still_fixes_one_given_the_outer_t.T()",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when an assertion is given an Each row's T()",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "eachrows_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 35,
+                  "name": "an_assertion_is_given_an_Each_row's_T()",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "assertion-redundant leaves it unreported and still reports a pair on one T",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "eachrows_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 44,
+                      "name": "assertion-redundant_leaves_it_unreported_and_still_reports_a_pair_on_one_T",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a redundant pair splits between an Each row's T and another T",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "eachrows_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 43,
+                  "name": "a_redundant_pair_splits_between_an_Each_row's_T_and_another_T",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "fail-guard reports it with a fix and no claim that an assertion halts",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "eachrows_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 50,
+                      "name": "fail-guard_reports_it_with_a_fix_and_no_claim_that_an_assertion_halts",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a guard of one condition calls Fail or Errorf on an Each row's T",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "eachrows_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 49,
+                  "name": "a_guard_of_one_condition_calls_Fail_or_Errorf_on_an_Each_row's_T",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "FailureGuards",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "eachrows_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 19,
+              "name": "TestFailureGuards",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "EachRowGuards",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "eachrows_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 11,
+          "name": "TestEachRowGuardsTestSuite",
+          "output": [],
+          "status": "none"
+        },
         {
           "children": [
             {
@@ -31875,7 +32215,7 @@
                   "children": [
                     {
                       "children": [],
-                      "display": "shows the rows of a table after its failing row as not run",
+                      "display": "shows the rows of a table after a row that stopped the method as not run",
                       "duration": 0,
                       "excluded": false,
                       "external": false,
@@ -31883,7 +32223,7 @@
                       "focused": false,
                       "kind": "block",
                       "line": 277,
-                      "name": "shows_the_rows_of_a_table_after_its_failing_row_as_not_run",
+                      "name": "shows_the_rows_of_a_table_after_a_row_that_stopped_the_method_as_not_run",
                       "output": [],
                       "status": "none",
                       "vocab": "it"
@@ -34724,13 +35064,13 @@
     }
   ],
   "stats": {
-    "behaviors": 1004,
+    "behaviors": 1014,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 147,
+    "suites": 148,
     "tests": 0
   }
 }

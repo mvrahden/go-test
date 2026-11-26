@@ -1,0 +1,18 @@
+Expect: eachfailing: no failure message says "second failure"
+Expect: eachfailing: the row after a failing one did not run
+Judge: ./tests/canary CanaryTestSuite/TestEachRowsGoOnPastAFailure
+Clause: when one row of an Each table fails → fails that row and the method, and the rows after it still run
+Clause: when an assertion fails in a helper an Each row hands its T → the failure names the helper's line, and the row goes on
+Clause: when Eventually is given an Each row's T and no poll passes → fails the row, and the row goes on
+--- a/pkg/gotest/assertions.go
++++ b/pkg/gotest/assertions.go
+@@ -34,9 +34,6 @@
+ 	} else {
+ 		t.Errorf("%s", msg)
+ 	}
+-	if st, ok := t.(*T); ok && st.soft {
+-		return
+-	}
+ 	t.FailNow()
+ }
+ 

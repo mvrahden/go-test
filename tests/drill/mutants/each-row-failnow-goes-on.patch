@@ -1,0 +1,16 @@
+Expect: eachfailing: the row after one that called FailNow ran
+Judge: ./tests/canary CanaryTestSuite/TestEachRowsGoOnPastAFailure
+Clause: when a row of an Each table calls FailNow → fails that row and the method there, and the rows after it never run
+--- a/pkg/gotest/t.go
++++ b/pkg/gotest/t.go
+@@ -102,6 +102,10 @@
+ 
+ // FailNow ends the test now, as failed.
+ func (t *T) FailNow() {
++	if t.soft {
++		t.testingTB().Fail()
++		return
++	}
+ 	t.testingTB().FailNow()
+ }
+ 

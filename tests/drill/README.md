@@ -273,6 +273,12 @@ shards of one run do not add up to every mutant exactly once.
 | `contains-text-needle-unhinted` | a rune, byte or `[]byte` needle for a string is refused without naming the string type to convert it to | ring-0 predicates suite |
 | `contains-wrapped-sign-hinted` | a number whose conversion wraps its sign both ways (`-1` for a `[]uint`) is told to convert | ring-0 predicates suite |
 | `each-method-t-reported-as-a-goexit` | a row that skips or fails the method's own T is reported as leaving through Goexit without a verdict | canary: the eachskip method that skips in a row fails, saying its row left without a verdict |
+| `each-row-deadline-t-stops` | `NewTWithDeadline` on an Each row's `T` gives a `T` whose failing assertion ends the method | canary: the eachfailing row stops at its failure on its deadline `T` |
+| `each-row-failnow-goes-on` | `FailNow` on an Each row's `T` only marks the row failed and returns | canary: the eachfailing row after one that called FailNow runs |
+| `each-row-failure-stops-the-row` | a failing assertion on an Each row's `T` ends the method | canary: the eachfailing row's second failure is missing, and the row after a failing one never runs |
+| `each-row-failure-swallowed` | a failing assertion on an Each row's `T` returns without reporting | canary: the eachfailing rows pass, against the golden list |
+| `each-row-t-passed-into-its` | `It` on an Each row's `T` hands its body a `T` that goes on past a failure | canary: the eachfailing It goes on past its failure |
+| `each-rows-not-soft` | an Each row's `T` is fatal, so a failing row ends the method | canary: the eachfailing row after the failing one never runs |
 | `empty-always-true` | `IsEmpty` reports every value as empty | ring-0 predicates suite, and the canary's `Empty` row |
 | `notempty-pointer-to-a-number-passes` | `IsEmptyable` takes every pointer as one that can be empty, so `NotEmpty` on a pointer to a number is a nil check | ring-0 predicates suite |
 | `noerror-error-method-panics` | `ErrorText` reads `<nil>` for an error whose `Error` method panicked, naming neither its type nor the panic | ring-0 predicates suite |
@@ -828,6 +834,12 @@ shards of one run do not add up to every mutant exactly once.
 | `lint-rule-len-message-reads-equal` | `True(t, len(x) != 0)` is reported as a `len == 0` check | conformance: the lint It for `len(x) != 0` finds the message naming `== 0` |
 | `lint-rule-redundant-fix-drops-message` | the `assertion-redundant` fix drops the removed assertion's message | conformance: the lint `-fix` It finds the stronger assertion without the message |
 | `lint-rule-simplify-fix-drops-comments` | the `assertion-simplify` fix drops comments between the arguments | conformance: the lint `-fix` It finds the comment gone |
+| `lint-fail-guard-row-ending-guard-fixed` | `fail-guard` fixes a guard on an Each row's T that ends the method with `FailNow` or a return | conformance: the lint It for a guard that ends the method finds it reported |
+| `lint-fail-guard-row-alias-unread` | `fail-guard` reads an alias of an Each row's T as a T that halts | conformance: the lint It for a guard that ends the method finds the alias's guard reported |
+| `lint-fail-guard-row-chain-split` | `fail-guard` splits an or-chained or else-if guard on an Each row's T into assertions that all run | conformance: the lint It for a guard of several conditions finds it reported |
+| `lint-fail-guard-row-claims-a-halt` | `fail-guard` says an assertion on an Each row's T halts where `Errorf` goes on, and offers no fix | conformance: the lint It for a guard that goes on finds the `Errorf` guard without a fix |
+| `lint-t-escape-row-fixed-onto-the-row` | `t-escape` fixes an assertion given an Each row's `T()` into one given the row, which goes on | conformance: the lint It for an assertion given a row's `T()` finds it reported |
+| `lint-redundant-row-pair-removed` | `assertion-redundant` removes one of a pair split between an Each row's T and another T | conformance: the lint It for a pair across a row's T finds the split pairs reported |
 | `lint-rule-fail-guard-ignores-shadow` | `fail-guard` takes a local that shadows the `gotest` import for the package | conformance: the lint It for a local named `gotest` finds the guard in its scope reported |
 | `lint-erg-bare-nolint-reason-ignored` | a bare `//nolint` followed by a reason is not read as a nolint comment | conformance: the lint It for a bare nolint comment finds the line's finding reported |
 | `lint-erg-nolint-all-is-a-rule` | `//nolint:all` names a rule called `all` instead of every rule | conformance: the lint It for `nolint:all` finds the line's finding reported |

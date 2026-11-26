@@ -303,11 +303,12 @@ func run(pass *analysis.Pass) (any, error) {
 	// expressiveness rules stand down on claimed spans so one construct
 	// yields one finding, from the rule with the stronger story.
 	cl := &claims{}
+	rows := eachRowVars(pass, insp)
 	checkPollScope(pass, insp, cl)
-	checkTEscape(pass, insp, suites, cl)
+	checkTEscape(pass, insp, suites, cl, rows)
 	checkAssertionSimplify(pass, insp, cl)
-	checkFailGuard(pass, insp, cl)
-	checkRedundantAssertion(pass, insp, cl)
+	checkFailGuard(pass, insp, cl, rows)
+	checkRedundantAssertion(pass, insp, cl, rows)
 	checkBehaviorWording(pass, insp)
 	checkConfigNoDeadline(pass, insp)
 	checkBenchLoop(pass, insp, suites)
@@ -737,7 +738,7 @@ type deferredReport struct {
 	message  string
 }
 
-func checkTEscape(pass *analysis.Pass, insp *inspector.Inspector, suites map[string]*suiteInfo, cl *claims) {
+func checkTEscape(pass *analysis.Pass, insp *inspector.Inspector, suites map[string]*suiteInfo, cl *claims, rows map[types.Object]bool) {
 	mr := buildMethodReach(pass, insp, 5)
 	reported := map[token.Pos]bool{}
 	var deferred []deferredReport
@@ -749,7 +750,7 @@ func checkTEscape(pass *analysis.Pass, insp *inspector.Inspector, suites map[str
 			case *ast.AssignStmt:
 				trackTVarAssign(pass.TypesInfo, node, tVars, gotestTVars)
 			case *ast.CallExpr:
-				reportDirectEscape(pass, cl, node, isSuiteMethod, tVars, reported)
+				reportDirectEscape(pass, cl, node, isSuiteMethod, tVars, reported, rows)
 				if isSuiteMethod {
 					collectInterproceduralEscape(node, tVars, gotestTVars, mr, &deferred)
 				}
@@ -839,7 +840,7 @@ func trackTVarAssign(info *types.Info, assign *ast.AssignStmt, tVars, gotestTVar
 	}
 }
 
-func reportDirectEscape(pass *analysis.Pass, cl *claims, call *ast.CallExpr, isSuiteMethod bool, tVars map[string]string, reported map[token.Pos]bool) {
+func reportDirectEscape(pass *analysis.Pass, cl *claims, call *ast.CallExpr, isSuiteMethod bool, tVars map[string]string, reported map[token.Pos]bool, rows map[types.Object]bool) {
 	sel, _ := call.Fun.(*ast.SelectorExpr)
 	if sel == nil {
 		return
@@ -883,6 +884,10 @@ func reportDirectEscape(pass *analysis.Pass, cl *claims, call *ast.CallExpr, isS
 			inner := arg.(*ast.CallExpr)
 			reported[inner.Pos()] = true
 			innerSel := inner.Fun.(*ast.SelectorExpr)
+			// An assertion given a row's T() halts the method; given the row it goes on.
+			if isRowVar(pass, rows, innerSel.X) {
+				return
+			}
 			reportWithFix(pass, TEscape, inner,
 				[]analysis.SuggestedFix{{
 					Message: fmt.Sprintf("pass gotest.%s directly", w),

@@ -1,0 +1,15 @@
+Expect: eachfailing: verdicts differ from the golden list
+Judge: ./tests/canary CanaryTestSuite/TestEachRowsGoOnPastAFailure
+Clause: when one row of an Each table fails → fails that row and the method, and the rows after it still run
+--- a/pkg/gotest/assertions.go
++++ b/pkg/gotest/assertions.go
+@@ -23,6 +23,9 @@
+ }
+ 
+ func fail(t testingT, msg string, msgAndArgs []any) {
++	if st, ok := t.(*T); ok && st.soft {
++		return
++	}
+ 	if userMsg := assert.FormatMessage(msgAndArgs); userMsg != "" {
+ 		msg = msg + "\n  message: " + userMsg
+ 	}

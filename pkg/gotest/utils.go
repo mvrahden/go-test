@@ -14,7 +14,10 @@ import (
 )
 
 // Each iterates over entries as sub-tests, yielding a fresh *T and the entry for each.
-// It panics on a T with no *testing.T, as It and When do.
+// A failing assertion on the row's T fails the row and returns, so the row
+// goes on and the next row still runs. FailNow or Skipf on it ends the method
+// there, as Go cannot resume a range-over-func loop whose body left early. It
+// panics on a T with no *testing.T, as It and When do.
 func Each[E any](t *T, entries []E) iter.Seq2[*T, E] {
 	if t.t == nil {
 		panic("gotest: Each is unavailable in benchmark/fuzz lifecycle hooks")
@@ -59,8 +62,8 @@ func eachRun[E any](parent *T, name string, entry E, yield func(*T, E) bool) boo
 		return true
 	}
 
-	// goexited stays true when yield leaves via runtime.Goexit — a failed
-	// assertion inside the entry. A panic is tracked separately: the two must
+	// goexited stays true when yield leaves via runtime.Goexit — a FailNow
+	// or SkipNow inside the entry. A panic is tracked separately: the two must
 	// not be confused, because the Goexit branch below would discard an
 	// in-flight panic instead of letting it propagate.
 	goexited := true
@@ -99,7 +102,9 @@ func eachRun[E any](parent *T, name string, entry E, yield func(*T, E) bool) boo
 
 	func() {
 		defer func() { captured = capturedFrom(recover(), "Each entry") }()
-		result = yield(parent.sub(tt), entry)
+		row := parent.sub(tt)
+		row.soft = true
+		result = yield(row, entry)
 		goexited = false
 	}()
 	return result

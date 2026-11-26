@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint EachRowGuards .* / fail-guard leaves it unreported, through an alias and inside a closure too \(
+Clause: when a guard on an Each row's T ends the method → fail-guard leaves it unreported, through an alias and inside a closure too
+--- a/internal/lint/eachrow.go
++++ b/internal/lint/eachrow.go
+@@ -105,7 +105,7 @@
+ 	if len(units) > 1 || len(splitOr(u.cond)) > 1 {
+ 		return false
+ 	}
+-	if u.returns || (u.label != "Fail" && u.label != "Errorf") {
++	if false {
+ 		return false
+ 	}
+ 	u.halting = true

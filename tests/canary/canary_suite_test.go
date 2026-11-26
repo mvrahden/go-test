@@ -302,6 +302,33 @@ func (s *CanaryTestSuite) TestEveryAssertionFamilyFails(t *gotest.T) {
 	}
 }
 
+// A failing assertion in an Each row reports and lets the row go on: both of
+// the row's failures show, the row after it runs and a row goes on past a
+// failure on its deadline T; an It in a row and a row that calls FailNow
+// still stop.
+func (s *CanaryTestSuite) TestEachRowsGoOnPastAFailure(t *gotest.T) {
+	r := s.check(t, "eachfailing")
+	for _, want := range []string{"first failure", "second failure"} {
+		if !strings.Contains(r.stream, want) {
+			t.Errorf("eachfailing: no failure message says %q", want)
+		}
+	}
+	data, _ := os.ReadFile(filepath.Join(r.dir, testkit.MarkersFile))
+	got := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if !slices.Contains(got, "row third") {
+		t.Errorf("eachfailing: the row after a failing one did not run: %v", got)
+	}
+	if slices.Contains(got, "stop third") {
+		t.Errorf("eachfailing: the row after one that called FailNow ran: %v", got)
+	}
+	if slices.Contains(got, "after the failure in the It") {
+		t.Errorf("eachfailing: an It in a row went on past its failure: %v", got)
+	}
+	if !slices.Contains(got, "after the deadline T") {
+		t.Errorf("eachfailing: a row stopped at a failure on its deadline T: %v", got)
+	}
+}
+
 // A failure inside a helper names the helper's line and the caller's, also
 // under -trimpath in a module whose path has no dot, which the standard
 // library's import paths resemble.

@@ -1,0 +1,11 @@
+Expect: ^FAIL .*conformance/lint EachRowGuards .* / fail-guard reports it with a fix and no claim that an assertion halts \(
+Clause: when a guard of one condition calls Fail or Errorf on an Each row's T → fail-guard reports it with a fix and no claim that an assertion halts
+--- a/internal/lint/eachrow.go
++++ b/internal/lint/eachrow.go
+@@ -108,6 +108,5 @@
+ 	if u.returns || (u.label != "Fail" && u.label != "Errorf") {
+ 		return false
+ 	}
+-	u.halting = true
+ 	return true
+ }

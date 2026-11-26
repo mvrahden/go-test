@@ -4,7 +4,7 @@ Signatures and rules for assertions, polling, goroutines, suites, lifecycle, con
 
 ## Assertions
 
-All assertion functions call `FailNow()` on failure (fatal — test stops immediately).
+All assertion functions call `FailNow()` on failure (fatal — test stops immediately), except on an `Each` row's `T` (v1.42+, see Each).
 All except `Eventually`, `Consistently` and `MatchSnapshot` (whose trailing arguments name the snapshot) accept optional trailing `msgAndArgs ...any` for custom error messages.
 
 ### Unconditional Failure
@@ -597,9 +597,15 @@ for t, entry := range gotest.Each(t, entries) {
 }
 ```
 Subtest names are derived from the entry struct's `Desc` or `Name` string field (if present), otherwise `#0`, `#1`, etc.
-Every row is its own subtest with its own verdict. A row that leaves early ends the method
-there — Go's range-over-func cannot resume a loop whose body left through `FailNow` or
-`Skipf` — so a row that should merely be passed over uses `continue` ([Each rows](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-each-rows)).
+Every row is its own subtest with its own verdict. From v1.42 a failing assertion on the
+row's `t` (in a helper given it, on `NewTWithDeadline` of it or in `Eventually` given it
+too) fails the row and the method, and the row and the rows after it go on, so one run
+reports every failing row; an `It` in a row hands its body a `t` that stops. Below v1.42
+the first failing assertion ended the method there. A row that calls `FailNow` or `Skipf`
+still ends the method — Go's range-over-func cannot resume a loop whose body left early —
+so a row that should merely be passed over uses `continue` ([Each rows](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-each-rows)).
+A row whose later lines need an earlier check to hold guards them itself:
+`if t.T().Failed() { continue }`, or puts them in a `t.It`, whose `t` is fatal.
 
 ## Utilities
 

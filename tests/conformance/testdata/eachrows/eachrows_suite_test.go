@@ -1,10 +1,12 @@
-// Package eachrows runs Each tables in which one row fails, one row skips,
-// rows end the method's own T and one loop breaks.
+// Package eachrows runs Each tables in which one row fails, one row stops,
+// one row skips, rows end the method's own T and one loop breaks, and rows
+// that fail in a helper, an It, a T with a deadline and Eventually.
 package eachrows
 
 import (
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
@@ -32,6 +34,16 @@ func (s *EachRowsTestSuite) TestAFailingRow(t *gotest.T) {
 		gotest.True(it, r.ok, "the %s row fails", r.Desc)
 	}
 	mark("after the loop")
+}
+
+func (s *EachRowsTestSuite) TestAStoppingRow(t *gotest.T) {
+	for it, r := range gotest.Each(t, []row{{"first", true}, {"second", false}, {"third", true}}) {
+		mark("stop " + r.Desc)
+		if !r.ok {
+			it.FailNow()
+		}
+	}
+	mark("after the stop")
 }
 
 func (s *EachRowsTestSuite) TestBreak(t *gotest.T) {
@@ -64,5 +76,42 @@ func (s *EachRowsTestSuite) TestMethodFailsInARow(t *gotest.T) {
 	for _, r := range gotest.Each(t, []row{{"first", true}, {"second", true}}) {
 		mark("method fail " + r.Desc)
 		gotest.Fail(t, "the method fails in a row")
+	}
+}
+
+func (s *EachRowsTestSuite) TestAHelperInARow(t *gotest.T) {
+	for it, r := range gotest.Each(t, []row{{"first", false}}) {
+		expectOK(it, r.ok)
+		mark("after the helper")
+	}
+}
+
+func expectOK(t *gotest.T, ok bool) {
+	gotest.True(t, ok, "the helper fails")
+}
+
+func (s *EachRowsTestSuite) TestAnItInARow(t *gotest.T) {
+	for it, r := range gotest.Each(t, []row{{"first", false}}) {
+		it.It("stops", func(it *gotest.T) {
+			gotest.True(it, r.ok)
+			mark("after the failure in the It")
+		})
+		mark("after the It")
+	}
+}
+
+func (s *EachRowsTestSuite) TestADeadlineInARow(t *gotest.T) {
+	for it, r := range gotest.Each(t, []row{{"first", false}}) {
+		gotest.True(gotest.NewTWithDeadline(it, time.Minute), r.ok, "the deadline T fails")
+		mark("after the deadline T")
+	}
+}
+
+func (s *EachRowsTestSuite) TestEventuallyInARow(t *gotest.T) {
+	for it, r := range gotest.Each(t, []row{{"first", false}}) {
+		gotest.Eventually(it, 50*time.Millisecond, 10*time.Millisecond, func(poll *gotest.R) {
+			gotest.True(poll, r.ok)
+		})
+		mark("after Eventually")
 	}
 }
