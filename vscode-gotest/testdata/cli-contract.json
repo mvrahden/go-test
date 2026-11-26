@@ -5877,7 +5877,13 @@
               "current": 0,
               "stale": 0,
               "unknown": 1
-            }
+            },
+            "ran": [
+              {
+                "package": "auditmod/shop",
+                "status": "fail"
+              }
+            ]
           },
           {
             "id": "<id>",
@@ -5917,7 +5923,13 @@
               "current": 0,
               "stale": 0,
               "unknown": 1
-            }
+            },
+            "ran": [
+              {
+                "package": "auditmod/shop",
+                "status": "pass"
+              }
+            ]
           },
           {
             "id": "<id>",
@@ -5957,7 +5969,13 @@
               "current": 0,
               "stale": 0,
               "unknown": 1
-            }
+            },
+            "ran": [
+              {
+                "package": "auditmod/shop",
+                "status": "pass"
+              }
+            ]
           },
           {
             "id": "<id>",
@@ -5987,7 +6005,13 @@
               "current": 0,
               "stale": 0,
               "unknown": 1
-            }
+            },
+            "ran": [
+              {
+                "package": "auditmod/shop",
+                "status": "pass"
+              }
+            ]
           }
         ]
       }
@@ -6037,7 +6061,10 @@
       "exitCode": 0,
       "manifestChanged": {
         "Ran": 1,
-        "Unchanged": 1
+        "Unchanged": 1,
+        "Packages": [
+          "auditmod/shop"
+        ]
       }
     },
     "list-after-changed": {
@@ -6068,7 +6095,10 @@
               ],
               "changed": {
                 "ran": 1,
-                "unchanged": 1
+                "unchanged": 1,
+                "packages": [
+                  "auditmod/shop"
+                ]
               }
             },
             "result": {
@@ -6092,7 +6122,14 @@
               "current": 1,
               "stale": 0,
               "unknown": 0
-            }
+            },
+            "ran": [
+              {
+                "package": "auditmod/shop",
+                "status": "pass",
+                "inputHash": "15e3fbe78436fe30062c77f594af77e5"
+              }
+            ]
           },
           {
             "id": "<id>",
@@ -6132,7 +6169,19 @@
               "current": 1,
               "stale": 1,
               "unknown": 0
-            }
+            },
+            "ran": [
+              {
+                "package": "auditmod/shop",
+                "status": "pass",
+                "inputHash": "05c0c1a55166727f7614e3cb9cb5978b"
+              },
+              {
+                "package": "auditmod/shop/ledger",
+                "status": "skip",
+                "inputHash": "99470f23101979c6c4154a5cba2da5aa"
+              }
+            ]
           },
           {
             "id": "<id>",
@@ -6177,7 +6226,13 @@
               "current": 0,
               "stale": 0,
               "unknown": 1
-            }
+            },
+            "ran": [
+              {
+                "package": "auditmod/shop",
+                "status": "fail"
+              }
+            ]
           },
           {
             "id": "<id>",
@@ -6217,7 +6272,13 @@
               "current": 0,
               "stale": 0,
               "unknown": 1
-            }
+            },
+            "ran": [
+              {
+                "package": "auditmod/shop",
+                "status": "pass"
+              }
+            ]
           },
           {
             "id": "<id>",
@@ -6257,7 +6318,13 @@
               "current": 0,
               "stale": 0,
               "unknown": 1
-            }
+            },
+            "ran": [
+              {
+                "package": "auditmod/shop",
+                "status": "pass"
+              }
+            ]
           },
           {
             "id": "<id>",
@@ -6287,7 +6354,13 @@
               "current": 0,
               "stale": 0,
               "unknown": 1
-            }
+            },
+            "ran": [
+              {
+                "package": "auditmod/shop",
+                "status": "pass"
+              }
+            ]
           }
         ]
       }
