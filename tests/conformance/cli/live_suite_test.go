@@ -57,6 +57,9 @@ const (
 	// liveWithin is how long an event may take to reach stdout once its
 	// suite wrote it; BeforeAll built the binary.
 	liveWithin = 20 * time.Second
+	// verdictWithin is how long a package verdict written when one suite
+	// ended may take to reach stdout once that suite's pass did.
+	verdictWithin = 3 * time.Second
 )
 
 // liveRun is a run of clilive whose stdout and events file a test reads
@@ -86,10 +89,10 @@ func (s *CLILiveTestSuite) start(t *gotest.T, args []string, env ...string) *liv
 }
 
 // await returns stdout once holds says it holds what was awaited, or once
-// liveWithin has passed: the caller releases the run either way, and its
+// within has passed: the caller releases the run either way, and its
 // clauses judge what stdout held.
-func (r *liveRun) await(holds func(stdout string) bool) string {
-	for deadline := time.Now().Add(testkit.Scaled(liveWithin)); ; time.Sleep(20 * time.Millisecond) {
+func (r *liveRun) await(within time.Duration, holds func(stdout string) bool) string {
+	for deadline := time.Now().Add(testkit.Scaled(within)); ; time.Sleep(20 * time.Millisecond) {
 		got, _ := os.ReadFile(r.out)
 		if holds(string(got)) || time.Now().After(deadline) {
 			return string(got)
@@ -150,8 +153,13 @@ func suiteEvents(stream, suite string) []string {
 
 func (s *CLILiveTestSuite) TestTwoSuitesThatHold(t *gotest.T) {
 	r := s.start(t, []string{"-json", "--live"})
-	before := r.await(firstPasses)
-	r.release(t, "first", "second")
+	before := r.await(liveWithin, firstPasses)
+	// The first suite ends alone: a verdict written then reaches stdout
+	// while the second suite still holds.
+	r.release(t, "first")
+	r.await(liveWithin, func(stdout string) bool { return passed(stdout, firstSuite) })
+	held := r.await(verdictWithin, func(stdout string) bool { return passed(stdout, "") })
+	r.release(t, "second")
 	stdout, file, code := r.finish(t)
 
 	// The same run without --live, its suites released before they start.
@@ -166,6 +174,8 @@ func (s *CLILiveTestSuite) TestTwoSuitesThatHold(t *gotest.T) {
 			gotest.False(it, passed(before, secondSuite+"/TestBHolds"), "stdout before the release:\n%s", before)
 		})
 		w.It("writes the package's verdict only after both suites ended", func(it *gotest.T) {
+			gotest.True(it, passed(held, firstSuite), "stdout while the second suite held:\n%s", held)
+			gotest.False(it, passed(held, ""), "stdout while the second suite held:\n%s", held)
 			verdict := eventIndex(stdout, "pass", "")
 			gotest.Greater(it, verdict, eventIndex(stdout, "pass", firstSuite), "stdout:\n%s", stdout)
 			gotest.Greater(it, verdict, eventIndex(stdout, "pass", secondSuite), "stdout:\n%s", stdout)
@@ -187,7 +197,7 @@ func (s *CLILiveTestSuite) TestTwoSuitesThatHold(t *gotest.T) {
 
 func (s *CLILiveTestSuite) TestTheVariable(t *gotest.T) {
 	r := s.start(t, []string{"-json"}, protocol.EnvLive+"=1")
-	before := r.await(firstPasses)
+	before := r.await(liveWithin, firstPasses)
 	r.release(t, "first", "second")
 	_, _, code := r.finish(t)
 
@@ -217,7 +227,7 @@ func (s *CLILiveTestSuite) TestAMethodThatHangsPastTheTimeout(t *gotest.T) {
 	// The second suite's method ignores its context: only the deadline's
 	// kill ends it, and no stop line names it.
 	r := s.start(t, []string{"-json", "--live", "--timeout=" + testkit.Scaled(8*time.Second).String()}, "LIVE_IGNORE_CONTEXT=1")
-	held := r.await(func(stdout string) bool {
+	held := r.await(liveWithin, func(stdout string) bool {
 		return eventIndex(stdout, "run", firstSuite+"/TestBHolds") >= 0 && eventIndex(stdout, "run", secondSuite+"/TestBHolds") >= 0
 	})
 	r.release(t, "first")
