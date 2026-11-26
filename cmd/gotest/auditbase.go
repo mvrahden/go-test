@@ -57,7 +57,25 @@ func resolveBase(ref string) (*gitBase, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &gitBase{ref: ref, commit: commit, short: short, branch: branchOf(cwd, ref), top: top, prefix: prefix}, nil
+	return &gitBase{ref: ref, commit: commit, short: short, branch: branchOf(cwd, ref), top: topAsSpelled(cwd, prefix, top), prefix: prefix}, nil
+}
+
+// topAsSpelled is the checkout's root spelled as the current directory is,
+// as go list names package directories: git resolves symlinks (macOS's /var)
+// and short names (Windows' RUNNER~1). It is git's top where the two differ.
+func topAsSpelled(cwd, prefix, top string) string {
+	dir := cwd
+	for _, seg := range strings.Split(strings.Trim(prefix, "/"), "/") {
+		if seg != "" {
+			dir = filepath.Dir(dir)
+		}
+	}
+	a, errA := os.Stat(dir)
+	b, errB := os.Stat(top)
+	if errA != nil || errB != nil || !os.SameFile(a, b) {
+		return top
+	}
+	return dir
 }
 
 // branchOf is the local or remote branch ref names, "" for anything else.
