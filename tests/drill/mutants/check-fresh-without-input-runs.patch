@@ -1,4 +1,5 @@
-Expect: ^FAIL .*conformance/cli CLIInputHash .* / refuses with exit 2, naming --input \(
+Expect: ^FAIL .*conformance/cli CLIInputHash .* / refuses with exit 2, naming --input / spec \(
+Expect: ^FAIL .*conformance/cli CLIInputHash .* / refuses with exit 2, naming --input / summary \(
 Clause: when spec or summary is given --check-fresh without --input → refuses with exit 2, naming --input
 --- a/cmd/gotest/freshness.go
 +++ b/cmd/gotest/freshness.go
