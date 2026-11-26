@@ -15199,6 +15199,144 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "prints result FAILED with the failed test in failedTests, the one without an assertion in warnedTests and the others in passedTests",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "testresult_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 93,
+                      "name": "prints_result_FAILED_with_the_failed_test_in_failedTests,_the_one_without_an_assertion_in_warnedTests_and_the_others_in_passedTests",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "names the CLI version, the Go version and the arguments the manifest records in its configuration",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "testresult_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 101,
+                      "name": "names_the_CLI_version,_the_Go_version_and_the_arguments_the_manifest_records_in_its_configuration",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when summary writes the test-result predicate of a stream whose run failed a test and passed one without an assertion",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "testresult_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 91,
+                  "name": "summary_writes_the_test-result_predicate_of_a_stream_whose_run_failed_a_test_and_passed_one_without_an_assertion",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "prints result PASSED and the url of the Actions run",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "testresult_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 114,
+                      "name": "prints_result_PASSED_and_the_url_of_the_Actions_run",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when summary writes the test-result predicate of a stream whose run passed, under GitHub Actions",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "testresult_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 112,
+                  "name": "summary_writes_the_test-result_predicate_of_a_stream_whose_run_passed,_under_GitHub_Actions",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "exits 2 naming --events-file on stderr, with nothing on stdout",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "testresult_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 124,
+                      "name": "exits_2_naming_--events-file_on_stderr,_with_nothing_on_stdout",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when summary writes the test-result predicate of a stream without a run manifest",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "testresult_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 122,
+                  "name": "summary_writes_the_test-result_predicate_of_a_stream_without_a_run_manifest",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ThePredicate",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "testresult_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 90,
+              "name": "TestThePredicate",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLITestResult",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "testresult_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 15,
+          "name": "TestCLITestResultTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "runs the gotest suite, notes the testify runner as a stdlib test go test runs, and exits 0",
                       "duration": 0,
                       "excluded": false,
@@ -39570,13 +39708,13 @@
     }
   ],
   "stats": {
-    "behaviors": 1149,
+    "behaviors": 1153,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 162,
+    "suites": 163,
     "tests": 0
   }
 }
