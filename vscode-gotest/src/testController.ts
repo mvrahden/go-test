@@ -25,6 +25,9 @@ export class GoTestController implements vscode.Disposable {
   // which of them parked themselves with t.Parallel.
   private pendingStarts = new Map<string, number>();
   private pendingPaused = new Set<string>();
+  // Every item in the tree by id, kept by attach and detach. A list because
+  // two modules can each hold a dir: item of the same id; the first answers.
+  private index = new Map<string, vscode.TestItem[]>();
 
   constructor(
     private readonly cache: DiscoveryCache,
@@ -222,7 +225,7 @@ export class GoTestController implements vscode.Disposable {
           }
           moduleItem.tags = [new vscode.TestTag("module")];
           moduleItem.description = "module";
-          target.add(moduleItem);
+          this.attach(target, moduleItem);
 
           // Build path trie within this module
           const trie = buildPathTrie(moduleRelEntries);
@@ -261,7 +264,7 @@ export class GoTestController implements vscode.Disposable {
               !seenModuleChildIds.has(child.id) &&
               !child.id.includes("/dynamic/")
             ) {
-              moduleItem!.children.delete(child.id);
+              this.detach(moduleItem!.children, child.id);
             }
           });
         }
@@ -305,7 +308,7 @@ export class GoTestController implements vscode.Disposable {
 
     this.controller.items.forEach((child) => {
       if (!rootIds.has(child.id) && !child.id.includes("/dynamic/")) {
-        this.controller.items.delete(child.id);
+        this.detach(this.controller.items, child.id);
       }
     });
   }
@@ -328,7 +331,7 @@ export class GoTestController implements vscode.Disposable {
     if (!dirItem) {
       dirItem = this.controller.createTestItem(dirId, node.segment);
     }
-    parent.add(dirItem);
+    this.attach(parent, dirItem);
 
     if (node.importPath) {
       this.addPackageItem(node.importPath, dirItem.children, seenIds);
@@ -349,7 +352,7 @@ export class GoTestController implements vscode.Disposable {
 
     dirItem.children.forEach((child) => {
       if (!seenChildIds.has(child.id) && !child.id.includes("/dynamic/")) {
-        dirItem.children.delete(child.id);
+        this.detach(dirItem.children, child.id);
       }
     });
   }
@@ -375,7 +378,7 @@ export class GoTestController implements vscode.Disposable {
     if (!item) {
       item = this.controller.createTestItem(id, name);
     }
-    this.controller.items.add(item);
+    this.attach(this.controller.items, item);
     return item.children;
   }
 
@@ -411,7 +414,7 @@ export class GoTestController implements vscode.Disposable {
     } else {
       pkgItem.error = undefined;
     }
-    parent.add(pkgItem);
+    this.attach(parent, pkgItem);
 
     const seenSuiteIds = new Set<string>();
 
@@ -441,7 +444,7 @@ export class GoTestController implements vscode.Disposable {
         isTwin,
       );
       suiteItem.description = suite.guarded ? "guarded" : undefined;
-      pkgItem.children.add(suiteItem);
+      this.attach(pkgItem.children, suiteItem);
 
       const seenMethodIds = new Set<string>();
 
@@ -477,7 +480,7 @@ export class GoTestController implements vscode.Disposable {
           methodUri,
           method.behaviorsComplete === false,
         );
-        suiteItem.children.add(methodItem);
+        this.attach(suiteItem.children, methodItem);
       }
 
       // Fuzz targets sit beside test methods in the tree; their names are
@@ -509,7 +512,7 @@ export class GoTestController implements vscode.Disposable {
           new vscode.TestTag("fuzz"),
         ];
         fuzzerItem.description = "fuzz";
-        suiteItem.children.add(fuzzerItem);
+        this.attach(suiteItem.children, fuzzerItem);
       }
 
       // Benchmark methods sit beside tests and fuzzers under their suite —
@@ -538,13 +541,13 @@ export class GoTestController implements vscode.Disposable {
           ...this.buildTags(bench.focused, bench.excluded, bench.parallel),
         ];
         benchItem.description = "bench";
-        suiteItem.children.add(benchItem);
+        this.attach(suiteItem.children, benchItem);
       }
 
       suiteItem.children.forEach((child) => {
         if (!seenMethodIds.has(child.id) && !this.dynamicIds.has(child.id)) {
           this.forgetDynamic(child);
-          suiteItem.children.delete(child.id);
+          this.detach(suiteItem.children, child.id);
         }
       });
     }
@@ -552,7 +555,7 @@ export class GoTestController implements vscode.Disposable {
     pkgItem.children.forEach((child) => {
       if (!seenSuiteIds.has(child.id) && !this.dynamicIds.has(child.id)) {
         this.forgetDynamic(child);
-        pkgItem.children.delete(child.id);
+        this.detach(pkgItem.children, child.id);
       }
     });
   }
@@ -566,7 +569,7 @@ export class GoTestController implements vscode.Disposable {
     });
     for (const child of toDelete) {
       this.forgetDynamic(child);
-      item.children.delete(child.id);
+      this.detach(item.children, child.id);
     }
     if (this.dynamicOverflow.delete(item.id)) {
       item.description = undefined;
@@ -596,7 +599,7 @@ export class GoTestController implements vscode.Disposable {
 
     const item = this.controller.createTestItem(id, label, parentItem.uri);
     this.dynamicIds.add(id);
-    parentItem.children.add(item);
+    this.attach(parentItem.children, item);
     return item;
   }
 
@@ -642,7 +645,7 @@ export class GoTestController implements vscode.Disposable {
           new vscode.Position(behavior.line - 1, 0),
         );
       }
-      parent.children.add(item);
+      this.attach(parent.children, item);
       this.addBehaviors(item, behavior.children ?? [], uri);
     }
     // Behaviors that no longer exist in source go away; ones discovered at run
@@ -650,7 +653,7 @@ export class GoTestController implements vscode.Disposable {
     parent.children.forEach((child) => {
       if (!seen.has(child.id) && !this.dynamicIds.has(child.id)) {
         this.forgetDynamic(child);
-        parent.children.delete(child.id);
+        this.detach(parent.children, child.id);
       }
     });
   }
@@ -691,7 +694,44 @@ export class GoTestController implements vscode.Disposable {
     // results, say — would otherwise search an empty tree and conclude the
     // tests no longer exist.
     this.flushPendingRebuild();
-    return this.findItemRecursive(this.controller.items, id);
+    return this.index.get(id)?.[0];
+  }
+
+  // attach adds item to a collection of the tree and to the index. Callers
+  // reuse the item a collection holds under the id, so nothing is replaced.
+  private attach(
+    collection: vscode.TestItemCollection,
+    item: vscode.TestItem,
+  ): void {
+    collection.add(item);
+    this.indexItem(item);
+  }
+
+  // detach deletes an item from a collection, its subtree from the index.
+  private detach(collection: vscode.TestItemCollection, id: string): void {
+    const item = collection.get(id);
+    if (item) this.unindex(item);
+    collection.delete(id);
+  }
+
+  // indexItem records an item and, when it is new to the index, the children
+  // it already holds; a re-added item's subtree is indexed already.
+  private indexItem(item: vscode.TestItem): void {
+    const list = this.index.get(item.id);
+    if (list?.includes(item)) return;
+    if (list) list.push(item);
+    else this.index.set(item.id, [item]);
+    item.children.forEach((child) => this.indexItem(child));
+  }
+
+  private unindex(item: vscode.TestItem): void {
+    const list = this.index.get(item.id);
+    if (list) {
+      const rest = list.filter((i) => i !== item);
+      if (rest.length > 0) this.index.set(item.id, rest);
+      else this.index.delete(item.id);
+    }
+    item.children.forEach((child) => this.unindex(child));
   }
 
   // noteStart remembers when go test registered a node, so the terminal event
@@ -754,24 +794,8 @@ export class GoTestController implements vscode.Disposable {
     this.disposables = [];
     this.pendingStarts.clear();
     this.pendingPaused.clear();
+    this.index.clear();
     this.controller.dispose();
-  }
-
-  private findItemRecursive(
-    collection: vscode.TestItemCollection,
-    id: string,
-  ): vscode.TestItem | undefined {
-    const direct = collection.get(id);
-    if (direct) {
-      return direct;
-    }
-    let found: vscode.TestItem | undefined;
-    collection.forEach((item) => {
-      if (!found) {
-        found = this.findItemRecursive(item.children, id);
-      }
-    });
-    return found;
   }
 
   private buildTags(
