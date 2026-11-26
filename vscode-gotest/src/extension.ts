@@ -81,13 +81,14 @@ import {
   moduleFileChanged,
   writeGitSettings,
 } from "./activeFolders.js";
+import { guardedLog } from "./guardedLog.js";
 
 let flushOnDeactivate: (() => Promise<void>) | undefined;
 
 export function activate(context: vscode.ExtensionContext): void {
-  const outputChannel = vscode.window.createOutputChannel("Go - Test Suites", {
-    log: true,
-  });
+  const outputChannel = guardedLog(
+    vscode.window.createOutputChannel("Go - Test Suites", { log: true }),
+  );
   outputChannel.info("[activate] extension activated");
 
   const workspaceFolders = vscode.workspace.workspaceFolders;
