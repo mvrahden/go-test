@@ -90,6 +90,32 @@ func (s *AuditMutateFlagsTestSuite) TestEnvironments(t *gotest.T) {
 	})
 }
 
+func (s *AuditMutateFlagsTestSuite) TestTheOverlay(t *gotest.T) {
+	t.When("the mutated files lie under a symlinked directory", func(w *gotest.T) {
+		if runtime.GOOS == "windows" {
+			w.Skipf("symlinks need privileges on Windows")
+		}
+		real := w.TempDir()
+		link := filepath.Join(w.TempDir(), "link")
+		gotest.NoError(w, os.Symlink(real, link))
+		resolved, err := filepath.EvalSymlinks(real)
+		gotest.NoError(w, err)
+		gotest.NoError(w, os.WriteFile(filepath.Join(real, "a.go"), []byte("package a\n"), 0o600))
+		replace, err := ExportWriteOverlay(w.TempDir(), map[string][]byte{
+			filepath.Join(link, "a.go"):     []byte("package a // mutated\n"),
+			filepath.Join(link, "added.go"): []byte("package a\n"),
+		})
+		gotest.NoError(w, err)
+		w.It("names each file under the link and under the resolved directory, a file the plan adds too", func(it *gotest.T) {
+			for _, base := range []string{"a.go", "added.go"} {
+				gotest.Contains(it, replace, filepath.Join(link, base))
+				gotest.Contains(it, replace, filepath.Join(resolved, base))
+				gotest.Equal(it, replace[filepath.Join(link, base)], replace[filepath.Join(resolved, base)])
+			}
+		})
+	})
+}
+
 func (s *AuditMutateFlagsTestSuite) TestTheStreamOfAMutant(t *gotest.T) {
 	stream := `{"Action":"run","Package":"m/a","Test":"TestS"}` + "\n" +
 		`{"Action":"fail","Package":"m/a","Test":"TestS/TestX","Elapsed":0.1}` + "\n" +

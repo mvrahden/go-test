@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -381,6 +383,24 @@ func ExportRunEnv(env []string, overlay string, id int) []string {
 
 func ExportCoverageEnv(env []string, dir string) []string {
 	return (&mutation{dir: dir}).coverageEnv(env)
+}
+
+// ExportWriteOverlay writes the mutants' overlay of files in dir and returns
+// its replacements.
+func ExportWriteOverlay(dir string, files map[string][]byte) (map[string]string, error) {
+	m := &mutation{dir: dir, overlay: filepath.Join(dir, "overlay.json"), plan: &mutate.Plan{Files: files}}
+	if err := os.MkdirAll(filepath.Join(dir, "src"), 0o700); err != nil {
+		return nil, err
+	}
+	if err := m.writeOverlay(); err != nil {
+		return nil, err
+	}
+	data, err := os.ReadFile(m.overlay)
+	if err != nil {
+		return nil, err
+	}
+	var o struct{ Replace map[string]string }
+	return o.Replace, json.Unmarshal(data, &o)
 }
 
 var ExportTestsFirst = testsFirst

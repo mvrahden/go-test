@@ -204,7 +204,9 @@ func (m *mutation) build(a *auditArgs, pkgs []*packages.Package, changed mutate.
 	}
 }
 
-// writeOverlay writes the plan's files and the overlay naming them.
+// writeOverlay writes the plan's files and the overlay naming them, each
+// under its resolved path too: a go command started in the module's real
+// directory, as a test's go build is, opens the files by that name.
 func (m *mutation) writeOverlay() error {
 	src := filepath.Join(m.dir, "src")
 	replace := map[string]string{}
@@ -219,6 +221,10 @@ func (m *mutation) writeOverlay() error {
 			return err
 		}
 		replace[name] = p
+		// The directory: a file the plan adds is not on disk.
+		if dir, err := filepath.EvalSymlinks(filepath.Dir(name)); err == nil {
+			replace[filepath.Join(dir, filepath.Base(name))] = p
+		}
 	}
 	data, err := json.Marshal(map[string]any{"Replace": replace})
 	if err != nil {
