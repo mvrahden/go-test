@@ -2,7 +2,9 @@ package audit_test
 
 import (
 	"encoding/json"
+	"go/version"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -89,7 +91,19 @@ func (s *AuditRunTestSuite) exported(t *gotest.T) os.FileInfo {
 	gotest.Len(t, matches, 1)
 	info, err := os.Stat(matches[0])
 	gotest.NoError(t, err)
+	// Windows reads a file's identity on first use: read it while the file
+	// is there.
+	gotest.True(t, os.SameFile(info, info))
 	return info
+}
+
+// goVersion is the toolchain the CLI's go runs in dir.
+func goVersion(t *gotest.T, dir string) string {
+	cmd := exec.Command("go", "env", "GOVERSION")
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	gotest.NoError(t, err)
+	return strings.TrimSpace(string(out))
 }
 
 func (s *AuditRunTestSuite) TestTheAuditsOwnRun(t *gotest.T) {
@@ -120,13 +134,19 @@ func (s *AuditRunTestSuite) TestTheAuditsOwnRun(t *gotest.T) {
 				u.Ranges = nil
 				got = append(got, u)
 			}
+			// Clamp's statements are lines 9 to 15; before Go 1.27 the
+			// profile opens its block at the brace on line 8.
+			first := 9
+			if version.Compare(goVersion(it, s.checkout), "go1.27") < 0 {
+				first = 8
+			}
 			gotest.Equal(it, []unproven{
 				{File: "shop/ledger/ledger.go"},
-				{File: "shop/shop.go", Line: 9, Coverage: true, Changed: 7, Unexecuted: 7},
+				{File: "shop/shop.go", Line: first, Coverage: true, Changed: 16 - first, Unexecuted: 16 - first},
 			}, got)
 			shop := doc.unprovenOf("shop/shop.go")
 			gotest.Len(it, shop.Ranges, 1)
-			gotest.Equal(it, []int{9, 15}, []int{shop.Ranges[0].Line, shop.Ranges[0].EndLine})
+			gotest.Equal(it, []int{first, 15}, []int{shop.Ranges[0].Line, shop.Ranges[0].EndLine})
 		})
 	})
 }
