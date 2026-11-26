@@ -34,13 +34,14 @@ func (s *ActionAuditTestSuite) SuiteGuard() string {
 
 // auditCLI logs each call, knows --events-file and --evidence, writes the
 // files --events-file, -coverprofile and --output name, and exits
-// STANDIN_AUDIT_EXIT from audit.
+// STANDIN_AUDIT_EXIT from audit. Its help runs on past a pipe's buffer, so
+// a probe that stops reading at the flag breaks the pipe it writes to.
 const auditCLI = `#!/usr/bin/env bash
 echo "$*" >> "$STANDIN_LOG"
 out=""
 for a in "$@"; do
   case "$a" in
-    --help) echo "  --events-file=<file>"; echo "  --evidence=<stream>"; exit 0 ;;
+    --help) echo "  --events-file=<file>"; echo "  --evidence=<stream>"; printf '%1048576s\n' ''; exit 0 ;;
     --events-file=*) echo '{}' > "${a#--events-file=}" ;;
     -coverprofile=*) echo 'mode: set' > "${a#-coverprofile=}" ;;
     --output=*) out="${a#--output=}" ;;

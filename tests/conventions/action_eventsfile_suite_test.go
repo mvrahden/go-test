@@ -58,7 +58,8 @@ func (s *ActionEventsFileTestSuite) BeforeAll(t *gotest.T) {
 func (s *ActionEventsFileTestSuite) AfterAll(t *gotest.T) {}
 
 // standIn prints help naming --events-file unless old, writes "{}" to the
-// file the flag names, and logs every call.
+// file the flag names, and logs every call. Its help runs on past a pipe's
+// buffer, so a probe that stops reading at the flag breaks the pipe.
 const standIn = `#!/usr/bin/env bash
 echo "$*" >> "$STANDIN_LOG"
 for a in "$@"; do
@@ -66,6 +67,7 @@ for a in "$@"; do
     --help)
       echo "Flags:"
       [ -z "$STANDIN_OLD" ] && echo "  --events-file=<file>"
+      printf '%1048576s\n' ''
       exit 0 ;;
     --events-file=*)
       f="${a#--events-file=}"; mkdir -p "$(dirname "$f")"; echo '{}' > "$f" ;;
@@ -93,7 +95,7 @@ func (s *ActionEventsFileTestSuite) runStep(t *gotest.T, eventsFile string, old 
 	cmd.Dir = dir
 	// PWD as a runner's shell has it: inherited, bash would distrust it and
 	// read the resolved path, /private/var/... on macOS.
-	cmd.Env = append(os.Environ(), "PWD="+dir,
+	cmd.Env = append(stepEnviron(t), "PWD="+dir,
 		"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
 		"GITHUB_OUTPUT="+output, "RUNNER_TEMP="+bin, "STANDIN_LOG="+log,
 		"INPUT_VERSION=v1.33.0", "INPUT_PACKAGES=./...", "INPUT_EVENTS_FILE="+eventsFile)

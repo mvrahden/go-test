@@ -182,9 +182,16 @@ runs:
 
         args=(summary --github)
 
+        # The help is read whole: grep -q would close the pipe early, and
+        # pipefail turns the CLI's broken pipe into a failed probe.
+        summary_help=""
+        if [ -n "$INPUT_EVENTS_FILE" ] || [ -n "$want_audit" ] || [ "$INPUT_ATTEST" = "true" ]; then
+          summary_help="$("${cmd[@]}" summary --help 2>/dev/null || true)"
+        fi
+
         events_file=""
         if [ -n "$INPUT_EVENTS_FILE" ]; then
-          if ! "${cmd[@]}" summary --help 2>/dev/null | grep -q -- --events-file; then
+          if [[ "$summary_help" != *--events-file* ]]; then
             have="$INPUT_VERSION"
             if [ "$have" = "gomod" ]; then
               have="$(go list -m -f '{{.Version}}' github.com/mvrahden/go-test 2>/dev/null || true)"
@@ -210,7 +217,7 @@ runs:
         # in RUNNER_TEMP when the caller keeps none and the CLI can write it.
         stream="$events_file"
         if [ -z "$stream" ] && { [ -n "$want_audit" ] || [ "$INPUT_ATTEST" = "true" ]; } &&
-          "${cmd[@]}" summary --help 2>/dev/null | grep -q -- --events-file; then
+          [[ "$summary_help" == *--events-file* ]]; then
           stream="${RUNNER_TEMP}/gotest-run-events.json"
           if command -v cygpath > /dev/null; then
             stream="$(cygpath -m "$stream")"
@@ -375,7 +382,9 @@ runs:
         if [ -z "$base" ]; then
           skip "the ${EVENT_NAME:-unknown} event names no base commit"
         fi
-        if ! "${cmd[@]}" audit --help 2>/dev/null | grep -q -- --evidence; then
+        # Read whole, as the test step reads summary's help.
+        audit_help="$("${cmd[@]}" audit --help 2>/dev/null || true)"
+        if [[ "$audit_help" != *--evidence* ]]; then
           skip "the gotest in use has no audit command that reads a run's stream"
         fi
 
