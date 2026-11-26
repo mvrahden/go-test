@@ -273,16 +273,13 @@ shards of one run do not add up to every mutant exactly once.
 | `contains-text-needle-unhinted` | a rune, byte or `[]byte` needle for a string is refused without naming the string type to convert it to | ring-0 predicates suite |
 | `contains-wrapped-sign-hinted` | a number whose conversion wraps its sign both ways (`-1` for a `[]uint`) is told to convert | ring-0 predicates suite |
 | `each-method-t-reported-as-a-goexit` | a row that skips or fails the method's own T is reported as leaving through Goexit without a verdict | canary: the eachskip method that skips in a row fails, saying its row left without a verdict |
-| `each-rows-not-soft` | an Each row's `T` is fatal, so a failing row ends the method | canary: the softfailing fixture's row after the failing one never runs |
+| `each-row-deadline-t-stops` | `NewTWithDeadline` on an Each row's `T` gives a `T` whose failing assertion ends the method | canary: the eachfailing row stops at its failure on its deadline `T` |
+| `each-row-failnow-goes-on` | `FailNow` on an Each row's `T` only marks the row failed and returns | canary: the eachfailing row after one that called FailNow runs |
+| `each-row-failure-stops-the-row` | a failing assertion on an Each row's `T` ends the method | canary: the eachfailing row's second failure is missing, and the row after a failing one never runs |
+| `each-row-failure-swallowed` | a failing assertion on an Each row's `T` returns without reporting | canary: the eachfailing rows pass, against the golden list |
+| `each-row-t-passed-into-its` | `It` on an Each row's `T` hands its body a `T` that goes on past a failure | canary: the eachfailing It goes on past its failure |
+| `each-rows-not-soft` | an Each row's `T` is fatal, so a failing row ends the method | canary: the eachfailing row after the failing one never runs |
 | `empty-always-true` | `IsEmpty` reports every value as empty | ring-0 predicates suite, and the canary's `Empty` row |
-| `lint-soft-fail-guard-reported` | fail-guard reports a guard whose `Fail` is given `t.Soft()`, whose split would run what the guard held back | conformance: the lint It for a guard on a soft T finds findings |
-| `lint-soft-failnow-guard-fixed-soft` | fail-guard fixes `if c { t.Soft().FailNow() }` onto `t.Soft()`, which goes on where FailNow stopped | conformance: the lint It for fixes on a soft T finds the soft receiver kept |
-| `lint-soft-poll-assertion-unread` | poll-scope leaves an assertion on the outer `t.Soft()` inside a poll unreported | conformance: the lint It for a soft T in a poll misses a finding |
-| `lint-soft-poll-helper-unread` | poll-scope leaves the outer `t.Soft()` handed to a helper inside a poll unreported | conformance: the lint It for a soft T in a poll misses a finding |
-| `lint-soft-redundant-mixed-pair-reported` | assertion-redundant removes a fatal assertion before a soft one, so the test goes on where it stopped | conformance: the lint It for a mixed pair finds a finding |
-| `lint-soft-redundant-soft-pair-unreported` | assertion-redundant leaves a pair unreported when either is soft | conformance: the lint It for two soft assertions finds none |
-| `lint-soft-simplify-fix-drops-soft` | assertion-simplify's fix hands the rewritten assertion the fatal `t` behind `t.Soft()` | conformance: the lint It for fixes on a soft T finds `Equal(t, a, b)` |
-| `migrate-soft-assertions-made-fatal` | migrate writes testify's non-fatal assertions on the fatal `t` | conformance: the migrate Its for assertions that go on find no `t.Soft()` and a test that stopped |
 | `notempty-pointer-to-a-number-passes` | `IsEmptyable` takes every pointer as one that can be empty, so `NotEmpty` on a pointer to a number is a nil check | ring-0 predicates suite |
 | `noerror-error-method-panics` | `ErrorText` reads `<nil>` for an error whose `Error` method panicked, naming neither its type nor the panic | ring-0 predicates suite |
 | `elementsmatch-unhashable-panics` | `CheckElementsMatch` passes lists whose elements `==` cannot compare | ring-0 predicates suite |
@@ -334,10 +331,6 @@ shards of one run do not add up to every mutant exactly once.
 | `overrun-names-no-phase` | an overrun's verdict does not name the hook that overran | canary: the slow fixture's verdict does not name its `BeforeEach` |
 | `setup-waits-unwatched` | the wait on BeforeAll's goroutines is not held to the SetupTimeout | canary: the setupwaits slow suite gets no SetupTimeout verdict |
 | `shared-fixture-each-hooks-accepted` | a shared fixture another package declares with a `BeforeEach` passes generation, and the hook never runs | cli conformance: the cross-package shared fixture row exits 0 instead of 2 |
-| `soft-assertion-stops-the-test` | a failing assertion on a soft `T` stops the test | canary: the softfailing fixture's second soft failure is missing, and the rows after a failing one never run |
-| `soft-assertion-swallowed` | a failing assertion on a soft `T` returns without reporting | canary: the softfailing fixture's methods pass, against the golden list |
-| `soft-failnow-goes-on` | `FailNow` on a soft `T` only marks the test failed and returns | canary: the softfailing fixture's row after one that called FailNow runs |
-| `soft-t-passed-into-its` | `It` on a soft `T` hands its body a soft `T` | canary: the softfailing fixture's It goes on past its failure |
 | `suite-afterall-goexit-passes` | a suite `AfterAll` that left through `runtime.Goexit` without a verdict passes | lifecycle holds suite: the Goexit AfterAll suite exits 0 |
 | `suite-beforeeach-after-a-fixture-overran` | the suite's `BeforeEach` runs after a fixture's `BeforeEach` overran the `Timeout` | canary: the slow fixture's suite marks its `BeforeEach` |
 | `testing-t-hook-misses-the-setup-waits` | `gotest.Go` finds the suite's waits only through the T's context, so a T wrapped around a `*testing.T` hook waits as a plain cleanup, not held to the SetupTimeout | canary: the setupwaits `*testing.T` slow suite gets no SetupTimeout verdict |
