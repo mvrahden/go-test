@@ -98,6 +98,7 @@ const NEEDS_ARGUMENTS = [
   "gotest.runFuzz",
   "gotest.runTest",
   "gotest.scaffoldTarget",
+  "gotest.showInPanel",
   "gotest.toggleFocus",
   "gotest.triageCrashers",
 ];

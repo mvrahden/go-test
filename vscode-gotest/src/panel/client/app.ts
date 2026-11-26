@@ -3,10 +3,12 @@
 // for what it lacks. Embedded by source (see helpers.ts); the DOM it gets is
 // the webview's, or a test's stand-in.
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { ClientState, Depth, HostMessage, Tab } from "../protocol.js";
+import type { ClientState, HostMessage, Tab } from "../protocol.js";
 import type { ChangeRender, ChangeUi } from "./renderChange.js";
 import type { CardState, NowView } from "./renderNow.js";
 import type { RunsRender, RunsUi } from "./renderRuns.js";
+import type { TreeView } from "./renderTree.js";
+import type { Level, Slice, TreeLogic, TreeState, VRow } from "./tree.js";
 
 export interface AppEnv {
   vscode: {
@@ -20,10 +22,12 @@ export interface AppEnv {
   NOW: NowView;
   CHANGE: ChangeRender;
   RUNS: RunsRender;
+  TREE: TreeLogic;
+  TREEVIEW: TreeView;
 }
 
 export function panelApp(env: AppEnv) {
-  const { vscode, NOW, CHANGE, RUNS } = env;
+  const { vscode, NOW, CHANGE, RUNS, TREE, TREEVIEW } = env;
   const doc = env.document;
   const win = env.window;
   const tabs: Tab[] = ["now", "change", "runs"];
@@ -59,14 +63,20 @@ export function panelApp(env: AppEnv) {
       }
     >,
     pending: {} as Record<string, string>,
-    treeOpen: {} as Record<string, Record<string, boolean>>,
-    depth: (saved.depth === "suites" || saved.depth === "behaviors"
-      ? saved.depth
-      : "packages") as Depth,
-    shut: Array.isArray(saved.shut) ? saved.shut.slice() : ([] as string[]),
-    folders: (saved.folders || {}) as Record<string, boolean>,
-    deep: Array.isArray(saved.deep) ? saved.deep.slice() : ([] as string[]),
-    deepSuites: (saved.deepSuites || {}) as Record<string, string[]>,
+    tree: {
+      open: saved.tree?.open ?? {},
+      deep: saved.tree?.deep ?? {},
+      level: (saved.tree?.level === "suites" ||
+      saved.tree?.level === "behaviors"
+        ? saved.tree.level
+        : "packages") as Level,
+      focus: saved.tree?.focus,
+    } as TreeState,
+    // The tree holds the focus: a redraw gives it back to the same row.
+    treeFocused: false,
+    // A row to bring into view and focus once it shows.
+    revealing: undefined as string | undefined,
+    copiedAt: 0,
     // What the host found for the search on show.
     found: undefined as
       | {
@@ -99,18 +109,13 @@ export function panelApp(env: AppEnv) {
   const save = () =>
     vscode.setState({
       tab: st.tab,
-      open: st.open,
       changeOpen: Object.keys(st.change.open).filter((k) => st.change.open[k]),
       search: st.search,
       filters: st.filters,
       scroll: st.scroll,
       models: st.models,
       badges: st.badges,
-      depth: st.depth,
-      shut: st.shut,
-      folders: st.folders,
-      deep: st.deep,
-      deepSuites: st.deepSuites,
+      tree: st.tree,
     });
 
   // --- header ---
@@ -194,22 +199,10 @@ export function panelApp(env: AppEnv) {
 
   // --- Now ---
 
-  const pkgEls = new Map<string, { row: any; head: any; tree: any }>();
-  const folderEls = new Map<string, { wrap: any; head: any; body: any }>();
-
   const searching = () => st.search.trim() !== "";
   // The key a package's rows are asked under: a new summary or other chips
   // make the rows on show out of date.
   const treeKey = () => `${st.models.now?.rev ?? 0}|${st.filters.join(",")}`;
-
-  const isOpen = (pkg: string) =>
-    st.deep.indexOf(pkg) >= 0 ||
-    (st.depth === "packages"
-      ? st.open.indexOf(pkg) >= 0
-      : st.shut.indexOf(pkg) < 0);
-
-  const folderOpen = (f: any) =>
-    st.folders[f.key] ?? (st.depth !== "packages" || f.hot);
 
   const needTree = (pkg: string) => {
     const t = st.trees[pkg];
@@ -231,92 +224,108 @@ export function panelApp(env: AppEnv) {
           for (const e of entries) {
             if (!e.isIntersecting) continue;
             io.unobserve(e.target);
-            const pkg = e.target.dataset.pkg;
-            if (pkg && isOpen(pkg)) request(pkg);
+            const pkg = e.target.dataset.lazy || e.target.dataset.pkg;
+            if (pkg) request(pkg);
           }
         },
         { root: $("tab-now"), rootMargin: "400px" },
       )
     : undefined;
 
-  const elOf = (pkg: string) => {
-    let e = pkgEls.get(pkg);
-    if (!e) {
-      const row = doc.createElement("div");
-      row.className = "pkg";
-      row.dataset.pkg = pkg;
-      const head = doc.createElement("div");
-      head.className = "pkg-head";
-      head.dataset.pkg = pkg;
-      const tree = doc.createElement("div");
-      tree.className = "pkg-tree";
-      tree.dataset.pkg = pkg;
-      row.appendChild(head);
-      row.appendChild(tree);
-      e = { row, head, tree };
-      pkgEls.set(pkg, e);
-    }
-    return e;
+  // Slices on show, out of date ones too: they show until the new arrives.
+  const slices = (): Record<string, Slice | undefined> => {
+    const out: Record<string, Slice | undefined> = {};
+    for (const k of Object.keys(st.trees)) out[k] = st.trees[k];
+    return out;
   };
 
-  const folderEl = (key: string) => {
-    let e = folderEls.get(key);
-    if (!e) {
-      const wrap = doc.createElement("div");
-      wrap.className = "folder";
-      const head = doc.createElement("button");
-      head.setAttribute("type", "button");
-      head.className = "folder-head";
-      head.dataset.act = "toggleFolder";
-      head.dataset.folder = key;
-      const body = doc.createElement("div");
-      body.className = "folder-body";
-      wrap.appendChild(head);
-      wrap.appendChild(body);
-      e = { wrap, head, body };
-      folderEls.set(key, e);
-    }
-    return e;
+  let rows: VRow[] = [];
+  const visible = () => {
+    rows = TREE.rows(st.models.now?.tree ?? [], slices(), st.tree);
+    return rows;
   };
 
-  const treeOpenOf = (pkg: string) => ({
-    open: st.treeOpen[pkg] || {},
-    deep: st.deep.indexOf(pkg) >= 0,
-    deepSuites: st.deepSuites[pkg] || [],
-    depth: st.depth,
-  });
+  const rowEl = (key: string) => {
+    const list = $("now-packages");
+    if (!list || !list.querySelector) return null;
+    const css =
+      win.CSS && win.CSS.escape
+        ? win.CSS.escape(key)
+        : key.replace(/"/g, '\\"');
+    return list.querySelector(`[data-key="${css}"]`);
+  };
 
-  const drawTree = (pkg: string) => {
-    const e = pkgEls.get(pkg);
-    if (!e) return;
-    const open = isOpen(pkg);
-    e.tree.hidden = !open;
-    if (!open) return;
-    const t = st.trees[pkg];
-    if (needTree(pkg)) {
-      if (io) io.observe(e.row);
-      else request(pkg);
-    }
-    if (!t) {
-      if (!e.tree.innerHTML)
-        e.tree.innerHTML = `<div class="dim pad">Loading the rows…</div>`;
+  // drawList draws the tree, asks for the slices its open packages lack,
+  // and gives the focus back to its row.
+  const drawList = (m: any) => {
+    const list = $("now-packages");
+    if (!list) return;
+    const found = $("now-found");
+    if (searching()) {
+      list.hidden = true;
+      if (found) found.hidden = false;
+      drawFound(m);
       return;
     }
-    if (t.drawn) return;
-    e.tree.innerHTML = NOW.tree(t.nodes, t.failure, treeOpenOf(pkg));
-    t.drawn = true;
-  };
-
-  const redrawTree = (pkg: string) => {
-    if (st.trees[pkg]) st.trees[pkg].drawn = false;
-    drawTree(pkg);
-  };
-
-  const drawDepth = () => {
-    for (const d of ["packages", "suites", "behaviors"]) {
-      const b = $(`depth-${d}`);
-      if (b) b.setAttribute("aria-pressed", String(st.depth === d));
+    list.hidden = false;
+    if (found) {
+      found.hidden = true;
+      found.innerHTML = "";
     }
+    visible();
+    // A row not shown (its package still loading, or closed above it) keeps
+    // the focus to come back to; its nearest shown parent is the tab stop.
+    let shownFocus = st.tree.focus;
+    while (shownFocus && !TREE.find(rows, shownFocus))
+      shownFocus = parentOf(shownFocus);
+    list.innerHTML = TREEVIEW.tree(rows, TREE, shownFocus || undefined);
+    if (m.filtering && rows.length === 0)
+      list.setAttribute("data-empty", "No behavior matches.");
+    else list.removeAttribute("data-empty");
+    // Open packages without their rows, or with rows of an older summary,
+    // ask for them as they come into view.
+    for (const r of TREE.flat(rows)) {
+      if (r.kind !== "pkg" || !r.open || !needTree(r.pkg!)) continue;
+      const el = io ? rowEl(r.key) : null;
+      if (el) io.observe(el);
+      else request(r.pkg!);
+    }
+    const want =
+      st.revealing && TREE.find(rows, st.revealing) ? st.revealing : undefined;
+    if (want || st.treeFocused) {
+      const el = shownFocus ? rowEl(shownFocus) : null;
+      el?.focus?.({ preventScroll: !want });
+      if (want) {
+        el?.scrollIntoView?.({ block: "center" });
+        st.revealing = undefined;
+      }
+    }
+  };
+
+  // parentOf is the key a row's parent has, from the key alone.
+  const parentOf = (key: string): string => {
+    const r = TREE.find(rows, key);
+    if (r?.parent) return r.parent;
+    const m = /^n:(.*):([\d.]+)$/.exec(key);
+    if (!m) return "";
+    const cut = m[2].lastIndexOf(".");
+    return cut < 0 ? `p:${m[1]}` : `n:${m[1]}:${m[2].slice(0, cut)}`;
+  };
+
+  // A burst of slices draws once.
+  let drawSoon = false;
+  const redraw = () => {
+    if (drawSoon || !st.models.now) return;
+    const raf = win.requestAnimationFrame;
+    if (!raf) {
+      drawList(st.models.now);
+      return;
+    }
+    drawSoon = true;
+    raf(() => {
+      drawSoon = false;
+      if (st.models.now && st.tab === "now") drawList(st.models.now);
+    });
   };
 
   const drawFound = (m: any) => {
@@ -329,14 +338,21 @@ export function panelApp(env: AppEnv) {
     }
     const by = new Map(f.results.map((r: any) => [r.pkg, r.nodes]));
     const parts = [NOW.foundNote(f.total, f.shown)];
-    for (const folder of m.folders as any[]) {
-      const rows = folder.rows.filter((r: any) => by.has(r.pkg));
-      if (rows.length === 0) continue;
+    for (const e of m.tree as any[]) {
+      const pkgs = TREE.pkgsBelow(e).filter((p: string) => by.has(p));
+      if (pkgs.length === 0) continue;
+      const rowsOf = (list: any[]): any[] =>
+        list.flatMap((x) => (x.kind === "pkg" ? [x] : rowsOf(x.children)));
+      const found = rowsOf([e]).filter((r) => by.has(r.pkg));
+      const head =
+        e.kind === "dir"
+          ? `<div class="folder-head static">${NOW.folderHead(e, true, found.length)}</div>`
+          : "";
       parts.push(
-        `<div class="folder"><div class="folder-head static">${NOW.folderHead(folder, true, rows.length)}</div><div class="folder-body">${rows
+        `<div class="folder">${head}<div class="folder-body">${found
           .map(
             (r: any) =>
-              `<div class="pkg"><div class="pkg-head static" data-pkg="${H_ESC(r.pkg)}"><span class="mono name">${H_ESC(r.name)}</span><span class="grow"></span><span class="counts t-${r.tone}">${H_ESC(r.counts)}</span></div><div class="pkg-tree" data-pkg="${H_ESC(r.pkg)}">${NOW.tree(by.get(r.pkg), undefined, { open: {}, deep: true, deepSuites: [], depth: "behaviors" })}</div></div>`,
+              `<div class="pkg"><div class="pkg-head static" data-pkg="${H_ESC(r.pkg)}"><span class="mono name">${H_ESC(r.name)}</span><span class="grow"></span><span class="counts t-${r.tone}">${H_ESC(r.counts)}</span></div><div class="pkg-tree" data-pkg="${H_ESC(r.pkg)}">${NOW.tree(by.get(r.pkg), undefined, { open: {}, deep: true, depth: "behaviors" })}</div></div>`,
           )
           .join("")}</div></div>`,
       );
@@ -351,98 +367,128 @@ export function panelApp(env: AppEnv) {
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;");
 
-  const drawPackages = (m: any) => {
-    const list = $("now-packages");
-    if (!list) return;
-    drawDepth();
-    const found = $("now-found");
-    if (searching()) {
-      list.hidden = true;
-      if (found) found.hidden = false;
-      drawFound(m);
-      return;
-    }
-    list.hidden = false;
-    if (found) {
-      found.hidden = true;
-      found.innerHTML = "";
-    }
-    const keepF = new Set<string>();
-    const keepP = new Set<string>();
-    for (const f of m.folders as any[]) {
-      const rows = f.rows.filter(
-        (r: any) => !m.filtering || (r.matches ?? 1) > 0,
-      );
-      if (m.filtering && rows.length === 0) continue;
-      const fe = folderEl(f.key);
-      const open = folderOpen(f);
-      fe.head.innerHTML = NOW.folderHead(
-        f,
-        open,
-        m.filtering ? rows.length : undefined,
-      );
-      fe.head.setAttribute("aria-expanded", String(open));
-      fe.body.hidden = !open;
-      list.appendChild(fe.wrap);
-      keepF.add(f.key);
-      if (!open) continue;
-      for (const r of rows) {
-        keepP.add(r.pkg);
-        const e = elOf(r.pkg);
-        e.head.innerHTML = NOW.pkgHead(
-          r,
-          isOpen(r.pkg),
-          st.deep.indexOf(r.pkg) >= 0,
+  // --- what a row does ---
+
+  const label = (r: VRow) => (r.kind === "dir" ? `${r.label}/` : r.label);
+
+  const doOp = (op: string, r: VRow | undefined) => {
+    if (!r) return;
+    st.tree.focus = r.key;
+    switch (op) {
+      case "toggle":
+        TREE.toggle(st.tree, r);
+        if (r.kind === "pkg" && !r.open) request(r.pkg!);
+        break;
+      case "openBelow":
+        TREE.openBelow(st.tree, r);
+        break;
+      case "closeBelow":
+        TREE.closeBelow(st.tree, r);
+        break;
+      case "copy":
+        post(
+          r.kind === "dir" || r.kind === "pkg"
+            ? {
+                type: "copy",
+                label: label(r),
+                pkgs: r.kind === "pkg" ? [r.pkg] : TREE.pkgsBelow(r.entry!),
+              }
+            : { type: "copy", label: r.label, pkg: r.pkg, pos: r.pos },
         );
-        if (r.title) e.head.setAttribute("title", r.title);
-        fe.body.appendChild(e.row);
-        drawTree(r.pkg);
-      }
+        save();
+        return;
+      case "run":
+        post(
+          r.kind === "dir"
+            ? { type: "run", ids: TREE.pkgsBelow(r.entry!) }
+            : r.kind === "pkg"
+              ? { type: "run", id: r.pkg }
+              : { type: "run", id: r.node?.id, pkg: r.pkg, pos: r.pos },
+        );
+        return;
+      case "debug":
+        post({ type: "debug", id: r.node?.id, pkg: r.pkg, pos: r.pos });
+        return;
+      case "source":
+        if (r.node?.loc)
+          post({
+            type: "goToLocation",
+            file: r.node.loc[0],
+            line: r.node.loc[1],
+          });
+        return;
+      case "focus":
+        break;
     }
-    for (const [key, e] of Array.from(folderEls)) {
-      if (keepF.has(key)) continue;
-      e.wrap.remove();
-      folderEls.delete(key);
-    }
-    for (const [pkg, e] of Array.from(pkgEls)) {
-      if (keepP.has(pkg)) continue;
-      io?.unobserve(e.row);
-      e.row.remove();
-      pkgEls.delete(pkg);
-      if (st.trees[pkg]) st.trees[pkg].drawn = false;
-    }
-    if (m.filtering && keepP.size === 0)
-      list.setAttribute("data-empty", "No behavior matches.");
-    else list.removeAttribute("data-empty");
-  };
-
-  // branchPositions lists the places of a package's branches at or under a
-  // place ("" for all).
-  const branchPositions = (nodes: any[], under: string): string[] => {
-    const out: string[] = [];
-    const walk = (list: any[]) => {
-      for (const n of list) {
-        if (!n.c) continue;
-        if (!under || n.pos === under || n.pos.startsWith(under + "."))
-          out.push(n.pos);
-        walk(n.c);
-      }
-    };
-    walk(nodes);
-    return out;
-  };
-
-  const setDepth = (d: Depth) => {
-    st.depth = d;
-    st.open = [];
-    st.shut = [];
-    st.treeOpen = {};
-    st.deep = [];
-    st.deepSuites = {};
-    if (d !== "packages") st.folders = {};
-    for (const t of Object.values(st.trees)) t.drawn = false;
     save();
-    if (st.models.now) drawPackages(st.models.now);
+    drawList(st.models.now);
+  };
+
+  const rowOf = (el: any): VRow | undefined => {
+    const ti = el && el.closest ? el.closest("[data-key]") : null;
+    return ti ? TREE.find(rows, ti.dataset.key) : undefined;
+  };
+
+  // The row menu: the header menu's look, at the row.
+  const MAC = /Mac|iPhone|iPad/.test(String(win.navigator?.platform ?? ""));
+  const showRowMenu = (r: VRow, x: number, y: number) => {
+    const menu = $("ctxmenu");
+    if (!menu) return;
+    st.tree.focus = r.key;
+    menu.innerHTML = TREEVIEW.menu(r, TREE, MAC);
+    menu.setAttribute("aria-label", `Actions for ${r.label}`);
+    menu.hidden = false;
+    if (menu.style) {
+      // Inside the panel, whichever corner the row is near.
+      const w = menu.offsetWidth || 240;
+      const hgt = menu.offsetHeight || 200;
+      const W = win.innerWidth || x + w + 8;
+      const Hh = win.innerHeight || y + hgt + 8;
+      menu.style.left = `${Math.max(4, Math.min(x, W - w - 8))}px`;
+      menu.style.top = `${Math.max(4, y + hgt + 8 > Hh ? y - hgt : y)}px`;
+    }
+    menu.querySelector?.("button")?.focus?.();
+  };
+
+  const hideRowMenu = (refocus: boolean) => {
+    const menu = $("ctxmenu");
+    if (!menu || menu.hidden) return;
+    menu.hidden = true;
+    if (refocus && st.tree.focus) rowEl(st.tree.focus)?.focus?.();
+  };
+
+  // reveal opens the way to a row, then brings it into view and focuses it;
+  // a package whose rows are not here yet is asked for them first.
+  const reveal = (pkg: string, pos: string) => {
+    if (searching()) {
+      st.search = "";
+      const box = $("search");
+      if (box) box.value = "";
+    }
+    if (st.tab !== "now") setTab("now");
+    TREE.reveal(st.tree, st.models.now?.tree ?? [], pkg, pos);
+    st.revealing = st.tree.focus;
+    if (pos) request(pkg);
+    save();
+    if (st.models.now) drawList(st.models.now);
+  };
+
+  const showToast = (text: string) => {
+    const t = $("toast");
+    if (!t) return;
+    t.textContent = text;
+    t.hidden = false;
+    win.clearTimeout(toastTimer);
+    toastTimer = win.setTimeout(() => {
+      t.hidden = true;
+    }, 4000);
+  };
+  let toastTimer: any;
+
+  const setLevel = (level: Level) => {
+    TREE.setLevel(st.tree, level);
+    save();
+    if (st.models.now) drawList(st.models.now);
   };
 
   const drawNow = () => {
@@ -453,9 +499,7 @@ export function panelApp(env: AppEnv) {
       for (const p of parts) if ($(p)) $(p).hidden = true;
       // Nothing kept: the rows of what was cleared go too.
       if (m?.empty) {
-        for (const e of folderEls.values()) e.wrap.remove();
-        folderEls.clear();
-        pkgEls.clear();
+        $("now-packages").innerHTML = "";
         st.trees = {};
         $("now-attention").innerHTML = "";
       }
@@ -478,7 +522,7 @@ export function panelApp(env: AppEnv) {
     $("now-attention").innerHTML = NOW.attention(m, st.cards);
     $("now-total").textContent = m.total;
     $("now-groups").textContent = (m.groups || []).join(" · ");
-    drawPackages(m);
+    drawList(m);
     applyScroll("now");
   };
 
@@ -589,12 +633,18 @@ export function panelApp(env: AppEnv) {
           failure: msg.failure,
         };
         delete st.pending[msg.pkg];
-        drawTree(msg.pkg);
+        if (st.tab === "now") redraw();
+        return;
+      case "toast":
+        showToast(msg.text);
+        return;
+      case "reveal":
+        reveal(msg.pkg, msg.pos);
         return;
       case "found":
         if (msg.query !== st.search.trim()) return;
         st.found = msg;
-        if (st.tab === "now" && st.models.now) drawPackages(st.models.now);
+        if (st.tab === "now" && st.models.now) drawList(st.models.now);
         return;
       case "output":
         st.cards.outputs[msg.key] = { lines: msg.lines, more: msg.more };
@@ -690,71 +740,19 @@ export function panelApp(env: AppEnv) {
         else if (st.tab === "change") post({ type: "change", act: "auditRun" });
         else post({ type: "runs", act: "import" });
         return;
-      case "togglePkg": {
-        const pkg = el.closest("[data-pkg]")?.dataset.pkg as string;
-        if (!pkg) return;
-        const open = isOpen(pkg);
-        const list = st.depth === "packages" ? st.open : st.shut;
-        const i = list.indexOf(pkg);
-        if (st.depth === "packages" ? open : !open) {
-          if (i >= 0) list.splice(i, 1);
-        } else if (i < 0) list.push(pkg);
-        if (open) st.deep = st.deep.filter((p) => p !== pkg);
-        save();
-        if (st.models.now) drawPackages(st.models.now);
+      case "level":
+        setLevel(d.level as Level);
         return;
-      }
-      case "toggleFolder": {
-        const f = st.models.now?.folders.find((x: any) => x.key === d.folder);
-        if (!f) return;
-        st.folders[f.key] = !folderOpen(f);
-        save();
-        drawPackages(st.models.now);
+      case "treeAct":
+        doOp(d.op, rowOf(el));
         return;
-      }
-      case "depth":
-        setDepth(d.depth as Depth);
+      case "ctxItem":
+        hideRowMenu(false);
+        doOp(d.op, TREE.find(rows, d.key));
         return;
-      case "deep": {
-        const pkg = (d.pkg ?? el.closest("[data-pkg]")?.dataset.pkg) as string;
-        if (!pkg) return;
-        const nodes = st.trees[pkg]?.nodes ?? [];
-        const closed = (under: string) => {
-          const map = (st.treeOpen[pkg] ||= {});
-          for (const pos of branchPositions(nodes, under)) map[pos] = false;
-        };
-        if (d.pos === undefined) {
-          if (st.deep.indexOf(pkg) >= 0) {
-            st.deep = st.deep.filter((p) => p !== pkg);
-            st.deepSuites[pkg] = [];
-            closed("");
-          } else {
-            // Open in its own right, so a collapse leaves its suites showing.
-            if (!isOpen(pkg)) {
-              if (st.depth === "packages") st.open.push(pkg);
-              else st.shut = st.shut.filter((p) => p !== pkg);
-            }
-            st.deep.push(pkg);
-            st.treeOpen[pkg] = {};
-          }
-        } else {
-          const list = (st.deepSuites[pkg] ||= []);
-          const i = list.indexOf(d.pos);
-          if (i >= 0) {
-            list.splice(i, 1);
-            closed(d.pos);
-          } else {
-            list.push(d.pos);
-            const map = st.treeOpen[pkg] || {};
-            for (const k of Object.keys(map))
-              if (k === d.pos || k.startsWith(d.pos + ".")) delete map[k];
-          }
-        }
-        save();
-        if (st.models.now) drawPackages(st.models.now);
-        redrawTree(pkg);
+      case "reveal":
+        reveal(d.pkg, d.pos ?? "");
         return;
-      }
       case "chip": {
         const s = d.status as string;
         const i = st.filters.indexOf(s);
@@ -790,15 +788,6 @@ export function panelApp(env: AppEnv) {
         }
         post({ type: a, ...posOf(el) });
         return;
-      case "copyNode": {
-        const p = posOf(el);
-        post({
-          type: "copyNode",
-          pkg: p.pkg,
-          position: p.pos ? p.pos.split(".").map(Number) : [],
-        });
-        return;
-      }
       case "goTo":
         post({ type: "goToLocation", file: d.file, line: Number(d.line) });
         return;
@@ -858,7 +847,26 @@ export function panelApp(env: AppEnv) {
   const onClick = (e: any) => {
     const t = e.target;
     const el = t && t.closest ? t.closest("[data-act]") : null;
-    if (!el) noteBranch(t);
+    if (!(t && t.closest && t.closest("#ctxmenu"))) hideRowMenu(false);
+    if (!el && t && t.closest && t.closest(".tr")) {
+      const r = rowOf(t);
+      if (r) {
+        e.preventDefault();
+        if (
+          e.altKey &&
+          (r.kind === "dir" ||
+            r.kind === "pkg" ||
+            r.kind === "suite" ||
+            r.kind === "method")
+        )
+          doOp(TREE.allOpen(r) ? "closeBelow" : "openBelow", r);
+        else if (r.expandable) doOp("toggle", r);
+        else doOp("focus", r);
+        st.treeFocused = true;
+        rowEl(r.key)?.focus?.({ preventScroll: true });
+      }
+      return;
+    }
     if (!el) {
       if (st.menu && !(t && t.closest && t.closest("#menu"))) {
         st.menu = false;
@@ -882,7 +890,7 @@ export function panelApp(env: AppEnv) {
       st.found = undefined;
       save();
       if (searching()) post({ type: "search", text: st.search });
-      if (st.models.now) drawPackages(st.models.now);
+      if (st.models.now) drawList(st.models.now);
     }, 200);
   };
 
@@ -893,14 +901,6 @@ export function panelApp(env: AppEnv) {
       post({ type: "selectSource", id: t.value });
     else if (t.dataset.change === "folder")
       post({ type: t.dataset.scope, act: "folder", folder: t.value });
-  };
-
-  const noteBranch = (t: any) => {
-    const sum = t && t.closest ? t.closest("summary") : null;
-    const det = sum ? sum.closest("details.branch") : null;
-    const owner = det ? det.closest("[data-pkg]") : null;
-    if (!det || !owner) return;
-    (st.treeOpen[owner.dataset.pkg] ||= {})[det.dataset.pos] = !det.open;
   };
 
   let scrollTimer: any;
@@ -914,7 +914,58 @@ export function panelApp(env: AppEnv) {
     }, 150);
   };
 
+  // A key in a menu moves over its items; Escape leaves it.
+  const menuKey = (e: any, menu: any): boolean => {
+    if (!menu || menu.hidden || !menu.contains?.(e.target)) return false;
+    const items = Array.from(
+      menu.querySelectorAll?.("[role=menuitem]") ?? [],
+    ) as any[];
+    const i = items.indexOf(e.target);
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      const n = items.length;
+      items[(i + (e.key === "ArrowDown" ? 1 : n - 1) + n) % n]?.focus?.();
+      e.preventDefault();
+      return true;
+    }
+    return false;
+  };
+
+  const treeKeyDown = (e: any): boolean => {
+    const t = e.target;
+    const ti = t && t.closest ? t.closest("[role=treeitem]") : null;
+    if (!ti || t !== ti) return false;
+    const op = TREE.keyOp(rows, ti.dataset.key, e);
+    if (!op) return false;
+    if (op.op === "copy") {
+      const sel = win.getSelection?.();
+      if (sel && String(sel) !== "") return false;
+      st.copiedAt = Date.now();
+    }
+    e.preventDefault();
+    const r = TREE.find(rows, op.key);
+    if (op.op === "menu") {
+      const box = ti.getBoundingClientRect?.() ?? { left: 0, bottom: 0 };
+      if (r) showRowMenu(r, box.left + 24, box.bottom);
+      return true;
+    }
+    if (op.op === "focus") {
+      st.tree.focus = op.key;
+      save();
+      drawList(st.models.now);
+      rowEl(op.key)?.scrollIntoView?.({ block: "nearest" });
+      return true;
+    }
+    doOp(op.op, r);
+    return true;
+  };
+
   const onKey = (e: any) => {
+    if (e.key === "Escape" && !$("ctxmenu")?.hidden) {
+      hideRowMenu(true);
+      return;
+    }
+    if (menuKey(e, $("ctxmenu")) || menuKey(e, $("menu"))) return;
+    if (treeKeyDown(e)) return;
     if (e.key === "Escape" && st.menu) {
       st.menu = false;
       renderHeader();
@@ -945,6 +996,40 @@ export function panelApp(env: AppEnv) {
   doc.addEventListener("change", onChange);
   doc.addEventListener("scroll", onScroll, true);
   doc.addEventListener("keydown", onKey);
+  // The row menu replaces the webview's own on tree rows only.
+  doc.addEventListener("contextmenu", (e: any) => {
+    const t = e.target;
+    if (!(t && t.closest && t.closest("#now-packages .tr"))) return;
+    const r = rowOf(t);
+    if (!r) return;
+    e.preventDefault();
+    showRowMenu(r, e.clientX, e.clientY);
+  });
+  // A copy the editor starts on a focused branch, as Ctrl/Cmd+C does when
+  // its key is not seen here.
+  doc.addEventListener("copy", (e: any) => {
+    if (Date.now() - st.copiedAt < 500) return;
+    const t = doc.activeElement;
+    const ti =
+      t && t.closest ? t.closest("#now-packages [role=treeitem]") : null;
+    const sel = win.getSelection?.();
+    if (!ti || ti !== t || (sel && String(sel) !== "")) return;
+    const r = TREE.find(rows, ti.dataset.key);
+    if (
+      !r ||
+      TREE.keyOp(rows, r.key, { key: "c", ctrlKey: true })?.op !== "copy"
+    )
+      return;
+    e.preventDefault?.();
+    doOp("copy", r);
+  });
+  doc.addEventListener("focusin", (e: any) => {
+    const t = e.target;
+    st.treeFocused = !!(t && t.closest && t.closest("#now-packages"));
+    const ti =
+      t && t.closest ? t.closest("#now-packages [role=treeitem]") : null;
+    if (ti && ti === t) st.tree.focus = ti.dataset.key;
+  });
   win.addEventListener("message", (e: any) => receive(e.data));
 
   const box = $("search");
@@ -961,5 +1046,5 @@ export function panelApp(env: AppEnv) {
   // A search kept across a reload asks again.
   if (searching()) post({ type: "search", text: st.search });
 
-  return { st, receive, onClick, onInput };
+  return { st, receive, onClick, onInput, onKey };
 }

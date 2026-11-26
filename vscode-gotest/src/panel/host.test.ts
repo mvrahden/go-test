@@ -56,7 +56,13 @@ import { PanelHost } from "./host.js";
 import { COALESCE_MS } from "./poster.js";
 import { LiveRuns } from "../liveProgress.js";
 import { Sessions } from "../sessions.js";
-import { MESSAGE_BUDGET, type HostMessage } from "./protocol.js";
+import {
+  MESSAGE_BUDGET,
+  type HostMessage,
+  type NowModel,
+  type PackageRow,
+  type TreeEntry,
+} from "./protocol.js";
 
 const channel = {
   info: vi.fn(),
@@ -186,6 +192,13 @@ function fakePanel(visible = true): FakePanel {
   return p;
 }
 
+// firstRow is the first package row of a summary's tree.
+const firstRow = (m: NowModel): PackageRow => {
+  const walk = (list: TreeEntry[]): PackageRow[] =>
+    list.flatMap((e) => (e.kind === "pkg" ? [e] : walk(e.children)));
+  return walk(m.tree)[0];
+};
+
 const posts = (p: FakePanel): HostMessage[] =>
   p.webview.postMessage.mock.calls.map(([m]) => m as HostMessage);
 const ofType = (p: FakePanel, t: HostMessage["type"]) =>
@@ -291,7 +304,7 @@ describe("the panel's host", () => {
       HostMessage,
       { type: "now" }
     >;
-    expect(last.model.folders[0].rows[0].counts).toContain("running");
+    expect(firstRow(last.model).counts).toContain("running");
     run.end();
   });
 
@@ -431,7 +444,7 @@ describe("the panel's host", () => {
       HostMessage,
       { type: "now" }
     >;
-    expect(now.model.folders[0].rows[0].matches).toBe(1);
+    expect(firstRow(now.model).matches).toBe(1);
     // A search is answered with what it finds, the chips still narrowing.
     fake.send!({ type: "search", text: "B" });
     const found = ofType(fake, "found").at(-1) as Extract<
@@ -474,6 +487,57 @@ describe("the panel's host", () => {
     ]);
     fake.send!({ type: "rerunFailed" });
     expect(run).toHaveBeenLastCalledWith(["m/a/STestSuite/a"]);
+  });
+
+  it("reveals a Test Explorer item's row, or the nearest row the list holds", async () => {
+    const { panel, fake } = await setup();
+    await panel.refresh({
+      stream: line({ Action: "fail" }) + "\n",
+      folder: "/ws",
+      at: Date.now(),
+    });
+    expect(await panel.reveal("m/a/STestSuite/b")).toBe(true);
+    expect(ofType(fake, "reveal").at(-1)).toEqual({
+      type: "reveal",
+      pkg: "m/a",
+      pos: "0.1",
+    });
+    // Past the rows it knows, the item shows as its nearest row.
+    expect(await panel.reveal("m/a/STestSuite/b/deeper")).toBe(true);
+    expect(ofType(fake, "reveal").at(-1)).toEqual({
+      type: "reveal",
+      pkg: "m/a",
+      pos: "0.1",
+    });
+    expect(await panel.reveal("other/pkg/XTestSuite")).toBe(false);
+    expect(ofType(fake, "toast").at(-1)).toEqual({
+      type: "toast",
+      text: "other/pkg/XTestSuite is not in the list yet: run it first.",
+    });
+  });
+
+  it("reveals once a new panel's page is ready", async () => {
+    const live = new LiveRuns();
+    const fake = fakePanel();
+    panels.push(fake);
+    const panel = new PanelHost(
+      channel,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      live,
+      new Sessions(),
+    );
+    (panel as unknown as { lastSpecData: unknown }).lastSpecData = JSON.parse(
+      specDoc("m/a", 1),
+    );
+    await panel.reveal("m/a/STestSuite");
+    expect(ofType(fake, "reveal")).toEqual([]);
+    fake.send!({ type: "ready", tab: "now", search: "", filters: [] });
+    expect(ofType(fake, "reveal")).toEqual([
+      { type: "reveal", pkg: "m/a", pos: "0" },
+    ]);
   });
 
   it("stops a session from the Running block, and redraws the block while one runs", async () => {

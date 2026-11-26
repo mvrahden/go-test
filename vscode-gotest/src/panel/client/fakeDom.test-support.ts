@@ -55,7 +55,7 @@ export class FakeEl {
     this.attrs.delete(n);
   }
 
-  // closest knows "[data-x]" and "#id".
+  // closest knows "[data-x]", "[role=x]", "#id" and ".class".
   closest(sel: string): FakeEl | null {
     for (let e: FakeEl | undefined = this; e; e = e.parent) {
       const data = /^\[data-([\w-]+)\]$/.exec(sel);
@@ -65,17 +65,44 @@ export class FakeEl {
         );
         if (e.dataset[key] !== undefined) return e;
       } else if (sel.startsWith("#") && e.id === sel.slice(1)) return e;
+      else if (
+        sel.startsWith(".") &&
+        e.className.split(" ").includes(sel.slice(1))
+      )
+        return e;
+      else {
+        const role = /^\[role=(\w+)\]$/.exec(sel);
+        if (role && e.getAttribute("role") === role[1]) return e;
+      }
     }
     return null;
   }
 
-  querySelector(): null {
-    return null;
+  // querySelector knows [data-key="…"] in what was drawn here.
+  querySelector(sel: string): FakeEl | null {
+    const m = /^\[data-key="(.*)"\]$/.exec(sel);
+    if (!m || !this.html.includes(`data-key="${m[1]}"`)) return null;
+    const el = new FakeEl("div");
+    el.dataset.key = m[1];
+    if (m[1].startsWith("p:")) el.dataset.pkg = m[1].slice(2);
+    el.focus = () => {
+      FakeEl.focused = m[1];
+    };
+    return el;
   }
 
-  querySelectorAll(): FakeEl[] {
-    return [];
+  // querySelectorAll knows [data-lazy] in what was drawn here.
+  querySelectorAll(sel = ""): FakeEl[] {
+    if (sel !== "[data-lazy]") return [];
+    return [...this.html.matchAll(/data-lazy="([^"]+)"/g)].map((m) => {
+      const el = new FakeEl("div");
+      el.dataset.lazy = m[1];
+      return el;
+    });
   }
+
+  // The key of the row last focused through querySelector.
+  static focused: string | undefined;
 
   matches(): boolean {
     return false;
@@ -115,9 +142,8 @@ export const SHELL_IDS = [
   "now-groups",
   "now-packages",
   "now-found",
-  "depth-packages",
-  "depth-suites",
-  "depth-behaviors",
+  "ctxmenu",
+  "toast",
   "search",
   "change-ctx",
   "change-body",
@@ -127,6 +153,7 @@ export const SHELL_IDS = [
 ];
 
 export function fakeDom() {
+  FakeEl.focused = undefined;
   const byId = new Map(SHELL_IDS.map((id) => [id, new FakeEl("div", id)]));
   const listeners = new Map<string, ((e: unknown) => void)[]>();
   const on = (type: string, fn: (e: unknown) => void) =>
@@ -163,6 +190,12 @@ export function fakeDom() {
     state: () => state as Record<string, unknown> | null,
     setState: (s: unknown) => (state = s),
     // send delivers a host message as the webview would receive it.
+    get focused() {
+      return FakeEl.focused;
+    },
+    // fire delivers a DOM event to the document's listeners.
+    fire: (type: string, e: unknown) =>
+      (listeners.get(type) ?? []).forEach((fn) => fn(e)),
     send: (data: unknown) =>
       (listeners.get("message") ?? []).forEach((fn) => fn({ data })),
     flushTimers: () => timers.splice(0).forEach((fn) => fn()),

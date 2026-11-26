@@ -9,7 +9,7 @@ import type {
   Card,
   Chip,
   FilterStatus,
-  FolderRow,
+  TreeEntry,
   NowModel,
   OutputLine,
   PackageRow,
@@ -496,14 +496,7 @@ export function buildNowModel(env: NowEnv): NowModel {
       });
     }
   }
-  const folders = foldersOf(
-    rows,
-    packages,
-    groupNames(
-      rows.map((r) => r.pkg),
-      env.modulePaths,
-    ),
-  );
+  const tree = dirTree(rows, packages, env.modulePaths);
 
   const stats = doc?.stats;
   const chips: Chip[] = stats
@@ -580,7 +573,7 @@ export function buildNowModel(env: NowEnv): NowModel {
       ...(stats ? moreTotals(stats) : []),
       ...(doc?.groups ?? []).map(groupText),
     ],
-    folders,
+    tree,
     filtering,
     failed: failed + liveFailed,
   };
@@ -591,33 +584,6 @@ const hot = (r: PackageRow) => r.tone === "fail" || !!r.stale;
 
 const byName = (a: { name: string }, b: { name: string }) =>
   a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
-
-// groupNames names each package's folder: the first path element below its
-// module's root; a package at the root, and every package of a module other
-// than the one with the most packages, under the module's last element.
-export function groupNames(
-  packages: string[],
-  modulePaths: string[],
-): Map<string, string> {
-  const mods = [...modulePaths].sort((a, b) => b.length - a.length);
-  const modOf = (p: string) =>
-    mods.find((m) => p === m || p.startsWith(m + "/")) ?? "";
-  const counts = new Map<string, number>();
-  for (const p of packages)
-    counts.set(modOf(p), (counts.get(modOf(p)) ?? 0) + 1);
-  let primary = "";
-  let most = -1;
-  for (const [m, n] of counts) if (n > most) [primary, most] = [m, n];
-  const out = new Map<string, string>();
-  for (const p of packages) {
-    const m = modOf(p);
-    const tail = m.slice(m.lastIndexOf("/") + 1);
-    if (!m) out.set(p, p.split("/")[0]);
-    else if (m !== primary || p === m) out.set(p, tail);
-    else out.set(p, p.slice(m.length + 1).split("/")[0]);
-  }
-  return out;
-}
 
 // sumStats adds packages' counts for their folder.
 function sumStats(list: (SpecStats | undefined)[]): SpecStats {
@@ -646,44 +612,120 @@ function sumStats(list: (SpecStats | undefined)[]): SpecStats {
   return sum;
 }
 
-// foldersOf groups the rows by folder: folders holding a failed or stale
-// package first, the rest in path order; inside each the same.
-function foldersOf(
+// A directory of the tree as it is built: its subdirectories by name, and
+// the package that sits at it, if one does.
+interface Trie {
+  dirs: Map<string, Trie>;
+  pkg?: PackageRow;
+}
+
+// dirTree lays the packages out as their directories, per module: the
+// module with the most packages at the top, another module a directory of
+// its own. A chain of directories holding only one directory each is one
+// row ("gotest/internal"); a package's subdirectories sit beside it, named
+// from it. Failed or stale entries come first within a directory, the rest
+// in path order.
+export function dirTree(
   rows: PackageRow[],
   packages: SpecPackage[],
-  group: Map<string, string>,
-): FolderRow[] {
-  const by = new Map<string, PackageRow[]>();
+  modulePaths: string[],
+): TreeEntry[] {
+  const mods = [...modulePaths].sort((a, b) => b.length - a.length);
+  const modOf = (p: string) =>
+    mods.find((m) => p === m || p.startsWith(m + "/")) ?? "";
+  const counts = new Map<string, number>();
+  for (const r of rows)
+    counts.set(modOf(r.pkg), (counts.get(modOf(r.pkg)) ?? 0) + 1);
+  let primary = "";
+  let most = -1;
+  for (const [m, n] of counts) if (n > most) [primary, most] = [m, n];
+  const tail = (m: string) => m.slice(m.lastIndexOf("/") + 1);
+  const segsOf = (pkg: string): string[] => {
+    const m = modOf(pkg);
+    if (!m) return pkg.split("/");
+    const rel = pkg === m ? [] : pkg.slice(m.length + 1).split("/");
+    if (m === primary) return rel.length > 0 ? rel : [tail(m)];
+    const base =
+      primary && m.startsWith(primary + "/")
+        ? m.slice(primary.length + 1).split("/")
+        : [tail(m)];
+    return [...base, ...rel];
+  };
+  const top: Trie = { dirs: new Map() };
   for (const r of rows) {
-    const g = group.get(r.pkg) ?? r.name;
-    by.set(g, [...(by.get(g) ?? []), r]);
+    let at = top;
+    for (const seg of segsOf(r.pkg)) {
+      let next = at.dirs.get(seg);
+      if (!next) {
+        next = { dirs: new Map() };
+        at.dirs.set(seg, next);
+      }
+      at = next;
+    }
+    at.pkg = r;
   }
   const stats = new Map(packages.map((p) => [p.path, p.stats]));
-  const out: FolderRow[] = Array.from(by, ([name, list]) => {
-    list.sort((a, b) => Number(hot(b)) - Number(hot(a)) || byName(a, b));
-    const c = countsText({
-      path: name,
+  const order = (list: TreeEntry[]) =>
+    list.sort(
+      (a, b) =>
+        Number(entryHot(b)) - Number(entryHot(a)) ||
+        (a.name < b.name ? -1 : a.name > b.name ? 1 : 0),
+    );
+  const below = (e: TreeEntry): PackageRow[] =>
+    e.kind === "pkg" ? [e] : e.children.flatMap(below);
+  const emit = (t: Trie, name: string, path: string, out: TreeEntry[]) => {
+    if (t.pkg) {
+      out.push({ ...t.pkg, kind: "pkg", name });
+      for (const [seg, c] of t.dirs)
+        emit(c, `${name}/${seg}`, `${path}/${seg}`, out);
+      return;
+    }
+    // A directory holding one directory only is one row with it.
+    if (t.dirs.size === 1) {
+      const [[seg, c]] = Array.from(t.dirs);
+      if (!c.pkg) {
+        emit(c, `${name}/${seg}`, `${path}/${seg}`, out);
+        return;
+      }
+    }
+    const children: TreeEntry[] = [];
+    for (const [seg, c] of t.dirs) emit(c, seg, `${path}/${seg}`, children);
+    const pkgs = children.flatMap(below);
+    const sum = countsText({
+      path,
       status: "",
       duration: 0,
       nodes: [],
-      stats: sumStats(list.map((r) => stats.get(r.pkg))),
+      stats: sumStats(pkgs.map((r) => stats.get(r.pkg))),
     });
-    const anyHot = list.some(hot);
-    return {
-      key: name,
+    const anyHot = pkgs.some(hot);
+    out.push({
+      kind: "dir",
+      key: path,
       name,
-      packages: list.length,
-      counts: c.text,
-      tone: list.some((r) => r.tone === "fail")
+      packages: pkgs.length,
+      counts: sum.text,
+      tone: pkgs.some((r) => r.tone === "fail")
         ? "fail"
         : anyHot
           ? "warn"
-          : c.tone,
+          : sum.tone,
       hot: anyHot,
-      rows: list,
-    };
-  });
-  return out.sort((a, b) => Number(b.hot) - Number(a.hot) || byName(a, b));
+      children: order(children),
+    });
+  };
+  const out: TreeEntry[] = [];
+  for (const [seg, c] of top.dirs) emit(c, seg, seg, out);
+  return order(out);
+}
+
+const entryHot = (e: TreeEntry): boolean => (e.kind === "dir" ? e.hot : hot(e));
+
+// packagesIn lists the packages of a tree in the order it shows them.
+export function packagesIn(tree: TreeEntry[]): string[] {
+  return tree.flatMap((e) =>
+    e.kind === "pkg" ? [e.pkg] : packagesIn(e.children),
+  );
 }
 
 // leafCounts words the leaves under a row by status.
@@ -823,14 +865,16 @@ function durationText(n: SpecNode): string | undefined {
   return formatDuration(n.duration);
 }
 
-function tagsOf(n: SpecNode): TreeNode["tags"] {
+// tagsOf lists a row's marks; EXT. only in a package whose suites sit in
+// both its test packages, where it tells the twins apart.
+function tagsOf(n: SpecNode, twins: boolean): TreeNode["tags"] {
   const tags: NonNullable<TreeNode["tags"]> = [];
   if (n.kind === "fuzz")
     tags.push({
       text: `FUZZ · ${countNoun(n.children.length, "seed")}`,
       tone: "info",
     });
-  if (n.external) tags.push({ text: "EXT." });
+  if (n.external && twins) tags.push({ text: "EXT." });
   if (n.runs && n.run) tags.push({ text: `RUN ${n.run} OF ${n.runs}` });
   if (n.focused) tags.push({ text: "FOCUSED", tone: "warn" });
   else if (n.excluded || n.status === "skip")
@@ -877,6 +921,8 @@ export function packageTree(
   if (!pkg) return undefined;
   const query = opts.query.trim().toLowerCase();
   const outDir = pkg.dir ?? opts.dirOf(pkg.path);
+  const twins =
+    pkg.nodes.some((n) => n.external) && pkg.nodes.some((n) => !n.external);
   const narrow = query !== "" || opts.filters.size > 0;
   const rec = (
     list: SpecNode[],
@@ -915,7 +961,7 @@ export function packageTree(
       if (dur) t.t = dur;
       if (n.kind !== "fixture" && base) t.id = base;
       if (loc) t.loc = [loc.file, loc.line];
-      const tags = tagsOf(n);
+      const tags = tagsOf(n, twins);
       if (tags) t.tags = tags;
       if (n.status === "fail") {
         const own = ownOutput(n);
@@ -1075,4 +1121,87 @@ export function searchFound(
     bytes += size;
   }
   return { results, total, shown };
+}
+
+// The names that pick a row out of its siblings.
+type RowName = Pick<
+  SpecNode,
+  "name" | "reported" | "external" | "variant" | "run"
+>;
+
+const sameRow = (a: RowName, b: RowName) =>
+  a.name === b.name &&
+  a.reported === b.reported &&
+  !!a.external === !!b.external &&
+  a.variant === b.variant &&
+  a.run === b.run;
+
+// namesAt is the names of the rows down to a place in a package.
+export function namesAt(
+  doc: SpecData | undefined,
+  pkgPath: string,
+  pos: number[],
+): RowName[] | undefined {
+  let list = doc?.packages.find((p) => p.path === pkgPath)?.nodes;
+  const out: RowName[] = [];
+  for (const i of pos) {
+    const n = list?.[i];
+    if (!n) return undefined;
+    out.push({
+      name: n.name,
+      reported: n.reported,
+      external: n.external,
+      variant: n.variant,
+      run: n.run,
+    });
+    list = n.children;
+  }
+  return out;
+}
+
+// findByNames finds a row by its names in another rendering of its
+// package, with its place there.
+export function findByNames(
+  doc: SpecData,
+  pkgPath: string,
+  names: RowName[],
+): { node: SpecNode; pos: number[] } | undefined {
+  let list = doc.packages.find((p) => p.path === pkgPath)?.nodes;
+  let node: SpecNode | undefined;
+  const pos: number[] = [];
+  for (const want of names) {
+    const i = (list ?? []).findIndex((n) => sameRow(n, want));
+    if (i < 0) return undefined;
+    node = list![i];
+    pos.push(i);
+    list = node.children;
+  }
+  return node ? { node, pos } : undefined;
+}
+
+// leavesUnder counts the behaviors a row holds; a fuzz target is one.
+export function leavesUnder(n: SpecNode): number {
+  if (n.children.length === 0 || n.kind === "fuzz") return 1;
+  return n.children.reduce((s, c) => s + leavesUnder(c), 0);
+}
+
+// rowOfItem finds the row a Test Explorer item stands for.
+export function rowOfItem(
+  doc: SpecData | undefined,
+  itemId: string,
+): { pkg: string; pos: number[] } | undefined {
+  for (const p of doc?.packages ?? []) {
+    if (itemId === p.path) return { pkg: p.path, pos: [] };
+    if (!itemId.startsWith(p.path + "/")) continue;
+    let hit: number[] | undefined;
+    walkNodes(
+      p.nodes,
+      (_n, ctx) => {
+        if (!hit && ctx.id === itemId) hit = ctx.pos;
+      },
+      p.path,
+    );
+    if (hit) return { pkg: p.path, pos: hit };
+  }
+  return undefined;
 }

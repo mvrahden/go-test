@@ -276,10 +276,25 @@ describe("what the panel asks the CLI for", () => {
     renderRuns(): Promise<unknown>;
     copy(): Promise<void>;
   };
-  // copies runs the panel's copy as the webview's message asks for it.
+  // toasts are the lines the panel showed; copies runs a copy as the
+  // webview's message asks for it, until the panel says what it did.
+  const toasts: string[] = [];
+  const shown = (panel: PanelHost) => {
+    (panel as unknown as { panel: unknown }).panel = {
+      visible: true,
+      webview: {
+        postMessage: async (m: { type: string; text: string }) => {
+          if (m.type === "toast") toasts.push(m.text);
+          return true;
+        },
+      },
+    };
+    return panel;
+  };
   const copies = async (panel: PanelHost, msg: unknown) => {
+    toasts.length = 0;
     internalsOf(panel).handleMessage(msg);
-    await vi.waitFor(() => expect(notes.info.length).toBeGreaterThan(0));
+    await vi.waitFor(() => expect(toasts.length).toBeGreaterThan(0));
   };
   const internalsOf = (panel: PanelHost) => panel as unknown as Internals;
   const argsOfCall = (i: number) => buildCli.mock.calls[i][0];
@@ -366,11 +381,46 @@ describe("what the panel asks the CLI for", () => {
     expect(clipboard.text).toBe("# Behavior Specification\n");
   });
 
+  // A package's rows as the CLI writes them: two suites, the second with
+  // a method of two behaviors.
+  const node = (name: string, status: string, children: unknown[] = []) => ({
+    name,
+    display: name,
+    kind: "block",
+    status,
+    duration: 0,
+    focused: false,
+    excluded: false,
+    external: false,
+    output: [],
+    children,
+  });
+  const specOf = (pkg: string, nodes: unknown[]) =>
+    JSON.stringify({
+      packages: [{ path: pkg, status: "pass", duration: 0, nodes }],
+      stats: {
+        suites: 0,
+        behaviors: 0,
+        tests: 0,
+        passed: 0,
+        failed: 0,
+        skipped: 0,
+      },
+    });
+  const FULL = [
+    node("TestAATestSuite", "pass", [node("x", "pass")]),
+    node("TestBBTestSuite", "fail", [
+      node("TestM", "fail", [node("ok", "pass"), node("bad", "fail")]),
+    ]),
+  ];
+
   async function loaded(md: string): Promise<PanelHost> {
-    notes.info = [];
-    notes.warn = [];
     script.always = { stdout: [md], code: 0 };
-    const panel = new PanelHost(channel, undefined as never);
+    const panel = shown(
+      new PanelHost(channel, undefined as never, undefined, async () => [
+        "./...",
+      ]),
+    );
     internalsOf(panel).runs.merge({
       stream: runOf("example.com/pkg"),
       folder: "/ws/a",
@@ -379,6 +429,9 @@ describe("what the panel asks the CLI for", () => {
       stream: runOf("example.com/other"),
       folder: "/ws/b",
     });
+    (panel as unknown as { lastSpecData: unknown }).lastSpecData = JSON.parse(
+      specOf("example.com/pkg", FULL),
+    );
     buildCli.mockClear();
     return panel;
   }
@@ -399,45 +452,167 @@ describe("what the panel asks the CLI for", () => {
     expect(argsOfCall(0).some((a) => a.startsWith("--match"))).toBe(false);
   });
 
-  it("copies one node from the folder of the row's package", async () => {
-    const panel = await loaded("## node\n");
+  it("copies a directory's packages only: their stream, their source, each folder its own CLI", async () => {
+    const panel = await loaded("## pkgs\n");
+    script.once = [
+      { stdout: [specOf("example.com/pkg", FULL)], code: 0 },
+      { stdout: ["## pkg\n"], code: 0 },
+      {
+        stdout: [
+          specOf("example.com/other", [
+            node("TestCTestSuite", "pass", [node("y", "pass")]),
+          ]),
+        ],
+        code: 0,
+      },
+      { stdout: ["## other\n"], code: 0 },
+    ];
     await copies(panel, {
-      type: "copyNode",
+      type: "copy",
+      label: "a/",
+      pkgs: ["example.com/pkg", "example.com/other"],
+    });
+    expect(buildCli.mock.calls.map((c) => [c[0], c[1]])).toEqual([
+      [
+        [
+          "spec",
+          "--input=-",
+          "--format=json",
+          "--render-only",
+          "--hide=",
+          "--declared",
+          "example.com/pkg",
+        ],
+        "/ws/a",
+      ],
+      [
+        [
+          "spec",
+          "--input=-",
+          "--format=md",
+          "--render-only",
+          "--hide=",
+          "--declared",
+          "example.com/pkg",
+        ],
+        "/ws/a",
+      ],
+      [
+        [
+          "spec",
+          "--input=-",
+          "--format=json",
+          "--render-only",
+          "--hide=",
+          "--declared",
+          "example.com/other",
+        ],
+        "/ws/b",
+      ],
+      [
+        [
+          "spec",
+          "--input=-",
+          "--format=md",
+          "--render-only",
+          "--hide=",
+          "--declared",
+          "example.com/other",
+        ],
+        "/ws/b",
+      ],
+    ]);
+    // Each folder's stream holds the packages copied, nothing else of it.
+    expect(script.calls![0].args).toBeDefined();
+    expect(clipboard.text).toBe("## pkg\n\n## other\n");
+    expect(toasts).toEqual(["Copied a/ as Markdown: 4 behaviors."]);
+  });
+
+  it("copies one row from its package's folder, by its place there", async () => {
+    const panel = await loaded("## node\n");
+    script.once = [{ stdout: [specOf("example.com/pkg", FULL)], code: 0 }];
+    await copies(panel, {
+      type: "copy",
+      label: "M",
       pkg: "example.com/pkg",
-      position: [0, 1],
+      pos: "1.0",
+    });
+    expect(argsOfCall(1)).toEqual([
+      "spec",
+      "--input=-",
+      "--format=md",
+      "--render-only",
+      "--hide=",
+      "--only=example.com/pkg:1.0",
+      "--declared",
+      "example.com/pkg",
+    ]);
+    expect(buildCli.mock.calls[1][1]).toBe("/ws/a");
+    expect(clipboard.text).toBe("## node\n");
+    expect(toasts).toEqual(["Copied M as Markdown: 2 behaviors."]);
+  });
+
+  it("finds the row again under the chips and the search, whose rows the CLI counts in --only", async () => {
+    const panel = await loaded("## failed\n");
+    internalsOf(panel).handleMessage({ type: "filters", filters: ["fail"] });
+    internalsOf(panel).handleMessage({ type: "search", text: "bad" });
+    // With the passing first suite left out, the second is the first shown.
+    const narrowed = [
+      node("TestBBTestSuite", "fail", [
+        node("TestM", "fail", [node("bad", "fail")]),
+      ]),
+    ];
+    script.once = [{ stdout: [specOf("example.com/pkg", narrowed)], code: 0 }];
+    await copies(panel, {
+      type: "copy",
+      label: "M",
+      pkg: "example.com/pkg",
+      pos: "1.0",
+    });
+    expect(argsOfCall(0)).toEqual([
+      "spec",
+      "--input=-",
+      "--format=json",
+      "--render-only",
+      "--hide=none,pass,skip",
+      "--match=bad",
+      "--declared",
+      "example.com/pkg",
+    ]);
+    expect(argsOfCall(1)).toContain("--only=example.com/pkg:0.0");
+    expect(toasts).toEqual([
+      "Copied M as Markdown: 1 behavior. Filters apply.",
+    ]);
+  });
+
+  it("says there is nothing to copy when the filters leave none of the row", async () => {
+    const panel = await loaded("## none\n");
+    internalsOf(panel).handleMessage({ type: "search", text: "zzz" });
+    script.once = [{ stdout: [specOf("example.com/pkg", [])], code: 0 }];
+    clipboard.text = "before";
+    await copies(panel, {
+      type: "copy",
+      label: "M",
+      pkg: "example.com/pkg",
+      pos: "1.0",
     });
     expect(buildCli.mock.calls).toHaveLength(1);
-    expect(argsOfCall(0)).toEqual(
-      expect.arrayContaining(["--format=md", "--only=example.com/pkg:0.1"]),
-    );
-    expect(buildCli.mock.calls[0][1]).toBe("/ws/a");
-    expect(clipboard.text).toBe("## node\n");
+    expect(clipboard.text).toBe("before");
+    expect(toasts).toEqual([
+      "Nothing of M to copy: the filters leave none of it.",
+    ]);
   });
 
-  it("copies a whole package for an empty position", async () => {
-    const panel = await loaded("## pkg\n");
-    await copies(panel, {
-      type: "copyNode",
-      pkg: "example.com/other",
-      position: [],
-    });
-    expect(argsOfCall(0)).toContain("--only=example.com/other");
-    expect(buildCli.mock.calls[0][1]).toBe("/ws/b");
-  });
-
-  it("says how big the copy is", async () => {
-    const panel = await loaded("x".repeat(400));
+  it("says how big the whole list's copy is, and when it is above GitHub's comment limit", async () => {
+    let panel = await loaded("x".repeat(400));
     await copies(panel, { type: "copySpec" });
-    expect(notes.info).toEqual(["Copied 801 characters (about 200 tokens)."]);
-    expect(notes.warn).toEqual([]);
-  });
-
-  it("warns when the copy is above GitHub's comment limit", async () => {
-    const panel = await loaded("x".repeat(35_000));
+    expect(toasts).toEqual([
+      "Copied the whole list as Markdown: 801 characters (about 200 tokens).",
+    ]);
+    panel = await loaded("x".repeat(35_000));
     await copies(panel, { type: "copySpec" });
-    await vi.waitFor(() => expect(notes.warn).toHaveLength(1));
-    expect(notes.warn[0]).toContain(
-      "above GitHub's 65,536-character comment limit.",
+    expect(toasts[0]).toContain(
+      "It is above GitHub's 65,536-character comment limit.",
     );
   });
 });

@@ -8,15 +8,17 @@ import { clientHelpers } from "./helpers.js";
 import { renderChange } from "./renderChange.js";
 import { renderNow } from "./renderNow.js";
 import { renderRuns } from "./renderRuns.js";
+import { renderTree } from "./renderTree.js";
+import { treeLogic } from "./tree.js";
 import { fakeDom, FakeEl } from "./fakeDom.test-support.js";
 import { buildShell, panelScript } from "../shell.js";
 import type {
   ChangeTab,
-  FolderRow,
+  TreeEntry,
+  TreeNode,
   NowModel,
   RunCard,
   RunsTab,
-  TreeNode,
 } from "../protocol.js";
 
 const H = clientHelpers();
@@ -32,31 +34,34 @@ const pkgRow = (i: number) => ({
   time: "1s",
 });
 
-// Two folders: a holds the failed p0, b the rest.
-function folders(map = (r: ReturnType<typeof pkgRow>) => r): FolderRow[] {
+// Two directories: a holds the failed p0, b the rest.
+function tree(map = (r: ReturnType<typeof pkgRow>) => r): TreeEntry[] {
+  const pk = (i: number) => ({ ...map(pkgRow(i)), kind: "pkg" as const });
   return [
     {
+      kind: "dir",
       key: "a",
       name: "a",
       packages: 3,
       counts: "1 failed",
       tone: "fail",
       hot: true,
-      rows: [0, 1, 2].map(pkgRow).map(map),
+      children: [0, 1, 2].map(pk),
     },
     {
+      kind: "dir",
       key: "b",
       name: "b",
       packages: 11,
       counts: "60 passed",
       tone: "pass",
       hot: false,
-      rows: Array.from({ length: 11 }, (_, i) => pkgRow(i + 3)).map(map),
+      children: Array.from({ length: 11 }, (_, i) => pk(i + 3)),
     },
   ];
 }
 
-const OPEN = { open: {}, deep: false, deepSuites: [], depth: "packages" };
+const OPEN = { open: {}, deep: false, depth: "packages" };
 
 function nowModel(over: Partial<NowModel> = {}): NowModel {
   return {
@@ -86,7 +91,7 @@ function nowModel(over: Partial<NowModel> = {}): NowModel {
     ],
     total: "13 in 2 suites, 14 packages",
     groups: [],
-    folders: folders(),
+    tree: tree(),
     filtering: false,
     failed: 1,
     ...over,
@@ -413,6 +418,8 @@ function app(
     NOW,
     CHANGE,
     RUNS,
+    TREE: treeLogic(),
+    TREEVIEW: renderTree(H),
   });
   return { dom, a };
 }
@@ -484,187 +491,295 @@ describe("the webview's app", () => {
     expect(dom.el("badge-now").textContent).toBe("");
   });
 
-  const folderEl = (dom: ReturnType<typeof fakeDom>, i: number) =>
-    dom.el("now-packages").children[i];
-  const pkgEl = (dom: ReturnType<typeof fakeDom>, f: number, i: number) =>
-    folderEl(dom, f).children[1].children[i];
-  // A click on a package's chevron, as the button in its head.
-  const toggle = (a: ReturnType<typeof panelApp>, row: FakeEl) =>
-    click(a, button({ act: "togglePkg" }, row.children[0]));
+  const list = (dom: ReturnType<typeof fakeDom>) =>
+    dom.el("now-packages").innerHTML;
+  // A click on a row's line, as the tree's line element under its row.
+  const rowLine = (key: string, data: Record<string, string> = {}) => {
+    const ti = new FakeEl("div");
+    ti.dataset.key = key;
+    const tr = new FakeEl("div");
+    tr.className = "tr";
+    Object.assign(tr.dataset, data);
+    ti.appendChild(tr);
+    return tr;
+  };
+  const clickRow = (
+    a: ReturnType<typeof panelApp>,
+    key: string,
+    mods: object = {},
+  ) => a.onClick({ target: rowLine(key), preventDefault() {}, ...mods });
+  const key = (
+    a: ReturnType<typeof panelApp>,
+    dom: ReturnType<typeof fakeDom>,
+    rowKey: string,
+    k: string,
+    mods: object = {},
+  ) => {
+    const ti = new FakeEl("div");
+    ti.dataset.key = rowKey;
+    ti.setAttribute("role", "treeitem");
+    let prevented = false;
+    a.onKey({
+      key: k,
+      target: ti,
+      preventDefault: () => (prevented = true),
+      ...mods,
+    });
+    void dom;
+    return prevented;
+  };
+  const SUITES: TreeNode[] = [
+    {
+      d: "Cart",
+      k: "suite",
+      s: "fail",
+      pos: "0",
+      id: "m/p0/CartTestSuite",
+      n: "1 failed",
+      nt: "fail",
+      c: [
+        {
+          d: "adds",
+          k: "block",
+          s: "fail",
+          pos: "0.0",
+          id: "m/p0/CartTestSuite/adds",
+          loc: ["/a_test.go", 3],
+        },
+      ],
+    },
+    {
+      d: "Stock",
+      k: "suite",
+      s: "pass",
+      pos: "1",
+      c: [{ d: "counts", k: "block", s: "pass", pos: "1.0" }],
+    },
+  ];
 
-  it("groups packages under folders, a failing folder open, the rest closed with their counts", () => {
+  it("draws the list as a tree: directories open, packages closed, one tab stop", () => {
     const { dom, a } = app();
     a.receive({ type: "now", model: nowModel() });
-    expect(dom.el("now-packages").children).toHaveLength(2);
-    expect(folderEl(dom, 0).children[0].innerHTML).toContain(
-      'a <span class="dim">3 packages</span>',
+    const html = list(dom);
+    expect(html.match(/role="treeitem"/g)).toHaveLength(16);
+    expect(html).toMatch(
+      /<div class="ti k-dir lv-1" role="treeitem" aria-level="1" aria-expanded="true" aria-label="a" tabindex="0" data-key="d:a">/,
     );
-    expect(folderEl(dom, 0).children[1].children).toHaveLength(3);
-    expect(folderEl(dom, 1).children[1].hidden).toBe(true);
-    expect(folderEl(dom, 1).children[1].children).toHaveLength(0);
-    click(a, button({ act: "toggleFolder", folder: "b" }));
-    expect(folderEl(dom, 1).children[1].children).toHaveLength(11);
-    expect(dom.state()!.folders).toEqual({ b: true });
-    const filtered = nowModel({
-      filtering: true,
-      folders: folders((r) => ({ ...r, matches: Number(r.pkg.slice(3)) % 2 })),
-    });
-    a.receive({ type: "now", model: filtered });
-    expect(folderEl(dom, 0).children[1].children).toHaveLength(1);
-    expect(folderEl(dom, 0).children[0].innerHTML).toContain("1 of 3 packages");
+    expect(html).toMatch(
+      /class="ti k-pkg lv-2" role="treeitem" aria-level="2" aria-expanded="false" aria-label="p0" tabindex="-1" data-key="p:m\/p0"/,
+    );
+    expect(html.match(/tabindex="0"/g)).toHaveLength(1);
+    expect(html).toContain('aria-label="Open everything below a"');
+    expect(html).not.toContain('class="deep');
   });
 
-  it("opens a package when its rows come into view, and draws them when they arrive", () => {
+  it("opens a package on a click of its row, asking for its rows when they come into view", () => {
     const { dom, a } = app();
     a.receive({ type: "now", model: nowModel() });
     dom.posted.length = 0;
-    const row = pkgEl(dom, 0, 2);
-    toggle(a, row);
-    expect(dom.state()!.open).toEqual(["m/p2"]);
-    expect(row.children[1].hidden).toBe(false);
-    expect(row.children[1].innerHTML).toContain("Loading the rows…");
-    expect(dom.posted).toEqual([]);
-    FakeIO.last!.show([row]);
-    expect(dom.posted).toEqual([{ type: "openPackage", pkg: "m/p2" }]);
-    a.receive({
-      type: "package",
-      pkg: "m/p2",
-      rev: 1,
-      nodes: [{ d: "adds", k: "block", s: "pass", pos: "0" }],
+    clickRow(a, "p:m/p0");
+    expect(dom.state()!.tree).toMatchObject({
+      open: { "p:m/p0": true },
+      focus: "p:m/p0",
     });
-    expect(row.children[1].innerHTML).toContain("adds");
-    toggle(a, row);
-    expect(row.children[1].hidden).toBe(true);
+    expect(list(dom)).toContain("Loading the rows…");
+    // Opened by hand: asked at once.
+    expect(dom.posted).toEqual([{ type: "openPackage", pkg: "m/p0" }]);
+    a.receive({ type: "package", pkg: "m/p0", rev: 1, nodes: SUITES });
+    expect(list(dom)).toContain('data-key="n:m/p0:0"');
+    expect(list(dom)).toContain('<span class="counts t-fail">1 failed</span>');
+    // A suite opens whole: its rows show at once.
+    clickRow(a, "n:m/p0:0");
+    expect(list(dom)).toContain('data-key="n:m/p0:0.0"');
+    expect(list(dom)).toContain('<span class="sw s-fail">FAIL</span>');
   });
 
-  it("opens every package at the Suites and Behaviors depths, asking only for the rows in view", () => {
+  it("asks only for the packages in view when the whole list opens to Behaviors, and levels stay unpressed", () => {
     const { dom, a } = app();
     a.receive({ type: "now", model: nowModel() });
     dom.posted.length = 0;
-    click(a, button({ act: "depth", depth: "behaviors" }));
-    expect(dom.el("depth-behaviors").getAttribute("aria-pressed")).toBe("true");
-    expect(dom.state()!.depth).toBe("behaviors");
-    // Every folder opens, every package waits for its rows to come into view.
-    expect(folderEl(dom, 1).children[1].children).toHaveLength(11);
+    click(a, button({ act: "level", level: "behaviors" }));
+    expect(dom.state()!.tree).toMatchObject({ level: "behaviors", open: {} });
+    const lazy = dom.el("now-packages").querySelectorAll("[data-lazy]");
+    expect(lazy).toHaveLength(14);
     expect(FakeIO.last!.seen.size).toBe(14);
     expect(dom.posted).toEqual([]);
-    FakeIO.last!.show([pkgEl(dom, 0, 0), pkgEl(dom, 0, 1)]);
+    FakeIO.last!.show([lazy[0], lazy[1]]);
     expect(dom.posted).toEqual([
       { type: "openPackage", pkg: "m/p0" },
       { type: "openPackage", pkg: "m/p1" },
     ]);
-    const nodes: TreeNode[] = [
-      {
-        d: "Cart",
-        k: "suite",
-        s: "pass",
-        pos: "0",
-        n: "2 passed",
-        nt: "pass",
-        c: [
-          {
-            d: "M",
-            k: "method",
-            s: "pass",
-            pos: "0.0",
-            c: [{ d: "adds", k: "block", s: "pass", pos: "0.0.0" }],
-          },
-        ],
-      },
-    ];
-    a.receive({ type: "package", pkg: "m/p0", rev: 1, nodes });
-    const tree = pkgEl(dom, 0, 0).children[1].innerHTML;
-    expect(tree).toMatch(/<details class="branch" data-pos="0" open>/);
-    expect(tree).toMatch(/<details class="branch" data-pos="0.0" open>/);
-    expect(tree).toContain('<span class="counts t-pass">2 passed</span>');
-    expect(tree).toContain('<span class="sw s-pass">pass</span>');
-    click(a, button({ act: "depth", depth: "suites" }));
-    expect(pkgEl(dom, 0, 0).children[1].innerHTML).toMatch(
-      /<details class="branch" data-pos="0">/,
-    );
-    // A new summary makes the rows on show out of date: asked again in view.
-    dom.posted.length = 0;
-    a.receive({ type: "now", model: { ...nowModel(), rev: 2 } });
-    FakeIO.last!.show([pkgEl(dom, 0, 0)]);
-    expect(dom.posted).toEqual([{ type: "openPackage", pkg: "m/p0" }]);
+    a.receive({ type: "package", pkg: "m/p0", rev: 1, nodes: SUITES });
+    expect(list(dom)).toContain('data-key="n:m/p0:1.0"');
+    expect(list(dom)).not.toContain("aria-pressed");
+    // A toggle after the level is free.
+    clickRow(a, "p:m/p0");
+    expect(list(dom)).not.toContain('data-key="n:m/p0:0"');
   });
 
-  it("expands everything in a package, or a suite, with the button beside its name, and collapses it again", () => {
+  it("opens or closes everything below a row with Alt-click, Shift+Arrow and its action", () => {
     const { dom, a } = app();
     a.receive({ type: "now", model: nowModel() });
-    const nodes = [
-      {
-        d: "Cart",
-        k: "suite",
-        s: "pass",
-        pos: "0",
-        c: [
-          {
-            d: "M",
-            k: "method",
-            s: "pass",
-            pos: "0.0",
-            c: [{ d: "x", k: "block", s: "pass", pos: "0.0.0" }],
-          },
-        ],
-      },
-      {
-        d: "Stock",
-        k: "suite",
-        s: "pass",
-        pos: "1",
-        c: [{ d: "y", k: "block", s: "pass", pos: "1.0" }],
-      },
-    ];
-    const row = pkgEl(dom, 0, 1);
-    expect(row.children[0].innerHTML).toContain(
-      'aria-label="Expand everything in p1"',
-    );
-    click(a, button({ act: "deep", pkg: "m/p1" }));
-    expect(dom.state()!.deep).toEqual(["m/p1"]);
-    expect(row.children[0].innerHTML).toContain(
-      'aria-pressed="true" aria-label="Collapse everything in p1"',
-    );
-    a.receive({ type: "package", pkg: "m/p1", rev: 1, nodes });
-    expect(row.children[1].innerHTML.match(/ open>/g)).toHaveLength(3);
-    click(a, button({ act: "deep", pkg: "m/p1" }));
-    expect(row.children[1].innerHTML).not.toContain(" open>");
-    // The package stays open at its suites; a suite's own button opens that
-    // suite through.
-    expect(row.children[1].hidden).toBe(false);
-    const suiteBtn = button({ act: "deep", pos: "0" }, row.children[1]);
-    click(a, suiteBtn);
-    expect(dom.state()!.deepSuites).toEqual({ "m/p1": ["0"] });
-    const html = row.children[1].innerHTML;
-    expect(html).toMatch(/data-pos="0" open>/);
-    expect(html).toMatch(/data-pos="0.0" open>/);
-    expect(html).toMatch(/data-pos="1">/);
+    a.receive({ type: "package", pkg: "m/p0", rev: 1, nodes: SUITES });
+    clickRow(a, "p:m/p0", { altKey: true });
+    expect(dom.state()!.tree).toMatchObject({ deep: { "m/p0": true } });
+    expect(list(dom)).toContain('data-key="n:m/p0:1.0"');
+    expect(list(dom)).toContain('aria-label="Close everything below p0"');
+    expect(key(a, dom, "p:m/p0", "ArrowLeft", { shiftKey: true })).toBe(true);
+    expect(list(dom)).toContain('data-key="n:m/p0:0"');
+    expect(list(dom)).not.toContain('data-key="n:m/p0:0.0"');
+    click(a, button({ act: "treeAct", op: "openBelow" }, rowLine("d:a")));
+    expect(dom.state()!.tree).toMatchObject({
+      deep: { "m/p0": true, "m/p1": true, "m/p2": true },
+    });
   });
 
-  it("keeps a package's rows in place when a new summary comes, only its head changing", () => {
-    const { dom, a } = app({ open: ["m/p0"] });
+  it("moves the focus with the arrow keys and keeps it on its row when rows arrive", () => {
+    const { dom, a } = app();
     a.receive({ type: "now", model: nowModel() });
-    FakeIO.last!.show([pkgEl(dom, 0, 0)]);
+    expect(key(a, dom, "d:a", "ArrowDown")).toBe(true);
+    expect(dom.state()!.tree).toMatchObject({ focus: "p:m/p0" });
+    key(a, dom, "p:m/p0", "ArrowRight");
+    a.receive({ type: "package", pkg: "m/p0", rev: 1, nodes: SUITES });
+    expect(list(dom)).toMatch(/tabindex="0" data-key="p:m\/p0"/);
+    key(a, dom, "p:m/p0", "ArrowRight");
+    expect(dom.state()!.tree).toMatchObject({ focus: "n:m/p0:0" });
+    // Closing the package gives the focus back to it.
+    key(a, dom, "n:m/p0:0", "ArrowLeft");
+    key(a, dom, "p:m/p0", "ArrowLeft");
+    expect(list(dom)).toMatch(/tabindex="0" data-key="p:m\/p0"/);
+  });
+
+  it("copies a branch as Markdown through the host, at every level, with Ctrl/Cmd+C or its action", () => {
+    const { dom, a } = app();
+    a.receive({ type: "now", model: nowModel() });
+    a.receive({ type: "package", pkg: "m/p0", rev: 1, nodes: SUITES });
+    clickRow(a, "p:m/p0");
+    clickRow(a, "n:m/p0:0");
+    dom.posted.length = 0;
+    key(a, dom, "d:a", "c", { ctrlKey: true });
+    key(a, dom, "p:m/p0", "c", { metaKey: true });
+    key(a, dom, "n:m/p0:0", "c", { ctrlKey: true });
+    expect(key(a, dom, "n:m/p0:0.0", "c", { ctrlKey: true })).toBe(false);
+    click(a, button({ act: "treeAct", op: "copy" }, rowLine("n:m/p0:1")));
+    expect(dom.posted).toEqual([
+      { type: "copy", label: "a/", pkgs: ["m/p0", "m/p1", "m/p2"] },
+      { type: "copy", label: "p0", pkgs: ["m/p0"] },
+      { type: "copy", label: "Cart", pkg: "m/p0", pos: "0" },
+      { type: "copy", label: "Stock", pkg: "m/p0", pos: "1" },
+    ]);
+  });
+
+  it("runs a directory's packages, a package, and a row by its item", () => {
+    const { dom, a } = app();
+    a.receive({ type: "now", model: nowModel() });
+    a.receive({ type: "package", pkg: "m/p0", rev: 1, nodes: SUITES });
+    clickRow(a, "p:m/p0");
+    dom.posted.length = 0;
+    click(a, button({ act: "treeAct", op: "run" }, rowLine("d:a")));
+    click(a, button({ act: "treeAct", op: "run" }, rowLine("p:m/p0")));
+    click(a, button({ act: "treeAct", op: "debug" }, rowLine("n:m/p0:0")));
+    expect(dom.posted).toEqual([
+      { type: "run", ids: ["m/p0", "m/p1", "m/p2"] },
+      { type: "run", id: "m/p0" },
+      { type: "debug", id: "m/p0/CartTestSuite", pkg: "m/p0", pos: "0" },
+    ]);
+  });
+
+  it("shows a row's actions as a menu on right-click, Copy with its shortcut, and leaves the rest of the page its own menu", () => {
+    const { dom, a } = app();
+    a.receive({ type: "now", model: nowModel() });
+    let prevented = false;
+    const line = rowLine("p:m/p0");
+    line.closest = ((sel: string) =>
+      sel === "#now-packages .tr" || sel === ".tr"
+        ? line
+        : FakeEl.prototype.closest.call(line, sel)) as never;
+    dom.fire("contextmenu", {
+      target: line,
+      clientX: 10,
+      clientY: 20,
+      preventDefault: () => (prevented = true),
+    });
+    expect(prevented).toBe(true);
+    const menu = dom.el("ctxmenu");
+    expect(menu.hidden).toBe(false);
+    const items = [...menu.innerHTML.matchAll(/data-op="(\w+)"/g)].map(
+      (m) => m[1],
+    );
+    expect(items).toEqual(["openBelow", "closeBelow", "copy", "run"]);
+    expect(menu.innerHTML).toContain("Ctrl+C");
+    dom.posted.length = 0;
+    click(a, button({ act: "ctxItem", op: "copy", key: "p:m/p0" }));
+    expect(menu.hidden).toBe(true);
+    expect(dom.posted).toEqual([{ type: "copy", label: "p0", pkgs: ["m/p0"] }]);
+    let elsewhere = false;
+    dom.fire("contextmenu", {
+      target: new FakeEl("div"),
+      preventDefault: () => (elsewhere = true),
+    });
+    expect(elsewhere).toBe(false);
+  });
+
+  it("reveals a behavior of a package not loaded yet: opens the way, asks for its rows, then focuses it", () => {
+    const { dom, a } = app();
+    a.receive({ type: "now", model: nowModel() });
+    dom.posted.length = 0;
+    click(a, button({ act: "reveal", pkg: "m/p0", pos: "0.0" }));
+    expect(dom.posted).toEqual([{ type: "openPackage", pkg: "m/p0" }]);
+    expect(dom.state()!.tree).toMatchObject({
+      focus: "n:m/p0:0.0",
+      open: { "d:a": true, "p:m/p0": true, "n:m/p0:0": true },
+    });
+    a.receive({ type: "package", pkg: "m/p0", rev: 1, nodes: SUITES });
+    expect(list(dom)).toMatch(/tabindex="0" data-key="n:m\/p0:0.0"/);
+    expect(dom.focused).toBe("n:m/p0:0.0");
+  });
+
+  it("says what a copy did in a line that goes by itself", () => {
+    const { dom, a } = app();
+    a.receive({ type: "toast", text: "Copied p0 as Markdown: 2 behaviors." });
+    expect(dom.el("toast").hidden).toBe(false);
+    expect(dom.el("toast").textContent).toBe(
+      "Copied p0 as Markdown: 2 behaviors.",
+    );
+    dom.flushTimers();
+    expect(dom.el("toast").hidden).toBe(true);
+  });
+
+  it("keeps a package's rows when a new summary comes, and asks for them again in view", () => {
+    const { dom, a } = app({
+      tree: { open: { "p:m/p0": true }, deep: {}, level: "packages" },
+    });
+    a.receive({ type: "now", model: nowModel() });
     a.receive({
       type: "package",
       pkg: "m/p0",
       rev: 1,
       nodes: [{ d: "kept", k: "block", s: "pass", pos: "0" }],
     });
-    const row = pkgEl(dom, 0, 0);
+    dom.posted.length = 0;
     a.receive({
       type: "now",
-      model: nowModel({
-        folders: folders((r) => ({ ...r, counts: "live " + r.counts })),
-      }),
+      model: {
+        ...nowModel({
+          tree: tree((r) => ({ ...r, counts: "live " + r.counts })),
+        }),
+        rev: 2,
+      },
     });
-    expect(pkgEl(dom, 0, 0)).toBe(row);
-    expect(row.children[0].innerHTML).toContain("live 0 passed");
-    expect(row.children[1].innerHTML).toContain("kept");
+    expect(list(dom)).toContain("live 0 passed");
+    expect(list(dom)).toContain("kept");
+    const lazy = dom.el("now-packages").querySelectorAll("[data-lazy]");
+    expect(lazy).toHaveLength(0);
+    // Out of date rows are asked for again once in view.
+    expect(dom.posted).toEqual([]);
+    FakeIO.last!.show([...FakeIO.last!.seen]);
+    expect(dom.posted).toEqual([{ type: "openPackage", pkg: "m/p0" }]);
   });
 
   it("shows what a search finds, open in place under its folders, and the list as it was once cleared", () => {
-    const { dom, a } = app({ depth: "suites" });
+    const { dom, a } = app({ tree: { open: {}, deep: {}, level: "suites" } });
     a.receive({ type: "now", model: nowModel() });
     const box = dom.el("search");
     box.value = "adds";
@@ -714,7 +829,7 @@ describe("the webview's app", () => {
     dom.flushTimers();
     expect(dom.el("now-packages").hidden).toBe(false);
     expect(dom.el("now-found").hidden).toBe(true);
-    expect(dom.state()!.depth).toBe("suites");
+    expect((dom.state()!.tree as { level: string }).level).toBe("suites");
   });
 
   it("asks a search again of a new summary and of other chips", () => {
@@ -756,7 +871,7 @@ describe("the webview's app", () => {
     expect(dom.posted).toEqual([{ type: "runTests" }]);
   });
 
-  it("sends Run and Debug with the row's item, package and place", () => {
+  it("sends a card's Rerun and Debug with the row's item, package and place", () => {
     const { dom, a } = app();
     const tree = new FakeEl("div");
     tree.dataset.pkg = "m/a";
@@ -766,11 +881,9 @@ describe("the webview's app", () => {
     dom.posted.length = 0;
     click(a, button({ act: "run" }, row));
     click(a, button({ act: "debug" }, row));
-    click(a, button({ act: "copyNode" }, row));
     expect(dom.posted).toEqual([
       { type: "run", pkg: "m/a", pos: "0.1", id: "m/a/S/x" },
       { type: "debug", pkg: "m/a", pos: "0.1", id: "m/a/S/x" },
-      { type: "copyNode", pkg: "m/a", position: [0, 1] },
     ]);
   });
 

@@ -6,6 +6,9 @@ import { clientHelpers } from "../../src/panel/client/helpers.js";
 import { renderChange } from "../../src/panel/client/renderChange.js";
 import { renderNow } from "../../src/panel/client/renderNow.js";
 import { renderRuns } from "../../src/panel/client/renderRuns.js";
+import { renderTree } from "../../src/panel/client/renderTree.js";
+import { treeLogic } from "../../src/panel/client/tree.js";
+import { packagesIn } from "../../src/panel/nowModel.js";
 import {
   fakeDom,
   FakeEl,
@@ -46,12 +49,12 @@ export async function shownHtml(
   const nows = webview.posted.filter(
     (m) => (m as HostMessage).type === "now",
   ) as Extract<HostMessage, { type: "now" }>[];
-  const pkgs =
-    nows.at(-1)?.model.folders.flatMap((f) => f.rows.map((r) => r.pkg)) ?? [];
+  const last = nows.at(-1)?.model;
+  const pkgs = last ? packagesIn(last.tree) : [];
   for (const pkg of pkgs) webview.post?.({ type: "openPackage", pkg });
   const H = clientHelpers();
   const dom = fakeDom();
-  dom.setState({ tab, depth: "behaviors" });
+  dom.setState({ tab, tree: { open: {}, deep: {}, level: "behaviors" } });
   const app = panelApp({
     vscode: dom.vscode,
     document: dom.document,
@@ -60,6 +63,8 @@ export async function shownHtml(
     NOW: renderNow(H),
     CHANGE: renderChange(H),
     RUNS: renderRuns(H),
+    TREE: treeLogic(),
+    TREEVIEW: renderTree(H),
   });
   for (const m of webview.posted) app.receive(m as HostMessage);
   for (const t of ["now", "change", "runs"] as Tab[])

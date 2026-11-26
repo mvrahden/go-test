@@ -35,8 +35,13 @@ import {
   failedIds,
   fullOutput,
   liveFailures,
+  findByNames,
+  leavesUnder,
+  namesAt,
   nodeAt,
   packageTree,
+  rowOfItem,
+  packagesIn,
   searchFound,
   type SourceOption,
 } from "./nowModel.js";
@@ -53,6 +58,7 @@ import {
 import { buildShell, getNonce } from "./shell.js";
 import {
   combineSpecData,
+  countNoun,
   declaredTests,
   interpretSpecExit,
   type SpecData,
@@ -601,9 +607,7 @@ export class PanelHost implements vscode.Disposable {
   // order the tab lists the packages.
   private sendFound(): void {
     const query = this.query.trim();
-    const order = this.nowModel().folders.flatMap((f) =>
-      f.rows.map((r) => r.pkg),
-    );
+    const order = packagesIn(this.nowModel().tree);
     const stale = this.freshness.get(this.selected ?? "");
     const found = searchFound(this.lastSpecData, query, order, {
       dirOf: (p) => this.cache?.getPackage(p)?.dir,
@@ -619,6 +623,33 @@ export class PanelHost implements vscode.Disposable {
 
   private noteAncestors(raw: Record<string, string[]>): void {
     for (const [id, list] of Object.entries(raw)) this.ancestry.set(id, list);
+  }
+
+  // A row to reveal once the webview is ready for it.
+  private revealing: { pkg: string; pos: number[] } | undefined;
+
+  // reveal shows a Test Explorer item's row in the Now tab: its package and
+  // the rows above it opened, the row in view and focused.
+  async reveal(itemId: string): Promise<boolean> {
+    const existed = !!this.panel;
+    await this.show("now");
+    // An item the list does not hold shows as the nearest one it does.
+    let at: { pkg: string; pos: number[] } | undefined;
+    for (
+      let id = itemId;
+      id && !at;
+      id = id.slice(0, Math.max(0, id.lastIndexOf("/")))
+    )
+      at = rowOfItem(this.lastSpecData, id);
+    if (!at) {
+      this.say(`${itemId} is not in the list yet: run it first.`);
+      return false;
+    }
+    const pos = at.pos.join(".");
+    // A panel just made gets it once its page is ready.
+    if (existed) this.post({ type: "reveal", pkg: at.pkg, pos });
+    else this.revealing = at;
+    return true;
   }
 
   // ancestorsOf lists the item ids above a row the panel last acted on.
@@ -660,6 +691,13 @@ export class PanelHost implements vscode.Disposable {
         this.sent.clear();
         this.poster.mark(this.tab, "badges");
         this.tabShown();
+        if (this.revealing)
+          this.post({
+            type: "reveal",
+            pkg: this.revealing.pkg,
+            pos: this.revealing.pos.join("."),
+          });
+        this.revealing = undefined;
         return;
       }
       case "tab":
@@ -680,8 +718,11 @@ export class PanelHost implements vscode.Disposable {
         this.markNow();
         return;
       case "run": {
-        const id = this.actOn(msg);
-        if (id && this.actions) void this.actions.run([id]);
+        // A directory runs its packages; any other row its own item.
+        const ids = Array.isArray(msg.ids)
+          ? msg.ids.filter((i: unknown): i is string => typeof i === "string")
+          : [this.actOn(msg)].filter((i): i is string => !!i);
+        if (ids.length > 0 && this.actions) void this.actions.run(ids);
         return;
       }
       case "debug": {
@@ -729,14 +770,15 @@ export class PanelHost implements vscode.Disposable {
       case "copySpec":
         void this.copy(this.query);
         return;
-      case "copyNode": {
-        const ok =
-          typeof msg.pkg === "string" &&
-          Array.isArray(msg.position) &&
-          msg.position.every(
-            (i: unknown) => Number.isInteger(i) && (i as number) >= 0,
-          );
-        if (ok) void this.copy("", { pkg: msg.pkg, position: msg.position });
+      case "copy": {
+        const pkgs = Array.isArray(msg.pkgs)
+          ? msg.pkgs.filter((p: unknown): p is string => typeof p === "string")
+          : [];
+        const pos = this.posOf(msg.pos);
+        const label = typeof msg.label === "string" ? msg.label : "";
+        if (typeof msg.pkg === "string" && pos && pos.length > 0)
+          void this.copyScope(label, [msg.pkg], { pkg: msg.pkg, pos });
+        else if (pkgs.length > 0) void this.copyScope(label, pkgs);
         return;
       }
       case "change":
@@ -1089,13 +1131,112 @@ export class PanelHost implements vscode.Disposable {
     const text = parts.join("\n");
     await vscode.env.clipboard.writeText(text);
     const tokens = Math.round(text.length / 4);
-    void vscode.window.showInformationMessage(
-      `Copied ${text.length} characters (about ${tokens} tokens).`,
+    this.say(
+      `Copied the whole list as Markdown: ${text.length} characters (about ${tokens} tokens)${this.narrowed() ? ". Filters apply" : ""}.` +
+        (text.length > GITHUB_COMMENT_LIMIT
+          ? " It is above GitHub's 65,536-character comment limit."
+          : ""),
     );
-    if (text.length > GITHUB_COMMENT_LIMIT)
-      void vscode.window.showWarningMessage(
-        `The copy is above GitHub's 65,536-character comment limit.`,
-      );
+  }
+
+  private narrowed(): boolean {
+    return this.filters.size > 0 || this.query.trim() !== "";
+  }
+
+  // say shows a short line in the panel, which goes by itself.
+  private say(text: string): void {
+    this.post({ type: "toast", text });
+  }
+
+  // copyScope copies packages, or one row of a package, as the CLI writes
+  // them in Markdown: the stream holds those packages only, the source read
+  // under it is theirs, and the chips and the search narrow it as they
+  // narrow the whole list. A row is found again by its names in what the
+  // CLI shows under them, since --only counts the shown rows.
+  private async copyScope(
+    label: string,
+    pkgs: string[],
+    node?: { pkg: string; pos: number[] },
+  ): Promise<void> {
+    const runs = this.currentRuns();
+    const byFolder = new Map<string, string[]>();
+    for (const p of pkgs) {
+      const f = runs.folderOf(p);
+      if (f !== undefined) byFolder.set(f, [...(byFolder.get(f) ?? []), p]);
+    }
+    const chosen = HIDEABLE.filter((s) => this.filters.has(s));
+    const hide =
+      chosen.length === 0 ? [] : HIDEABLE.filter((s) => !this.filters.has(s));
+    const match = this.query.trim();
+    const extra = match ? [`--match=${match}`] : [];
+    const names = node
+      ? namesAt(this.lastSpecData, node.pkg, node.pos)
+      : undefined;
+    const parts: string[] = [];
+    let behaviors = 0;
+    try {
+      for (const [folder, only] of byFolder) {
+        const stream = runs.compose(folder, new Set(only));
+        const shown = JSON.parse(
+          await this.runSpec(
+            stream,
+            folder,
+            "json",
+            extra,
+            undefined,
+            hide,
+            only,
+          ),
+        ) as SpecData;
+        if (node) {
+          const at = names && findByNames(shown, node.pkg, names);
+          if (!at) continue;
+          behaviors += leavesUnder(at.node);
+          parts.push(
+            await this.runSpec(
+              stream,
+              folder,
+              "md",
+              [...extra, `--only=${node.pkg}:${at.pos.join(".")}`],
+              undefined,
+              hide,
+              only,
+            ),
+          );
+        } else {
+          for (const p of shown.packages)
+            behaviors += p.nodes.reduce((n, x) => n + leavesUnder(x), 0);
+          parts.push(
+            await this.runSpec(
+              stream,
+              folder,
+              "md",
+              extra,
+              undefined,
+              hide,
+              only,
+            ),
+          );
+        }
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.outputChannel.error(`[panel] copy: ${message}`);
+      this.say(`Could not copy ${label}: ${message.split("\n")[0]}`);
+      return;
+    }
+    if (parts.length === 0) {
+      this.say(`Nothing of ${label} to copy: the filters leave none of it.`);
+      return;
+    }
+    const text = parts.join("\n");
+    await vscode.env.clipboard.writeText(text);
+    this.say(
+      `Copied ${label} as Markdown: ${countNoun(behaviors, "behavior")}${this.narrowed() ? ". Filters apply" : ""}.` +
+        (text.length > GITHUB_COMMENT_LIMIT
+          ? " It is above GitHub's 65,536-character comment limit."
+          : ""),
+    );
   }
 
   // specArgs are the CLI's flags for a folder's render: the declared
@@ -1107,6 +1248,8 @@ export class PanelHost implements vscode.Disposable {
     format: string,
     extra: string[] = [],
     hide: string[] = [],
+    // The packages a render is about; the source read is theirs then.
+    only?: string[],
   ): Promise<string[]> {
     const args = [
       "spec",
@@ -1122,7 +1265,8 @@ export class PanelHost implements vscode.Disposable {
       : await this.patternsFor?.(folder);
     // --declared takes the rest of the line, so the flags come before it.
     args.push(...extra);
-    if (patterns && patterns.length > 0) args.push("--declared", ...patterns);
+    if (patterns && patterns.length > 0)
+      args.push("--declared", ...(only ?? patterns));
     return args;
   }
 
@@ -1186,13 +1330,14 @@ export class PanelHost implements vscode.Disposable {
     // Told of the child, so a superseded render can be stopped.
     track?: Set<ManagedChild>,
     hide: string[] = [],
+    only?: string[],
   ): Promise<string> {
     const workspaceDir =
       folder ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     let cmd;
     try {
       cmd = await buildCliCommand(
-        await this.specArgs(workspaceDir ?? "", format, extra, hide),
+        await this.specArgs(workspaceDir ?? "", format, extra, hide, only),
         workspaceDir,
         this.outputChannel,
       );

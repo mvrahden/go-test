@@ -201,7 +201,6 @@ describe.each(MODES)("spec sync via $name", (mode) => {
     await panel.refresh(run("fuzz"));
 
     const html = await renderedHtml();
-    expect(html).toContain('class="row k-fuzz');
     expect(html).toContain("TrimIdempotent");
     expect(html).toContain("drops surrounding spaces");
     // The row is tagged as a property backed by seeds, and the trailer counts
@@ -237,12 +236,12 @@ describe.each(MODES)("spec sync via $name", (mode) => {
     expect(html).not.toContain('<span class="lbl">reads a</span>');
     // A fast behavior shows no time, so its actions follow its label.
     expect(html).toContain(
-      '<span class="lbl">keeps &lt;b&gt;&amp;&quot; text</span><span class="row-acts">',
+      '<span class="lbl">keeps &lt;b&gt;&amp;&quot; text</span><span class="grow"></span>',
     );
     expect(html).not.toContain("&amp;lt;");
     expect(html).not.toContain("&amp;amp;");
     // A run skips an excluded suite, and the CLI's run spec says so.
-    expect(html).toMatch(/Parked<\/strong>(?:(?!<\/summary>)[\s\S])*SKIPPED/);
+    expect(html).toMatch(/Parked<\/span> <span class="tag t-warn">SKIPPED/);
     expect(html).toContain("2 passed");
   });
 
@@ -256,7 +255,7 @@ describe.each(MODES)("spec sync via $name", (mode) => {
     // No package and no rendered node — asserted on content rather than on the
     // static template, which carries status glyphs of its own.
     expect(html).not.toContain("example.com");
-    expect(html).not.toContain('class="row leaf');
+    expect(html).not.toContain('class="ti k-leaf');
   });
 });
 
@@ -550,7 +549,7 @@ describe("a branch's own verdict", () => {
 
     const html = await renderedHtml();
     expect(recorder.errors).toEqual([]);
-    expect(html).toContain('<summary class="row k-suite s-fail">');
+    expect(html).toMatch(/class="ti k-suite lv-\d+ s-fail"/);
     const said = /<pre class="row-out">([^<]*)<\/pre>/.exec(html)?.[1];
     expect(said).toBe("store_test.go:40: AfterAll: close db: connection reset");
   });
@@ -610,13 +609,12 @@ function discovered(patterns: string[]): Map<string, string> {
 // linked reads each row's go-to-source target from the rendered panel.
 function linked(html: string): Map<string, string> {
   const at = new Map<string, string>();
-  // A row's own Open comes before the next row's id.
-  const row =
-    /data-id="([^"]+)" data-pos="[^"]*"((?:(?!data-id=)[\s\S])*?)data-act="goTo" data-file="([^"]+)" data-line="(\d+)"/g;
+  // A row carries where its source declares it.
+  const row = /data-id="([^"]+)" data-file="([^"]+)" data-line="(\d+)"/g;
   for (const m of html.matchAll(row)) {
     at.set(
       m[1].replace(/&quot;/g, '"').replace(/&#39;/g, "'"),
-      `${m[3]}:${m[4]}`,
+      `${m[2]}:${m[3]}`,
     );
   }
   return at;
@@ -678,7 +676,7 @@ describe("the source under the runs", () => {
     const { panel, recorder } = newPanel();
     await panel.show();
     await panel.refresh(run("mixed"));
-    expect(await renderedHtml()).toMatch(/class="row leaf k-[a-z]+ s-pass"/);
+    expect(await renderedHtml()).toMatch(/class="ti k-leaf lv-\d+ s-pass"/);
 
     (panel as unknown as { handleMessage(m: unknown): void }).handleMessage({
       type: "filters",
@@ -687,8 +685,8 @@ describe("the source under the runs", () => {
 
     const html = await renderedHtml();
     expect(recorder.errors).toEqual([]);
-    expect(html).not.toMatch(/class="row leaf k-[a-z]+ s-pass"/);
-    expect(html).toMatch(/class="row leaf k-[a-z]+ s-fail"/);
+    expect(html).not.toMatch(/class="ti k-leaf lv-\d+ s-pass"/);
+    expect(html).toMatch(/class="ti k-leaf lv-\d+ s-fail"/);
     expect(html).toContain("1 passed");
   });
 });
@@ -935,7 +933,7 @@ describe("the panel speaks the vocabulary the tree speaks", () => {
     expect(recorder.errors).toEqual([]);
     // The string behaviorTree.test.ts expects as this item's label in the tree.
     expect(html).toContain(
-      '<span class="lbl">when classifying a number</span>',
+      '<span class="lbl when">when classifying a number</span>',
     );
     expect(html).not.toContain("when when");
     // Rows and expectations stand on their own — only a context takes a

@@ -869,6 +869,14 @@ export function registerCommands(deps: {
       await panelHost.showRuns();
     }),
 
+    // A Test Explorer item's row, revealed in the Now tab.
+    vscode.commands.registerCommand(
+      "gotest.showInPanel",
+      async (item?: vscode.TestItem) => {
+        if (item?.id) await panelHost.reveal(item.id);
+      },
+    ),
+
     vscode.commands.registerCommand(
       "gotest.runChanged",
       // The folder named, else the active editor's, else every one.

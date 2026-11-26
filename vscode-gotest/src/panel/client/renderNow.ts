@@ -2,7 +2,6 @@
 // webview by source (see helpers.ts).
 import type {
   Card,
-  FolderRow,
   NowModel,
   OutputLine,
   PackageRow,
@@ -17,7 +16,6 @@ export type NowView = ReturnType<typeof renderNow>;
 export interface TreeOpen {
   open: Record<string, boolean>;
   deep: boolean;
-  deepSuites: string[];
   depth: string;
 }
 
@@ -96,6 +94,12 @@ export function renderNow(h: Helpers) {
       c.loc
         ? button("Open test", "goTo", { file: c.loc.file, line: c.loc.line })
         : "",
+      c.pos && !c.live
+        ? button("Reveal in list", "reveal", {
+            pkg: c.pkg,
+            pos: c.pos.join("."),
+          })
+        : "",
       c.pos && c.kind === "failed"
         ? button(
             shown ? "Hide output" : "Full output",
@@ -141,36 +145,17 @@ export function renderNow(h: Helpers) {
   const CHEV = (open: boolean) =>
     `<svg class="chev${open ? " open" : ""}" aria-hidden="true" width="12" height="12" viewBox="0 0 12 12"><path d="M4 2l4 4-4 4"/></svg>`;
 
-  // deepButton expands, or collapses, everything under a package or suite.
-  const deepButton = (
-    name: string,
-    pressed: boolean,
-    d: Record<string, string>,
-  ): string => {
-    const label = `${pressed ? "Collapse" : "Expand"} everything in ${name}`;
-    const path = pressed
-      ? `<path d="M3 6l4-4 4 4"/><path d="M3 12l4-4 4 4"/>`
-      : `<path d="M3 2l4 4 4-4"/><path d="M3 8l4 4 4-4"/>`;
-    return `<button type="button" class="deep${pressed ? " on" : ""}" data-act="deep"${h.data(d)} aria-pressed="${pressed}" aria-label="${esc(label)}" title="${esc(label)}"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6">${path}</svg></button>`;
-  };
-
   // folderHead is the inside of a folder's button.
-  const folderHead = (f: FolderRow, open: boolean, shown?: number): string =>
+  const folderHead = (
+    f: { name: string; packages: number; counts: string; tone: string },
+    open: boolean,
+    shown?: number,
+  ): string =>
     `${CHEV(open)}<span class="folder-name">${esc(f.name)} <span class="dim">${
       shown === undefined
         ? `${f.packages} ${f.packages === 1 ? "package" : "packages"}`
         : `${shown} of ${f.packages} ${f.packages === 1 ? "package" : "packages"}`
     }</span></span><span class="counts t-${f.tone}">${esc(f.counts)}</span>`;
-
-  // pkgHead is a package's row: its chevron and name open one level, the
-  // button beside the name everything.
-  const pkgHead = (r: PackageRow, open: boolean, deep: boolean): string => {
-    const counts =
-      r.matches !== undefined
-        ? `${r.matches.toLocaleString("en-US")} ${r.matches === 1 ? "match" : "matches"} · ${r.counts}`
-        : r.counts;
-    return `<button type="button" class="pkg-toggle" data-act="togglePkg" aria-expanded="${open}">${CHEV(open)}<span class="mono name">${esc(r.name)}</span></button>${deepButton(r.name, deep, { pkg: r.pkg })}<span class="grow"></span><span class="counts t-${r.tone}">${esc(counts)}${r.note ? ` <span class="dim">· ${esc(r.note)}</span>` : ""}</span><span class="dim time">${esc(r.time)}</span>`;
-  };
 
   const tagHtml = (n: TreeNode): string =>
     (n.tags ?? [])
@@ -202,9 +187,7 @@ export function renderNow(h: Helpers) {
     const ids = `${n.id ? ` data-id="${esc(n.id)}"` : ""} data-pos="${esc(n.pos)}"`;
     if (!n.c)
       return `<div class="row leaf k-${esc(n.k)} s-${esc(n.s)}"${ids}><span class="sw s-${esc(n.s)}">${WORD[n.s] ?? esc(n.s)}</span> <span class="lbl">${label}</span>${tagHtml(n)}${time}${acts(n, false)}</div>${out}`;
-    const top = !n.pos.includes(".");
-    const suiteDeep = top && o.deepSuites.indexOf(n.pos) >= 0;
-    const deep = deepAbove || suiteDeep;
+    const deep = deepAbove;
     const isOpen =
       o.open[n.pos] ??
       (deep ||
@@ -216,8 +199,7 @@ export function renderNow(h: Helpers) {
     const counts = n.n
       ? `<span class="grow"></span><span class="counts t-${n.nt ?? "none"}">${esc(n.n)}</span>`
       : "";
-    const deepBtn = top ? deepButton(n.d, suiteDeep, { pos: n.pos }) : "";
-    return `<details class="branch"${ids}${isOpen ? " open" : ""}><summary class="row k-${esc(n.k)} s-${esc(n.s)}">${icon(n.s)} <span class="lbl">${label}</span>${deepBtn}${tagHtml(n)}${time}${acts(n, true)}${counts}</summary>${out}${n.c
+    return `<details class="branch"${ids}${isOpen ? " open" : ""}><summary class="row k-${esc(n.k)} s-${esc(n.s)}">${icon(n.s)} <span class="lbl">${label}</span>${tagHtml(n)}${time}${acts(n, true)}${counts}</summary>${out}${n.c
       .map((c) => node(c, o, deep))
       .join("")}</details>`;
   };
@@ -251,7 +233,6 @@ export function renderNow(h: Helpers) {
     attention,
     card,
     folderHead,
-    pkgHead,
     tree,
     foundNote,
   };

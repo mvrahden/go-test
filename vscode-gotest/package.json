@@ -110,6 +110,10 @@
         "title": "Go Test: Show Panel (Runs)"
       },
       {
+        "command": "gotest.showInPanel",
+        "title": "Go Test: Show in Panel"
+      },
+      {
         "command": "gotest.runChanged",
         "title": "Go Test: Run Changed Packages"
       },
@@ -213,6 +217,10 @@
           "when": "false"
         },
         {
+          "command": "gotest.showInPanel",
+          "when": "false"
+        },
+        {
           "command": "gotest.toggleFocus",
           "when": "false"
         },
@@ -250,6 +258,11 @@
           "command": "gotest.copyTestResults",
           "when": "controllerId == gotest",
           "group": "inline"
+        },
+        {
+          "command": "gotest.showInPanel",
+          "when": "controllerId == gotest",
+          "group": "gotest@2"
         }
       ]
     },

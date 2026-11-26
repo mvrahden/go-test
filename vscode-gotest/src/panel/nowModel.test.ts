@@ -12,6 +12,7 @@ import {
   fullOutput,
   nodeAt,
   packageTree,
+  packagesIn,
   searchFound,
   FOUND_LEAVES,
   shortNames,
@@ -29,6 +30,7 @@ import {
 import {
   MESSAGE_BUDGET,
   type PackageRow,
+  type TreeEntry,
   type FilterStatus,
   type TreeNode,
 } from "./protocol.js";
@@ -117,8 +119,11 @@ const treeOf = (
 
 const OPEN = { open: {}, deep: false, deepSuites: [], depth: "packages" };
 
-const rowsOf = (m: { folders: { rows: PackageRow[] }[] }) =>
-  m.folders.flatMap((f) => f.rows);
+const rowsOf = (m: { tree: TreeEntry[] }): PackageRow[] => {
+  const walk = (list: TreeEntry[]): PackageRow[] =>
+    list.flatMap((e) => (e.kind === "pkg" ? [e] : walk(e.children)));
+  return walk(m.tree);
+};
 
 const flat = (nodes: TreeNode[]): TreeNode[] =>
   nodes.flatMap((n) => [n, ...flat(n.c ?? [])]);
@@ -675,7 +680,7 @@ describe("the Now summary", () => {
     expect(rowsOf(m).map((r) => r.matches)).toEqual([1, 0, 0]);
   });
 
-  it("groups packages by their first path element below the module, a failing or stale folder first", () => {
+  it("lays packages out as their directories: chains merged, a second module its own, failed first, then path order", () => {
     const p = (path: string, failed = 0) =>
       pkg(
         path,
@@ -692,27 +697,51 @@ describe("the Now summary", () => {
       p("m/cmd/gotest"),
       p("m/internal/b"),
       p("m/internal/a"),
-      p("m/pkg/z", 1),
-      p("m/pkg/a"),
+      p("m/pkg/gotestruntime", 1),
+      p("m/pkg/gotest"),
+      p("m/pkg/gotest/internal/assert"),
+      p("m/pkg/gotest/internal/snapfile"),
+      p("m/tests/conformance/cli"),
       p("m"),
       p("m/examples/shop"),
       p("m/examples/cart"),
     ]);
     const m = buildNowModel(env(doc, { modulePaths: ["m", "m/examples"] }));
-    expect(
-      m.folders.map((f) => [
-        f.name,
-        f.packages,
-        f.counts,
-        f.hot,
-        f.rows.map((r) => r.name),
-      ]),
-    ).toEqual([
-      ["pkg", 2, "1 failed · 1 passed", true, ["pkg/z", "pkg/a"]],
-      ["cmd", 1, "1 passed", false, ["cmd/gotest"]],
-      ["examples", 2, "2 passed", false, ["examples/cart", "examples/shop"]],
-      ["internal", 2, "2 passed", false, ["internal/a", "internal/b"]],
-      ["m", 1, "1 passed", false, ["m"]],
+    const show = (list: TreeEntry[]): unknown[] =>
+      list.map((e) =>
+        e.kind === "pkg"
+          ? e.name
+          : [e.name, e.packages, e.counts, show(e.children)],
+      );
+    expect(show(m.tree)).toEqual([
+      [
+        "pkg",
+        4,
+        "1 failed · 3 passed",
+        [
+          "gotestruntime",
+          "gotest",
+          ["gotest/internal", 2, "2 passed", ["assert", "snapfile"]],
+        ],
+      ],
+      ["cmd", 1, "1 passed", ["gotest"]],
+      ["examples", 2, "2 passed", ["cart", "shop"]],
+      ["internal", 2, "2 passed", ["a", "b"]],
+      "m",
+      ["tests/conformance", 1, "1 passed", ["cli"]],
+    ]);
+    expect(packagesIn(m.tree)[0]).toBe("m/pkg/gotestruntime");
+  });
+
+  it("marks a suite EXT. only where the package has suites in both its test packages", () => {
+    const suite = (external: boolean, name = "TestCartTestSuite") =>
+      node(name, "pass", [node("a", "pass")], { external });
+    const lone = docOf([pkg("p", [suite(true)])]);
+    expect(treeOf(lone, "p").nodes[0].tags).toBeUndefined();
+    const twins = docOf([pkg("p", [suite(false), suite(true)])]);
+    expect(treeOf(twins, "p").nodes.map((n) => n.tags)).toEqual([
+      undefined,
+      [{ text: "EXT." }],
     ]);
   });
 

@@ -89,8 +89,11 @@ export interface PackageRow {
   empty?: boolean;
 }
 
-// A folder of packages: the first path element below a module's root.
-export interface FolderRow {
+// A directory of packages, its path relative to the directory above; a
+// chain of directories with one directory each is one.
+export interface DirEntry {
+  kind: "dir";
+  // Its path from the top of the tree.
   key: string;
   name: string;
   packages: number;
@@ -98,8 +101,13 @@ export interface FolderRow {
   tone: Tone;
   // Holds a failed or stale package.
   hot: boolean;
-  rows: PackageRow[];
+  children: TreeEntry[];
 }
+
+// A package, named relative to the directory above it.
+export type PkgEntry = PackageRow & { kind: "pkg" };
+
+export type TreeEntry = DirEntry | PkgEntry;
 
 export interface NowModel {
   rev: number;
@@ -112,7 +120,7 @@ export interface NowModel {
   noSuites?: { text: string; names: string[] };
   total: string;
   groups: string[];
-  folders: FolderRow[];
+  tree: TreeEntry[];
   filtering: boolean;
   failed: number;
 }
@@ -287,6 +295,10 @@ export type HostMessage =
       failure?: OutputLine[];
     }
   | { type: "output"; key: string; lines: OutputLine[]; more?: number }
+  // A short line the panel shows and lets go by itself.
+  | { type: "toast"; text: string }
+  // A row to open the way to, scroll to and focus.
+  | { type: "reveal"; pkg: string; pos: string }
   | {
       type: "found";
       query: string;
@@ -309,14 +321,12 @@ export interface ClientState {
   search: string;
   filters: FilterStatus[];
   scroll: Partial<Record<Tab, number>>;
-  depth: Depth;
-  // Packages closed at a depth that opens them, folders as toggled, and the
-  // packages and suites expanded all the way.
-  shut: string[];
-  folders: Record<string, boolean>;
-  deep: string[];
-  deepSuites: Record<string, string[]>;
+  // The behavior tree: rows opened or closed by hand, packages opened all
+  // through, the level the whole list was opened to, and the focused row.
+  tree: {
+    open: Record<string, boolean>;
+    deep: Record<string, boolean>;
+    level: string;
+    focus?: string;
+  };
 }
-
-// How far the behavior list opens: packages only, their suites, or all.
-export type Depth = "packages" | "suites" | "behaviors";

@@ -5,6 +5,8 @@ import { clientHelpers } from "./client/helpers.js";
 import { renderChange } from "./client/renderChange.js";
 import { renderNow } from "./client/renderNow.js";
 import { renderRuns } from "./client/renderRuns.js";
+import { renderTree } from "./client/renderTree.js";
+import { treeLogic } from "./client/tree.js";
 import type { Tab } from "./protocol.js";
 import { encodeStateForScript } from "./specData.js";
 
@@ -27,7 +29,9 @@ const H = (${clientHelpers.toString()})();
 const NOW = (${renderNow.toString()})(H);
 const CHANGE = (${renderChange.toString()})(H);
 const RUNS = (${renderRuns.toString()})(H);
-(${panelApp.toString()})({ vscode: acquireVsCodeApi(), document, window, initial: INITIAL, NOW, CHANGE, RUNS });
+const TREE = (${treeLogic.toString()})();
+const TREEVIEW = (${renderTree.toString()})(H);
+(${panelApp.toString()})({ vscode: acquireVsCodeApi(), document, window, initial: INITIAL, NOW, CHANGE, RUNS, TREE, TREEVIEW });
 `;
 }
 
@@ -71,17 +75,17 @@ ${CSS}
     <div id="now-attention" class="block"></div>
     <div id="now-all" class="block">
       <div class="all-head">
-        <h2 class="eyebrow">All behaviors</h2><span id="now-total" class="dim"></span>
-      </div>
-      <div class="all-tools">
-        <div class="depth" role="group" aria-label="Depth">
-          <button type="button" id="depth-packages" data-act="depth" data-depth="packages" aria-pressed="true">Packages</button><button type="button" id="depth-suites" data-act="depth" data-depth="suites" aria-pressed="false">Suites</button><button type="button" id="depth-behaviors" data-act="depth" data-depth="behaviors" aria-pressed="false">Behaviors</button>
-        </div>
-        <span class="grow"></span>
+        <h2 class="eyebrow">All behaviors</h2><span id="now-total" class="dim"></span><span class="grow"></span>
         <label for="search" class="sr">Search behaviors</label><input id="search" type="search" placeholder="Search opens what it finds" autocomplete="off">
       </div>
+      <div class="all-tools">
+        <span class="dim" id="level-label">Open the whole list to</span>
+        <div class="levels" role="group" aria-labelledby="level-label">
+          <button type="button" data-act="level" data-level="packages">Packages</button><button type="button" data-act="level" data-level="suites">Suites</button><button type="button" data-act="level" data-level="behaviors">Behaviors</button>
+        </div>
+      </div>
       <div id="now-groups" class="dim"></div>
-      <div id="now-packages" class="list"></div>
+      <div id="now-packages" class="list tree" role="tree" aria-label="All behaviors"></div>
       <div id="now-found" class="list" hidden></div>
     </div>
   </section>
@@ -95,6 +99,8 @@ ${CSS}
     <div id="runs-body" class="block"></div>
   </section>
 </main>
+<div id="ctxmenu" class="menu ctx-menu" role="menu" hidden></div>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 <script nonce="${o.nonce}">
 ${panelScript({ tab: o.tab, has: o.has })}
 </script>
@@ -216,11 +222,64 @@ pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-family: va
 /* package rows */
 .all-head { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; }
 .all-tools { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; }
-.depth { display: inline-flex; border: 1px solid var(--vscode-panel-border); border-radius: 4px; overflow: hidden; }
-.depth button { height: 28px; padding: 0 12px; background: none; border: 0; }
-.depth button + button { border-left: 1px solid var(--vscode-panel-border); }
-.depth button[aria-pressed="true"] { background: var(--vscode-list-activeSelectionBackground, var(--vscode-button-background)); color: var(--vscode-list-activeSelectionForeground, var(--vscode-button-foreground)); font-weight: 600; }
-.all-tools input { width: 260px; max-width: 100%; height: 28px; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border, var(--vscode-panel-border)); border-radius: 4px; padding: 0 8px; font: inherit; }
+.levels { display: inline-flex; border: 1px solid var(--vscode-panel-border); border-radius: 4px; overflow: hidden; }
+.levels button { height: 26px; padding: 0 12px; background: none; border: 0; }
+.levels button + button { border-left: 1px solid var(--vscode-panel-border); }
+.levels button:hover { background: var(--vscode-list-hoverBackground); }
+
+/* the behavior tree: one line per row, its rows in a group below */
+.list.tree { overflow: visible; }
+.ti { outline: none; }
+.ti > .tr { display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 3px 12px 3px calc(12px + var(--indent, 0px)); cursor: pointer; background: var(--vscode-editor-background); border-top: 1px solid transparent; }
+.ti > .tr:hover { background: var(--vscode-list-hoverBackground); }
+.ti:focus > .tr { background: var(--vscode-list-activeSelectionBackground, var(--vscode-list-focusBackground)); color: var(--vscode-list-activeSelectionForeground, inherit); outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
+.ti:focus > .tr .dim, .ti:focus > .tr .counts { color: inherit; }
+.ti.k-dir > .tr { background: var(--vscode-sideBar-background, var(--vscode-editorWidget-background)); }
+.ti.k-dir > .tr:hover { background: var(--vscode-list-hoverBackground); }
+.tree > .ti + .ti > .tr, .ti.k-dir > [role=group] > .ti > .tr, .ti.k-pkg + .ti > .tr { border-top-color: var(--vscode-panel-border); }
+.chev-slot { width: 14px; flex-shrink: 0; display: inline-flex; justify-content: center; }
+.ti .lbl { min-width: 0; overflow-wrap: anywhere; }
+.ti .lbl.mono { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dir-name { font-weight: 600; color: var(--vscode-editor-foreground); }
+.dir-name .dim { font-weight: normal; }
+.lbl.suite { font-weight: 600; color: var(--vscode-editor-foreground); }
+.lbl.when { color: var(--vscode-descriptionForeground); }
+.ti.k-method > .tr .lbl { color: var(--vscode-editor-foreground); }
+.ti .counts { white-space: nowrap; flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ti.k-dir > .tr .lbl, .ti.k-pkg > .tr .lbl { flex: 0 1 auto; min-width: 6ch; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ti .time { width: 56px; text-align: right; flex-shrink: 0; }
+.ti.k-leaf > .tr, .ti.k-when > .tr { min-height: 24px; padding-top: 1px; padding-bottom: 1px; }
+.ti.k-leaf.s-fail > .tr { background: color-mix(in srgb, var(--vscode-testing-iconFailed) 10%, var(--vscode-editor-background)); }
+.ti-note { padding: 4px 12px 6px calc(12px + var(--indent, 0px)); }
+.ractions { display: none; gap: 2px; flex-shrink: 0; }
+.ti > .tr:hover .ractions, .ti:focus > .tr .ractions, .ti > .tr:focus-within .ractions { display: inline-flex; }
+.ibtn { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; padding: 0; background: none; border: 0; border-radius: 4px; color: inherit; }
+.ibtn:hover { background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground)); }
+/* the package and its open suite stay at the top while their rows scroll */
+.ti.k-pkg[aria-expanded="true"] > .tr { position: sticky; top: 0; z-index: 3; }
+.ti.k-suite[aria-expanded="true"] > .tr { position: sticky; top: 30px; z-index: 2; }
+.ti.k-pkg > .tr, .ti.k-suite > .tr { height: 30px; white-space: nowrap; }
+.ti.k-suite > .tr .lbl { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ti > pre.row-out { margin: 2px 12px 6px calc(40px + var(--indent, 0px)); }
+.ctx-menu { position: fixed; min-width: 230px; z-index: 20; }
+.menu-item { display: flex; justify-content: space-between; gap: 16px; }
+.kbd { font-size: 0.9em; }
+.ti .tag, .ti .dur { white-space: nowrap; }
+.toast { position: fixed; left: 16px; right: 16px; bottom: 16px; z-index: 30; padding: 10px 14px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; background: var(--vscode-editorWidget-background, var(--vscode-editor-background)); color: var(--vscode-editor-foreground); box-shadow: 0 6px 18px var(--vscode-widget-shadow); }
+.lv-1 { --indent: calc(0 * var(--step, 14px)); }
+.lv-2 { --indent: calc(1 * var(--step, 14px)); }
+.lv-3 { --indent: calc(2 * var(--step, 14px)); }
+.lv-4 { --indent: calc(3 * var(--step, 14px)); }
+.lv-5 { --indent: calc(4 * var(--step, 14px)); }
+.lv-6 { --indent: calc(5 * var(--step, 14px)); }
+.lv-7 { --indent: calc(6 * var(--step, 14px)); }
+.lv-8 { --indent: calc(7 * var(--step, 14px)); }
+.lv-9 { --indent: calc(8 * var(--step, 14px)); }
+.lv-10 { --indent: calc(9 * var(--step, 14px)); }
+.lv-11 { --indent: calc(10 * var(--step, 14px)); }
+.lv-12 { --indent: calc(11 * var(--step, 14px)); }
+
+.all-head input { width: 230px; max-width: 100%; height: 28px; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border, var(--vscode-panel-border)); border-radius: 4px; padding: 0 8px; font: inherit; }
 .list { display: flex; flex-direction: column; border: 1px solid var(--vscode-panel-border); border-radius: 6px; overflow: hidden; }
 .list:empty { display: none; }
 .list[data-empty]::after { content: attr(data-empty); padding: 9px 14px; color: var(--vscode-descriptionForeground); }
@@ -337,6 +396,11 @@ details.extra > summary { cursor: pointer; color: var(--vscode-descriptionForegr
   #tab-now .pkg-head { flex-wrap: wrap; padding-left: 20px; }
   #tab-now .pkg-head .counts { text-align: left; }
   .pkg-tree { padding-left: 24px; }
+  .ti .time { display: none; }
+  .tree { --step: 8px; }
+  .sw { min-width: 3.4em; }
+  .ti > .tr { gap: 6px; padding-right: 8px; }
+  .ti .counts { font-size: 0.92em; }
   .decision { grid-template-columns: minmax(0, 1fr); }
   .decision .kind, .decision .what, .decision .fact, .decision .where, .decision .d-acts { grid-column: 1; }
   .decision .fact { text-align: left; }
@@ -345,6 +409,6 @@ details.extra > summary { cursor: pointer; color: var(--vscode-descriptionForegr
   .run-card .verdict, .run-card .right { text-align: left; grid-column: 2; }
   .run-card .cmd { grid-column: 1 / 3; }
   .pkg-tree { padding-left: 14px; }
-  .all-tools input { width: 100%; }
+  .all-head input { width: 100%; }
 }
 `;
