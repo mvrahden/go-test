@@ -1,7 +1,7 @@
 // What a test run in progress has streamed so far: how many test events of
-// each kind it applied, and its stream as run pieces, so the Spec View can
-// render the rows a run has reached before it ends. Counting events is all
-// this does: what a test's verdict is stays the CLI's to say.
+// each kind it applied, what each package's tests said, and its stream as
+// run pieces. The panel shows these until the run's end has the CLI render
+// it; what a test's verdict means stays the CLI's to say.
 import type { TestEvent } from "./outputParser.js";
 import type { RunPiece } from "./specStore.js";
 
@@ -22,7 +22,78 @@ export function countEvent(t: Tally, ev: TestEvent): void {
   else if (ev.Action === "fail") t.failed++;
 }
 
-// tallyText is a tally as the panel and the Sessions view word it.
+// What a run said so far of one package's tests, by go test name.
+export interface LivePackage {
+  tests: Map<string, LiveTest>;
+  // Tests that have tests of their own.
+  parents: Set<string>;
+  // Tests one of whose own tests failed.
+  failedParents: Set<string>;
+  // The package's own verdict, once it came.
+  done?: "pass" | "fail" | "skip";
+}
+
+export interface LiveTest {
+  status: "run" | "pass" | "fail" | "skip";
+  // What it printed, while it runs and once it failed.
+  output: string[];
+}
+
+// The lines a test in progress keeps of what it printed.
+export const LIVE_OUTPUT_LINES = 40;
+
+function ancestorsOf(test: string): string[] {
+  const out: string[] = [];
+  for (let i = test.indexOf("/"); i > 0; i = test.indexOf("/", i + 1))
+    out.push(test.slice(0, i));
+  return out;
+}
+
+// noteLive adds one event to its package's tests.
+export function noteLive(
+  packages: Map<string, LivePackage>,
+  ev: TestEvent,
+): void {
+  if (ev.RunLevel === true || !ev.Package) return;
+  let lp = packages.get(ev.Package);
+  if (!lp) {
+    if (ev.Action === "output" || ev.Action === "start") return;
+    lp = { tests: new Map(), parents: new Set(), failedParents: new Set() };
+    packages.set(ev.Package, lp);
+  }
+  if (!ev.Test) {
+    if (ev.Action === "pass" || ev.Action === "fail" || ev.Action === "skip")
+      lp.done = ev.Action;
+    return;
+  }
+  let t = lp.tests.get(ev.Test);
+  if (!t) {
+    t = { status: "run", output: [] };
+    lp.tests.set(ev.Test, t);
+    for (const a of ancestorsOf(ev.Test)) lp.parents.add(a);
+  }
+  switch (ev.Action) {
+    case "run":
+      t.status = "run";
+      break;
+    case "output":
+      if (t.status === "pass" || t.status === "skip") break;
+      t.output.push((ev.Output ?? "").replace(/\n$/, ""));
+      if (t.output.length > LIVE_OUTPUT_LINES) t.output.shift();
+      break;
+    case "pass":
+    case "skip":
+      t.status = ev.Action;
+      t.output = [];
+      break;
+    case "fail":
+      t.status = "fail";
+      for (const a of ancestorsOf(ev.Test)) lp.failedParents.add(a);
+      break;
+  }
+}
+
+// tallyText is a tally as the panel words it.
 export function tallyText(t: Tally): string {
   return `${t.started} started · ${t.passed} passed · ${t.failed} failed`;
 }
@@ -40,6 +111,8 @@ export function elapsedText(ms: number): string {
 // after the other.
 export class RunProgress {
   readonly tally: Tally = { started: 0, passed: 0, failed: 0 };
+  // Each package's tests as the run reported them so far.
+  readonly packages = new Map<string, LivePackage>();
   readonly startedAt: number;
   private readonly done: RunPiece[] = [];
   private current: (() => RunPiece) | undefined;
@@ -62,6 +135,7 @@ export class RunProgress {
   note(ev: TestEvent): void {
     if (this.ended) return;
     countEvent(this.tally, ev);
+    noteLive(this.packages, ev);
     this.changed(this);
   }
 
