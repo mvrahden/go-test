@@ -79,7 +79,7 @@ Go writes a tool there in place, and a run that resolves it meanwhile cannot
 execute it.
 
 The drill exits 0 only when every selected mutant was caught. CI splits it into
-four shards, retains each shard's logs and phase timings even on failure, and
+six shards, retains each shard's logs and phase timings even on failure, and
 then checks with `--check-shards` that the shards split the mutants exactly.
 
 `bash tests/drill/drill.sh <name> ...` selects named mutants; no names selects all.
