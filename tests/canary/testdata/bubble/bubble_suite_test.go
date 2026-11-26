@@ -42,7 +42,6 @@ func (s *BubbleTestSuite) TestBackoff(t *gotest.T) {
 func (s *BubbleTestSuite) TestOnlyInside(t *gotest.T) {
 	gotest.Bubble(t, func(bt *gotest.T) {
 		gotest.True(bt, true)
-		gotest.True(bt.Soft(), true)
 		gotest.True(bt.T(), true)
 	})
 }
@@ -64,14 +63,18 @@ func (s *BubbleTestSuite) TestRows(t *gotest.T) {
 	}
 }
 
+// TestEventually polls on a row's T, which goes on after the failure to
+// time the bubble.
 func (s *BubbleTestSuite) TestEventually(t *gotest.T) {
-	start := time.Now()
-	gotest.Bubble(t.Soft(), func(bt *gotest.T) {
-		gotest.Eventually(bt, time.Hour, time.Minute, func(poll *gotest.R) {
-			gotest.True(poll, false, "never ready")
+	for row := range gotest.Each(t, []struct{ Desc string }{{"hour"}}) {
+		start := time.Now()
+		gotest.Bubble(row, func(bt *gotest.T) {
+			gotest.Eventually(bt, time.Hour, time.Minute, func(poll *gotest.R) {
+				gotest.True(poll, false, "never ready")
+			})
 		})
-	})
-	gotest.Less(t, time.Since(start), time.Second)
+		gotest.Less(row, time.Since(start), time.Second)
+	}
 }
 
 func (s *BubbleTestSuite) TestSettle(t *gotest.T) {

@@ -404,15 +404,15 @@ Eventually and Consistently SHALL fail without polling when waitFor or tick is n
 - **THEN** fails saying both must be positive and polls nothing
 
 ### Requirement: Bubbles
-gotest.Bubble(t, fn) SHALL run fn in a testing/synctest bubble on a T of t's test: its assertions SHALL count for that test, fail it at their lines and be soft when t is, and time in it SHALL be the bubble's fake clock, Eventually's and Consistently's polls included. Settle on that T SHALL return once every other goroutine of the bubble is durably blocked or has returned.
+gotest.Bubble(t, fn) SHALL run fn in a testing/synctest bubble on a T of t's test: its assertions SHALL count for that test and fail it at their lines, on an Each row's T failing the row and going on, and time in it SHALL be the bubble's fake clock, Eventually's and Consistently's polls included. Settle on that T SHALL return once every other goroutine of the bubble is durably blocked or has returned.
 
 #### Scenario: An hour of backoff in a bubble
 - **WHEN** a method waits an hour of backoff inside a Bubble
 - **THEN** passes in less than a second of real time
 
 #### Scenario: Assertions only inside a bubble
-- **WHEN** a leaf asserts only inside a Bubble, on its T, a soft T and its *testing.T
-- **THEN** reports the three assertions as its count
+- **WHEN** a leaf asserts only inside a Bubble, on its T and its *testing.T
+- **THEN** reports the two assertions as its count
 
 #### Scenario: A failure inside a bubble
 - **WHEN** an assertion fails inside a Bubble

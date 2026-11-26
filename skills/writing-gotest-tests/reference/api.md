@@ -219,7 +219,7 @@ gotest.Bubble(t, func(bt *gotest.T) {
 
 In a bubble, time moves only when every goroutine in it is durably blocked (on a
 channel, timer, `sync.Cond` or `WaitGroup` of the bubble, or `time.Sleep`; a mutex, I/O
-or a channel made outside does not count). Assert on `bt`: its assertions, `Soft()` and
+or a channel made outside does not count). Assert on `bt`: its assertions and
 `AssertsBy` count and fail as the method's, at their lines
 ([Bubbles](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-bubbles)).
 `Eventually` and `Consistently` given `bt` poll on the fake clock. A fake clock does not

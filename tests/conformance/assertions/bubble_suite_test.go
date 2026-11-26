@@ -66,11 +66,11 @@ func (s *BubbleTestSuite) TestBubbles(t *gotest.T) {
 			gotest.Equal(it, "pass", s.run.Verdict(bubbleSuite+"TestBackoff"), s.output(bubbleSuite+"TestBackoff"))
 		})
 	})
-	t.When("a leaf asserts only inside a Bubble, on its T, a soft T and its *testing.T", func(w *gotest.T) {
-		w.It("reports the three assertions as its count", func(it *gotest.T) {
+	t.When("a leaf asserts only inside a Bubble, on its T and its *testing.T", func(w *gotest.T) {
+		w.It("reports the two assertions as its count", func(it *gotest.T) {
 			n, ok := s.run.Attr(bubbleSuite+"TestOnlyInside", protocol.AttrAssertions)
 			gotest.True(it, ok, "no count reported")
-			gotest.Equal(it, "3", n)
+			gotest.Equal(it, "2", n)
 		})
 	})
 	t.When("an assertion fails inside a Bubble", func(w *gotest.T) {
@@ -87,8 +87,8 @@ func (s *BubbleTestSuite) TestBubbles(t *gotest.T) {
 	})
 	t.When("Eventually polls for an hour inside a Bubble and no poll passes", func(w *gotest.T) {
 		w.It("fails after an hour of fake time, in less than a second of real time", func(it *gotest.T) {
-			out := s.output(bubbleSuite + "TestEventually")
-			gotest.Equal(it, "fail", s.run.Verdict(bubbleSuite+"TestEventually"))
+			out := s.output(bubbleSuite + "TestEventually/hour")
+			gotest.Equal(it, "fail", s.run.Verdict(bubbleSuite+"TestEventually/hour"))
 			gotest.Contains(it, out, "Eventually failed after 1h0m0s (61 polls)")
 			gotest.NotContains(it, out, "Less failed")
 		})

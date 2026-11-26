@@ -21,8 +21,8 @@ import (
 // once and the same under any load. Bubble returns when fn and every
 // goroutine started in the bubble have returned.
 //
-// Assertions on fn's T fail t's test where they fail, count for it and are
-// soft when t is; a skip skips it. Its Context is the bubble's: it has no
+// Assertions on fn's T fail t's test at their lines, an Each row's going on,
+// and count for it; a skip skips it. Its Context is the bubble's: it has no
 // deadline and ends when fn returns, before Bubble waits for the goroutines
 // gotest.Go started on it. Its Cleanup, TempDir and Setenv end with the
 // bubble. Eventually and Consistently on it poll on the fake clock.

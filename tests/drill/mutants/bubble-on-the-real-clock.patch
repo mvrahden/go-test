@@ -1,5 +1,5 @@
 Expect: bubble: TestBackoff did not pass
-Expect: bubble: TestEventually does not say "Eventually failed after 1h0m0s
+Expect: bubble: TestEventually/hour does not say "Eventually failed after 1h0m0s
 Judge: ./tests/canary CanaryTestSuite/TestABubbleRunsOnTheFakeClock
 Clause: when a method waits an hour of backoff inside a Bubble → passes in less than a second of real time
 Clause: when Eventually polls for an hour inside a Bubble and no poll passes → fails after an hour of fake time, in less than a second of real time

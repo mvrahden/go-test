@@ -1,6 +1,6 @@
 Expect: bubble: TestOnlyInside gotest\.assertions is "0"
 Judge: ./tests/canary CanaryTestSuite/TestABubbleRunsOnTheFakeClock
-Clause: when a leaf asserts only inside a Bubble, on its T, a soft T and its *testing.T → reports the three assertions as its count
+Clause: when a leaf asserts only inside a Bubble, on its T and its *testing.T → reports the two assertions as its count
 --- a/pkg/gotest/bubble.go
 +++ b/pkg/gotest/bubble.go
 @@ -130,7 +130,7 @@

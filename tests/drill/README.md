@@ -321,7 +321,7 @@ shards of one run do not add up to every mutant exactly once.
 | `bubble-on-the-real-clock` | `gotest.Bubble` runs its callback on the test's own T, outside a bubble | canary: the bubble fixture's hour of backoff fails and its `Eventually` does not fail after an hour of fake time |
 | `bubble-assertions-uncounted` | the bubble's T counts its assertions for no test | canary: the bubble leaf that asserts only inside its bubble reports 0 |
 | `bubble-failure-located-in-gotest` | a bubble's T marks gotest's frames on itself, not on the parent its failures are located by | canary: the bubble fixture's failure names a gotest file |
-| `bubble-row-failure-ends-the-method` | a failing bubble ends a soft T's test, so an `Each` row's ends the method | canary: the bubble fixture's row after the failing one has no verdict |
+| `bubble-row-failure-ends-the-method` | a failing bubble on an `Each` row's T ends the method | canary: the bubble fixture's row after the failing one has no verdict |
 | `settle-waits-for-nothing` | `Settle` returns without waiting for the bubble's goroutines | canary: the bubble fixture reads the goroutine's value before it is written |
 | `bubble-runs-an-it` | an `It` on a bubble's T is not refused, so testing's own panic names `t.Run` | canary: the bubble fixture's `It` does not say a bubble runs no subtest |
 | `bubble-parallel-panics` | testing's panic for `Parallel` in a bubble is carried out as a panic | canary: the bubble fixture's `Parallel` does not say it cannot run in a bubble |

@@ -58,24 +58,24 @@ func (s *CanaryTestSuite) TestABubbleRunsOnTheFakeClock(t *gotest.T) {
 			count = ev.Value
 		}
 	}
-	if count != "3" {
-		t.Errorf("bubble: TestOnlyInside gotest.assertions is %q, want \"3\"", count)
+	if count != "2" {
+		t.Errorf("bubble: TestOnlyInside gotest.assertions is %q, want \"2\"", count)
 	}
 	for test, want := range map[string]string{
-		"TestFails":         at("fails here") + ": Equal failed",
-		"TestEventually":    "Eventually failed after 1h0m0s (61 polls)",
-		"TestIt":            at("opens an It") + ": It inside a Bubble: a bubble runs no subtest",
-		"TestParallel":      at("calls Parallel") + ": t.Parallel called inside synctest bubble: Run, Parallel and Deadline cannot run in a bubble",
-		"TestOuterT":        at("asks the method's T") + ": Context on a T from outside the bubble: inside Bubble use the T its callback is given",
-		"TestDeadlock":      at("deadlocks") + ": Bubble deadlock: ",
-		"TestSettleOutside": at("settles outside") + ": Settle runs only in a bubble",
+		"TestFails":           at("fails here") + ": Equal failed",
+		"TestEventually/hour": "Eventually failed after 1h0m0s (61 polls)",
+		"TestIt":              at("opens an It") + ": It inside a Bubble: a bubble runs no subtest",
+		"TestParallel":        at("calls Parallel") + ": t.Parallel called inside synctest bubble: Run, Parallel and Deadline cannot run in a bubble",
+		"TestOuterT":          at("asks the method's T") + ": Context on a T from outside the bubble: inside Bubble use the T its callback is given",
+		"TestDeadlock":        at("deadlocks") + ": Bubble deadlock: ",
+		"TestSettleOutside":   at("settles outside") + ": Settle runs only in a bubble",
 	} {
 		if out := streamOutput(r.stream, suite+test); !strings.Contains(out, want) {
 			t.Errorf("bubble: %s does not say %q:\n%s", test, want, out)
 		}
 	}
-	if out := streamOutput(r.stream, suite+"TestEventually"); strings.Contains(out, "Less failed") {
-		t.Errorf("bubble: TestEventually polled an hour on the real clock:\n%s", out)
+	if out := streamOutput(r.stream, suite+"TestEventually/hour"); strings.Contains(out, "Less failed") {
+		t.Errorf("bubble: TestEventually/hour polled an hour on the real clock:\n%s", out)
 	}
 	if out := streamOutput(r.stream, suite+"TestDeadlock"); !strings.Contains(out, "[chan receive (durable)] at "+at("blocks forever")+"\n") {
 		t.Errorf("bubble: TestDeadlock does not name the blocked goroutine's line:\n%s", out)

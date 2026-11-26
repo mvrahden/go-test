@@ -309,6 +309,7 @@ bubble fail TestAbandonTestSuite/TestBlockedOutside
 bubble fail TestBubbleTestSuite
 bubble fail TestBubbleTestSuite/TestDeadlock
 bubble fail TestBubbleTestSuite/TestEventually
+bubble fail TestBubbleTestSuite/TestEventually/hour
 bubble fail TestBubbleTestSuite/TestFails
 bubble fail TestBubbleTestSuite/TestIt
 bubble fail TestBubbleTestSuite/TestOuterT
