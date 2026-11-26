@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint EachRowGuards .* / t-escape leaves it unreported and still fixes one given the outer t\.T\(\) \(
+Clause: when an assertion is given an Each row's T() → t-escape leaves it unreported and still fixes one given the outer t.T()
+--- a/internal/lint/lint.go
++++ b/internal/lint/lint.go
+@@ -885,7 +885,7 @@
+ 			reported[inner.Pos()] = true
+ 			innerSel := inner.Fun.(*ast.SelectorExpr)
+ 			// An assertion given a row's T() halts the method; given the row it goes on.
+-			if isRowVar(pass, rows, innerSel.X) {
++			if false {
+ 				return
+ 			}
+ 			reportWithFix(pass, TEscape, inner,
