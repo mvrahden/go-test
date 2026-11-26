@@ -85,18 +85,6 @@ func NewTWithContext(tb testing.TB, ctx context.Context) *T {
 	return &T{t: t, tb: tb, ctx: ctx}
 }
 
-// Soft returns t for assertions that fail the test and go on: a failing
-// assertion given it reports where a fatal one would and returns, and the
-// test fails when it ends. NewTWithDeadline on it stays soft. FailNow and
-// Skipf on it still stop the test, and It and When on it give their bodies a
-// fatal T. Code after a soft assertion
-// runs on the value that failed: check what it dereferences fatally first.
-func (t *T) Soft() *T {
-	soft := *t
-	soft.soft = true
-	return &soft
-}
-
 // Errorf fails the test at the caller's line and goes on.
 func (t *T) Errorf(format string, args ...any) {
 	report(t.testingTB(), fmt.Sprintf(format, args...))
