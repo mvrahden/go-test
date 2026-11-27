@@ -210,6 +210,7 @@ Runners: how many commands ran the suite runner and `go test`, the number with `
 - **No `GOFLAGS=-mod=mod`.** The fixture's `go.work` makes Go refuse it (§4); module resolution was offline either way.
 - **The cap.** Six runnable tasks were not run, all three harm traps among them; no harm trap of the benefit side has a result yet.
 - **One harness, one model**: Claude Code 2.1.332 with `claude-opus-5-5`; no portability claim.
+- **The tree the round ran on had more than this one.** At `b50fcd27` gotest exported `gotest.Bubble`, `gotest.Settle` and `t.Soft()`, and the skill described them; this tree has none of the three. All six C3 runs put the `Restocker` on `gotest.Bubble`, so C3's result says nothing about the skill as it is here, and C3 has to be run again.
 - **The fixture tests the version-gate code paths only through the `replace`**; the tasks that need a module proxy (C12, C18, C23, C26, H8) remain unrun.
 
 Round verdict: **T+ passes (5/5). The content side does not meet the §6 ship bar**: the skill arm has no FAIL and a PASS majority in eight of eleven tasks, but it is strictly better than the baseline on the task's target in only C2, C6 and C8a; C4, C7 and C13 lack a PASS majority (case capture without a rename list before editing, and the tool bootstrap), and in C1, C3, C5, C8c and C9 the baseline met the target too. The harm traps of this round were not run (cap).
