@@ -1039,15 +1039,18 @@ const runs = {};
     GOTEST_CACHE_DIR: path.join(runsRoot, "cache"),
   });
   const proofSource = path.join(auditSource, "proof");
+  // Paths below <proof> and <stage> are spelled as on Linux.
   const unstage = (text) =>
-    maskDir(maskDir(text, proofSource, "<proof>"), runsRoot, "<stage>");
+    slashed(
+      maskDir(maskDir(text, proofSource, "<proof>"), runsRoot, "<stage>"),
+    );
   const maskRecord = (r) => ({
     ...r,
     id: "<id>",
     recorded: "<time>",
     // A live run's start is now; an imported one's is its stream's.
     ...(r.started && !r.imported ? { started: "<time>" } : {}),
-    ...(r.eventsFile ? { eventsFile: slashed(unstage(r.eventsFile)) } : {}),
+    ...(r.eventsFile ? { eventsFile: unstage(r.eventsFile) } : {}),
     // An input hash covers the Go version and the platform.
     ...(r.ran
       ? {
