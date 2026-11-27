@@ -11,7 +11,12 @@ input=$(cat)
 case $event in
 post-edit) case $input in *_test.go*) ;; *) exit 0 ;; esac ;;
 pre-shell) case $input in *go*test*) ;; *) exit 0 ;; esac ;;
-stop) exit 0 ;; # gotest hook stop answers nothing yet
+stop)
+	# The end of a turn is audited only in a checkout with a changed or
+	# untracked Go file.
+	changed=$(git status --porcelain --untracked-files=all 2>/dev/null) || exit 0
+	printf '%s\n' "$changed" | grep -Eq '\.go"?$' || exit 0
+	;;
 esac
 
 # answer runs the hook with the CLI given as arguments, once it knows the

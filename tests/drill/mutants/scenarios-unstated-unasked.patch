@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/scenarios ScenariosBinding / BehaviorsNoClauseStates / when a bound When holds an It no clause states and --unstated is not given / lists no unstated behavior \(
+Clause: when a bound When holds an It no clause states and --unstated is not given → lists no unstated behavior
+--- a/internal/gotestscenarios/bind.go
++++ b/internal/gotestscenarios/bind.go
+@@ -57,7 +57,7 @@
+ 	for i := range doc.Scenarios {
+ 		judge(&doc.Scenarios[i], evidence)
+ 	}
+-	if opt.Unstated {
++	if opt.Unstated || true {
+ 		doc.Unstated = unstated(doc.Scenarios, its, claimed)
+ 	}
+ 	sort.SliceStable(doc.Scenarios, func(a, b int) bool {

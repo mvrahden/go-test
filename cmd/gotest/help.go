@@ -44,6 +44,8 @@ func showHelp(topic string) {
 		printLintHelp()
 	case "audit":
 		printAuditHelp()
+	case "scenarios":
+		printScenariosHelp()
 	case "migrate":
 		printMigrateHelp()
 	case "refactor":
@@ -85,6 +87,7 @@ Subcommands:
   scaffold    Generate test suite skeleton
   lint        Run gotest-specific linter checks
   audit       Compare a change's test estate with its base, from source
+  scenarios   Bind OpenSpec scenarios to the suites by text, and judge them
   migrate     Convert testify/suite tests to go-test format
   refactor    Source code refactoring tools
   skill       Install the agent skill matching this version
@@ -383,7 +386,9 @@ stderr. Declared benchmarks a test run left unexecuted are counted with
 that match no package exit 2 as well: a run of nothing is not green.
 
 Flags:
-  --format=<fmt>          Output format: terminal (default), md, json
+  --format=<fmt>          Output format: terminal (default), md, json; with
+                          --input also intoto-test-result, the in-toto
+                          test-result predicate (v0.1) of the saved run
   --output=<file>         Write to file instead of stdout
   --events-file=<file>    Also write the run's go test -json event stream to
                           file as it happens; summary --input reads it back

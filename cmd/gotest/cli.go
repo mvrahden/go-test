@@ -89,6 +89,8 @@ func main() {
 		os.Exit(runLint(inv))
 	case "audit":
 		os.Exit(runAudit(inv))
+	case "scenarios":
+		os.Exit(runScenarios(inv))
 	case "skill":
 		os.Exit(runSkill(inv))
 	default:

@@ -128,7 +128,7 @@ func (s *ActionResolveTestSuite) resolve(t *gotest.T, files map[string]string, c
 	cmd := exec.CommandContext(t.Context(), "bash", "--noprofile", "--norc", "-eo", "pipefail", "-c", s.script) //nolint:gosec // G204: the action's own script
 	cmd.Dir = dir
 	// GOPROXY=off: the step must decide from the files alone.
-	cmd.Env = append(os.Environ(), "PWD="+dir,
+	cmd.Env = append(stepEnviron(t), "PWD="+dir,
 		"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
 		"GITHUB_ENV="+env, "REAL_GO="+s.realGo, "FAKE_TOOL_LISTING="+listing,
 		"RUNNER_TEMP="+bin, "RUNNER_OS=Linux", "GO_LOG="+filepath.Join(bin, "go.log"),

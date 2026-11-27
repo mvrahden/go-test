@@ -432,6 +432,10 @@ func shortPackage(d *Document, pkg string) string {
 	return "./" + strings.TrimPrefix(pkg, best+"/")
 }
 
+// FindingText is a finding's line as the text format writes it, without
+// its class.
+func FindingText(d *Document, f *Finding) string { return findingText(d, f) }
+
 // findingText is a finding's line: what it is about, its values and where.
 // A file's finding names the file once, with its line.
 func findingText(d *Document, f *Finding) string {

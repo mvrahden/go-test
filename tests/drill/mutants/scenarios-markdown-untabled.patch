@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/scenarios ScenariosDocument / TheScenariosDocument / when scenarios writes --format=md / writes a heading and a table of requirements and scenarios per capability \(
+Clause: when scenarios writes --format=md → writes a heading and a table of requirements and scenarios per capability
+--- a/internal/gotestscenarios/render.go
++++ b/internal/gotestscenarios/render.go
+@@ -121,7 +121,7 @@
+ 		sc := &d.Scenarios[i]
+ 		if sc.File != file {
+ 			file = sc.File
+-			fmt.Fprintf(w, "\n### %s\n\n`%s`\n\n| Requirement | Scenario | Status | Its |\n|---|---|---|---|\n", mdText(sc.Capability), sc.File)
++			fmt.Fprintf(w, "\n### %s\n\n`%s`\n\n", mdText(sc.Capability), sc.File)
+ 		}
+ 		var its []string
+ 		for _, c := range sc.Clauses {

@@ -79,7 +79,7 @@ Go writes a tool there in place, and a run that resolves it meanwhile cannot
 execute it.
 
 The drill exits 0 only when every selected mutant was caught. CI splits it into
-four shards, retains each shard's logs and phase timings even on failure, and
+six shards, retains each shard's logs and phase timings even on failure, and
 then checks with `--check-shards` that the shards split the mutants exactly.
 
 `bash tests/drill/drill.sh <name> ...` selects named mutants; no names selects all.
@@ -1049,7 +1049,15 @@ shards of one run do not add up to every mutant exactly once.
 | `test-variants-built-for-export-data` | the package loader asks for types in its listing with tests, so go list builds every test variant and test main | pkgload: the load with tests asks for types |
 | `run-books-a-cached-result` | a suite that ran before is booked passed without running again | cli conformance: a package run twice runs its tests again and marks nothing cached |
 | `hook-unknown-event-exits-0` | `gotest hook` answers an event it does not know with exit 0 | cli conformance: an unknown hook event exits 1 and names the events |
-| `hook-stop-writes-a-note` | the stop hook event writes a note | cli conformance: the stop event exits 0 and writes nothing |
+| `hook-stop-audits-against-head` | `gotest hook stop` audits against HEAD where origin names a default branch | cli conformance: the stop reason does not name the merge base with origin/main |
+| `hook-stop-lists-information` | `gotest hook stop` lists a changed body among the weakenings | cli conformance: the stop reason names the changed `TestMultiplies` |
+| `hook-stop-reports-again` | `gotest hook stop` forgets what it reported | cli conformance: the second end of the turn blocks again |
+| `hook-stop-without-default-audits-the-parent` | without a default branch, `gotest hook stop` audits against HEAD's parent | cli conformance: the stop reason lists the committed removal of `TestSubtracts` |
+| `hook-stop-ignores-stop-hook-active` | `gotest hook stop` blocks a turn a stop hook already continued | cli conformance: the end of a turn with `stop_hook_active` set writes a decision |
+| `testresult-vacuous-pass-passed` | a test that passed without an assertion is listed in `passedTests` | cli conformance: the failed run's `warnedTests` is empty |
+| `testresult-configuration-without-args` | the predicate's configuration leaves out the run's arguments | cli conformance: the configuration names no arguments |
+| `testresult-url-dropped` | the predicate leaves out the Actions run's url | cli conformance: the passed run under GitHub Actions has no url |
+| `testresult-without-manifest-attested` | a stream without a run manifest is attested | cli conformance: summary exits 0 instead of 2 |
 | `hook-lint-findings-dropped` | `gotest hook post-edit` drops the findings lint reports | cli conformance: an edited test file with a finding gets it as additional context |
 | `hook-lints-any-go-file` | `gotest hook post-edit` lints the package of any edited `.go` file, not only of a test file | cli conformance: an edited file that is not a test gets no answer |
 | `hook-note-keeps-go-test` | the `pre-shell` note gives the command line with `go test` left in it | cli conformance: the note's command line runs gotest in place of go test |
@@ -1135,6 +1143,35 @@ shards of one run do not add up to every mutant exactly once.
 | `audit-needs-decision-only-on-failure` | only a failing row needs a decision | audit conformance: the decision It finds the vacuous row undecided |
 | `version-json-without-schema` | `version --json` names a schema the audit does not write | cli conformance: the version It finds schema 2 |
 | `audit-base-records-a-missing-directory` | a directory the commit lacks is recorded as a package that cannot be read | audit conformance: the missing-directory It sees exit 2 |
+| `scenarios-openspec-dir-unread` | the default directories leave out openspec/specs | scenarios conformance: the It of its clause fails |
+| `scenarios-bare-keywords-unread` | a clause whose keyword is bare capitals is not read | scenarios conformance: the It of its clause fails |
+| `scenarios-fences-read` | a code fence is read like the text around it | scenarios conformance: the It of its clause fails |
+| `scenarios-removed-requirements-read` | a REMOVED requirement of a delta spec is read | scenarios conformance: the It of its clause fails |
+| `scenarios-config-specs-ignored` | the scenarios.specs key is not read | scenarios conformance: the It of its clause fails |
+| `scenarios-no-spec-taken` | finding no spec file is no error | scenarios conformance: the It of its clause fails |
+| `scenarios-first-letter-unfolded` | the first letter keeps its case | scenarios conformance: the It of its clause fails |
+| `scenarios-given-ignored` | only the last condition is compared | scenarios conformance: the It of its clause fails |
+| `scenarios-missing-it-bound` | a clause no It states counts as bound | scenarios conformance: the It of its clause fails |
+| `scenarios-non-ascii-dropped` | letters outside ASCII are dropped before comparing | scenarios conformance: the It of its clause fails |
+| `scenarios-excluded-its-bind` | an It of an excluded suite binds | scenarios conformance: the It of its clause fails |
+| `scenarios-two-its-one-clause` | a clause two Its state binds the first | scenarios conformance: the It of its clause fails |
+| `scenarios-shared-it-unflagged` | an It two scenarios bind is no ambiguity | scenarios conformance: the It of its clause fails |
+| `scenarios-rows-apart` | each row of a table is an It of its own | scenarios conformance: the It of its clause fails |
+| `scenarios-unstated-unlisted` | --unstated lists nothing | scenarios conformance: the It of its clause fails |
+| `scenarios-unstated-unasked` | the unstated Its are listed without --unstated | scenarios conformance: the It of its clause fails |
+| `scenarios-vacuous-verified` | a pass with no assertion is verified | scenarios conformance: the It of its clause fails |
+| `scenarios-run-packages-unnamed` | the run names no package | scenarios conformance: the It of its clause fails |
+| `scenarios-skip-verified` | a skipped It reads as verified | scenarios conformance: the It of its clause fails |
+| `scenarios-verify-runs-everything` | --verify runs every package given | scenarios conformance: the It of its clause fails |
+| `scenarios-paths-absolute` | the document names files by their absolute path | scenarios conformance: the It of its clause fails |
+| `scenarios-text-faults-unsaid` | the text format names no clause at fault | scenarios conformance: the It of its clause fails |
+| `scenarios-markdown-untabled` | the Markdown writes no table header | scenarios conformance: the It of its clause fails |
+| `scenarios-default-policy-without-evidence` | the default policy holds without evidence too | scenarios conformance: the It of its clause fails |
+| `scenarios-no-default-policy` | evidence has no default policy | scenarios conformance: the It of its clause fails |
+| `scenarios-fail-on-statuses-ignored` | --fail-on matches no scenario status | scenarios conformance: the It of its clause fails |
+| `scenarios-unknown-status-taken` | an unknown status is taken | scenarios conformance: the It of its clause fails |
+| `scenarios-evidence-status-taken` | an evidence status is taken without evidence | scenarios conformance: the It of its clause fails |
+| `scenarios-broken-package-passes` | a package that does not compile leaves the exit at 0 | scenarios conformance: the It of its clause fails |
 
 ## Adding a mutant
 

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/scenarios ScenariosDocument / ThePolicyExit / when a package of the module does not compile / names it and exits 2 \(
+Clause: when a package of the module does not compile → names it and exits 2
+--- a/cmd/gotest/scenarios.go
++++ b/cmd/gotest/scenarios.go
+@@ -79,7 +79,7 @@
+ 	}
+ 	for i := range pkgs.Broken {
+ 		fmt.Fprintf(os.Stderr, "scenarios: %s cannot be read: %s\n", pkgs.Broken[i].PkgPath, firstLine(pkgs.Broken[i].Errors))
+-		opt.Unreadable = append(opt.Unreadable, pkgs.Broken[i].PkgPath)
++		_ = pkgs.Broken[i].PkgPath
+ 	}
+ 	doc := gotestscenarios.Bind(specs, tree, &opt)
+ 

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/scenarios ScenariosBinding / BindingByText / when two scenarios differ only in letters outside ASCII / binds each to the When that spells it and not to the other \(
+Clause: when two scenarios differ only in letters outside ASCII → binds each to the When that spells it and not to the other
+--- a/internal/gotestscenarios/normalize.go
++++ b/internal/gotestscenarios/normalize.go
+@@ -21,7 +21,7 @@
+ 			i += 2
+ 			space = false
+ 			continue
+-		case r == '`':
++		case r == '`' || r >= utf8.RuneSelf:
+ 			i++
+ 			continue
+ 		case (r == '*' || r == '_') && i+1 < len(s) && s[i+1] == s[i]:

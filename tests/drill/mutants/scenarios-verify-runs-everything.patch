@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/scenarios ScenariosEvidence / Evidence / when scenarios is given --verify / runs the packages that hold a bound It and no other, and judges the scenarios by that run \(
+Clause: when scenarios is given --verify → runs the packages that hold a bound It and no other, and judges the scenarios by that run
+--- a/cmd/gotest/scenarios.go
++++ b/cmd/gotest/scenarios.go
+@@ -297,7 +297,7 @@
+ func runBound(a *scenariosArgs, pkgs gotestgen.RunPackages, bound map[string]bool) ([]gotestspec.TestEvent, *gotestspec.RunInfo, error) { //nolint:gocritic // hugeParam: once per run
+ 	var loaded []*gotestgen.LoadResult
+ 	for _, lr := range pkgs.Loaded {
+-		if bound[lr.PkgPath] {
++		if bound[lr.PkgPath] || true {
+ 			loaded = append(loaded, lr)
+ 		}
+ 	}

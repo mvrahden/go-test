@@ -1446,12 +1446,13 @@ Arrows read "imports". Third-party modules are named where a package needs one.
 
 | Package | Role | Imports of this module |
 |---|---|---|
-| `cmd/gotest` | The CLI: arguments, subcommands, signals, watch | `internal/{about,config,filewrite,gotestast,gotestaudit,gotestbench,gotestgen,gotestrunner,gotestspec,lint,migrate,pkgpattern,protocol,refactor,scaffold,unidiff}`, `skills`; third-party: `fsnotify`, `x/tools` |
+| `cmd/gotest` | The CLI: arguments, subcommands, signals, watch | `internal/{about,config,filewrite,gotestast,gotestaudit,gotestbench,gotestscenarios,gotestgen,gotestrunner,gotestspec,lint,migrate,pkgpattern,protocol,refactor,scaffold,unidiff}`, `skills`; third-party: `fsnotify`, `x/tools` |
 | `internal/gotestast` | Suite and fixture model read from syntax and types | `internal/{about,protocol,typeclass}`; third-party: `x/tools` |
 | `internal/gotestgen` | Loading, collection, binding, rendering of the harness | `internal/{about,genstub,gotestast,goversion,pkgload,pkgpattern,protocol}`; third-party: `x/mod`, `x/tools` |
 | `internal/gotestrunner` | Overlay, compile, shared fixtures, one process per suite | `internal/{about,control,gotestgen,proctree,protocol,protocol/sharedwire,schedinfo}` |
 | `internal/gotestspec` | Event stream → tree → terminal, Markdown and JSON renderers; the census | `internal/{about,protocol}` |
 | `internal/gotestaudit` | A tree's test estate read from source into a record; two records compared into the audit document; its text, JSON and Markdown | `internal/{about,gotestast,gotestgen,gotestspec,lint,protocol}`; third-party: `x/tools` |
+| `internal/gotestscenarios` | OpenSpec scenarios read from spec files, bound to a tree's `When`/`It` labels by text; the scenarios document, its policy and its text, JSON and Markdown | `internal/{about,gotestspec}` |
 | `internal/gotestbench` | Benchmark baselines, deltas and the gate | `internal/gotestspec` |
 | `internal/lint` | The analyzer and its fix driver | `internal/{about,filewrite,genstub,gotestast,gotestgen,goversion,pkgload,pkgpattern,protocol,refactor,typeclass}`; third-party: `x/tools` |
 | `internal/pkgload` | Loads packages with their tests, type-checked in process, without building a test variant | third-party: `x/tools` |

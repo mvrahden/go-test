@@ -122,16 +122,17 @@ var (
 
 // flags.go
 var (
-	ExportGotestFlags    = gotestFlags
-	ExportTestAllowed    = testAllowed
-	ExportSpecAllowed    = specAllowed
-	ExportWatchAllowed   = watchAllowed
-	ExportSummaryAllowed = summaryAllowed
-	ExportFuzzAllowed    = fuzzAllowed
-	ExportBenchAllowed   = benchAllowed
-	ExportMigrateAllowed = migrateAllowed
-	ExportControlAllowed = controlAllowed
-	ExportAuditAllowed   = auditAllowed
+	ExportGotestFlags      = gotestFlags
+	ExportTestAllowed      = testAllowed
+	ExportSpecAllowed      = specAllowed
+	ExportWatchAllowed     = watchAllowed
+	ExportSummaryAllowed   = summaryAllowed
+	ExportFuzzAllowed      = fuzzAllowed
+	ExportBenchAllowed     = benchAllowed
+	ExportMigrateAllowed   = migrateAllowed
+	ExportControlAllowed   = controlAllowed
+	ExportAuditAllowed     = auditAllowed
+	ExportScenariosAllowed = scenariosAllowed
 )
 
 // focusguard.go

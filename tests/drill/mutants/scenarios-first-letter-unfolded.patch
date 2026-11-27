@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/scenarios ScenariosBinding / BindingByText / when a scenario's texts equal a When and its Its, but for the first letter's case, backticks and a trailing period / binds the scenario, naming the file and line of each clause's It, and exits 0 without running a test \(
+Clause: when a scenario's texts equal a When and its Its, but for the first letter's case, backticks and a trailing period → binds the scenario, naming the file and line of each clause's It, and exits 0 without running a test
+--- a/internal/gotestscenarios/normalize.go
++++ b/internal/gotestscenarios/normalize.go
+@@ -40,7 +40,7 @@
+ 		i += size
+ 	}
+ 	out := strings.TrimRight(b.String(), ".,;: ")
+-	if r, size := utf8.DecodeRuneInString(out); size > 0 && unicode.IsUpper(r) {
++	if r, size := utf8.DecodeRuneInString(out); size > 0 && unicode.IsUpper(r) && false {
+ 		out = string(unicode.ToLower(r)) + out[size:]
+ 	}
+ 	return out

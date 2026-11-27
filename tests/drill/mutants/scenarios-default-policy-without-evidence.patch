@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/scenarios ScenariosDocument / ThePolicyExit / when scenarios finds unbound scenarios without evidence and without --fail-on / exits 0 \(
+Clause: when scenarios finds unbound scenarios without evidence and without --fail-on → exits 0
+--- a/cmd/gotest/scenarios.go
++++ b/cmd/gotest/scenarios.go
+@@ -112,7 +112,7 @@
+ 	}
+ 
+ 	failOn := args.failOn
+-	if !args.failOnGiven && opt.Evidence != gotestscenarios.EvidenceNone {
++	if !args.failOnGiven {
+ 		failOn = gotestscenarios.DefaultFailOn
+ 	}
+ 	verdict := gotestscenarios.Verdict{ExitCode: gotestscenarios.ExitCode(&doc, failOn), FailOn: failOn}

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/scenarios ScenariosReading / ReadingTheSpecFiles / when scenarios finds no spec file / exits 2 naming the places it looked \(
+Clause: when scenarios finds no spec file → exits 2 naming the places it looked
+--- a/internal/gotestscenarios/find.go
++++ b/internal/gotestscenarios/find.go
+@@ -76,7 +76,7 @@
+ 			return nil, err
+ 		}
+ 	}
+-	if len(specs) == 0 {
++	if len(specs) == 0 && false {
+ 		return nil, fmt.Errorf("no %s under %s", SpecFile, strings.Join(paths, ", "))
+ 	}
+ 	sort.Slice(specs, func(i, j int) bool { return specs[i].File < specs[j].File })

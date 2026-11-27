@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/scenarios ScenariosEvidence / Evidence / when scenarios is given a saved stream with --input / names the stream's run, its version and arguments and the packages it ran, as the run judged \(
+Clause: when scenarios is given a saved stream with --input → names the stream's run, its version and arguments and the packages it ran, as the run judged
+--- a/cmd/gotest/scenarios.go
++++ b/cmd/gotest/scenarios.go
+@@ -272,7 +272,6 @@
+ 	for i := range events {
+ 		if p := events[i].Package; p != "" && !events[i].RunLevel && !seen[p] {
+ 			seen[p] = true
+-			out = append(out, p)
+ 		}
+ 	}
+ 	slices.Sort(out)

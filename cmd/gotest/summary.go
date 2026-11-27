@@ -21,6 +21,9 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 
 	format := own.ValueOr("--format", "terminal")
+	if format == formatTestResult {
+		return runTestResult(own, goTestArgs)
+	}
 	if err := checkFormat(format); err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
@@ -46,11 +49,7 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 
 	if input != "" {
-		if refuseGroups(own, "--input") {
-			return 2
-		}
-		if own.Given("--events-file") {
-			fmt.Fprintln(os.Stderr, "FAIL: --events-file saves a run's event stream, and --input runs nothing")
+		if refuseInputFlags(own) {
 			return 2
 		}
 		return runSummaryFromInput(input, format, output, coverageProfile, noColor, github, renderOnly, badgePath)
@@ -171,6 +170,19 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	fmt.Fprint(os.Stderr, coverageFailure)
 	gotestrunner.EndRun(code)
 	return code
+}
+
+// refuseInputFlags says on stderr why a flag of a run does not go with
+// --input, and reports whether one was given.
+func refuseInputFlags(own OwnFlags) bool { //nolint:gocritic // hugeParam: OwnFlags is passed by value everywhere
+	if refuseGroups(own, "--input") {
+		return true
+	}
+	if own.Given("--events-file") {
+		fmt.Fprintln(os.Stderr, "FAIL: --events-file saves a run's event stream, and --input runs nothing")
+		return true
+	}
+	return false
 }
 
 func runSummaryFromInput(input, format, output, coverageProfile string, noColor, github, renderOnly bool, badgePath string) int {

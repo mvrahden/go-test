@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/scenarios ScenariosReading / ReadingTheSpecFiles / when a spec writes its clauses bold, bold with a colon, underlined, bare in capitals and wrapped onto a second line / reads the same clauses as from the plain bold form \(
+Clause: when a spec writes its clauses bold, bold with a colon, underlined, bare in capitals and wrapped onto a second line → reads the same clauses as from the plain bold form
+--- a/internal/gotestscenarios/spec.go
++++ b/internal/gotestscenarios/spec.go
+@@ -161,7 +161,7 @@
+ 	if m := strongKeyword.FindStringSubmatch(item); m != nil && m[1] == m[4] {
+ 		return strings.ToUpper(m[2]), strings.TrimSpace(m[5]), true
+ 	}
+-	if m := bareKeyword.FindStringSubmatch(item); m != nil {
++	if m := bareKeyword.FindStringSubmatch(item); m != nil && false {
+ 		return m[1], strings.TrimSpace(m[2]), true
+ 	}
+ 	return "", "", false

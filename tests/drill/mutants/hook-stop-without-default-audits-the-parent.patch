@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/cli .* / lists only the weakenings against HEAD \(
+Clause: when an agent ends its turn in a checkout whose origin names no default branch → lists only the weakenings against HEAD
+--- a/cmd/gotest/hookstop.go
++++ b/cmd/gotest/hookstop.go
+@@ -107,6 +107,7 @@
+ 			return mb, "the merge base with " + strings.TrimPrefix(ref, "refs/remotes/")
+ 		}
+ 	}
++	head, _ = gitOutput(dir, "rev-parse", "HEAD~1")
+ 	return head, "HEAD"
+ }
+ 

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/scenarios ScenariosDocument / ThePolicyExit / when --fail-on names failing without --input or --verify / refuses it with exit 2, naming --input and --verify \(
+Clause: when --fail-on names failing without --input or --verify → refuses it with exit 2, naming --input and --verify
+--- a/internal/gotestscenarios/policy.go
++++ b/internal/gotestscenarios/policy.go
+@@ -39,7 +39,7 @@
+ 					want[k] = true
+ 				}
+ 			}
+-		case slices.Contains(Classes, c) && NeedsEvidence(c) && !evidence:
++		case slices.Contains(Classes, c) && NeedsEvidence(c) && !evidence && false:
+ 			return nil, fmt.Errorf("%s is a verdict of a run: give --input=<events file> or --verify", c)
+ 		case slices.Contains(Classes, c):
+ 			want[c] = true

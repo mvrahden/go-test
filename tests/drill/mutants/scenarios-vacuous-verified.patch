@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/scenarios ScenariosEvidence / Evidence / when scenarios is given a saved stream with --input / lists each bound scenario as verified, failing, not-run or vacuous as its Its ran \(
+Clause: when scenarios is given a saved stream with --input → lists each bound scenario as verified, failing, not-run or vacuous as its Its ran
+--- a/internal/gotestscenarios/bind.go
++++ b/internal/gotestscenarios/bind.go
+@@ -285,7 +285,7 @@
+ 			s = StatusFailing
+ 		case n.NotRun || n.Status == gotestspec.StatusSkip || n.Status == gotestspec.StatusNone:
+ 			s = StatusNotRun
+-		case n.Vacuous():
++		case n.Vacuous() && false:
+ 			s = StatusVacuous
+ 		default:
+ 			s = StatusVerified

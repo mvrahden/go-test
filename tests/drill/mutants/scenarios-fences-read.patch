@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/scenarios ScenariosReading / ReadingTheSpecFiles / when a spec writes its clauses bold, bold with a colon, underlined, bare in capitals and wrapped onto a second line / reads no heading or clause inside a code fence \(
+Clause: when a spec writes its clauses bold, bold with a colon, underlined, bare in capitals and wrapped onto a second line → reads no heading or clause inside a code fence
+--- a/internal/gotestscenarios/spec.go
++++ b/internal/gotestscenarios/spec.go
+@@ -94,7 +94,7 @@
+ 	}
+ 	for i, raw := range strings.Split(text, "\n") {
+ 		n := i + 1
+-		if f.skip(raw) {
++		if f.skip(raw) && false {
+ 			last = nil
+ 			continue
+ 		}

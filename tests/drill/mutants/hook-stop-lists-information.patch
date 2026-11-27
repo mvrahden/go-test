@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / lists no changed body \(
+Clause: when an agent ends its turn in a checkout whose commits and uncommitted changes since the merge base with origin's default branch remove and exclude tests and change a body → lists no changed body
+--- a/cmd/gotest/hookstop.go
++++ b/cmd/gotest/hookstop.go
+@@ -74,7 +74,7 @@
+ 	var standing []string
+ 	for i := range doc.Findings {
+ 		f := &doc.Findings[i]
+-		if !f.Weakens || slices.Contains(standing, f.ID) {
++		if slices.Contains(standing, f.ID) {
+ 			continue
+ 		}
+ 		if !slices.Contains(state.Reported, f.ID) {

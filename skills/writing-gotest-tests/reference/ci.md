@@ -78,6 +78,15 @@ jobs:
   runs by default, so sessions compound; `fuzz-cache: false` opts out.
   setup-go's build cache alone would not carry it: that cache is never
   re-saved on a key hit.
+- **v1.42+ audit and attestation inputs:** on `pull_request` events the
+  action runs `gotest audit` against the pull request's base after the
+  tests (`audit: auto`; `true` also audits a push against
+  `github.event.before`, `false` never), with the run's stream and coverage
+  as evidence, and appends it to the step summary. It only reports unless
+  `audit-fail-on` names classes. `attest: true` attests the run with the
+  in-toto test-result predicate through `actions/attest`; the job must grant
+  `id-token: write` and `attestations: write`, or the attestation is
+  skipped with a summary line. Do not add a separate audit or attest step.
 - CI environments auto-arm `--ci` (any non-falsy `CI`/`GOTEST_CI` value):
   committed `F_` focus prefixes FAIL the run, a test that passed without
   an assertion fails it (v1.42+, in every output mode), and a missing

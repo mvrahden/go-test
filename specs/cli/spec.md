@@ -452,6 +452,22 @@ gotest summary --github SHALL annotate a failed test at its file in its package'
 - **WHEN** gotest summary --github runs a package with a failed test
 - **THEN** annotates the failure at the test file in its package's directory
 
+### Requirement: A run's result as an in-toto predicate
+`gotest summary --input=<stream> --format=intoto-test-result` SHALL print the in-toto test-result predicate, v0.1, of the run the stream records: FAILED when a test or package failed or the run did not exit 0, WARNED when a test passed without an assertion, else PASSED; each leaf test as `<package>.<test>` in its list; the CLI and Go versions and the arguments from the manifest; the Actions run's url under GitHub Actions. A stream without a manifest SHALL exit 2.
+
+#### Scenario: The predicate of a failed run
+- **WHEN** summary writes the test-result predicate of a stream whose run failed a test and passed one without an assertion
+- **THEN** prints result FAILED with the failed test in failedTests, the one without an assertion in warnedTests and the others in passedTests
+- **AND** names the CLI version, the Go version and the arguments the manifest records in its configuration
+
+#### Scenario: The predicate of a passed run in GitHub Actions
+- **WHEN** summary writes the test-result predicate of a stream whose run passed, under GitHub Actions
+- **THEN** prints result PASSED and the url of the Actions run
+
+#### Scenario: A stream gotest did not write
+- **WHEN** summary writes the test-result predicate of a stream without a run manifest
+- **THEN** exits 2 naming --events-file on stderr, with nothing on stdout
+
 ### Requirement: Hooks that call t.T() where it is nil
 gotest SHALL refuse with exit 2 a suite whose hook calls t.T() where its wrapper makes it nil: every hook under a benchmark method, BeforeAll and AfterAll under a fuzz method. One error names every such hook in source order, at the first. It reads the hook's own body, closures and aliases of t included, not the helpers it calls, and accepts a call whose result is checked for nil. The cases are the table in `tests/conformance/cli/rejections_suite_test.go`.
 
@@ -784,14 +800,30 @@ A test run, a -json run, spec and summary SHALL record, when they run their pack
 - **THEN** runs nothing and exits 2, saying why on stderr
 
 ### Requirement: An agent's hook events
-`gotest hook <event>` SHALL read a coding agent's hook event as JSON on stdin and never block the agent: it SHALL exit 0, writing nothing or one JSON object whose hookSpecificOutput carries additionalContext and no permission decision, and SHALL exit 1, never 2, on an event it does not know. The stop event SHALL write nothing.
+`gotest hook <event>` SHALL read a coding agent's hook event as JSON on stdin and never deny the agent a tool: it SHALL exit 0, writing nothing or one JSON object, for post-edit and pre-shell one whose hookSpecificOutput carries additionalContext and no permission decision, and SHALL exit 1, never 2, on an event it does not know.
 
 #### Scenario: An event gotest hook does not know
 - **WHEN** gotest hook runs an event it does not know
 - **THEN** exits 1 and names the events it takes on stderr
 
-#### Scenario: The stop event
-- **WHEN** gotest hook runs the stop event
+### Requirement: Weakenings at the end of an agent's turn
+In a git checkout of a module that uses gotest, `gotest hook stop` SHALL audit the working tree, running no test, against the merge base of HEAD and origin's default branch, else HEAD, and write a block decision whose reason lists each weakening not reported for the checkout before. It SHALL write nothing when stop_hook_active is set, for information, outside such a module or a checkout, and when the audit fails or takes over 20 seconds.
+
+#### Scenario: A turn that weakened the estate
+- **WHEN** an agent ends its turn in a checkout whose commits and uncommitted changes since the merge base with origin's default branch remove and exclude tests and change a body
+- **THEN** exits 0 with a block decision whose reason lists the removed and the excluded test with class, subject, values and location, and asks to undo each or state it to the user
+- **AND** lists no changed body
+
+#### Scenario: A weakening reported before
+- **WHEN** the agent ends its turn again with the same weakenings
+- **THEN** exits 0 and writes nothing
+
+#### Scenario: A checkout without a default branch
+- **WHEN** an agent ends its turn in a checkout whose origin names no default branch
+- **THEN** lists only the weakenings against HEAD
+
+#### Scenario: A turn the hook does not judge
+- **WHEN** an agent ends its turn with stop_hook_active set, outside a git checkout, or in a module without gotest
 - **THEN** exits 0 and writes nothing
 
 ### Requirement: Lint findings after an agent's edit

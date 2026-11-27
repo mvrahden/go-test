@@ -60,15 +60,6 @@ func (s *CLIAgentHookTestSuite) TestEvents(t *gotest.T) {
 			gotest.Contains(it, run.Stderr, "post-edit, pre-shell or stop")
 		})
 	})
-	t.When("gotest hook runs the stop event", func(w *gotest.T) {
-		run, err := testkit.RunCLIWithInput(w.Context(), s.module, hookEvent(w, "Stop", s.module, nil), "hook", "stop")
-		gotest.NoError(w, err)
-		w.It("exits 0 and writes nothing", func(it *gotest.T) {
-			gotest.Equal(it, 0, run.Exit)
-			gotest.Empty(it, run.Stdout)
-			gotest.Empty(it, run.Stderr)
-		})
-	})
 }
 
 func (s *CLIAgentHookTestSuite) TestAfterAnEdit(t *gotest.T) {

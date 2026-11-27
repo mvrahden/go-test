@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/scenarios ScenariosEvidence / Rows / when a bound When sits under the rows of an Each table / binds each clause to one It, every row's run counting toward its verdict \(
+Clause: when a bound When sits under the rows of an Each table → binds each clause to one It, every row's run counting toward its verdict
+--- a/internal/gotestscenarios/bind.go
++++ b/internal/gotestscenarios/bind.go
+@@ -86,7 +86,7 @@
+ 				}
+ 				if parent := last(ancestors); n.Vocab == gotestspec.VocabIt && parent != nil && parent.Vocab == gotestspec.VocabWhen {
+ 					file, whenFile := relFile(root, pkg.Dir, n.File), relFile(root, pkg.Dir, parent.File)
+-					key := fmt.Sprintf("%s\x00%s:%d\x00%s", pkg.Path, file, n.Line, n.SourceLabel)
++					key := fmt.Sprintf("%s\x00%s:%d\x00%s\x00%d", pkg.Path, file, n.Line, n.SourceLabel, len(its))
+ 					x := its[key]
+ 					if x == nil {
+ 						path := labels(suite, ancestors, n)
