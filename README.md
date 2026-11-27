@@ -684,6 +684,10 @@ gotest.Consistently(t, 500*time.Millisecond, 50*time.Millisecond, func(poll *got
 
 // Panic-safe goroutines
 wait := gotest.Go(t, func() { ... })         // captures a goroutine panic and re-raises it on the test's goroutine
+
+// Fake time
+gotest.Bubble(t, func(bt *gotest.T) { ... }) // runs on testing/synctest's fake clock: an hour of backoff takes no real time
+gotest.Settle(bt)                            // waits until every other goroutine in the bubble is blocked
 ```
 
 Unwrap `(T, error)` or `(T, bool)` pairs in test setup:
@@ -762,6 +766,23 @@ gotest.Consistently(t, 500*time.Millisecond, 50*time.Millisecond, func(poll *got
 Poll callbacks receive a `*gotest.R` — an assertion recorder that captures failures without propagating them to the test runner.
 The full assertion library works with `*R` just as it does with `*T` or `*testing.T`.
 Failures are collected until the timeout; only the final outcome is reported.
+
+### Fake Time
+
+Code whose verdict depends on the clock (a backoff, a ticker, a TTL, a debounce, a context deadline) runs in a `gotest.Bubble`, on [testing/synctest](https://pkg.go.dev/testing/synctest)'s fake clock: time moves only when every goroutine in the bubble is blocked, so an hour of retries passes at once and the same under any load.
+
+```go
+gotest.Bubble(t, func(bt *gotest.T) {
+    ctx, cancel := context.WithTimeout(bt.Context(), time.Hour)
+    defer cancel()
+    go worker.Run(ctx)
+    time.Sleep(time.Hour)
+    gotest.Settle(bt)                        // the worker has seen the deadline and stopped
+    gotest.True(bt, worker.Stopped())
+})
+```
+
+Assert on `bt`, the callback's T: its assertions count and fail where a method's do, `Eventually` given it polls on the fake clock, and `Settle` makes what other goroutines wrote safe to read. What cannot run in a bubble fails at the call: an `It`, `When` or `Each` inside it, `bt.T().Parallel()`, the method's own `t` ([Bubbles](specs/assertions/spec.md#requirement-bubbles), [What a bubble refuses](specs/assertions/spec.md#requirement-what-a-bubble-refuses)). The suite's `Timeout` bounds the real time a bubble takes, never its fake time ([A bubble and the Timeout](specs/assertions/spec.md#requirement-a-bubble-and-the-timeout)). A child process, real network I/O or a shared fixture cannot be bubbled: their time is the wall clock's.
 
 ### Snapshot Testing
 

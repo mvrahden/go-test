@@ -1,0 +1,14 @@
+Expect: bubble: TestOuterT did not fail
+Judge: ./tests/canary CanaryTestSuite/TestABubbleRunsOnTheFakeClock
+Clause: when a Bubble's callback asks the method's own T for its Context → fails at the call, saying to use the T the callback is given
+--- a/pkg/gotest/bubble.go
++++ b/pkg/gotest/bubble.go
+@@ -205,7 +205,7 @@
+ // a bubble, where it would mix the bubble's fake clock and channels with the
+ // test's real ones.
+ func (t *T) refuseInBubble(what string) {
+-	if activeBubbles.Load() == 0 || t.bubbled || t.t == nil || !inBubble() {
++	if activeBubbles.Load() >= 0 || t.bubbled || t.t == nil || !inBubble() {
+ 		return
+ 	}
+ 	panic(&bubbleRefusal{msg: what + " on a T from outside the bubble: inside Bubble use the T its callback is given", at: userLine()})

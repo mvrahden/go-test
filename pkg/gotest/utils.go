@@ -22,6 +22,10 @@ func Each[E any](t *T, entries []E) iter.Seq2[*T, E] {
 	if t.t == nil {
 		panic("gotest: Each is unavailable in benchmark/fuzz lifecycle hooks")
 	}
+	t.refuseInBubble("Each")
+	if t.refuseBubbled("Each") {
+		return func(func(*T, E) bool) {}
+	}
 	return func(yield func(*T, E) bool) {
 		for i, entry := range entries {
 			name := eachEntryName(reflect.ValueOf(entry), i)
@@ -116,20 +120,19 @@ func eachRun[E any](parent *T, name string, entry E, yield func(*T, E) bool) boo
 // logAtUser logs msg on tb at the innermost line of the user's on the stack:
 // while a Goexit unwinds, Logf would name a frame of the runtime's.
 func logAtUser(tb testing.TB, msg string) {
-	pcs := make([]uintptr, 64)
-	frames := runtime.CallersFrames(pcs[:runtime.Callers(2, pcs)])
-	for {
-		f, more := frames.Next()
-		if !assert.IsGotestSource(f.File) && !assert.IsGeneratedBridge(f.File) && !callsite.IsStd(f.Function, f.File) {
-			msg = callsite.Format(f.File, f.Line) + ": " + msg
-			break
-		}
-		if !more {
-			break
-		}
+	if at := userLine(); at != "" {
+		msg = at + ": " + msg
 	}
 	fmt.Fprintln(tb.Output(), msg)
 }
+
+// userFrame reports whether f is the user's: not gotest's, not a generated
+// harness's and not the standard library's.
+func userFrame(f *runtime.Frame) bool {
+	return !assert.IsGotestSource(f.File) && !assert.IsGeneratedBridge(f.File) && !callsite.IsStd(f.Function, f.File)
+}
+
+func formatFrame(f *runtime.Frame) string { return callsite.Format(f.File, f.Line) }
 
 func eachEntryName(v reflect.Value, index int) string {
 	if v.Kind() == reflect.Struct {
@@ -197,6 +200,7 @@ func Must[T any](val T, ok any) T {
 //
 // Calling the returned function more than once is safe.
 func Go(t *T, fn func()) (wait func()) {
+	t.refuseInBubble("Go")
 	done := make(chan struct{})
 	var captured *capturedPanic
 	var returned bool

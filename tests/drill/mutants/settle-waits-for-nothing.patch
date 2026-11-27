@@ -1,0 +1,13 @@
+Expect: bubble: TestSettle did not pass
+Judge: ./tests/canary CanaryTestSuite/TestABubbleRunsOnTheFakeClock
+Clause: when a goroutine in a Bubble writes a value as it returns → the callback reads the value after Settle
+--- a/pkg/gotest/bubble.go
++++ b/pkg/gotest/bubble.go
+@@ -109,7 +109,6 @@
+ // settle is synctest.Wait, returning what it panicked with.
+ func settle() (p any) {
+ 	defer func() { p = recover() }()
+-	synctest.Wait()
+ 	return nil
+ }
+ 

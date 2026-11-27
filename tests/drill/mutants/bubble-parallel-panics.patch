@@ -1,0 +1,16 @@
+Expect: bubble: TestParallel does not say
+Judge: ./tests/canary CanaryTestSuite/TestABubbleRunsOnTheFakeClock
+Clause: when the bubble's *testing.T calls Parallel → fails at the call, saying Parallel cannot run in a bubble
+--- a/pkg/gotest/bubble.go
++++ b/pkg/gotest/bubble.go
+@@ -236,10 +236,6 @@
+ 	switch v := r.(type) {
+ 	case *bubbleRefusal:
+ 		return v.msg, v.at, true
+-	case string:
+-		if strings.HasPrefix(v, "testing: ") && strings.HasSuffix(v, " inside synctest bubble") {
+-			return strings.TrimPrefix(v, "testing: ") + ": Run, Parallel and Deadline cannot run in a bubble", userLine(), true
+-		}
+ 	}
+ 	return "", "", false
+ }

@@ -1,7 +1,7 @@
 # Assertions Specification
 
 ## Purpose
-What gotest's assertions, polls and snapshots accept, where their failures point, and what their failure messages say.
+What gotest's assertions, polls and snapshots accept, where their failures point, what their failure messages say, and how they run in a Bubble's fake time.
 
 ## Requirements
 
@@ -402,6 +402,63 @@ Eventually and Consistently SHALL fail without polling when waitFor or tick is n
 #### Scenario: A zero or negative duration
 - **WHEN** waitFor or tick is not positive
 - **THEN** fails saying both must be positive and polls nothing
+
+### Requirement: Bubbles
+gotest.Bubble(t, fn) SHALL run fn in a testing/synctest bubble on a T of t's test: its assertions SHALL count for that test and fail it at their lines, on an Each row's T failing the row and going on, and time in it SHALL be the bubble's fake clock, Eventually's and Consistently's polls included. Settle on that T SHALL return once every other goroutine of the bubble is durably blocked or has returned.
+
+#### Scenario: An hour of backoff in a bubble
+- **WHEN** a method waits an hour of backoff inside a Bubble
+- **THEN** passes in less than a second of real time
+
+#### Scenario: Assertions only inside a bubble
+- **WHEN** a leaf asserts only inside a Bubble, on its T and its *testing.T
+- **THEN** reports the two assertions as its count
+
+#### Scenario: A failure inside a bubble
+- **WHEN** an assertion fails inside a Bubble
+- **THEN** fails the method at the assertion's line
+
+#### Scenario: Bubbles in Each rows
+- **WHEN** an Each row's Bubble fails
+- **THEN** fails the row, and the next row runs and passes
+
+#### Scenario: A poll in a bubble
+- **WHEN** Eventually polls for an hour inside a Bubble and no poll passes
+- **THEN** fails after an hour of fake time, in less than a second of real time
+
+#### Scenario: Settling a bubble
+- **WHEN** a goroutine in a Bubble writes a value as it returns
+- **THEN** the callback reads the value after Settle
+
+### Requirement: What a bubble refuses
+In a Bubble's callback, It, When, Each and Bubble on its T, Run, Parallel and Deadline on its *testing.T, and Context, Go, It, When, Each, Bubble, FailNow and SkipNow on a T from outside the bubble SHALL fail the test at the call, saying what cannot run there. Settle on a T outside a bubble SHALL fail at the call. A bubble whose goroutines all block with no timer due SHALL fail the test at the Bubble, naming each blocked goroutine's line.
+
+#### Scenario: An It in a bubble
+- **WHEN** an It is opened inside a Bubble
+- **THEN** fails at the It's line, saying a bubble runs no subtest
+
+#### Scenario: Parallel in a bubble
+- **WHEN** the bubble's *testing.T calls Parallel
+- **THEN** fails at the call, saying Parallel cannot run in a bubble
+
+#### Scenario: The method's T in its bubble
+- **WHEN** a Bubble's callback asks the method's own T for its Context
+- **THEN** fails at the call, saying to use the T the callback is given
+
+#### Scenario: A deadlocked bubble
+- **WHEN** every goroutine in a Bubble blocks on a channel with no timer due
+- **THEN** fails at the Bubble, naming the deadlock and the blocked goroutine's line
+
+#### Scenario: Settle outside a bubble
+- **WHEN** Settle is given the method's T
+- **THEN** fails at the call, saying Settle runs only in a bubble
+
+### Requirement: A bubble and the Timeout
+The Timeout SHALL bound the real time a Bubble takes, never its fake time: its callback's T SHALL carry the bubble's own context, which has no deadline and ends when the callback returns. When the test's context ends while the bubble runs, Bubble SHALL fail the test at its call, saying the bubble was abandoned, and return, leaving the bubble's goroutines to run on.
+
+#### Scenario: A bubble blocked outside itself
+- **WHEN** a Bubble waits on a mutex held outside it past the Timeout
+- **THEN** fails at the Bubble, saying the bubble was abandoned
 
 ### Requirement: Snapshot sections
 MatchSnapshot SHALL key each section by the exact subtest name and SHALL find the baselines beside the test, also when the package is built with -trimpath. Under -trimpath the caller's file cannot be opened and the package directory go test runs in stands in for it, so a snapshot taken in a helper of another package is found beside the package under test, not beside the helper.

@@ -1,0 +1,16 @@
+Expect: bubble: TestBackoff did not pass
+Expect: bubble: TestEventually/hour does not say "Eventually failed after 1h0m0s
+Judge: ./tests/canary CanaryTestSuite/TestABubbleRunsOnTheFakeClock
+Clause: when a method waits an hour of backoff inside a Bubble → passes in less than a second of real time
+Clause: when Eventually polls for an hour inside a Bubble and no poll passes → fails after an hour of fake time, in less than a second of real time
+--- a/pkg/gotest/bubble.go
++++ b/pkg/gotest/bubble.go
+@@ -55,7 +55,7 @@
+ 	go func() {
+ 		defer close(done)
+ 		defer func() { out.panicked = recover() }()
+-		synctest.Test(t.t, func(tt *testing.T) { out.run(t, tt, fn) })
++		out.run(t, t.t, fn)
+ 		out.passed = true
+ 	}()
+ 	select {

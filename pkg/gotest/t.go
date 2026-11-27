@@ -14,7 +14,7 @@ import (
 // NewT wraps a *testing.T, for a helper or a hook written against
 // *testing.T that calls code taking a *T.
 func NewT(t *testing.T) *T {
-	return &T{t: t, tb: t, c: censusOf(t)}
+	return &T{t: t, tb: t, c: censusOf(t), bubbled: isBubbleT(t)}
 }
 
 // T is the test a suite method runs as: assertions report to it, Context
@@ -30,6 +30,8 @@ type T struct {
 	c *census
 	// by is the reason AssertsBy declared on a T whose test counts none.
 	by *string
+	// bubbled marks the T of a Bubble's callback, or one made from it.
+	bubbled bool
 }
 
 // T returns the underlying *testing.T. It is nil when a suite hook runs under
@@ -52,6 +54,7 @@ func (t *T) testingTB() testing.TB {
 // BeforeAll runs; once BeforeAll returned it has no deadline and ends when
 // the methods are done, before AfterAll.
 func (t *T) Context() context.Context {
+	t.refuseInBubble("Context")
 	if t.ctx != nil {
 		return t.ctx
 	}
@@ -74,7 +77,7 @@ func NewTWithDeadline[TB *testing.T | *T](t TB, timeout time.Duration) *T {
 	}
 	ctx, cancel := context.WithTimeout(base.Context(), timeout)
 	base.testingTB().Cleanup(cancel)
-	return &T{t: base.t, tb: base.tb, ctx: ctx, soft: base.soft, c: base.census(), by: base.by}
+	return &T{t: base.t, tb: base.tb, ctx: ctx, soft: base.soft, c: base.census(), by: base.by, bubbled: base.bubbled}
 }
 
 // NewTWithContext wraps t, overriding what [T.Context] reports. Use it when the
@@ -86,7 +89,7 @@ func NewTWithDeadline[TB *testing.T | *T](t TB, timeout time.Duration) *T {
 // It, When and Each panic.
 func NewTWithContext(tb testing.TB, ctx context.Context) *T {
 	t, _ := tb.(*testing.T)
-	return &T{t: t, tb: tb, ctx: ctx, c: censusOf(t)}
+	return &T{t: t, tb: tb, ctx: ctx, c: censusOf(t), bubbled: isBubbleT(t)}
 }
 
 // Errorf fails the test at the caller's line and goes on.
@@ -162,6 +165,10 @@ func (t *T) It(description string, testFn func(it *T)) {
 	if t.t == nil {
 		panic("gotest: It/When are unavailable in benchmark/fuzz lifecycle hooks")
 	}
+	t.refuseInBubble("It")
+	if t.refuseBubbled("It") {
+		return
+	}
 	t.opens()
 	by := t.declared()
 	t.t.Run(description, func(tt *testing.T) {
@@ -177,6 +184,10 @@ func (t *T) It(description string, testFn func(it *T)) {
 func (t *T) When(description string, fn func(w *T)) {
 	if t.t == nil {
 		panic("gotest: It/When are unavailable in benchmark/fuzz lifecycle hooks")
+	}
+	t.refuseInBubble("When")
+	if t.refuseBubbled("When") {
+		return
 	}
 	t.opens()
 	by := t.declared()

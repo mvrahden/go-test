@@ -1,0 +1,16 @@
+Expect: bubble: TestSettleOutside does not say
+Judge: ./tests/canary CanaryTestSuite/TestABubbleRunsOnTheFakeClock
+Clause: when Settle is given the method's T → fails at the call, saying Settle runs only in a bubble
+--- a/pkg/gotest/bubble.go
++++ b/pkg/gotest/bubble.go
+@@ -97,10 +97,6 @@
+ // fails the test when t is not a bubble's T, or when another goroutine of
+ // the bubble is settling.
+ func Settle(t *T) {
+-	if !t.bubbled {
+-		fail(t, "Settle runs only in a bubble: call it on the T Bubble gives its callback", nil)
+-		return
+-	}
+ 	if p := settle(); p != nil {
+ 		fail(t, fmt.Sprintf("Settle: %v: only one goroutine of a bubble may settle at a time", p), nil)
+ 	}

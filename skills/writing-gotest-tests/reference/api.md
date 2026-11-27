@@ -203,6 +203,43 @@ still run. A poll abandoned as still running keeps running, since Go cannot stop
 panic it raises later is written to stderr with its stack, not reported as a failure
 ([Abandoned polls](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-abandoned-polls)).
 
+## Fake time (v1.42+)
+
+```go
+gotest.Bubble(t, fn func(bt *gotest.T))              // fn runs in a testing/synctest bubble, on its fake clock
+gotest.Settle(bt)                                    // waits until every other goroutine of the bubble is durably blocked
+```
+
+```go
+gotest.Bubble(t, func(bt *gotest.T) {
+    calls := retry(bt.Context(), op)                 // an hour of doubling backoff, no real second
+    gotest.Equal(bt, 13, calls)
+})
+```
+
+In a bubble, time moves only when every goroutine in it is durably blocked (on a
+channel, timer, `sync.Cond` or `WaitGroup` of the bubble, or `time.Sleep`; a mutex, I/O
+or a channel made outside does not count). Assert on `bt`: its assertions and
+`AssertsBy` count and fail as the method's, at their lines
+([Bubbles](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-bubbles)).
+`Eventually` and `Consistently` given `bt` poll on the fake clock. A fake clock does not
+order goroutines: call `gotest.Settle(bt)` before reading what another goroutine wrote,
+after a `time.Sleep` that wakes it too.
+`bt.Context()` has no deadline and ends when the callback returns; derive deadlines from it
+and they expire on the fake clock. `Bubble` works in a method, an `It`, an `Each` row (a
+failing bubble fails the row alone), a helper, a hook and a fuzz body; not in a hook of a
+benchmark or fuzz target, and `*gotest.B` has none.
+It refuses, failing at the call: `It`, `When`, `Each` or `Bubble` on `bt`,
+`bt.T().Run`/`Parallel`/`Deadline`, and `Context`, `Go`, `It` or a fatal assertion on the
+outer `t` inside the callback; a bubble whose goroutines all block with no timer due fails
+naming each one's line
+([What a bubble refuses](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-what-a-bubble-refuses)).
+The `Timeout` bounds the real time a bubble takes, never its fake time: a bubble blocked on
+something outside it is abandoned when the test's context ends
+([A bubble and the Timeout](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-a-bubble-and-the-timeout)).
+Goroutines started before the bubble (in `BeforeEach`, by a fixture) are not in it, and a
+channel, timer or ticker made in it must not be used after it.
+
 ## Goroutines Started by Tests
 
 A panic on a goroutine the test starts is unrecoverable: Go terminates the process

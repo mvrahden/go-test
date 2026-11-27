@@ -318,6 +318,17 @@ shards of one run do not add up to every mutant exactly once.
 | `go-wait-outside-the-method-timeout` | the wait on a `gotest.Go` goroutine among the method's cleanups is held to no `Timeout` | lifecycle holds suite: the lingering goroutine's method passes |
 | `method-cleanups-held-to-the-timeout` | the method's watch runs through all its cleanups, so a helper's slow cleanup fails it, named as a `gotest.Go` wait | lifecycle holds suite: the slow-cleanup method fails |
 | `harness-drops-methods` | the shared suite-methods template omits the first method of each suite | census: declared methods have no verdict, exercised by the canary's passing fixture |
+| `bubble-on-the-real-clock` | `gotest.Bubble` runs its callback on the test's own T, outside a bubble | canary: the bubble fixture's hour of backoff fails and its `Eventually` does not fail after an hour of fake time |
+| `bubble-assertions-uncounted` | the bubble's T counts its assertions for no test | canary: the bubble leaf that asserts only inside its bubble reports 0 |
+| `bubble-failure-located-in-gotest` | a bubble's T marks gotest's frames on itself, not on the parent its failures are located by | canary: the bubble fixture's failure names a gotest file |
+| `bubble-row-failure-ends-the-method` | a failing bubble on an `Each` row's T ends the method | canary: the bubble fixture's row after the failing one has no verdict |
+| `settle-waits-for-nothing` | `Settle` returns without waiting for the bubble's goroutines | canary: the bubble fixture reads the goroutine's value before it is written |
+| `bubble-runs-an-it` | an `It` on a bubble's T is not refused, so testing's own panic names `t.Run` | canary: the bubble fixture's `It` does not say a bubble runs no subtest |
+| `bubble-parallel-panics` | testing's panic for `Parallel` in a bubble is carried out as a panic | canary: the bubble fixture's `Parallel` does not say it cannot run in a bubble |
+| `bubble-takes-the-tests-own-t` | the method's own T is not refused inside its bubble | canary: the bubble fixture's method that asks its own T for its Context passes |
+| `bubble-deadlock-unlisted` | a deadlocked bubble's failure lists no goroutine | canary: the bubble fixture's deadlock names no blocked line |
+| `settle-outside-a-bubble-unrefused` | `Settle` on a T outside a bubble reaches synctest's own panic | canary: the bubble fixture's `Settle` outside a bubble does not say it runs only in one |
+| `bubble-abandoned-silently` | a bubble abandoned at the test's deadline fails nothing of its own | canary: the bubble fixture's blocked bubble does not say it was abandoned |
 | `bench-harness-drops-methods` | the bench template omits the first benchmark of each suite | bench census, exercised by the canary's benchmark fixture |
 | `fuzz-harness-drops-target` | the fuzz template omits the first fuzz target of each suite | canary: the fuzzing fixture's golden list (the fixture is red, so the census stands down) |
 | `exit-code-zero` | `WorstExitCode` always returns 0 | canary: exit codes differ from the golden list |

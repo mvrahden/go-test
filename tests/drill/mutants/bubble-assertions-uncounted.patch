@@ -1,0 +1,14 @@
+Expect: bubble: TestOnlyInside gotest\.assertions is "0"
+Judge: ./tests/canary CanaryTestSuite/TestABubbleRunsOnTheFakeClock
+Clause: when a leaf asserts only inside a Bubble, on its T and its *testing.T → reports the two assertions as its count
+--- a/pkg/gotest/bubble.go
++++ b/pkg/gotest/bubble.go
+@@ -130,7 +130,7 @@
+ 	out.id.Store(bubbleID())
+ 	out.inner.Store(tt)
+ 	bubbleTs.Store(tt, struct{}{})
+-	c := t.census()
++	var c *census
+ 	if c != nil {
+ 		censuses.Store(tt, c)
+ 		openCensuses.Add(1)

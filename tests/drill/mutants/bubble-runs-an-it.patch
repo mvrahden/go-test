@@ -1,0 +1,15 @@
+Expect: bubble: TestIt does not say
+Judge: ./tests/canary CanaryTestSuite/TestABubbleRunsOnTheFakeClock
+Clause: when an It is opened inside a Bubble → fails at the It's line, saying a bubble runs no subtest
+--- a/pkg/gotest/bubble.go
++++ b/pkg/gotest/bubble.go
+@@ -217,8 +217,7 @@
+ 	if !t.bubbled {
+ 		return false
+ 	}
+-	fail(t, what+" inside a Bubble: a bubble runs no subtest; open it outside and call Bubble in its body", nil)
+-	return true
++	return false
+ }
+ 
+ // bubbleRefusal is the panic a refused call raises in a bubble; the Bubble

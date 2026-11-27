@@ -1,0 +1,14 @@
+Expect: bubble: TestAbandonTestSuite/TestBlockedOutside does not say the bubble was abandoned
+Judge: ./tests/canary CanaryTestSuite/TestABubbleRunsOnTheFakeClock
+Clause: when a Bubble waits on a mutex held outside it past the Timeout → fails at the Bubble, saying the bubble was abandoned
+--- a/pkg/gotest/bubble.go
++++ b/pkg/gotest/bubble.go
+@@ -64,7 +64,7 @@
+ 		select {
+ 		case <-done: // it ended as the context did
+ 		default:
+-			fail(t, fmt.Sprintf("Bubble abandoned when the test's context ended (%v): a goroutine in it is blocked on something outside the bubble, such as a mutex, I/O or a channel made outside, and its fake clock cannot move", context.Cause(ctx)), nil)
++			_ = context.Cause(ctx)
+ 			return
+ 		}
+ 	}

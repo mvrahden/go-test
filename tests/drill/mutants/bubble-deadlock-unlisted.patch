@@ -1,0 +1,14 @@
+Expect: bubble: TestDeadlock does not name the blocked goroutine's line
+Judge: ./tests/canary CanaryTestSuite/TestABubbleRunsOnTheFakeClock
+Clause: when every goroutine in a Bubble blocks on a channel with no timer due → fails at the Bubble, naming the deadlock and the blocked goroutine's line
+--- a/pkg/gotest/bubble.go
++++ b/pkg/gotest/bubble.go
+@@ -181,7 +181,7 @@
+ 		}
+ 	}
+ 	if _, ok := deadlockReason(out.panicked); ok {
+-		out.blocked = bubbleStacks(out.id.Load())
++		out.blocked = ""
+ 	}
+ }
+ 
