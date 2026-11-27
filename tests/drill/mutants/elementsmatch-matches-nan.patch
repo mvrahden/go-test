@@ -1,0 +1,14 @@
+Expect: pkg/gotest/internal/assert Predicates / .*CheckElementsMatch_NaN
+Judge: ./pkg/gotest/internal/assert
+Clause: when ElementsMatch is given a list holding a NaN → fails naming the element and its list, whichever list holds it and also when both hold one
+--- a/pkg/gotest/internal/assert/predicates.go
++++ b/pkg/gotest/internal/assert/predicates.go
+@@ -443,7 +443,7 @@
+ 		}
+ 	}()
+ 	counts := make(map[V]int, len(listA))
+-	if v, list, found := notSelfEqual(listA, listB); found {
++	if v, list, found := notSelfEqual(listA, listB); found && false {
+ 		return fmt.Sprintf("ElementsMatch failed:\n  element %#v in %s is not equal to itself: a NaN matches nothing, itself included", v, list)
+ 	}
+ 	for _, v := range listA {

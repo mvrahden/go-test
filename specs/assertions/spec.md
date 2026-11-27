@@ -170,6 +170,13 @@ Greater, GreaterOrEqual, Less and LessOrEqual SHALL fail when either operand is 
 - **WHEN** an ordering assertion is given a NaN operand
 - **THEN** fails: NaN is neither below nor above any number
 
+### Requirement: A NaN among list elements
+ElementsMatch SHALL fail when an element of either list is not equal to itself, a NaN or a struct, array or interface value holding one, naming the first such element and its list: a NaN matches nothing, itself included.
+
+#### Scenario: A NaN in either list
+- **WHEN** ElementsMatch is given a list holding a NaN
+- **THEN** fails naming the element and its list, whichever list holds it and also when both hold one
+
 ### Requirement: Failure messages
 A failure message SHALL format the extra arguments by the first when it is of any string kind and carry every extra argument when it is not, and ErrorAs SHALL name the type it expected when the error is of another type.
 

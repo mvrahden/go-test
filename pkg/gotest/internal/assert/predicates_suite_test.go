@@ -6,6 +6,7 @@ package assert_test //nolint:fail-guard // ring 0: raw checks only, never a gote
 import (
 	"encoding/json"
 	"io"
+	"math"
 	"strings"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -416,5 +417,65 @@ func (s *PredicatesTestSuite) TestCheckElementsMatch_Unhashable(t *gotest.T, _ *
 	}
 	if got := assert.CheckElementsMatch([]int{1, 1, 2}, []int{1, 2, 2}); !strings.Contains(got, "is in listB but not enough times in listA") {
 		t.Errorf("CheckElementsMatch(duplicate counts): got %q", got)
+	}
+}
+
+func (s *PredicatesTestSuite) TestCheckElementsMatch_NaN(t *gotest.T, _ *predicatesCtx) {
+	t.AssertsBy(rawCheck)
+	type pt struct{ X, Y float64 }
+	nan := math.NaN()
+	msg := func(v, list string) string {
+		return "ElementsMatch failed:\n  element " + v + " in " + list + " is not equal to itself: a NaN matches nothing, itself included"
+	}
+	if got, want := assert.CheckElementsMatch([]float64{1, 2}, []float64{nan, nan}), msg("NaN", "listB"); got != want {
+		t.Errorf("CheckElementsMatch(NaNs in listB): got %q, want %q", got, want)
+	}
+	if got, want := assert.CheckElementsMatch([]float64{nan, nan}, []float64{1, 2}), msg("NaN", "listA"); got != want {
+		t.Errorf("CheckElementsMatch(NaNs in listA): got %q, want %q", got, want)
+	}
+	if got, want := assert.CheckElementsMatch([]float64{nan}, []float64{nan}), msg("NaN", "listA"); got != want {
+		t.Errorf("CheckElementsMatch(a NaN in both): got %q, want %q", got, want)
+	}
+	if got, want := assert.CheckElementsMatch([]float64{0.5, 0.25}, []float64{0.5, nan}), msg("NaN", "listB"); got != want {
+		t.Errorf("CheckElementsMatch(a NaN after a match): got %q, want %q", got, want)
+	}
+	if got, want := assert.CheckElementsMatch([]float32{1, 2}, []float32{float32(nan), float32(nan)}), msg("NaN", "listB"); got != want {
+		t.Errorf("CheckElementsMatch(float32 NaNs): got %q, want %q", got, want)
+	}
+	if got, want := assert.CheckElementsMatch([]pt{{1, 2}}, []pt{{nan, 7}}), msg("assert_test.pt{X:NaN, Y:7}", "listB"); got != want {
+		t.Errorf("CheckElementsMatch(a struct holding a NaN): got %q, want %q", got, want)
+	}
+	if got, want := assert.CheckElementsMatch([][2]float64{{1, 2}}, [][2]float64{{nan, 7}}), msg("[2]float64{NaN, 7}", "listB"); got != want {
+		t.Errorf("CheckElementsMatch(an array holding a NaN): got %q, want %q", got, want)
+	}
+	if got, want := assert.CheckElementsMatch([]any{1.0}, []any{nan}), msg("NaN", "listB"); got != want {
+		t.Errorf("CheckElementsMatch(an any holding a NaN): got %q, want %q", got, want)
+	}
+	if got, want := assert.CheckElementsMatch([]any{nan, []int{1}}, []any{nan, []int{1}}), msg("NaN", "listA"); got != want {
+		t.Errorf("CheckElementsMatch(a NaN before a slice): got %q, want %q", got, want)
+	}
+	if got, want := assert.CheckElementsMatch([]any{[]int{1}, nan}, []any{[]int{1}, nan}), "ElementsMatch failed:\n  an element of type []int cannot be compared with ==; compare such lists with Equal"; got != want {
+		t.Errorf("CheckElementsMatch(a slice before a NaN): got %q, want %q", got, want)
+	}
+	if got, want := assert.CheckElementsMatch([]float64{nan}, []float64{1, 2}), "ElementsMatch failed:\n  lists have different lengths: 1 vs 2"; got != want {
+		t.Errorf("CheckElementsMatch(a NaN, lengths differ): got %q, want %q", got, want)
+	}
+	if got, want := assert.CheckElementsMatch([]float64{1, 2, 2}, []float64{1, 1, 2}), "ElementsMatch failed:\n  element 1 is in listB but not enough times in listA"; got != want {
+		t.Errorf("CheckElementsMatch(counts differ): got %q, want %q", got, want)
+	}
+	if got := assert.CheckElementsMatch([]float64{1, 2, 2}, []float64{2, 1, 2}); got != "" {
+		t.Errorf("CheckElementsMatch(reordered floats): got %q, want \"\"", got)
+	}
+	if got := assert.CheckElementsMatch([]float64{math.Inf(1), 0}, []float64{0, math.Inf(1)}); got != "" {
+		t.Errorf("CheckElementsMatch(infinities): got %q, want \"\"", got)
+	}
+	if got := assert.CheckElementsMatch([]float64{}, nil); got != "" {
+		t.Errorf("CheckElementsMatch(empty and nil): got %q, want \"\"", got)
+	}
+	if got, want := assert.CheckSubset([]float64{1, nan}, []float64{nan}), "Subset failed:\n  element NaN from subset not found in list"; got != want {
+		t.Errorf("CheckSubset(a NaN in subset): got %q, want %q", got, want)
+	}
+	if got := assert.CheckSubset([]float64{1, nan}, []float64{1}); got != "" {
+		t.Errorf("CheckSubset(a NaN in list): got %q, want \"\"", got)
 	}
 }
