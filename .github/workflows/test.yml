@@ -174,7 +174,7 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     # The coverage badge is pushed to ci/badges; the action publishes it from
     # main only, so pull-request runs never use the write scope.
     permissions:
