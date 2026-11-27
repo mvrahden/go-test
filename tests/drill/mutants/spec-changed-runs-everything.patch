@@ -1,0 +1,17 @@
+Expect: ^FAIL .*conformance/cli CLIChanged .* / -json and spec --changed hold no verdict of the unchanged package \(
+Clause: when --changed follows a run, after a file two of its packages read changed → -json and spec --changed hold no verdict of the unchanged package
+--- a/cmd/gotest/spec.go
++++ b/cmd/gotest/spec.go
+@@ -122,11 +122,11 @@
+ 	} else if code != 0 {
+ 		return code
+ 	}
++	loaded, broken, noTestFiles := pkgs.Loaded, pkgs.Broken, pkgs.NoTestFiles
+ 	plan, ok := planReport(&cfg, &pkgs)
+ 	if !ok {
+ 		return 2
+ 	}
+-	loaded, broken, noTestFiles := pkgs.Loaded, pkgs.Broken, pkgs.NoTestFiles
+ 
+ 	overlay, cleanup, err := gotestrunner.GenerateOverlay(loaded, broken, cfg.Debug, cfg.NoCache, cfg.HarvestSeeds)
+ 	if err != nil {

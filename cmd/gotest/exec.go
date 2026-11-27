@@ -15,7 +15,7 @@ import (
 )
 
 func Run(cfg ExecConfig) int { //nolint:gocritic // hugeParam: stable API
-	code, _, phases := execRun(cfg)
+	code, _, _, phases := execRun(cfg)
 	if phases != "" {
 		fmt.Fprintln(os.Stderr, phases)
 	}
@@ -25,7 +25,7 @@ func Run(cfg ExecConfig) int { //nolint:gocritic // hugeParam: stable API
 // execRun is Run with what the pipeline judged, nil when it did not run, and
 // the --debug line of where its time went, "" without --debug, for the
 // caller to print last.
-func execRun(cfg ExecConfig) (exit int, judged *gotestrunner.PipelineResult, phases string) { //nolint:gocritic // hugeParam: stable API
+func execRun(cfg ExecConfig) (exit int, judged *gotestrunner.PipelineResult, plan *runPlan, phases string) { //nolint:gocritic // hugeParam: stable API
 	clock := phaseClock{start: time.Now()}
 	if cfg.Debug {
 		// Deferred first, so it is taken last: after the cleanup and the stop.
@@ -35,28 +35,40 @@ func execRun(cfg ExecConfig) (exit int, judged *gotestrunner.PipelineResult, pha
 	loadFlags := gotestrunner.StripNonLoadFlags(classified.BuildFlags)
 	pkgs, err := loadRunPackages(cfg.PackagePatterns, loadFlags)
 	clock.discovered = time.Now()
-	loaded, broken, noTestFiles := pkgs.Loaded, pkgs.Broken, pkgs.NoTestFiles
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
-		return 2, nil, ""
+		return 2, nil, nil, ""
 	}
 
 	if refuseUnfailed(cfg.Only, pkgs.Order) {
-		return 2, nil, ""
+		return 2, nil, nil, ""
 	}
 
-	if code, err := focusGate(loaded, cfg.CI); err != nil {
+	// The focus guard sees every package given, those --changed leaves out
+	// among them.
+	if code, err := focusGate(pkgs.Loaded, cfg.CI); err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
-		return 2, nil, ""
+		return 2, nil, nil, ""
 	} else if code != 0 {
-		return code, nil, ""
+		return code, nil, nil, ""
 	}
+
+	mode, manifest := modeFromJSON(cfg.JSON), cfg.Manifest
+	if manifest == nil {
+		manifest = manifestIf(cfg.JSON)
+		cfg.Manifest = manifest
+	}
+	plan, ok := planRun(&cfg, &pkgs)
+	if !ok {
+		return 2, nil, nil, ""
+	}
+	loaded, broken, noTestFiles := pkgs.Loaded, pkgs.Broken, pkgs.NoTestFiles
 
 	overlay, cleanup, err := gotestrunner.GenerateOverlay(loaded, broken, cfg.Debug, cfg.NoCache, cfg.HarvestSeeds)
 	clock.generated = time.Now()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
-		return 2, nil, ""
+		return 2, nil, nil, ""
 	}
 	defer cleanup()
 
@@ -69,10 +81,6 @@ func execRun(cfg ExecConfig) (exit int, judged *gotestrunner.PipelineResult, pha
 		defer cancel()
 	}
 
-	mode, manifest := modeFromJSON(cfg.JSON), cfg.Manifest
-	if manifest == nil {
-		manifest = manifestIf(cfg.JSON)
-	}
 	var stdout io.Writer
 	if cfg.Agent != nil {
 		// An agent's text is rendered from the stream, so the census and
@@ -98,17 +106,18 @@ func execRun(cfg ExecConfig) (exit int, judged *gotestrunner.PipelineResult, pha
 		Manifest:        manifest,
 		Only:            cfg.Only,
 		Stdout:          stdout,
+		Inputs:          plan.inputs.stamp(),
 	}, overlay)
 	clock.ran, clock.compile = time.Now(), result.CompileSpan
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
-		return 2, nil, ""
+		return 2, nil, nil, ""
 	}
 	// stderr is free in every output mode, so the notes about what did not
 	// run reach the reader whether stdout carries text or JSON.
 	noteStdlibTests(overlay.Plan.StdlibTests())
 	gotestrunner.NoteBenchmarksNotRun(os.Stderr, cfg.GoTestArgs, len(overlay.Declared.Benchmarks))
-	return result.ExitCode, &result, ""
+	return result.ExitCode, &result, plan, ""
 }
 
 // noteStdlibTests says on stderr how many stdlib tests the run left to go test.

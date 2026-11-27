@@ -87,6 +87,9 @@ type ExecConfig struct {
 	// Only is --failed's selection: each package's own -run, "" for all its
 	// suites; nil without the flag.
 	Only map[string]string
+	// Changed is --changed: only the packages whose verdict the record does
+	// not hold as current run. ChangedFailed is --failed beside it.
+	Changed, ChangedFailed bool
 	// Agent renders a text run for a coding agent; nil for go test's text.
 	Agent *gotestrunner.AgentOutput
 	// Manifest opens a -json or agent run's stream and goes into the run's
@@ -110,6 +113,7 @@ var knownSubcommands = map[string]bool{
 	"lint":      true,
 	"audit":     true,
 	"scenarios": true,
+	"runs":      true,
 	"refactor":  true,
 	"skill":     true,
 	"hook":      true,

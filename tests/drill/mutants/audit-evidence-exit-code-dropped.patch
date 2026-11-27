@@ -2,12 +2,12 @@ Expect: ^FAIL .*conformance/audit AuditEvidence / EvidenceFromRuns / when audit 
 Clause: when audit is given a stream of the head's run → lists the stream with its manifest's CLI version, commit, dirty flag, agent and exit code
 --- a/internal/gotestaudit/evidence.go
 +++ b/internal/gotestaudit/evidence.go
-@@ -129,7 +129,7 @@
+@@ -156,7 +156,7 @@
  	st := streamTree{stream: Stream{File: in.File, Side: in.Side, Ran: in.Ran}, pkgs: map[string]*gotestspec.Package{}}
  	if run, ok := gotestspec.RunOf(in.Events); ok {
  		m := run.Manifest
 -		st.stream.Run = &StreamRun{Version: m.Version, GoVersion: m.GoVersion, Args: m.Args, Commit: m.Commit, Dirty: m.Dirty, Agent: m.Agent, ExitCode: run.ExitCode}
 +		st.stream.Run = &StreamRun{Version: m.Version, GoVersion: m.GoVersion, Args: m.Args, Commit: m.Commit, Dirty: m.Dirty, Agent: m.Agent}
  	}
- 	st.stream.Current, st.stream.Stale = currency(st.stream.Run, side, in.Side, in.Ran)
- 	for _, p := range gotestspec.BuildTree(in.Events, gotestspec.WithDeclarations(idx.twins)) {
+ 	st.byCommit.current, st.byCommit.stale = currency(st.stream.Run, side, in.Side, in.Ran)
+ 	st.fresh, st.ran = in.Fresh, in.Ran

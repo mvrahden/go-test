@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditCurrency / AStreamsOwnCurrency / when audit is given streams with input hashes, one also as the base's run, after an uncommitted change to a package one of them ran / marks the stream of one unchanged package current, though the tree has uncommitted changes \(
+Clause: when audit is given streams with input hashes, one also as the base's run, after an uncommitted change to a package one of them ran → marks the stream of one unchanged package current, though the tree has uncommitted changes
+--- a/internal/gotestaudit/evidence.go
++++ b/internal/gotestaudit/evidence.go
+@@ -172,7 +172,7 @@
+ 	for _, p := range gotestspec.BuildTree(in.Events, gotestspec.WithDeclarations(idx.twins)) {
+ 		st.pkgs[p.Path] = p
+ 	}
+-	if len(st.fresh) > 0 && !in.Ran {
++	if len(st.fresh) > 1 && !in.Ran {
+ 		st.stream.Current, st.stream.Stale = streamFreshness(st.fresh)
+ 	}
+ 	return st

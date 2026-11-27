@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditCurrency .* / marks the evidence of the changed package stale, naming its inputs changed \(
+Clause: when audit is given a stream with input hashes after an uncommitted change to one of its packages and to a file no package reads → marks the evidence of the changed package stale, naming its inputs changed
+--- a/internal/gotestaudit/evidence.go
++++ b/internal/gotestaudit/evidence.go
+@@ -144,7 +144,7 @@
+ 		return true, ""
+ 	}
+ 	if fresh, ok := st.fresh[pkg]; ok {
+-		if fresh {
++		if fresh || ok {
+ 			return true, ""
+ 		}
+ 		return false, "the inputs of " + pkg + " changed since the stream ran"

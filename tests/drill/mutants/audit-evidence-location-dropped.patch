@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditEvidence / RowsAToolLinks / when a tool reads the audit document with evidence as JSON / finds on each behavior and evidence row its module, and on each evidence row the head's file and lines of its behavior \(
+Clause: when a tool reads the audit document with evidence as JSON → finds on each behavior and evidence row its module, and on each evidence row the head's file and lines of its behavior
+--- a/internal/gotestaudit/evidence.go
++++ b/internal/gotestaudit/evidence.go
+@@ -531,7 +531,7 @@
+ 	}
+ 	e.Selector = t.selector()
+ 	loc := t.chain[len(t.chain)-1].loc
+-	e.Module, e.Location = t.mod, &loc
++	e.Module, e.Location = t.mod, &Location{File: loc.File}
+ 	js := make([]judgment, len(trees))
+ 	for i := range trees {
+ 		js[i] = trees[i].judge(s.pkg, t)

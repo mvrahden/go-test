@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/audit AuditEvidence / AStoppedAuditRun / when audit --run --control=stdin has its standard input at its end / writes the document naming the stopped run among what was not compared and exits 130 \(
+Clause: when audit --run --control=stdin has its standard input at its end → writes the document naming the stopped run among what was not compared and exits 130
+--- a/cmd/gotest/auditproof.go
++++ b/cmd/gotest/auditproof.go
+@@ -317,7 +317,6 @@
+ 	}
+ 	if exit != nil && exit.ExitCode() == 130 {
+ 		a.stopped = true
+-		doc.Incomplete = append(doc.Incomplete, "--run: the run was stopped before its end; what it did not reach reads as not run")
+ 		doc.Summary.Incomplete = len(doc.Incomplete)
+ 	}
+ 	events, err := gotestspec.ParseEvents(strings.NewReader(stdout.String()))

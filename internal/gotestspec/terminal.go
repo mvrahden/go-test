@@ -179,6 +179,9 @@ func RenderTerminal(w io.Writer, packages []*Package, opts ...RenderOption) {
 		if own {
 			heading += " — FAILED"
 		}
+		if pkg.Freshness == FreshStale {
+			heading += " — " + StaleMark
+		}
 		if !cfg.withoutVerdicts {
 			if counts := countsPhrase(CollectStats([]*Package{pkg})); counts != "" {
 				heading += " — " + counts
@@ -603,6 +606,9 @@ func renderSummary(w io.Writer, stats Stats, c colors) { //nolint:gocritic // hu
 	}
 	if stats.FailedPackages > 0 {
 		parts = append(parts, fmt.Sprintf("%s%s%s", c.red, countNoun(stats.FailedPackages, "failed package", "failed packages"), c.reset))
+	}
+	if stats.Stale > 0 {
+		parts = append(parts, fmt.Sprintf("%s%s%s", c.yellow, countNoun(stats.Stale, "stale package", "stale packages"), c.reset))
 	}
 
 	counts := countParts(stats)

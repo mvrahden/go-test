@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/audit AuditEvidence / RowsAToolLinks / when a tool reads the audit document with evidence as JSON / finds on each behavior its place in the text format's list of behaviors \(
+Clause: when a tool reads the audit document with evidence as JSON → finds on each behavior its place in the text format's list of behaviors
+--- a/internal/gotestaudit/render.go
++++ b/internal/gotestaudit/render.go
+@@ -211,8 +211,8 @@
+ 			c.Evidence = e.ID
+ 		}
+ 	}
+-	for rank, i := range behaviorOrder(d, ev) {
+-		d.Behaviors[i].Order = rank
++	for rank := range behaviorOrder(d, ev) {
++		d.Behaviors[rank].Order = rank
+ 	}
+ 	d.normalize()
+ }

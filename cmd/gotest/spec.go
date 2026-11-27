@@ -46,11 +46,7 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		return 2
 	}
 
-	if renderOnly && input == "" {
-		// Suppressing the verdict of a real run would turn a red pipeline
-		// green. The flag only makes sense where the exit code describes a
-		// rendering, not a test run.
-		fmt.Fprintf(os.Stderr, "FAIL: --render-only requires --input\n")
+	if refuseWithoutInput(own, input) {
 		return 2
 	}
 
@@ -82,7 +78,7 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 			loadFlags := gotestrunner.StripNonLoadFlags(gotestrunner.ClassifyGoTestArgs(cfg.GoTestArgs).BuildFlags)
 			source = &declaredSource{patterns: cfg.PackagePatterns, loadFlags: loadFlags}
 		}
-		return runSpecFromInput(input, format, output, noColor, renderOnly, source, view.options)
+		return runSpecFromInput(input, format, output, noColor, renderOnly, own.Bool("--check-fresh"), source, view.options)
 	}
 
 	if own.Bool("--static") {
@@ -120,14 +116,17 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	if !ok {
 		return 2
 	}
-	loaded, broken, noTestFiles := pkgs.Loaded, pkgs.Broken, pkgs.NoTestFiles
-
-	if code, err := focusGate(loaded, cfg.CI); err != nil {
+	if code, err := focusGate(pkgs.Loaded, cfg.CI); err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	} else if code != 0 {
 		return code
 	}
+	plan, ok := planReport(&cfg, &pkgs)
+	if !ok {
+		return 2
+	}
+	loaded, broken, noTestFiles := pkgs.Loaded, pkgs.Broken, pkgs.NoTestFiles
 
 	overlay, cleanup, err := gotestrunner.GenerateOverlay(loaded, broken, cfg.Debug, cfg.NoCache, cfg.HarvestSeeds)
 	if err != nil {
@@ -145,7 +144,7 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		defer timeoutCancel()
 	}
 
-	manifest := runManifest()
+	manifest := cfg.Manifest
 	result, err := gotestrunner.RunPipeline(ctx, gotestrunner.PipelineConfig{
 		GoTestArgs:      cfg.GoTestArgs,
 		SetupTimeout:    cfg.SetupTimeout,
@@ -161,6 +160,7 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		SkipGroups:      cfg.SkipGroups,
 		Manifest:        manifest,
 		Only:            cfg.Only,
+		Inputs:          plan.inputs.stamp(),
 	}, overlay)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
@@ -168,7 +168,7 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 
 	code, coverageFailure := coverageVerdict(coverProfile, minCoverage, result.ExitCode)
-	recordRun(&result, code, manifest)
+	saveRun(&result, code, manifest, recordOptions{plan: plan, eventsFile: own.Value("--events-file"), narrowed: narrowedBy(&cfg, plan)})
 	events, err := gotestspec.ParseEvents(bytes.NewReader(result.CapturedJSON))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: parsing test events: %s\n", err)
@@ -189,16 +189,11 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		return 2
 	}
 
-	var w io.Writer = os.Stdout
-	if output != "" {
-		f, ferr := os.Create(output)
-		if ferr != nil {
-			fmt.Fprintf(os.Stderr, "FAIL: creating output file: %s\n", ferr)
-			return 2
-		}
-		defer f.Close()
-		w = f
+	w, closeOutput, ok := createOutput(output)
+	if !ok {
+		return 2
 	}
+	defer closeOutput()
 
 	renderSpec(w, tree, format, noColor, append(slices.Clone(view.options), runOptions(events, &code)...), liveRun)
 	fmt.Fprint(os.Stderr, coverageFailure)
@@ -303,7 +298,7 @@ func stampInput(input, output string) int {
 	return 0
 }
 
-func runSpecFromInput(input, format, output string, noColor, renderOnly bool, source *declaredSource, view []gotestspec.RenderOption) int {
+func runSpecFromInput(input, format, output string, noColor, renderOnly, checkFresh bool, source *declaredSource, view []gotestspec.RenderOption) int {
 	var r io.Reader
 	if input == "-" {
 		r = os.Stdin
@@ -331,22 +326,23 @@ func runSpecFromInput(input, format, output string, noColor, renderOnly bool, so
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
+	if checkFresh {
+		if err := markFreshness(context.Background(), tree, events); err != nil {
+			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+			return 2
+		}
+	}
 
 	if err := gotestspec.CheckView(tree, view...); err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
 
-	var w io.Writer = os.Stdout
-	if output != "" {
-		of, ferr := os.Create(output)
-		if ferr != nil {
-			fmt.Fprintf(os.Stderr, "FAIL: creating output file: %s\n", ferr)
-			return 2
-		}
-		defer of.Close()
-		w = of
+	w, closeOutput, ok := createOutput(output)
+	if !ok {
+		return 2
 	}
+	defer closeOutput()
 
 	renderSpec(w, tree, format, noColor, append(slices.Clone(view), runOptions(events, nil)...), savedStream)
 
@@ -455,6 +451,20 @@ func builtPackage(importPath string) string {
 		return strings.TrimSuffix(strings.TrimSuffix(variant, "]"), ".test")
 	}
 	return importPath
+}
+
+// createOutput is where a report goes: stdout, or the --output file it
+// creates, closed by the func it returns. It says on stderr when it cannot.
+func createOutput(output string) (io.Writer, func(), bool) {
+	if output == "" {
+		return os.Stdout, func() {}, true
+	}
+	f, err := os.Create(output)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: creating output file: %s\n", err)
+		return nil, nil, false
+	}
+	return f, func() { _ = f.Close() }, true
 }
 
 // specView is how a spec is shown: the rows --hide leaves out, and whether

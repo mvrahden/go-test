@@ -65,7 +65,7 @@ func rerunCommand(dir string, args []string) string {
 				words = append(words, shellQuote(rest))
 			}
 			return strings.Join(words, " ")
-		case slices.Contains(patterns, i), arg == "--failed", strings.HasPrefix(arg, "--failed="), strings.HasPrefix(arg, "-run="):
+		case slices.Contains(patterns, i), arg == "--failed", strings.HasPrefix(arg, "--failed="), arg == "--changed", strings.HasPrefix(arg, "--changed="), strings.HasPrefix(arg, "-run="):
 			continue
 		case arg == "-run":
 			i++
@@ -113,22 +113,4 @@ func refuseUnfailed(only map[string]string, pkgs []string) bool {
 	}
 	fmt.Fprintln(os.Stderr, "FAIL: --failed: none of the packages given failed in the last run, so there is nothing to rerun")
 	return true
-}
-
-// recordRun leaves the run's record for --failed in the cache; a run that
-// judged nothing leaves none. It returns the failed units.
-func recordRun(result *gotestrunner.PipelineResult, code int, manifest *protocol.Manifest) []protocol.FailedUnit {
-	if result == nil || result.Judged == nil || manifest == nil {
-		return nil
-	}
-	dir, err := os.Getwd()
-	if err != nil {
-		return result.Failed
-	}
-	res := *result.Judged
-	res.ExitCode = code
-	if err := gotestrunner.WriteRunRecord(protocol.RunRecord{Dir: dir, Manifest: *manifest, Result: res, Failed: result.Failed}); err != nil {
-		fmt.Fprintf(os.Stderr, "gotest: the run is not recorded for --failed: %s\n", err)
-	}
-	return result.Failed
 }

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditCurrency / AStreamsOwnCurrency / when audit is given streams with input hashes, one also as the base's run, after an uncommitted change to a package one of them ran / marks the stream of one unchanged package current, though the tree has uncommitted changes \(
+Clause: when audit is given streams with input hashes, one also as the base's run, after an uncommitted change to a package one of them ran → marks the stream of one unchanged package current, though the tree has uncommitted changes
+--- a/cmd/gotest/auditproof.go
++++ b/cmd/gotest/auditproof.go
+@@ -93,7 +93,7 @@
+ 		}
+ 		stamped[ev.Package] = ev.InputHash
+ 	}
+-	if len(pkgs) == 0 {
++	if len(pkgs) <= 1 {
+ 		return nil, nil
+ 	}
+ 	current, err := currentHashes(context.Background(), pkgs, streamBuild(events))

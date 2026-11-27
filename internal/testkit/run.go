@@ -98,6 +98,11 @@ func RunCLIWithEnv(ctx context.Context, dir string, env []string, args ...string
 	return runCLI(ctx, dir, "", env, args...)
 }
 
+// RunBinaryWithEnv is RunCLIWithEnv with binary as the CLI.
+func RunBinaryWithEnv(ctx context.Context, binary, dir string, env []string, args ...string) (Run, error) {
+	return runBinary(ctx, binary, stopGrace(ctx), dir, "", env, args...)
+}
+
 type stdinKey struct{}
 
 // RunCLIWithInput is RunCLI with input as the CLI's standard input.

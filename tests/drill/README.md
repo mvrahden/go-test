@@ -1172,6 +1172,57 @@ shards of one run do not add up to every mutant exactly once.
 | `scenarios-unknown-status-taken` | an unknown status is taken | scenarios conformance: the It of its clause fails |
 | `scenarios-evidence-status-taken` | an evidence status is taken without evidence | scenarios conformance: the It of its clause fails |
 | `scenarios-broken-package-passes` | a package that does not compile leaves the exit at 0 | scenarios conformance: the It of its clause fails |
+| `input-hash-on-test-events` | the input hash is stamped on test verdicts too, not only on a package's | cli conformance: a -json run's test events carry an InputHash |
+| `spec-json-drops-the-input-hash` | spec's JSON gives no package its `inputHash` | cli conformance: the document's hashes are not the stream's |
+| `input-hash-skips-dependencies` | a package's hash leaves out the packages it imports | cli conformance: a dependency's edit leaves its importer current |
+| `stale-check-marks-every-package` | `--check-fresh` compares the hash with the wrong field, so no package is current | cli conformance: a package that reads no edited file is marked stale |
+| `input-hash-ignores-build-flags` | the hash leaves out the run's build flags | cli conformance: runs with and without -tags carry one hash |
+| `input-hash-reads-the-whole-directory` | the hash digests each directory above the package instead of its testdata | cli conformance: a file outside the testdata trees makes the package stale |
+| `manifest-names-no-build-flags` | the manifest never names the build flags the hashes cover | cli conformance: the manifest of a -tags run has no Build |
+| `stats-count-no-stale-package` | the stats count no stale package | cli conformance: `--check-fresh` counts 0 stale |
+| `stream-without-hashes-reads-current` | a verdict without a hash reads as current | cli conformance: go test's own stream reads current, not unknown |
+| `terminal-spec-hides-stale-packages` | the terminal spec marks no stale package | cli conformance: the terminal spec names no stale package |
+| `check-fresh-without-input-runs` | `--check-fresh` without `--input` runs the packages | cli conformance: a live spec given --check-fresh does not exit 2 |
+| `changed-skips-failed-packages` | `--changed` leaves out a package whose last verdict failed | cli conformance: the failing package does not run again |
+| `spec-changed-runs-everything` | `spec --changed` renders every package, not those it runs | cli conformance: spec --changed renders the unchanged package |
+| `changed-trusts-narrowed-verdicts` | `--changed` takes a narrowed verdict as current | cli conformance: the narrowed package does not run again |
+| `changed-silent-without-a-record` | `--changed` without a record says nothing on stderr | cli conformance: stderr names no missing record |
+| `changed-failed-reruns-whole-packages` | `--changed --failed` reruns a failed package whole | cli conformance: the passing method of the failed package runs too |
+| `closing-line-hides-the-narrowing` | the closing line of a `--changed` run says nothing of the packages it left out | cli conformance: the closing line ends at the package counts |
+| `manifest-hides-the-narrowing` | a `--changed` run's manifest holds no `Changed` | cli conformance: the opening event has no Changed |
+| `changed-run-narrows-with-run` | a `--changed` run narrows itself with `-run`, which stands the census down | cli conformance: the closing event has no count of units not run |
+| `record-ignores-run-narrowing` | a `-run` narrowed run's packages are recorded as whole | cli conformance: the recorded package is not marked narrowed |
+| `changed-run-replaces-the-record` | a `--changed` run replaces the record instead of keeping the packages it left out | cli conformance: the record holds only the packages the run ran |
+| `record-forgets-the-events-file` | a run's kept record never names its `--events-file` | cli conformance: the third record names no events file |
+| `clean-keeps-run-records` | `gotest clean --cache` leaves the run records | cli conformance: the history and last.json are still there |
+| `history-keeps-one-more` | the history keeps 51 records | cli conformance: the full history holds 51 |
+| `history-keeps-old-records` | a record kept over 30 days is not removed | cli conformance: the old record is still there |
+| `runs-listed-oldest-first` | `gotest runs` lists the records oldest first | cli conformance: the first entry is the older run |
+| `runs-count-every-hash-current` | `gotest runs` counts any recorded package the tree still has as current | cli conformance: the changed package counts current |
+| `runs-text-counts-stale-as-current` | the text listing counts stale packages as current | cli conformance: the older run's line counts 2 current, 0 stale |
+| `runs-without-a-record-fails` | `gotest runs` prints nothing without a record | cli conformance: stdout does not say no run is recorded |
+| `import-forgets-the-file` | an imported run's record names no file | cli conformance: the imported entry has no events file |
+| `import-takes-an-empty-stream` | `--import` keeps a stream without a package verdict | cli conformance: the empty file is imported with exit 0 |
+| `audit-judges-hashed-streams-by-commit` | the audit judges a stream with input hashes by the tree's commit | audit conformance: the unchanged package's evidence is stale on the dirty tree |
+| `audit-trusts-every-hashed-package` | the audit takes every package a stream hashed as current | audit conformance: the changed package's evidence reads current |
+| `audit-findings-unlinked` | a finding names no evidence row | audit conformance: the links It finds a finding without its row's id |
+| `audit-evidence-location-dropped` | an evidence row's location keeps its file, not its lines | audit conformance: the location It finds no lines |
+| `audit-mark-without-stale-star` | the `*` goes on the marks of current streams | audit conformance: the mark It finds a stale mark without it |
+| `audit-order-by-document` | a behavior's order is its place in the document | audit conformance: the order It finds the changes in the document's order |
+| `audit-stopped-run-unnamed` | a stopped `--run` is not named among what was not compared | audit conformance: the stopped-run It finds nothing not compared |
+| `audit-stopped-run-exits-by-policy` | a stopped `--run` exits 130 only where the policy passes | audit conformance: the closing-line It sees exit 1 |
+| `audit-control-without-run-taken` | `--control` without `--run` is taken | audit conformance: the refusal It sees exit 0 |
+| `audit-stream-currency-by-commit` | a stream with input hashes is listed current or stale by commit | audit conformance: the stream-currency It finds the hashed stream stale for uncommitted changes |
+| `audit-stream-current-with-changed-inputs` | a stream whose packages' inputs changed is listed current | audit conformance: the stream-currency It finds the changed stream current |
+| `audit-stream-of-one-package-by-commit` | a stream that hashed one package is listed by commit | audit conformance: the stream-currency It finds the fresh/c stream stale |
+| `audit-one-hashed-package-unread` | a stream that hashed one package is judged without its hash | audit conformance: the stream-currency It finds the fresh/c stream stale |
+| `audit-base-stream-judged-by-hashes` | a stream of the base's run is judged by the working tree's hashes | audit conformance: the base-stream It finds it stale for changed inputs, not for the base's missing commit |
+| `audit-run-children-without-coverdir` | `--run` gives its tests no `GOCOVERDIR` | audit conformance: the child-coverage It finds greet.go without coverage data |
+| `audit-run-leaves-its-directory` | `--run` leaves its directory under `GOTMPDIR` | audit conformance: the run's and the interrupted run's directory Its find it left |
+| `audit-run-empty-profile-refused` | a `--run` profile with no block is refused as an empty `--coverage` | audit conformance: the without-cover It sees exit 2 |
+| `audit-run-child-note-dropped` | no note says how a binary a test starts counts | audit conformance: the note It finds no such note |
+| `audit-run-interrupt-kills-the-audit` | an interrupt ends the audit with its run unstopped | audit conformance: the interrupted-run It sees no exit 130 |
+| `audit-last-stream-wins` | of two current streams the last judges a behavior | audit conformance: the two-current-streams It finds the fresh/c rows judged by the second stream |
 
 ## Adding a mutant
 

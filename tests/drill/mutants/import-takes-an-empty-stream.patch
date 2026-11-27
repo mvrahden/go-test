@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLIRunRecords .* / refuses with exit 2 a file that holds no package verdict \(
+Clause: when gotest runs --import names a saved stream of a run → refuses with exit 2 a file that holds no package verdict
+--- a/internal/gotestrunner/streamrecord.go
++++ b/internal/gotestrunner/streamrecord.go
+@@ -51,7 +51,7 @@
+ 		tally.count(ev.Package, ev.Test, ev.Action, ev.Elapsed, ev.InputHash)
+ 	}
+ 	rec.Packages = tally.verdicts(runLevel)
+-	if len(rec.Packages) == 0 {
++	if len(rec.Packages) < 0 {
+ 		return rec, errors.New("the stream holds no package's verdict")
+ 	}
+ 	res, failed := tally.snapshot(runLevel)

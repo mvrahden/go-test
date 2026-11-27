@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLIChanged .* / its record lists the package with its verdict, its InputHash and its time, marked narrowed \(
+Clause: when a -run narrowed run of a package ends → its record lists the package with its verdict, its InputHash and its time, marked narrowed
+--- a/cmd/gotest/changed.go
++++ b/cmd/gotest/changed.go
+@@ -173,7 +173,7 @@
+ // -skip, --group and --skip-group narrow all, --failed's selection the
+ // packages it narrows.
+ func narrowedBy(cfg *ExecConfig, plan *runPlan) func(string) bool {
+-	all := hasFlag(cfg.GoTestArgs, "-run") || hasFlag(cfg.GoTestArgs, "-skip") || len(cfg.Groups)+len(cfg.SkipGroups) > 0
++	all := hasFlag(cfg.GoTestArgs, "-skip") || len(cfg.Groups)+len(cfg.SkipGroups) > 0
+ 	only := cfg.Only
+ 	if plan != nil && plan.only != nil {
+ 		only = plan.only

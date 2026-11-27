@@ -91,6 +91,8 @@ func main() {
 		os.Exit(runAudit(inv))
 	case "scenarios":
 		os.Exit(runScenarios(inv))
+	case "runs":
+		os.Exit(runRuns(inv))
 	case "skill":
 		os.Exit(runSkill(inv))
 	default:
@@ -240,9 +242,13 @@ func runText(inv Invocation, own OwnFlags, goTestArgs []string, jsonMode bool, a
 		go func() { manifest <- runManifest() }()
 	}
 
-	code, result, phases := execRun(cfg)
+	code, result, plan, phases := execRun(cfg)
 	code = enforceCoverage(coverProfile, minCoverage, code)
-	failed := recordRun(result, code, <-manifest)
+	m := <-manifest
+	if m != nil && plan != nil && m != cfg.Manifest {
+		m.Build, m.Changed = plan.inputs.flags, plan.changed
+	}
+	failed := saveRun(result, code, m, recordOptions{plan: plan, eventsFile: own.Value("--events-file"), narrowed: narrowedBy(&cfg, plan)})
 	if agent != nil && len(failed) > 0 {
 		if dir, err := os.Getwd(); err == nil {
 			agent.SetRerun(rerunCommand(dir, inv.Args))
@@ -252,7 +258,11 @@ func runText(inv Invocation, own OwnFlags, goTestArgs []string, jsonMode bool, a
 	if !jsonMode && agent == nil && result != nil && result.Judged != nil {
 		// stdout stays go test's text; the verdict closes stderr. A -list
 		// run judges nothing.
-		fmt.Fprintln(os.Stderr, gotestrunner.ClosingOf(result.Judged, code, false))
+		closing := gotestrunner.ClosingOf(result.Judged, code, false)
+		if plan != nil {
+			closing.Changed = plan.changed
+		}
+		fmt.Fprintln(os.Stderr, closing)
 	}
 	if phases != "" {
 		fmt.Fprintln(os.Stderr, phases)
@@ -395,7 +405,13 @@ func parseExecFlags(own OwnFlags, goTestArgs []string, projCfg *config.ProjectCo
 		return ExecConfig{}, err
 	}
 	var only map[string]string
-	if own.Bool("--failed") {
+	changed := own.Bool("--changed")
+	if own.Bool("--failed") && changed {
+		if err := refuseSelection(goTestArgs); err != nil {
+			return ExecConfig{}, err
+		}
+	}
+	if own.Bool("--failed") && !changed {
 		if only, patterns, err = rerunFailed(goTestArgs, patterns); err != nil {
 			return ExecConfig{}, err
 		}
@@ -416,16 +432,16 @@ func parseExecFlags(own OwnFlags, goTestArgs []string, projCfg *config.ProjectCo
 		SkipGroups:      own.Values("--skip-group"),
 		Control:         control,
 		Only:            only,
+		Changed:         changed,
+		ChangedFailed:   changed && own.Bool("--failed"),
 	}, nil
 }
 
 // rerunFailed is --failed's selection and the packages it runs: those given,
 // else the packages of the last run's failures.
 func rerunFailed(goTestArgs, patterns []string) (map[string]string, []string, error) {
-	for _, flag := range []string{"-run", "-list"} {
-		if hasFlag(goTestArgs, flag) {
-			return nil, nil, fmt.Errorf("--failed selects the tests it runs itself; drop %s", flag)
-		}
+	if err := refuseSelection(goTestArgs); err != nil {
+		return nil, nil, err
 	}
 	dir, err := os.Getwd()
 	if err != nil {
@@ -439,6 +455,16 @@ func rerunFailed(goTestArgs, patterns []string) (map[string]string, []string, er
 		patterns = failedPkgs
 	}
 	return only, patterns, nil
+}
+
+// refuseSelection is --failed's refusal of the flags that select tests.
+func refuseSelection(goTestArgs []string) error {
+	for _, flag := range []string{"-run", "-list"} {
+		if hasFlag(goTestArgs, flag) {
+			return fmt.Errorf("--failed selects the tests it runs itself; drop %s", flag)
+		}
+	}
+	return nil
 }
 
 // ensureCoverProfile makes sure a -coverprofile is in play when a coverage

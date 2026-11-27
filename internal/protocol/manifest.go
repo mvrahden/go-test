@@ -16,7 +16,26 @@ type Manifest struct {
 	// Dirty is set only in a checkout: whether it has uncommitted changes.
 	Dirty *bool  `json:"Dirty,omitempty"`
 	Agent string `json:"Agent,omitempty"`
+	// Build are the run's build flags its packages' input hashes cover,
+	// each with its value as one word; absent for none.
+	Build []string `json:"Build,omitempty"`
+	// Changed says a --changed run left out the packages it found
+	// unchanged; absent for any other run.
+	Changed *Changed `json:"Changed,omitempty"`
 }
+
+// Changed is how a --changed run narrowed itself.
+type Changed struct {
+	// Ran is how many packages it ran; Unchanged how many it left out.
+	Ran       int `json:"Ran"`
+	Unchanged int `json:"Unchanged"`
+	// NoRecord marks a run that found no record and ran everything.
+	NoRecord bool `json:"NoRecord,omitempty"`
+}
+
+// InputHashField is the field a package's verdict event carries its input
+// hash in.
+const InputHashField = "InputHash"
 
 // RunResult is what a run judged: its exit code and the verdicts its stream
 // holds, the run's own package aside.

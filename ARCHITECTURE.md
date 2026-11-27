@@ -804,6 +804,29 @@ share one; `GOFLAGS`, `GOEXPERIMENT` and `CGO_ENABLED` are keyed too. The
 VS Code debugger and `gotest fuzz` build outside the compile stage and are
 never stripped.
 
+### Input Hashes and Run Records
+
+Discovery's first `go list` already holds what a verdict depends on as
+source: each package's files, embedded files and module, and the graph of
+what it imports. The run's load hands that graph (`pkgload.Config.Graph`) to `internal/inputhash`, which
+digests per package, beside the run and off its critical path, the files
+of every package it reaches in a main module, its testdata trees, the
+versions of other modules and the build settings
+([A package's input hash](specs/cli/spec.md#requirement-a-packages-input-hash)).
+The output collector stamps each package's verdict line with its hash as
+the stream is written, and the run's record keeps it per package. Checking
+a saved stream later (`--check-fresh`, `gotest runs`, the audit's evidence)
+lists only that graph, `go list` without type-checking, and digests it
+again; nothing is skipped because of a hash.
+
+A checkout's records live in `runs/<key>/` under the gotest cache:
+`last.json`, which `--failed` and `--changed` read and a `--changed` run
+merges into, and `history/`, one file per run named by its time, pruned on
+each write. Every writer holds `runs/<key>/lock`, the binary cache's file
+lock, and writes by a rename
+([The packages of a record](specs/cli/spec.md#requirement-the-packages-of-a-record),
+[Run records kept](specs/cli/spec.md#requirement-run-records-kept)).
+
 ### Per-Suite Fixture Readiness
 
 Each suite has a set of shared fixture keys it needs (including transitive
@@ -1446,7 +1469,7 @@ Arrows read "imports". Third-party modules are named where a package needs one.
 
 | Package | Role | Imports of this module |
 |---|---|---|
-| `cmd/gotest` | The CLI: arguments, subcommands, signals, watch | `internal/{about,config,filewrite,gotestast,gotestaudit,gotestbench,gotestscenarios,gotestgen,gotestrunner,gotestspec,lint,migrate,pkgpattern,protocol,refactor,scaffold,unidiff}`, `skills`; third-party: `fsnotify`, `x/tools` |
+| `cmd/gotest` | The CLI: arguments, subcommands, signals, watch | `internal/{about,config,filewrite,gotestast,gotestaudit,gotestbench,gotestscenarios,gotestgen,gotestrunner,gotestspec,inputhash,lint,migrate,pkgpattern,protocol,refactor,scaffold,unidiff}`, `skills`; third-party: `fsnotify`, `x/tools` |
 | `internal/gotestast` | Suite and fixture model read from syntax and types | `internal/{about,protocol,typeclass}`; third-party: `x/tools` |
 | `internal/gotestgen` | Loading, collection, binding, rendering of the harness | `internal/{about,genstub,gotestast,goversion,pkgload,pkgpattern,protocol}`; third-party: `x/mod`, `x/tools` |
 | `internal/gotestrunner` | Overlay, compile, shared fixtures, one process per suite | `internal/{about,control,gotestgen,proctree,protocol,protocol/sharedwire,schedinfo}` |
@@ -1456,6 +1479,7 @@ Arrows read "imports". Third-party modules are named where a package needs one.
 | `internal/gotestbench` | Benchmark baselines, deltas and the gate | `internal/gotestspec` |
 | `internal/lint` | The analyzer and its fix driver | `internal/{about,filewrite,genstub,gotestast,gotestgen,goversion,pkgload,pkgpattern,protocol,refactor,typeclass}`; third-party: `x/tools` |
 | `internal/pkgload` | Loads packages with their tests, type-checked in process, without building a test variant | third-party: `x/tools` |
+| `internal/inputhash` | A package's input hash: its sources, its in-module dependencies', what they embed, its testdata trees, module versions and build settings | `internal/{about,genstub,pkgload}`; third-party: `x/mod`, `x/tools` |
 | `internal/migrate` | testify/suite conversion | `internal/{about,filewrite,gotestast,protocol,refactor,unidiff}`; third-party: `x/tools` |
 | `internal/refactor` | Source edits: focus toggles, seed splices | `internal/{gotestast,protocol}`; third-party: `x/tools` |
 | `internal/scaffold` | Suite skeletons from a type | `internal/{gotestgen,goversion}`; third-party: `x/tools` |

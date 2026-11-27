@@ -164,17 +164,21 @@ func (lr *LoadResult) InMainModule() bool {
 // failure is a verdict, not an absence. Matched packages without test files
 // are named in noTestFiles, for the same reason. matched names every package
 // the patterns matched, in load order.
-func loadPackages(targetPkgs []string, buildFlags []string) (loaded []*LoadResult, broken []BrokenPackage, noTestFiles, matched []string, err error) {
+//
+// graph is what go listed: every matched package, its test variants and
+// test main, with their dependencies reachable.
+func loadPackages(targetPkgs []string, buildFlags []string) (loaded []*LoadResult, broken []BrokenPackage, noTestFiles, matched []string, graph []*packages.Package, err error) {
 	cfg := &pkgload.Config{
 		Tests:     true,
 		Fset:      token.NewFileSet(),
 		ParseFile: about.ParseStubbingGenerated,
+		Graph:     func(roots []*packages.Package) { graph = roots },
 	}
 	// A broken package is built for its report, from disk, so the go
 	// command takes the stubs too.
 	loadFlags, unstub, err := genstub.LoadFlags("", targetPkgs, buildFlags)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 	defer unstub()
 	if len(loadFlags) > 0 {
@@ -182,10 +186,10 @@ func loadPackages(targetPkgs []string, buildFlags []string) (loaded []*LoadResul
 	}
 	totalFoundPkgs, err := pkgload.Load(cfg, targetPkgs...)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 	if err := goversion.Check(totalFoundPkgs); err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 	seen := map[string]bool{}
 	for _, p := range totalFoundPkgs {
@@ -271,7 +275,7 @@ func loadPackages(targetPkgs []string, buildFlags []string) (loaded []*LoadResul
 		}
 	}
 	if len(loadedTestPkgs) == 0 {
-		return nil, broken, noTestFiles, matched, nil
+		return nil, broken, noTestFiles, matched, graph, nil
 	}
 
 	prodPkgs := make(map[string]bool)
@@ -336,21 +340,21 @@ func loadPackages(targetPkgs []string, buildFlags []string) (loaded []*LoadResul
 	sort.SliceStable(res, func(i, j int) bool {
 		return pkgOrder[res[i].PkgPath] < pkgOrder[res[j].PkgPath]
 	})
-	return res, broken, noTestFiles, matched, nil
+	return res, broken, noTestFiles, matched, graph, nil
 }
 
 // LoadPackages loads and groups test packages for the given target patterns.
 // Broken packages are returned separately; the caller decides whether they
 // abort the command or become failed-package verdicts.
 func LoadPackages(targetPkgs []string, buildFlags []string) ([]*LoadResult, []BrokenPackage, error) {
-	res, broken, _, _, err := loadPackages(targetPkgs, buildFlags)
+	res, broken, _, _, _, err := loadPackages(targetPkgs, buildFlags)
 	return res, broken, err
 }
 
 // LoadPackagesMatching is LoadPackages that also reports whether the
 // patterns matched any package at all.
 func LoadPackagesMatching(targetPkgs []string, buildFlags []string) (loaded []*LoadResult, broken []BrokenPackage, matched bool, err error) {
-	loaded, broken, _, all, err := loadPackages(targetPkgs, buildFlags)
+	loaded, broken, _, all, _, err := loadPackages(targetPkgs, buildFlags)
 	return loaded, broken, len(all) > 0, err
 }
 
@@ -364,6 +368,9 @@ type RunPackages struct {
 	Unmatched []string
 	// Order is every matched package in the order go test reports them.
 	Order []string
+	// Graph is every matched package, its test variants and test main, as
+	// go listed them, with what they import.
+	Graph []*packages.Package
 }
 
 // NoPackagesError is a run whose patterns matched no package: it would verify
@@ -384,7 +391,7 @@ func (e *NoPackagesError) Error() string {
 // a verdict: it also names those without test files, and fails with a
 // *NoPackagesError when the patterns match no package at all.
 func LoadRunPackages(targetPkgs []string, buildFlags []string) (RunPackages, error) {
-	loaded, broken, noTestFiles, matched, err := loadPackages(targetPkgs, buildFlags)
+	loaded, broken, noTestFiles, matched, graph, err := loadPackages(targetPkgs, buildFlags)
 	if err != nil {
 		return RunPackages{}, err
 	}
@@ -398,6 +405,7 @@ func LoadRunPackages(targetPkgs []string, buildFlags []string) (RunPackages, err
 		NoTestFiles: noTestFiles,
 		Unmatched:   unmatched,
 		Order:       reportOrder(matched, listed),
+		Graph:       graph,
 	}, nil
 }
 

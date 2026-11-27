@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/audit AuditChildCoverage / AnInterruptedAuditRun / when audit --run is interrupted while its run is under way / writes the document naming the stopped run among what was not compared and exits 130 \(
+Clause: when audit --run is interrupted while its run is under way → writes the document naming the stopped run among what was not compared and exits 130
+--- a/cmd/gotest/auditcover.go
++++ b/cmd/gotest/auditcover.go
+@@ -81,7 +81,6 @@
+ // and is dropped.
+ func runForwarding(cmd *exec.Cmd) error {
+ 	sigs := make(chan os.Signal, 1)
+-	signal.Notify(sigs, shutdownSignals...)
+ 	defer signal.Stop(sigs)
+ 	if err := cmd.Start(); err != nil {
+ 		return err

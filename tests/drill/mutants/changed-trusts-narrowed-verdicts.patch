@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLIChanged .* / runs again the packages the narrowed run ran, and none it left out \(
+Clause: when --changed follows a --changed run that -run narrowed → runs again the packages the narrowed run ran, and none it left out
+--- a/cmd/gotest/changed.go
++++ b/cmd/gotest/changed.go
+@@ -112,7 +112,7 @@
+ 	keep := map[string]bool{}
+ 	for _, pkg := range pkgs.Order {
+ 		r, ok := recorded[pkg]
+-		current := ok && r.InputHash != "" && r.InputHash == hashes[pkg] && !r.Narrowed
++		current := ok && r.InputHash != "" && r.InputHash == hashes[pkg]
+ 		switch {
+ 		case !current:
+ 			keep[pkg] = true

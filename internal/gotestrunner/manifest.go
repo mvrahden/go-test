@@ -15,17 +15,21 @@ type runTally struct {
 	mu       sync.Mutex
 	opened   time.Time
 	packages map[string]string
-	order    []string
-	tests    protocol.Tally
-	notRun   *int
-	vacuous  *int
-	closed   bool
+	// elapsed and hashes are each package's last verdict's time and input
+	// hash.
+	elapsed map[string]float64
+	hashes  map[string]string
+	order   []string
+	tests   protocol.Tally
+	notRun  *int
+	vacuous *int
+	closed  bool
 	// failed are the units of every fail, once each, in stream order.
 	failed []protocol.FailedUnit
 }
 
 // count books one event of the stream; the run's own package is not counted.
-func (r *runTally) count(pkg, test, action string) {
+func (r *runTally) count(pkg, test, action string, elapsed float64, hash string) {
 	if r == nil || pkg == protocol.RunPackage {
 		return
 	}
@@ -49,13 +53,29 @@ func (r *runTally) count(pkg, test, action string) {
 		r.order = append(r.order, pkg)
 	}
 	r.packages[pkg] = action
+	r.elapsed[pkg] = elapsed
+	r.hashes[pkg] = hash
+}
+
+// verdicts are the packages' last verdicts in stream order, those the run
+// booked for itself left out.
+func (r *runTally) verdicts(runLevel map[string]bool) []protocol.PackageVerdict {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var out []protocol.PackageVerdict
+	for _, pkg := range r.order {
+		if !runLevel[pkg] {
+			out = append(out, protocol.PackageVerdict{Package: pkg, Verdict: r.packages[pkg], InputHash: r.hashes[pkg], Elapsed: r.elapsed[pkg]})
+		}
+	}
+	return out
 }
 
 // open writes the stream's first event, the run's start carrying m, and
 // starts the tally.
 func (s *startWriter) open(m *protocol.Manifest) {
 	now := time.Now()
-	s.run = &runTally{opened: now, packages: map[string]string{}}
+	s.run = &runTally{opened: now, packages: map[string]string{}, elapsed: map[string]float64{}, hashes: map[string]string{}}
 	s.runLevel[protocol.RunPackage] = true
 	data, _ := json.Marshal(runEvent{Time: now, Action: "start", Package: protocol.RunPackage, RunLevel: true, Manifest: m})
 	_, _ = s.Write(append(data, '\n'))

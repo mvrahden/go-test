@@ -42,6 +42,16 @@ invocation runs tests — there is NO `test` subcommand:
   that failed a `--ci` run included, of the packages given or the
   record's, with `-json`, `spec` and `summary` too, and exits 2 when
   there is no record or nothing to rerun (v1.42+).
+  `--changed` (v1.42+) runs only the packages whose input hash, a digest
+  of the source and build flags their verdict judged, differs from the
+  record's, or that failed or ran narrowed in it; the closing line ends
+  `changed only: N ran, M unchanged`. A hash sees no file read outside
+  `testdata`, nor the environment: finish with a full run
+  ([Running what changed](https://github.com/mvrahden/go-test/blob/main/specs/cli/spec.md#requirement-running-what-changed)).
+  `go tool gotest runs` lists the kept runs with how many of each run's
+  packages are still current, and `runs --import=<file>` keeps a CI run's
+  saved stream among them; `spec --input=<file> --check-fresh` marks the
+  stale packages of a saved stream.
 - `go tool gotest spec ./...` — run + render the behavioral spec view.
   `--format terminal|md|json` (terminal is the default), `--output <file>`; `--input <file|->` re-renders a
   captured `go test -json` stream WITHOUT running (v1.29+: it still reads
@@ -131,7 +141,9 @@ invocation runs tests — there is NO `test` subcommand:
   instead (stale unless it ran the head's commit, clean;
   `--base-evidence=<stream>` adds the base's run-time assertion counts),
   and with `--base`, or `--diff=<file>` and `--coverage=<profile>`, the
-  changed production lines no test executed are listed;
+  changed production lines no test executed are listed (under `--run` a
+  binary a test starts counts when built with `go build -cover`, which
+  writes to the `GOCOVERDIR` the run sets);
   `--fail-on=proof` fails on a failing, not run, vacuous or stale
   behavior or an unproven line. `-v` lists the rows text groups.
 - `go tool gotest summary --input=<events file> --format=intoto-test-result`
@@ -169,7 +181,8 @@ coverage, `--no-cache` skips the test binary cache and forces a fresh link (`got
 with one stderr line, `DEBUG: phases: discover=… generate=… compile=… run=…
 report=… total=…`; compile overlaps run, so it is part of `run`'s span, not
 added to the total.
-`--control=stdin` (**v1.37+**, every command that stops on Ctrl-C) reads
+`--control=stdin` (**v1.37+**, every command that stops on Ctrl-C, and
+`audit --run`, v1.42+) reads
 `stop` and `force` lines on stdin, a first and a second Ctrl-C; the input's
 end is a stop. For a program driving gotest that cannot signal it (Windows);
 without the flag stdin is never read, and `--input=-` refuses it.

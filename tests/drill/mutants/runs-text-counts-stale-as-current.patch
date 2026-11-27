@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLIRunRecords .* / the text format prints one line for each, newest first \(
+Clause: when gotest runs --format=json follows two runs, a package of the first changed since → the text format prints one line for each, newest first
+--- a/cmd/gotest/runs.go
++++ b/cmd/gotest/runs.go
+@@ -233,7 +233,7 @@
+ 		parts := []string{
+ 			e.Recorded.Local().Format("2006-01-02 15:04:05"),
+ 			fmt.Sprintf("%s exit %d", verdict, e.Result.ExitCode),
+-			fmt.Sprintf("packages: %d current, %d stale, %d unknown", e.Packages.Current, e.Packages.Stale, e.Packages.Unknown),
++			fmt.Sprintf("packages: %d current, %d stale, %d unknown", e.Packages.Current+e.Packages.Stale, 0, e.Packages.Unknown),
+ 		}
+ 		if c := e.Manifest.Commit; c != "" {
+ 			if d := e.Manifest.Dirty; d != nil && *d {

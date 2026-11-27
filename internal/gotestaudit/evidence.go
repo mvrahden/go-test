@@ -16,6 +16,10 @@ type StreamInput struct {
 	// Ran marks the run the audit made of the working tree itself.
 	Ran    bool
 	Events []gotestspec.TestEvent
+	// Fresh says, of each package whose verdict the stream stamped with an
+	// input hash, whether the head's tree still has that hash; nil when the
+	// head is not a tree on disk, and the commit judges.
+	Fresh map[string]bool
 }
 
 // rnode is a record's suite or behavior as the evidence reader walks it.
@@ -24,12 +28,14 @@ type rnode struct {
 	kind     string
 	excluded bool
 	kids     []*rnode
+	loc      Location
 }
 
 // target is a behavior of a record: its levels from the suite down.
 type target struct {
 	chain          []*rnode
 	external, twin bool
+	mod            string
 }
 
 // recordIndex finds a record's suites and behaviors by package and labels.
@@ -63,26 +69,26 @@ func indexRecord(r *Record) *recordIndex {
 				}
 				idx.twins[p.Path][gotestspec.DeclKey("Test"+s.Name)] = gotestspec.Declaration{Twin: true}
 			}
-			root := &rnode{name: "Test" + s.Name, kind: KindSuite, excluded: s.Excluded}
-			idx.add(p.Path, []string{s.Display}, []*rnode{root}, s.External, twin)
-			root.kids = idx.behaviors(p.Path, []string{s.Display}, []*rnode{root}, s.Methods, s.External, twin)
+			root := &rnode{name: "Test" + s.Name, kind: KindSuite, excluded: s.Excluded, loc: s.Location}
+			idx.add(p, []string{s.Display}, []*rnode{root}, s.External, twin)
+			root.kids = idx.behaviors(p, []string{s.Display}, []*rnode{root}, s.Methods, s.External, twin)
 		}
 	}
 	return idx
 }
 
-func (idx *recordIndex) add(pkg string, path []string, chain []*rnode, external, twin bool) {
-	k := pathKey(pkg, path)
+func (idx *recordIndex) add(pkg *Package, path []string, chain []*rnode, external, twin bool) {
+	k := pathKey(pkg.Path, path)
 	if idx.targets[k] == nil {
-		idx.targets[k] = &target{chain: slices.Clone(chain), external: external, twin: twin}
+		idx.targets[k] = &target{chain: slices.Clone(chain), external: external, twin: twin, mod: pkg.Module}
 	}
 }
 
-func (idx *recordIndex) behaviors(pkg string, path []string, chain []*rnode, bs []Behavior, external, twin bool) []*rnode {
+func (idx *recordIndex) behaviors(pkg *Package, path []string, chain []*rnode, bs []Behavior, external, twin bool) []*rnode {
 	out := make([]*rnode, 0, len(bs))
 	for i := range bs {
 		b := &bs[i]
-		n := &rnode{name: b.Name, kind: b.Kind, excluded: b.Excluded}
+		n := &rnode{name: b.Name, kind: b.Kind, excluded: b.Excluded, loc: b.Location}
 		p := append(slices.Clip(path), b.Display)
 		c := append(slices.Clip(chain), n)
 		idx.add(pkg, p, c, external, twin)
@@ -123,6 +129,35 @@ type judgment struct {
 type streamTree struct {
 	stream Stream
 	pkgs   map[string]*gotestspec.Package
+	// byCommit is the commit rule's judgment, for a package without a hash.
+	byCommit struct {
+		current bool
+		stale   string
+	}
+	fresh map[string]bool
+	ran   bool
+}
+
+// current is currentFor without the reason.
+func (st *streamTree) current(pkg string) bool {
+	c, _ := st.currentFor(pkg)
+	return c
+}
+
+// currentFor is whether the stream's verdicts of pkg judged the head's
+// tree, and why not: by its input hash where the stream stamped one, else
+// by commit.
+func (st *streamTree) currentFor(pkg string) (bool, string) {
+	if st.ran {
+		return true, ""
+	}
+	if fresh, ok := st.fresh[pkg]; ok {
+		if fresh {
+			return true, ""
+		}
+		return false, "the inputs of " + pkg + " changed since the stream ran"
+	}
+	return st.byCommit.current, st.byCommit.stale
 }
 
 func readStream(in *StreamInput, idx *recordIndex, side *Side) streamTree {
@@ -131,11 +166,32 @@ func readStream(in *StreamInput, idx *recordIndex, side *Side) streamTree {
 		m := run.Manifest
 		st.stream.Run = &StreamRun{Version: m.Version, GoVersion: m.GoVersion, Args: m.Args, Commit: m.Commit, Dirty: m.Dirty, Agent: m.Agent, ExitCode: run.ExitCode}
 	}
-	st.stream.Current, st.stream.Stale = currency(st.stream.Run, side, in.Side, in.Ran)
+	st.byCommit.current, st.byCommit.stale = currency(st.stream.Run, side, in.Side, in.Ran)
+	st.fresh, st.ran = in.Fresh, in.Ran
+	st.stream.Current, st.stream.Stale = st.byCommit.current, st.byCommit.stale
 	for _, p := range gotestspec.BuildTree(in.Events, gotestspec.WithDeclarations(idx.twins)) {
 		st.pkgs[p.Path] = p
 	}
+	if len(st.fresh) > 0 && !in.Ran {
+		st.stream.Current, st.stream.Stale = streamFreshness(st.fresh)
+	}
 	return st
+}
+
+// streamFreshness judges a stream by its packages' hashes: current when
+// the head's tree has each, else stale, naming those it lacks.
+func streamFreshness(fresh map[string]bool) (bool, string) {
+	var changed []string
+	for pkg, ok := range fresh {
+		if !ok {
+			changed = append(changed, pkg)
+		}
+	}
+	if len(changed) == 0 {
+		return true, ""
+	}
+	slices.Sort(changed)
+	return false, "the inputs changed since the stream ran: " + strings.Join(changed, ", ")
 }
 
 // currency says whether a stream ran the side's tree: the audit's own run
@@ -384,13 +440,13 @@ func cmpOr(a, b string) string {
 // best picks, of the streams' judgments, the one a reader trusts most: one
 // that holds the package, a current stream before a stale one, then the
 // first given.
-func best(trees []streamTree, js []judgment) int {
+func best(trees []streamTree, js []judgment, pkg string) int {
 	pick := -1
 	for i := range js {
 		if js[i].verdict == VerdictNone {
 			continue
 		}
-		if pick < 0 || trees[i].stream.Current && !trees[pick].stream.Current {
+		if pick < 0 || trees[i].current(pkg) && !trees[pick].current(pkg) {
 			pick = i
 		}
 	}
@@ -474,11 +530,13 @@ func evidenceFor(s *evidenceSubject, idx *recordIndex, trees []streamTree, at []
 		e.Kind = t.chain[len(t.chain)-1].kind
 	}
 	e.Selector = t.selector()
+	loc := t.chain[len(t.chain)-1].loc
+	e.Module, e.Location = t.mod, &loc
 	js := make([]judgment, len(trees))
 	for i := range trees {
 		js[i] = trees[i].judge(s.pkg, t)
 	}
-	pick := best(trees, js)
+	pick := best(trees, js, s.pkg)
 	if pick < 0 {
 		return e
 	}
@@ -486,7 +544,8 @@ func evidenceFor(s *evidenceSubject, idx *recordIndex, trees []streamTree, at []
 	stream := at[pick]
 	e.Verdict, e.Assertions, e.Vacuous, e.AssertsBy, e.SkipReason, e.Runs, e.Leaves = j.verdict, j.assertions, j.vacuous, j.assertsBy, j.skipReason, j.runs, j.leaves
 	st := &trees[pick].stream
-	e.Stream, e.Current, e.Stale = &stream, st.Current, st.Stale
+	e.Current, e.Stale = trees[pick].currentFor(s.pkg)
+	e.Stream = &stream
 	e.Source = st.File
 	if st.Ran {
 		e.Source = "--run"
@@ -497,7 +556,7 @@ func evidenceFor(s *evidenceSubject, idx *recordIndex, trees []streamTree, at []
 	e.NeedsDecision = e.Verdict == VerdictFail || e.Vacuous || e.notProven() || !e.Current
 	for i := range js {
 		if i != pick && js[i].verdict != VerdictNone {
-			e.Others = append(e.Others, OtherVerdict{Stream: at[i], Verdict: js[i].verdict, Current: trees[i].stream.Current})
+			e.Others = append(e.Others, OtherVerdict{Stream: at[i], Verdict: js[i].verdict, Current: trees[i].current(s.pkg)})
 		}
 	}
 	return e
@@ -524,7 +583,7 @@ func runtimeAssertions(d *Document, bIdx *recordIndex, bases []streamTree) {
 			for k := range bases {
 				js[k] = bases[k].judge(f.Package, t)
 			}
-			if pick := best(bases, js); pick >= 0 {
+			if pick := best(bases, js, f.Package); pick >= 0 {
 				rt.Base = js[pick].assertions
 			}
 		}
@@ -562,7 +621,7 @@ func (d *Document) countEvidence() {
 	setClass(s, ClassNotRun, s.NotRun)
 	setClass(s, ClassVacuous, s.Vacuous)
 	setClass(s, ClassStale, s.Stale)
-	d.normalize()
+	d.link()
 }
 
 func setClass(s *Summary, class string, n int) {

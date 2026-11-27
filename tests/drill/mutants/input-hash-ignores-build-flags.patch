@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/cli CLIInputHash .* / its two verdicts carry two hashes \(
+Clause: when one package is run with and without -tags → its two verdicts carry two hashes
+--- a/internal/inputhash/settings.go
++++ b/internal/inputhash/settings.go
+@@ -93,9 +93,6 @@
+ // lines are the settings as the hash lists them.
+ func (s *Settings) lines() []string {
+ 	var out []string
+-	for _, f := range s.Flags {
+-		out = append(out, "flag "+f)
+-	}
+ 	for _, name := range envNames {
+ 		if v, ok := s.Env[name]; ok && v != "" {
+ 			out = append(out, "env "+name+"="+v)

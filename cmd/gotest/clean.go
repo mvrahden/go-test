@@ -75,9 +75,9 @@ func runClean(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	return 0
 }
 
-// clearCache removes every cached test binary no run is using and every
-// base tree no audit is using; args may hold go test flags, never a
-// package.
+// clearCache removes every cached test binary no run is using, every
+// base tree no audit is using and the run records no run is writing; args
+// may hold go test flags, never a package.
 func clearCache(args []string) int {
 	if len(gotestrunner.PatternIndices(args, ownFlag)) > 0 {
 		fmt.Fprintln(os.Stderr, "FAIL: --cache clears the test binary cache and takes no packages; run gotest clean <packages> for generated files")
@@ -102,6 +102,17 @@ func clearCache(args []string) int {
 	}
 	if held > 0 {
 		fmt.Fprintf(os.Stderr, "note: %d audit base tree%s left in place: a running audit is using %s\n", held, plural(held), itThem(held))
+	}
+	checkouts, writing, runsDir, err := gotestrunner.ClearRuns()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
+	if checkouts > 0 {
+		fmt.Fprintf(os.Stderr, "removed the run records of %d checkout%s from %s\n", checkouts, plural(checkouts), runsDir)
+	}
+	if writing > 0 {
+		fmt.Fprintf(os.Stderr, "note: the run records of %d checkout%s left in place: a run is writing them\n", writing, plural(writing))
 	}
 	return 0
 }

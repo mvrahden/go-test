@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/cli CLIChanged .* / opens its -json stream with a manifest whose Changed holds both counts \(
+Clause: when a --changed run leaves packages out as unchanged → opens its -json stream with a manifest whose Changed holds both counts
+--- a/cmd/gotest/changed.go
++++ b/cmd/gotest/changed.go
+@@ -147,9 +147,6 @@
+ }
+ 
+ func (p *runPlan) setManifest(cfg *ExecConfig) {
+-	if cfg.Manifest != nil {
+-		cfg.Manifest.Changed = p.changed
+-	}
+ }
+ 
+ // narrowPackages keeps of pkgs those keep names.

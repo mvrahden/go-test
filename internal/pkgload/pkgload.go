@@ -30,13 +30,16 @@ type Config struct {
 	Fset       *token.FileSet
 	ParseFile  func(fset *token.FileSet, filename string, src []byte) (*ast.File, error)
 	Overlay    map[string][]byte
+	// Graph, when set, is handed the roots as listed, their dependencies
+	// reachable through Imports, before any is checked or reported again.
+	Graph func(roots []*packages.Package)
 }
 
 const (
 	// graphMode lists without compiling: any of CompiledGoFiles, Syntax,
 	// Types, TypesInfo or TypesSizes makes go list run the build actions
 	// of every test variant and test main.
-	graphMode = packages.NeedName | packages.NeedFiles | packages.NeedImports | packages.NeedDeps | packages.NeedModule
+	graphMode = packages.NeedName | packages.NeedFiles | packages.NeedImports | packages.NeedDeps | packages.NeedModule | packages.NeedEmbedFiles
 	// exportMode builds only plain packages, which the test build needs anyway.
 	exportMode = packages.NeedName | packages.NeedExportFile | packages.NeedImports | packages.NeedDeps | packages.NeedTypesSizes
 	// reportMode is the load a package with errors is reported from.
@@ -77,6 +80,14 @@ func Load(cfg *Config, patterns ...string) ([]*packages.Package, error) {
 		return nil, err
 	}
 	return l.report()
+}
+
+// Graph lists the packages the patterns match, with their tests when
+// cfg.Tests, and every package they reach through Imports: names, files,
+// embedded files and modules, nothing parsed, checked or built.
+func Graph(cfg *Config, patterns ...string) ([]*packages.Package, error) {
+	l := &loader{cfg: cfg, fset: cfg.Fset}
+	return load(l.config(graphMode, cfg.Tests), patterns...)
 }
 
 type loader struct {
@@ -124,6 +135,9 @@ func (l *loader) graph(mode packages.LoadMode, patterns []string) error {
 	}
 	l.compiled = mode&packages.NeedCompiledGoFiles != 0
 	l.roots = roots
+	if l.cfg.Graph != nil {
+		l.cfg.Graph(roots)
+	}
 	l.nodes = map[string]*packages.Package{}
 	l.source = map[string]*packages.Package{}
 	packages.Visit(roots, nil, func(p *packages.Package) { l.nodes[p.ID] = p })

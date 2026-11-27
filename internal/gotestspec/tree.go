@@ -1,6 +1,7 @@
 package gotestspec
 
 import (
+	"cmp"
 	"fmt"
 	"path/filepath"
 	"regexp"
@@ -233,6 +234,46 @@ type Package struct {
 	Duration time.Duration
 	Nodes    []*Node
 	Output   []string
+	// InputHash is the hash the run stamped the package's verdict with; ""
+	// for none, as in a stream go test wrote.
+	InputHash string
+	// Freshness says whether the verdict still belongs to the tree, once
+	// MarkFreshness has judged it; "" before.
+	Freshness Freshness
+}
+
+// Freshness is whether a package's verdict judged the source the tree
+// holds now.
+type Freshness string
+
+const (
+	// FreshCurrent is a verdict whose input hash the tree's package has.
+	FreshCurrent Freshness = "current"
+	// FreshStale is a verdict whose package's inputs changed, or is gone.
+	FreshStale Freshness = "stale"
+	// FreshUnknown is a verdict the run stamped with no hash.
+	FreshUnknown Freshness = "unknown"
+)
+
+// StaleMark is what the text and Markdown renderings say beside a package
+// whose verdict is stale.
+const StaleMark = "STALE: its inputs changed since the run"
+
+// MarkFreshness judges each package's verdict against current, the input
+// hashes of the tree's packages now; a package the run booked for itself
+// is left unjudged.
+func MarkFreshness(packages []*Package, current map[string]string) {
+	for _, pkg := range packages {
+		switch {
+		case pkg.RunLevel:
+		case pkg.InputHash == "":
+			pkg.Freshness = FreshUnknown
+		case current[pkg.Path] == pkg.InputHash:
+			pkg.Freshness = FreshCurrent
+		default:
+			pkg.Freshness = FreshStale
+		}
+	}
 }
 
 type Stats struct {
@@ -259,6 +300,8 @@ type Stats struct {
 	AssertsBy int
 	// Excluded counts the leaves the X_ prefix excludes, or one above them.
 	Excluded int
+	// Stale counts the packages whose verdict MarkFreshness found stale.
+	Stale int
 }
 
 func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
@@ -299,6 +342,7 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 		}
 
 		if ev.Test == "" {
+			pkg.InputHash = cmp.Or(ev.InputHash, pkg.InputHash)
 			switch ev.Action {
 			case ActionPass, ActionFail:
 				pkg.Status = statusFrom(ev.Action)
@@ -856,6 +900,9 @@ func CollectStats(packages []*Package) Stats {
 	for _, pkg := range packages {
 		if PkgFailedOnItsOwn(pkg) {
 			s.FailedPackages++
+		}
+		if pkg.Freshness == FreshStale {
+			s.Stale++
 		}
 		for _, n := range pkg.Nodes {
 			collectStats(n, &s, n.Kind == KindTest)

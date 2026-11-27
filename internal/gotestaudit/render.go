@@ -52,7 +52,7 @@ func RenderText(w io.Writer, d *Document, v Verdict) {
 	if len(d.Behaviors) > 0 {
 		fmt.Fprintf(w, "\nbehaviors: %s\n", behaviorCounts(&d.Summary))
 		var rows []textRow
-		for _, i := range behaviorOrder(d, ev) {
+		for _, i := range byOrder(d) {
 			c := &d.Behaviors[i]
 			var e *Evidence
 			p := c.Base
@@ -162,12 +162,17 @@ func evidenceIndex(d *Document) map[string]*Evidence {
 	return out
 }
 
-// markOf is an evidence entry's mark: its verdict, the assertions a passing
-// leaf made, and * when the stream is stale; "" without an entry.
+// markOf is the mark of the row an evidence entry is about, "" without one.
 func markOf(e *Evidence) string {
 	if e == nil {
 		return ""
 	}
+	return e.Mark
+}
+
+// mark is an evidence entry's mark: its verdict, the assertions a passing
+// leaf made, and * when the stream is stale.
+func mark(e *Evidence) string {
 	m := e.Verdict
 	switch {
 	case e.Verdict == VerdictFail:
@@ -183,6 +188,50 @@ func markOf(e *Evidence) string {
 		m += "*"
 	}
 	return m
+}
+
+// link gives each evidence entry its mark, each finding and behavior the id
+// of the entry about it, and each behavior its place in the text format.
+func (d *Document) link() {
+	ev := evidenceIndex(d)
+	for i := range d.Evidence {
+		d.Evidence[i].Mark = mark(&d.Evidence[i])
+	}
+	for i := range d.Findings {
+		f := &d.Findings[i]
+		f.Evidence = ""
+		if e := ev[pathKey(f.Package, f.headPath)]; e != nil && f.headPath != nil {
+			f.Evidence = e.ID
+		}
+	}
+	for i := range d.Behaviors {
+		c := &d.Behaviors[i]
+		c.Evidence = ""
+		if e := ev[pathKey(c.Package, headPath(c))]; e != nil && c.Head != nil {
+			c.Evidence = e.ID
+		}
+	}
+	for rank, i := range behaviorOrder(d, ev) {
+		d.Behaviors[i].Order = rank
+	}
+	d.normalize()
+}
+
+func headPath(c *Change) []string {
+	if c.Head == nil {
+		return nil
+	}
+	return c.Head.Path
+}
+
+// byOrder lists the behaviors' indexes in their Order.
+func byOrder(d *Document) []int {
+	order := make([]int, len(d.Behaviors))
+	for i := range order {
+		order[i] = i
+	}
+	slices.SortStableFunc(order, func(a, b int) int { return cmp.Compare(d.Behaviors[a].Order, d.Behaviors[b].Order) })
+	return order
 }
 
 // behaviorOrder lists the behaviors a reader should see first, first:
@@ -559,7 +608,7 @@ func RenderMarkdown(w io.Writer, d *Document, v Verdict) {
 		} else {
 			fmt.Fprint(w, "\n#### Behaviors\n\n| Change | Package | Behavior | Where |\n|---|---|---|---|\n")
 		}
-		for _, i := range behaviorOrder(d, ev) {
+		for _, i := range byOrder(d) {
 			c := &d.Behaviors[i]
 			if len(ev) > 0 {
 				var e *Evidence

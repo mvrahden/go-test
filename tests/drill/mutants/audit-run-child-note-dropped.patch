@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditChildCoverage / BinariesBuiltWithoutCover / when audit --run runs only tests that start binaries built without -cover / notes that a binary a test starts counts when built with go build -cover \(
+Clause: when audit --run runs only tests that start binaries built without -cover → notes that a binary a test starts counts when built with go build -cover
+--- a/cmd/gotest/auditproof.go
++++ b/cmd/gotest/auditproof.go
+@@ -339,7 +339,7 @@
+ 		switch n, err := foldChildCoverage(covdir, profile, cover); {
+ 		case err != nil:
+ 			doc.Notes = append(doc.Notes, "--run: the coverage data of the binaries the tests started was not read: "+err.Error())
+-		case n == 0 && !a.stopped:
++		case n < 0 && !a.stopped:
+ 			doc.Notes = append(doc.Notes, childCoverNote)
+ 		default:
+ 			doc.Notes = append(doc.Notes, fmt.Sprintf("--run: the coverage counts what %s the tests started executed", binaries(n)))

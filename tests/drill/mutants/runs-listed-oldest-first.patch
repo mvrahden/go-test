@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLIRunRecords .* / prints one document opening with version that lists both newest first, with manifest, result and failed units \(
+Clause: when gotest runs --format=json follows two runs, a package of the first changed since → prints one document opening with version that lists both newest first, with manifest, result and failed units
+--- a/internal/gotestrunner/runhistory.go
++++ b/internal/gotestrunner/runhistory.go
+@@ -218,7 +218,7 @@
+ 	hdir := historyDir(root, dir)
+ 	names := historyNames(hdir)
+ 	out := make([]KeptRun, 0, len(names))
+-	for i := len(names) - 1; i >= 0; i-- {
++	for i := range names {
+ 		data, err := os.ReadFile(filepath.Join(hdir, names[i])) //nolint:gosec // G304: a record under gotest's own cache
+ 		if err != nil {
+ 			continue

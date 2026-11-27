@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditCurrency / AStreamsOwnCurrency / when audit is given streams with input hashes, one also as the base's run, after an uncommitted change to a package one of them ran / judges the base's stream by commit \(
+Clause: when audit is given streams with input hashes, one also as the base's run, after an uncommitted change to a package one of them ran → judges the base's stream by commit
+--- a/cmd/gotest/auditproof.go
++++ b/cmd/gotest/auditproof.go
+@@ -56,7 +56,7 @@
+ 				return fmt.Errorf("--%s: %w", evidenceFlag(side.name), err)
+ 			}
+ 			in := gotestaudit.StreamInput{File: file, Side: side.name, Events: events}
+-			if side.name == gotestaudit.SideHead && a.headFile == "" {
++			if side.name == gotestaudit.SideHead || a.headFile == "" {
+ 				if in.Fresh, err = freshOnDisk(events); err != nil {
+ 					return fmt.Errorf("--evidence: %w", err)
+ 				}

@@ -58,11 +58,16 @@ type goTestEvent struct {
 		Version   string
 		GoVersion string `json:",omitempty"`
 		Args      []string
-		Commit    string `json:",omitempty"`
-		Dirty     *bool  `json:",omitempty"`
-		Agent     string `json:",omitempty"`
+		Commit    string                        `json:",omitempty"`
+		Dirty     *bool                         `json:",omitempty"`
+		Agent     string                        `json:",omitempty"`
+		Build     []string                      `json:",omitempty"`
+		Changed   *struct{ Ran, Unchanged int } `json:",omitempty"`
 	} `json:",omitempty"`
-	Result *struct {
+	// InputHash is gotest's own: the digest of the source a package's
+	// verdict judged, on that verdict.
+	InputHash string `json:",omitempty"`
+	Result    *struct {
 		ExitCode int
 		Packages struct{ Passed, Failed, Skipped int }
 		Tests    struct{ Passed, Failed, Skipped int }

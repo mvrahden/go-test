@@ -114,6 +114,50 @@ func (c *OutputCollector) judged() (*protocol.RunResult, []protocol.FailedUnit) 
 	return &res, narrowFailures(append(failed, c.vacuousUnits()...))
 }
 
+// packageVerdicts are the verdicts of the packages the run judged, each
+// with its input hash and time; nil for a stream without a tally.
+func (c *OutputCollector) packageVerdicts() []protocol.PackageVerdict {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.mode != RunBatchText {
+		if c.starts == nil || c.starts.run == nil {
+			return nil
+		}
+		return c.starts.run.verdicts(c.runLevel)
+	}
+	missed := map[string]bool{}
+	for _, m := range c.missing {
+		missed[m.Pkg] = true
+	}
+	var out []protocol.PackageVerdict
+	for _, pkg := range c.order {
+		s := c.pkgs[pkg]
+		if c.runLevel[pkg] || s == nil {
+			continue
+		}
+		v := protocol.PackageVerdict{Package: pkg, Elapsed: packageSpan(s.results).Seconds()}
+		bad := s.failedBuild != "" || missed[pkg]
+		for i := range s.results {
+			bad = bad || s.results[i].ExitCode != 0
+		}
+		switch {
+		case bad:
+			v.Verdict = "fail"
+		case strings.HasPrefix(s.fixed, "?"):
+			v.Verdict = "skip"
+		case s.fixed != "" || s.completed > 0:
+			v.Verdict = "pass"
+		default:
+			continue
+		}
+		if c.inputs != nil {
+			v.InputHash = c.inputs(pkg)
+		}
+		out = append(out, v)
+	}
+	return out
+}
+
 // vacuousUnits are the units of the passes without an assertion that failed
 // the run under --ci.
 func (c *OutputCollector) vacuousUnits() []protocol.FailedUnit {
@@ -163,16 +207,6 @@ func RunRecordPath(dir string) (string, error) {
 func recordPathIn(root, dir string) string {
 	sum := sha256.Sum256([]byte(dir))
 	return filepath.Join(root, "runs", hex.EncodeToString(sum[:])[:16], "last.json")
-}
-
-// WriteRunRecord replaces the record of rec.Dir by a rename, so a reader
-// never sees half of one.
-func WriteRunRecord(rec protocol.RunRecord) error { //nolint:gocritic // hugeParam: once per run
-	root, err := cacheRoot()
-	if err != nil {
-		return err
-	}
-	return writeRecordIn(root, rec)
 }
 
 func writeRecordIn(root string, rec protocol.RunRecord) error { //nolint:gocritic // hugeParam: once per run

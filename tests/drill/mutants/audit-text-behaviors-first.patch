@@ -10,4 +10,4 @@ Clause: when audit compares two records in the text format → prints the weaken
 +	if len(d.Behaviors) < 0 {
  		fmt.Fprintf(w, "\nbehaviors: %s\n", behaviorCounts(&d.Summary))
  		var rows []textRow
- 		for _, i := range behaviorOrder(d, ev) {
+ 		for _, i := range byOrder(d) {

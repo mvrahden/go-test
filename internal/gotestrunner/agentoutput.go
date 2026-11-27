@@ -26,6 +26,8 @@ type Closing struct {
 	Packages protocol.Tally
 	// Rerun is the command that reruns the run's failures; "" for none.
 	Rerun string
+	// Changed is how a --changed run narrowed itself; nil for another run.
+	Changed *protocol.Changed
 }
 
 // count is one number of a closing line and what it counts.
@@ -68,6 +70,13 @@ func (c Closing) String() string { //nolint:gocritic // hugeParam: once per run
 		segments = append(segments, "tests: "+joinCounts(tests))
 	}
 	segments = append(segments, "packages: "+joinCounts([]count{{c.Packages.Passed, "passed"}, {c.Packages.Failed, "failed"}, {c.Packages.Skipped, "skipped"}}))
+	if ch := c.Changed; ch != nil {
+		if ch.NoRecord {
+			segments = append(segments, "changed only: no record, all ran")
+		} else {
+			segments = append(segments, "changed only: "+joinCounts([]count{{ch.Ran, "ran"}, {ch.Unchanged, "unchanged"}}))
+		}
+	}
 	if c.Rerun != "" {
 		segments = append(segments, "rerun: "+c.Rerun)
 	}
@@ -112,6 +121,8 @@ type AgentOutput struct {
 	pkgs    map[string]*agentPackage
 	rerun   string
 	closed  bool
+	// changed is what the stream's manifest says a --changed run left out.
+	changed *protocol.Changed
 }
 
 // agentPackage is what a package's stream has held since its last verdict.
@@ -165,6 +176,7 @@ func (a *AgentOutput) line(line []byte) {
 		Test       string
 		Output     string
 		ImportPath string
+		Manifest   *protocol.Manifest
 		Result     *protocol.RunResult
 	}
 	if json.Unmarshal(line, &ev) != nil {
@@ -174,8 +186,12 @@ func (a *AgentOutput) line(line []byte) {
 	case ev.Action == "build-output":
 		_, _ = io.WriteString(a.w, ev.Output)
 	case ev.Package == protocol.RunPackage:
+		if ev.Manifest != nil {
+			a.changed = ev.Manifest.Changed
+		}
 		if ev.Result != nil {
 			closing := ClosingOf(ev.Result, ev.Result.ExitCode, true)
+			closing.Changed = a.changed
 			if ev.Result.ExitCode != 0 {
 				closing.Rerun = a.rerun
 			}

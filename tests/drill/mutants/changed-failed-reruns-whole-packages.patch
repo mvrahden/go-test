@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLIChanged .* / reruns only that method \(
+Clause: when --changed --failed follows a run in which one method of an unchanged package failed → reruns only that method
+--- a/cmd/gotest/changed.go
++++ b/cmd/gotest/changed.go
+@@ -125,7 +125,7 @@
+ 		cfg.Only = map[string]string{}
+ 		for pkg := range keep {
+ 			sel, failed := only[pkg]
+-			if failedOnly[pkg] && failed {
++			if failedOnly[pkg] && failed && false {
+ 				cfg.Only[pkg] = sel
+ 			} else {
+ 				cfg.Only[pkg] = ""

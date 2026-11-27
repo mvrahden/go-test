@@ -3,11 +3,11 @@ Judge: ./tests/canary CanaryDiscoveryTestSuite/TestGeneratedFilesStayValid
 Clause: when a package holds a generated file from an earlier generate → discover and spec read past a stale generated file
 --- a/internal/gotestgen/generator.go
 +++ b/internal/gotestgen/generator.go
-@@ -168,7 +168,6 @@
+@@ -171,7 +171,6 @@
  	cfg := &pkgload.Config{
  		Tests:     true,
  		Fset:      token.NewFileSet(),
 -		ParseFile: about.ParseStubbingGenerated,
+ 		Graph:     func(roots []*packages.Package) { graph = roots },
  	}
  	// A broken package is built for its report, from disk, so the go
- 	// command takes the stubs too.

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLIInputHash .* / stamps each package's verdict event with an InputHash and no test event with one \(
+Clause: when a -json run is made with -tags → stamps each package's verdict event with an InputHash and no test event with one
+--- a/internal/gotestrunner/output_collector.go
++++ b/internal/gotestrunner/output_collector.go
+@@ -702,7 +702,7 @@
+ 		InputHash string
+ 	}
+ 	if json.Unmarshal(line, &ev) == nil && ev.Package != "" {
+-		if ev.Test == "" && isVerdict(ev.Action) && !s.runLevel[ev.Package] && ev.InputHash == "" && s.inputs != nil {
++		if isVerdict(ev.Action) && !s.runLevel[ev.Package] && ev.InputHash == "" && s.inputs != nil {
+ 			if h := s.inputs(ev.Package); h != "" {
+ 				line, ev.InputHash = withInputHash(line, h), h
+ 			}

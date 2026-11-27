@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 
 	"github.com/mvrahden/go-test/internal/gotestaudit"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
@@ -14,7 +15,7 @@ import (
 )
 
 var auditAllowed = flagSet("--record", "--base", "--base-record", "--head-record", "--fail-on", "--format", "--output",
-	"--evidence", "--base-evidence", "--run", "--coverage", "--diff", "--agent")
+	"--evidence", "--base-evidence", "--run", "--coverage", "--diff", "--agent", "--control")
 
 // auditUsage is what an audit without a base is told.
 const auditUsage = "audit compares the tree with a base: give --base-record=<file> with a record --record wrote, or --base=<ref> to record a commit of this checkout"
@@ -67,6 +68,9 @@ func runAudit(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		return 2
 	}
 	verdict := gotestaudit.Verdict{ExitCode: gotestaudit.ExitCode(&doc, args.failOn), FailOn: args.failOn, Verbose: args.verbose}
+	if args.stopped {
+		verdict.ExitCode = 130 // as the stopped run exits
+	}
 	err = writeAuditOutput(args.output, func(w io.Writer) error {
 		switch args.format {
 		case "json":
@@ -98,6 +102,9 @@ type auditArgs struct {
 	evidence, baseEvidence []string
 	run, verbose           bool
 	coverage, diff         string
+	// control hands standard input to the run --run makes; stopped says a
+	// stop ended that run before its end.
+	control, stopped bool
 }
 
 func parseAuditArgs(own OwnFlags, rest []string) (auditArgs, error) {
@@ -112,6 +119,10 @@ func parseAuditArgs(own OwnFlags, rest []string) (auditArgs, error) {
 		run:          own.Bool("--run"),
 		coverage:     own.Value("--coverage"),
 		diff:         own.Value("--diff"),
+		control:      own.Given("--control"),
+	}
+	if _, err := parseControlFlag(own); err != nil {
+		return a, err
 	}
 	switch f := own.ValueOr("--format", "text"); f {
 	case "text", "json":
@@ -163,6 +174,14 @@ var proofFlags = []string{"--evidence", "--base-evidence", "--run", "--coverage"
 
 // check refuses flags that do not go together.
 func (a *auditArgs) check(own OwnFlags) error {
+	if a.control {
+		switch {
+		case !a.run:
+			return errors.New("--control=stdin stops the run --run makes; give it with --run")
+		case a.diff == "-" || slices.Contains(a.evidence, "-") || slices.Contains(a.baseEvidence, "-"):
+			return errors.New("--control=stdin and a stream or diff from - both read standard input; save it to a file")
+		}
+	}
 	if a.record {
 		for _, f := range append([]string{"--base", "--base-record", "--head-record", "--fail-on"}, proofFlags...) {
 			if own.Given(f) {
@@ -369,13 +388,15 @@ Flags:
                         unproven; proof is the five
   --format=<fmt>        text (default), json or md
   --output=<file>       Write to a file instead of stdout
+  --control=stdin       Hand stop and force lines on stdin to the run --run
+                        makes; a stopped run exits 130, its document written
   -v                    List every row the text format groups
   --agent=<bool>        Taken as a run takes it; audit prints the same either way
 
 Exit codes: 0 compared (whatever it found, without --fail-on); 1 --fail-on
 found its class; 2 a flag, a record or a stream is wrong, git or the ref is
 missing, or a package could not be read on one side, which then is not
-compared.
+compared; 130 the run --run made was stopped.
 
 Examples:
   gotest audit --base=origin/main

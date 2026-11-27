@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditEvidence / AStoppedAuditRun / when audit --run --control=stdin has its standard input at its end / the text format's closing line names exit 130 \(
+Clause: when audit --run --control=stdin has its standard input at its end → the text format's closing line names exit 130
+--- a/cmd/gotest/audit.go
++++ b/cmd/gotest/audit.go
+@@ -68,7 +68,7 @@
+ 		return 2
+ 	}
+ 	verdict := gotestaudit.Verdict{ExitCode: gotestaudit.ExitCode(&doc, args.failOn), FailOn: args.failOn, Verbose: args.verbose}
+-	if args.stopped {
++	if args.stopped && verdict.ExitCode == 0 {
+ 		verdict.ExitCode = 130 // as the stopped run exits
+ 	}
+ 	err = writeAuditOutput(args.output, func(w io.Writer) error {

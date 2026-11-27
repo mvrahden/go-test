@@ -928,6 +928,9 @@ var (
 	ExportRecordPathIn  = recordPathIn
 	ExportWriteRecordIn = writeRecordIn
 	ExportReadRecordIn  = readRecordIn
+	ExportSaveRunIn     = saveRunIn
+	ExportKeptRunsIn    = keptRunsIn
+	ExportClearRunsIn   = clearRunsIn
 )
 
 // ExportVacuousInText is what a text run's process of pkg leaves vacuous,

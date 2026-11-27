@@ -5,21 +5,21 @@ Clause: when a package holds a generated file from an earlier generate → a sta
 +++ b/internal/gotestgen/generator.go
 @@ -14,7 +14,6 @@
  	"strings"
-
+ 
  	"github.com/mvrahden/go-test/internal/about"
 -	"github.com/mvrahden/go-test/internal/genstub"
  	"github.com/mvrahden/go-test/internal/gotestast"
  	"github.com/mvrahden/go-test/internal/goversion"
  	"github.com/mvrahden/go-test/internal/pkgload"
-@@ -170,15 +169,8 @@
- 		Fset:      token.NewFileSet(),
+@@ -174,15 +173,8 @@
  		ParseFile: about.ParseStubbingGenerated,
+ 		Graph:     func(roots []*packages.Package) { graph = roots },
  	}
 -	// A broken package is built for its report, from disk, so the go
 -	// command takes the stubs too.
 -	loadFlags, unstub, err := genstub.LoadFlags("", targetPkgs, buildFlags)
 -	if err != nil {
--		return nil, nil, nil, nil, err
+-		return nil, nil, nil, nil, nil, err
 -	}
 -	defer unstub()
 -	if len(loadFlags) > 0 {

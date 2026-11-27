@@ -101,15 +101,36 @@ The audit SHALL exit 0 whatever it finds unless `--fail-on` names finding classe
 - **AND** lists the stream with its manifest's CLI version, commit, dirty flag, agent and exit code
 
 ### Requirement: Current and stale evidence
-Evidence SHALL be current when its stream ran the head's commit with neither tree holding uncommitted changes, or when the audit ran it; else stale, naming why: another commit, uncommitted changes, or no manifest. Of the streams that judge one behavior the audit SHALL take a current one before a stale one, then the first given, and name the others' verdicts.
+Evidence SHALL be current when the audit ran it, or when its stream stamped the package's verdict with an InputHash the head's working tree still has; stale when the hash differs, naming the package's inputs changed. A stream without a hash for the package, or a head given as a record, SHALL be judged by commit: current when it ran the head's commit with neither tree dirty, else stale, naming another commit, uncommitted changes, or no manifest.
 
 #### Scenario: Streams of other trees
 - **WHEN** audit is given streams of another commit, of a tree with uncommitted changes and without a manifest
 - **THEN** marks each stale, naming another commit, uncommitted changes and no manifest
 
+#### Scenario: A stream with input hashes
+- **WHEN** audit is given a stream with input hashes after an uncommitted change to one of its packages and to a file no package reads
+- **THEN** marks the evidence of the unchanged package current, though the tree has uncommitted changes
+- **AND** marks the evidence of the changed package stale, naming its inputs changed
+
+### Requirement: A stream's own currency
+Each stream SHALL be listed as current or stale as a whole. A stream of the head's run whose verdicts carry input hashes, one package's or more, SHALL be current when the head's working tree still has each hash, else stale, naming in order each package whose inputs changed; any other stream, a stream of the base's run among them, SHALL be judged by commit as its evidence is.
+
+#### Scenario: Streams with input hashes
+- **WHEN** audit is given streams with input hashes, one also as the base's run, after an uncommitted change to a package one of them ran
+- **THEN** marks the stream that ran the changed package stale, naming each package whose inputs changed
+- **AND** marks the stream of one unchanged package current, though the tree has uncommitted changes
+- **AND** judges the base's stream by commit
+
+### Requirement: The stream that judges a behavior
+Of the streams that judge one behavior the audit SHALL take a current one before a stale one, then the first given, and name the others' verdicts.
+
 #### Scenario: Two streams of one behavior
 - **WHEN** a current and a stale stream judge one behavior
 - **THEN** states the current stream's verdict and names the stale one's among the others
+
+#### Scenario: Two current streams of one behavior
+- **WHEN** two current streams judge one behavior
+- **THEN** states the verdict of the first given and names the other's among the others
 
 ### Requirement: Assertions at run time
 With `--base-evidence=<stream>`, a stream of the base's run, a finding of class `assertions` SHALL carry, beside the counts written in source, the count each side's run reported.
@@ -138,6 +159,19 @@ Given a coverage profile, `--coverage` or the one `--run` measured, and the chan
 #### Scenario: Lines from git
 - **WHEN** audit --base with --coverage runs in a checkout with uncommitted and untracked production files
 - **THEN** takes the changed lines from the commit to the files on disk, every line of an untracked file included
+
+### Requirement: Coverage of the binaries a test starts
+When `gotest audit --run` measures coverage it SHALL give the run a `GOCOVERDIR` under its own directory and count, beside the test binaries' profiles, what each binary built with `go build -cover` that a test starts wrote there. A file only binaries built without it execute SHALL read as without coverage data, and where no binary wrote any a note SHALL say how one counts. Nothing SHALL be written into the module, and the directory SHALL go with the run's.
+
+#### Scenario: A test that starts a binary built with -cover
+- **WHEN** audit --run runs a test that starts a binary built with go build -cover
+- **THEN** lists, of the changed lines that binary's packages hold, only those it did not execute
+- **AND** leaves the module as it was and no directory of the run behind
+
+#### Scenario: Binaries built without -cover
+- **WHEN** audit --run runs only tests that start binaries built without -cover
+- **THEN** lists the changed files only those binaries execute as without coverage data
+- **AND** notes that a binary a test starts counts when built with go build -cover
 
 ### Requirement: Proof in the policy
 `--fail-on` SHALL take the proof classes `failing`, `not-run`, `vacuous`, `stale` and `unproven`, and `proof` for the five; `all` SHALL stay every weakening, without them, for they judge the evidence given, not the change. A proof class with nothing to judge SHALL be refused with exit 2. The closing line SHALL count the evidence and the unproven lines.
@@ -185,6 +219,33 @@ In the JSON document each finding and evidence row SHALL carry an `id` made from
 - **AND** finds on a finding, behavior and evidence row about a test the go test name and -run pattern that select it
 - **AND** finds each module's directory relative to the audited one and each side's branch
 - **AND** finds on each evidence row whether it needs a decision, the stream it was judged by and that stream's commit
+
+### Requirement: Rows a tool links
+In the JSON document a finding and a behavior SHALL name, as `evidence`, the id of the evidence row about its behavior where there is one; a behavior and an evidence row SHALL carry its `module`; an evidence row SHALL carry, as `location`, where the head declares its behavior, and, as `mark`, the mark the text format writes on its rows; a behavior SHALL carry, as `order`, its place in the text format's list, the findings being in the text format's order.
+
+#### Scenario: A tool linking the rows
+- **WHEN** a tool reads the audit document with evidence as JSON
+- **THEN** finds on each finding and behavior about an evidence row's behavior that row's id, and none on the others
+- **AND** finds on each behavior and evidence row its module, and on each evidence row the head's file and lines of its behavior
+- **AND** finds on each evidence row the mark the text format writes on its rows
+- **AND** finds on each behavior its place in the text format's list of behaviors
+
+### Requirement: A stopped audit run
+`gotest audit --run --control=stdin` SHALL hand its standard input to the run it makes, which stops on a stop line or the input's end as a run does, and an interrupt the audit gets SHALL stop that run as one; the audit SHALL then write its document with what that run reported, name the run as stopped among what was not compared, and exit 130 whatever the policy. --control SHALL be refused with exit 2 without --run, and beside a stream or diff read from standard input.
+
+#### Scenario: A run stopped by the input's end
+- **WHEN** audit --run --control=stdin has its standard input at its end
+- **THEN** writes the document naming the stopped run among what was not compared and exits 130
+- **AND** the text format's closing line names exit 130
+
+#### Scenario: An interrupted audit run
+- **WHEN** audit --run is interrupted while its run is under way
+- **THEN** writes the document naming the stopped run among what was not compared and exits 130
+- **AND** leaves no directory of the run behind
+
+#### Scenario: Control without the run
+- **WHEN** --control=stdin is given to audit without --run, or beside --evidence=-
+- **THEN** audit refuses it with exit 2, naming --run or standard input
 
 ### Requirement: A tree that does not compile
 A record SHALL list a package that does not compile with its errors and no suites, and exit 2; the audit SHALL compare none of that package's behaviors, name it as not compared and exit 2 unless the policy failed.

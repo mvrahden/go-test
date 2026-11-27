@@ -2,6 +2,7 @@ package audit_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -642,4 +643,226 @@ func moveLines(v any) {
 			moveLines(val)
 		}
 	}
+}
+
+// linkDoc is the document as a tool links its rows.
+type linkDoc struct {
+	Findings []struct {
+		Class, Package, Subject, Evidence string
+	} `json:"findings"`
+	Behaviors []struct {
+		Change, Module, Evidence string
+		Order                    int
+		Head                     *struct {
+			Path []string
+			File string
+			Line int
+		} `json:"head"`
+	} `json:"behaviors"`
+	Evidence []struct {
+		ID, Package, Module, Mark string
+		Path                      []string
+		Location                  *struct {
+			File          string
+			Line, EndLine int
+		} `json:"location"`
+	} `json:"evidence"`
+}
+
+func readLinks(t *gotest.T, run testkit.Run) linkDoc { //nolint:gocritic // hugeParam: a run as RunCLI returns it
+	gotest.Equal(t, 0, run.Exit, "stderr: %s", run.Stderr)
+	var doc linkDoc
+	gotest.NoError(t, json.Unmarshal([]byte(run.Stdout), &doc), "document: %s", run.Stdout)
+	return doc
+}
+
+// idOf is the id of the evidence row about path, "" for none.
+func (d *linkDoc) idOf(path string) string {
+	for i := range d.Evidence {
+		if strings.Join(d.Evidence[i].Path, " / ") == path {
+			return d.Evidence[i].ID
+		}
+	}
+	return ""
+}
+
+// textRows are the rows of one list of the text format, from its title to
+// the blank line after it.
+func textRows(stdout, title string) []string {
+	var rows []string
+	in := false
+	for _, line := range strings.Split(stdout, "\n") {
+		switch {
+		case strings.HasPrefix(line, title):
+			in = true
+		case in && line == "":
+			return rows
+		case in:
+			rows = append(rows, line)
+		}
+	}
+	return rows
+}
+
+func (s *AuditEvidenceTestSuite) TestRowsAToolLinks(t *gotest.T) {
+	t.When("a tool reads the audit document with evidence as JSON", func(w *gotest.T) {
+		w.It("finds on each finding and behavior about an evidence row's behavior that row's id, and none on the others", func(it *gotest.T) {
+			doc := readLinks(it, s.json)
+			linked := 0
+			for _, f := range doc.Findings {
+				want := ""
+				if f.Package != "" && f.Class != "removed" {
+					want = doc.idOf(f.Subject)
+					gotest.NotEmpty(it, want, f.Subject)
+					linked++
+				}
+				gotest.Equal(it, want, f.Evidence, "%s %s", f.Class, f.Subject)
+			}
+			gotest.Equal(it, 9, linked)
+			for _, c := range doc.Behaviors {
+				if c.Head == nil {
+					gotest.Empty(it, c.Evidence, c.Change)
+					continue
+				}
+				gotest.Equal(it, doc.idOf(strings.Join(c.Head.Path, " / ")), c.Evidence, "%v", c.Head.Path)
+				gotest.NotEmpty(it, c.Evidence, "%v", c.Head.Path)
+			}
+		})
+		w.It("finds on each behavior and evidence row its module, and on each evidence row the head's file and lines of its behavior", func(it *gotest.T) {
+			doc := readLinks(it, s.json)
+			for _, c := range doc.Behaviors {
+				gotest.Equal(it, "auditmod", c.Module, c.Change)
+			}
+			type loc struct {
+				File          string
+				Line, EndLine int
+			}
+			got := map[string]loc{}
+			for _, e := range doc.Evidence {
+				gotest.Equal(it, "auditmod", e.Module, "%v", e.Path)
+				gotest.NotZero(it, e.Location, "%v", e.Path)
+				got[strings.Join(e.Path, " / ")] = loc{e.Location.File, e.Location.Line, e.Location.EndLine}
+			}
+			const cart, stock = "shop/cart_suite_test.go", "shop/stock_suite_test.go"
+			gotest.Equal(it, map[string]loc{
+				"Cart / Copies / the only copy":                                     {cart, 49, 51},
+				"Stock / Count / when the stock is empty":                           {stock, 30, 34},
+				"Stock / Count / when the stock is refilled":                        {stock, 25, 29},
+				"Cart / Add / when both numbers are positive / ignores the order":   {cart, 21, 26},
+				"Stock / Count / when the stock is refilled / counts every item":    {stock, 26, 28},
+				"Cart / Add / when one number is negative / returns the difference": {cart, 29, 31},
+				"Cart / Rounds": {cart, 43, 46},
+				"Cart / Empty":  {cart, 35, 37},
+				"Cart / Total":  {cart, 39, 41},
+				"Stock":         {stock, 11, 11},
+				"Cart":          {cart, 9, 9},
+			}, got)
+		})
+		w.It("finds on each evidence row the mark the text format writes on its rows", func(it *gotest.T) {
+			doc := readLinks(it, s.json)
+			got := map[string]string{}
+			for _, e := range doc.Evidence {
+				got[strings.Join(e.Path, " / ")] = e.Mark
+			}
+			gotest.Equal(it, map[string]string{
+				"Cart / Copies / the only copy":                                     "vacuous",
+				"Stock / Count / when the stock is empty":                           "not run",
+				"Stock / Count / when the stock is refilled":                        "pass",
+				"Cart / Add / when both numbers are positive / ignores the order":   "pass 1",
+				"Stock / Count / when the stock is refilled / counts every item":    "pass 1",
+				"Cart / Add / when one number is negative / returns the difference": "FAIL",
+				"Cart / Rounds": "pass 1",
+				"Cart / Empty":  "skip",
+				"Cart / Total":  "pass 1",
+				"Stock":         "partly run",
+				"Cart":          "FAIL",
+			}, got)
+			gotest.Contains(it, s.text.Stdout, "\n  guard        partly run   ./shop Stock: no SuiteGuard → SuiteGuard (shop/stock_suite_test.go:11)\n")
+			stale := readLinks(it, s.cli(it, "--evidence="+filepath.Join(s.proof, "another-commit.json"), "--format=json"))
+			staleText := s.cli(it, "--evidence="+filepath.Join(s.proof, "another-commit.json"))
+			gotest.Len(it, stale.Evidence, 11)
+			for _, e := range stale.Evidence {
+				gotest.Regexp(it, `\*$`, e.Mark, "%v", e.Path)
+				if strings.Join(e.Path, " / ") == "Cart / Total" {
+					gotest.Equal(it, "pass 1*", e.Mark)
+					gotest.Contains(it, staleText.Stdout, "\n  focus        pass 1*      ./shop Cart / Total: TestTotal → F_TestTotal (shop/cart_suite_test.go:39)\n")
+				}
+			}
+		})
+		w.It("finds on each behavior its place in the text format's list of behaviors", func(it *gotest.T) {
+			doc := readLinks(it, s.json)
+			marks := map[string]string{}
+			for _, e := range doc.Evidence {
+				marks[e.ID] = e.Mark
+			}
+			rows := textRows(s.text.Stdout, "behaviors: ")
+			gotest.Len(it, rows, 10)
+			gotest.Len(it, doc.Behaviors, 10)
+			seen := map[int]bool{}
+			for _, c := range doc.Behaviors {
+				gotest.False(it, seen[c.Order], "order %d twice", c.Order)
+				seen[c.Order] = true
+				gotest.True(it, c.Order >= 0 && c.Order < len(rows), "order %d", c.Order)
+				f := strings.Fields(rows[c.Order])
+				gotest.Equal(it, c.Change, f[0], rows[c.Order])
+				if c.Head != nil {
+					gotest.Contains(it, rows[c.Order], " "+marks[c.Evidence]+" ")
+					gotest.Contains(it, rows[c.Order], c.Head.Path[len(c.Head.Path)-1])
+					gotest.Contains(it, rows[c.Order], fmt.Sprintf("%s:%d)", c.Head.File, c.Head.Line))
+				}
+			}
+			byOrder := make([]string, len(doc.Behaviors))
+			for _, c := range doc.Behaviors {
+				byOrder[c.Order] = c.Change
+			}
+			gotest.Equal(it, []string{"removed", "removed", "removed", "changed", "changed", "added", "added", "added", "reworded", "moved"}, byOrder)
+		})
+	})
+}
+
+func (s *AuditEvidenceTestSuite) TestAStoppedAuditRun(t *gotest.T) {
+	t.When("audit --run --control=stdin has its standard input at its end", func(w *gotest.T) {
+		w.It("writes the document naming the stopped run among what was not compared and exits 130", func(it *gotest.T) {
+			run := s.cli(it, "--run", "--control=stdin", "--format=json")
+			gotest.Equal(it, 130, run.Exit, "stderr: %s", run.Stderr)
+			var doc struct {
+				Incomplete []string `json:"incomplete"`
+				Streams    []struct {
+					Ran bool
+					Run *struct{ ExitCode *int } `json:"run"`
+				} `json:"streams"`
+				Evidence []struct{ Verdict string } `json:"evidence"`
+			}
+			gotest.NoError(it, json.Unmarshal([]byte(run.Stdout), &doc), "document: %s", run.Stdout)
+			gotest.Equal(it, []string{"--run: the run was stopped before its end; what it did not reach reads as not run"}, doc.Incomplete)
+			gotest.Len(it, doc.Streams, 1)
+			gotest.True(it, doc.Streams[0].Ran)
+			gotest.NotZero(it, doc.Streams[0].Run)
+			gotest.Equal(it, 130, *doc.Streams[0].Run.ExitCode)
+			gotest.Len(it, doc.Evidence, 11)
+		})
+		w.It("the text format's closing line names exit 130", func(it *gotest.T) {
+			run := s.cli(it, "--run", "--control=stdin", "--fail-on=all")
+			gotest.Equal(it, 130, run.Exit, "stderr: %s", run.Stderr)
+			gotest.Contains(it, run.Stdout, "\nnot compared:\n  --run: the run was stopped before its end; what it did not reach reads as not run\n")
+			gotest.Regexp(it, `\ngotest audit: FAIL exit 130 \| .* \| not compared: 1 \| fail-on: removed,`, run.Stdout)
+		})
+	})
+	t.When("--control=stdin is given to audit without --run, or beside --evidence=-", func(w *gotest.T) {
+		w.It("audit refuses it with exit 2, naming --run or standard input", func(it *gotest.T) {
+			type refusal struct {
+				args []string
+				want string
+			}
+			for _, row := range []refusal{
+				{[]string{"--control=stdin"}, "FAIL: --control=stdin stops the run --run makes; give it with --run\n"},
+				{[]string{"--run", "--control=stdin", "--evidence=-"}, "FAIL: --control=stdin and a stream or diff from - both read standard input; save it to a file\n"},
+			} {
+				run := s.cli(it, row.args...)
+				gotest.Equal(it, 2, run.Exit, "%v", row.args)
+				gotest.Empty(it, run.Stdout, "%v", row.args)
+				gotest.Equal(it, row.want, run.Stderr)
+			}
+		})
+	})
 }

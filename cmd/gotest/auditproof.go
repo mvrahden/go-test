@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -54,14 +55,21 @@ func (a *auditArgs) prove(doc *gotestaudit.Document, base, head *gotestaudit.Rec
 			if err != nil {
 				return fmt.Errorf("--%s: %w", evidenceFlag(side.name), err)
 			}
-			inputs = append(inputs, gotestaudit.StreamInput{File: file, Side: side.name, Events: events})
+			in := gotestaudit.StreamInput{File: file, Side: side.name, Events: events}
+			if side.name == gotestaudit.SideHead && a.headFile == "" {
+				if in.Fresh, err = freshOnDisk(events); err != nil {
+					return fmt.Errorf("--evidence: %w", err)
+				}
+			}
+			inputs = append(inputs, in)
 		}
 	}
 	if len(inputs) > 0 {
 		gotestaudit.AddEvidence(doc, base, head, inputs)
 	}
 	if a.unproven() && profile != "" {
-		blocks, err := readProfile(profile)
+		// The run's own profile may hold no block: then no file has data.
+		blocks, err := readProfile(profile, a.coverage == "")
 		if err != nil {
 			return fmt.Errorf("--coverage: %w", err)
 		}
@@ -69,6 +77,35 @@ func (a *auditArgs) prove(doc *gotestaudit.Document, base, head *gotestaudit.Rec
 		gotestaudit.AddUnproven(doc, files, blocks, gotestaudit.Coverage{Profile: shown, Lines: lines})
 	}
 	return nil
+}
+
+// freshOnDisk says, of each package whose verdict events stamped with an
+// input hash, whether the working tree's package still has it.
+func freshOnDisk(events []gotestspec.TestEvent) (map[string]bool, error) {
+	stamped := map[string]string{}
+	var pkgs []string
+	for i := range events {
+		ev := &events[i]
+		if ev.InputHash == "" || ev.RunLevel || ev.Test != "" {
+			continue
+		}
+		if _, ok := stamped[ev.Package]; !ok {
+			pkgs = append(pkgs, ev.Package)
+		}
+		stamped[ev.Package] = ev.InputHash
+	}
+	if len(pkgs) == 0 {
+		return nil, nil
+	}
+	current, err := currentHashes(context.Background(), pkgs, streamBuild(events))
+	if err != nil {
+		return nil, err
+	}
+	fresh := make(map[string]bool, len(pkgs))
+	for _, pkg := range pkgs {
+		fresh[pkg] = current[pkg] == stamped[pkg]
+	}
+	return fresh, nil
 }
 
 func evidenceFlag(side string) string {
@@ -105,7 +142,7 @@ func readStreamFile(file string) ([]gotestspec.TestEvent, error) {
 	return events, nil
 }
 
-func readProfile(path string) ([]gotestspec.CoverageBlock, error) {
+func readProfile(path string, empty bool) ([]gotestspec.CoverageBlock, error) {
 	f, err := os.Open(path) //nolint:gosec // G304: the profile the user named or the run wrote
 	if err != nil {
 		return nil, err
@@ -115,7 +152,7 @@ func readProfile(path string) ([]gotestspec.CoverageBlock, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(blocks) == 0 {
+	if len(blocks) == 0 && !empty {
 		return nil, fmt.Errorf("%s holds no coverage block", path)
 	}
 	return blocks, nil
@@ -254,10 +291,19 @@ func (a *auditArgs) runChanged(doc *gotestaudit.Document, files []gotestaudit.Pr
 		return nil, "", err
 	}
 	args := append([]string{"-json"}, a.loadFlags...)
-	profile := ""
+	if a.control {
+		args = append([]string{"--control=stdin"}, args...)
+	}
+	profile, covdir := "", ""
 	if a.unproven() && len(cover) > 0 {
 		profile = filepath.Join(dir, "cover.out")
 		args = append(args, "-coverprofile="+profile, "-coverpkg="+strings.Join(cover, ","))
+		// The binaries the tests start write their coverage here.
+		covdir = filepath.Join(dir, "covdata")
+		if err := os.Mkdir(covdir, 0o700); err != nil {
+			_ = os.RemoveAll(dir)
+			return nil, "", err
+		}
 	}
 	exe, err := os.Executable()
 	if err != nil {
@@ -265,18 +311,39 @@ func (a *auditArgs) runChanged(doc *gotestaudit.Document, files []gotestaudit.Pr
 		return nil, "", err
 	}
 	cmd := exec.Command(exe, append(args, run...)...) //nolint:gosec // G204: this CLI, running the changed packages
+	if covdir != "" {
+		cmd.Env = withCoverDir(os.Environ(), covdir)
+	}
 	var stdout strings.Builder
 	cmd.Stdout, cmd.Stderr = &stdout, os.Stderr
-	runErr := cmd.Run()
+	if a.control {
+		cmd.Stdin = os.Stdin
+	}
+	runErr := runForwarding(cmd)
 	var exit *exec.ExitError
 	if runErr != nil && !errors.As(runErr, &exit) {
 		_ = os.RemoveAll(dir)
 		return nil, "", fmt.Errorf("--run: %w", runErr)
 	}
+	if exit != nil && exit.ExitCode() == 130 {
+		a.stopped = true
+		doc.Incomplete = append(doc.Incomplete, "--run: the run was stopped before its end; what it did not reach reads as not run")
+		doc.Summary.Incomplete = len(doc.Incomplete)
+	}
 	events, err := gotestspec.ParseEvents(strings.NewReader(stdout.String()))
 	if err != nil || len(events) == 0 {
 		_ = os.RemoveAll(dir)
 		return nil, "", fmt.Errorf("--run: the run wrote no stream: %v", runErr)
+	}
+	if covdir != "" {
+		switch n, err := foldChildCoverage(covdir, profile, cover); {
+		case err != nil:
+			doc.Notes = append(doc.Notes, "--run: the coverage data of the binaries the tests started was not read: "+err.Error())
+		case n == 0 && !a.stopped:
+			doc.Notes = append(doc.Notes, childCoverNote)
+		default:
+			doc.Notes = append(doc.Notes, fmt.Sprintf("--run: the coverage counts what %s the tests started executed", binaries(n)))
+		}
 	}
 	if profile != "" {
 		if _, err := os.Stat(profile); err != nil {

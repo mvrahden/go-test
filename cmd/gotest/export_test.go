@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"io"
 	"time"
 
@@ -214,7 +215,7 @@ var ExportRunScaffold = runScaffold
 var (
 	ExportRunSpec          = runSpec
 	ExportRunSpecFromInput = func(input, format, output string, noColor, renderOnly bool) int {
-		return runSpecFromInput(input, format, output, noColor, renderOnly, nil, nil)
+		return runSpecFromInput(input, format, output, noColor, renderOnly, false, nil, nil)
 	}
 	ExportRunStaticSpec = runStaticSpec
 )
@@ -222,7 +223,9 @@ var (
 // summary.go
 var (
 	ExportRunSummary          = runSummary
-	ExportRunSummaryFromInput = runSummaryFromInput
+	ExportRunSummaryFromInput = func(input, format, output, coverageProfile string, noColor, github, renderOnly bool, badgePath string) int {
+		return runSummaryFromInput(input, format, output, coverageProfile, noColor, github, renderOnly, false, badgePath)
+	}
 )
 
 // watch.go
@@ -326,3 +329,9 @@ func ExportAgentOutput(ownArgs []string, env map[string]string) (bool, string, e
 }
 
 var ExportRerunCommand = rerunCommand
+
+// ExportRunsEntryJSON is one run of the runs listing as JSON.
+func ExportRunsEntryJSON(k *gotestrunner.KeptRun) string {
+	data, _ := json.Marshal(entryOf(k, nil))
+	return string(data)
+}

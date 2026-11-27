@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/cli CLIChanged .* / ends stderr with a closing line counting the packages it ran and those unchanged \(
+Clause: when a --changed run leaves packages out as unchanged → ends stderr with a closing line counting the packages it ran and those unchanged
+--- a/internal/gotestrunner/agentoutput.go
++++ b/internal/gotestrunner/agentoutput.go
+@@ -74,7 +74,6 @@
+ 		if ch.NoRecord {
+ 			segments = append(segments, "changed only: no record, all ran")
+ 		} else {
+-			segments = append(segments, "changed only: "+joinCounts([]count{{ch.Ran, "ran"}, {ch.Unchanged, "unchanged"}}))
+ 		}
+ 	}
+ 	if c.Rerun != "" {

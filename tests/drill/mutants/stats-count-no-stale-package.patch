@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/cli CLIInputHash .* / its JSON marks the changed package stale and the others current, counting 1 stale \(
+Clause: when spec --check-fresh reads a run's stream after one of its packages changed, and go test's own stream → its JSON marks the changed package stale and the others current, counting 1 stale
+--- a/internal/gotestspec/tree.go
++++ b/internal/gotestspec/tree.go
+@@ -901,9 +901,6 @@
+ 		if PkgFailedOnItsOwn(pkg) {
+ 			s.FailedPackages++
+ 		}
+-		if pkg.Freshness == FreshStale {
+-			s.Stale++
+-		}
+ 		for _, n := range pkg.Nodes {
+ 			collectStats(n, &s, n.Kind == KindTest)
+ 		}

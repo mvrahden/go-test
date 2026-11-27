@@ -65,7 +65,10 @@ line, never from the absence of `FAIL`; a suite that ran none of its tests
 fails the run with exit 2. `go tool gotest --failed` reruns only what the
 last run in this directory failed, with `-json`, `spec` and `summary` too,
 and exits 2 when nothing is recorded to rerun. `--agent=false` or
-`GOTEST_AGENT=0` gives you go test's text instead.
+`GOTEST_AGENT=0` gives you go test's text instead. While you iterate,
+`go tool gotest --changed ./...` (v1.42+) runs only the packages whose
+sources changed since the last run here, or that failed in it; its closing
+line says how many it left out, so the final check still runs everything.
 
 Before you report a change done, audit it against its base (v1.42+):
 `go tool gotest audit --base=$(git merge-base origin/main HEAD)` reads both

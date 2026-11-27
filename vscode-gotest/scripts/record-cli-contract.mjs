@@ -241,8 +241,9 @@ const LIVE = {
   ],
 };
 
-// mask drops what changes from run to run: times and durations, and the
-// host facts the run's manifest names: the Go, the checkout and the agent.
+// mask drops what changes from run to run: times and durations, the host
+// facts the run's manifest names (the Go, the checkout and the agent) and
+// the input hashes, which move with every commit of the packages run.
 function mask(stdout) {
   return stdout
     .split("\n")
@@ -251,6 +252,7 @@ function mask(stdout) {
       const ev = JSON.parse(line);
       delete ev.Time;
       if ("Elapsed" in ev) ev.Elapsed = 0;
+      if ("InputHash" in ev) ev.InputHash = "<hash>";
       if (ev.Manifest) {
         if ("GoVersion" in ev.Manifest) ev.Manifest.GoVersion = "<go>";
         if ("Commit" in ev.Manifest) ev.Manifest.Commit = "<commit>";

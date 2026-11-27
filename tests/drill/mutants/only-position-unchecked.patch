@@ -2,8 +2,8 @@ Expect: ^FAIL .*conformance/spec .* / refuses with exit 2 and says what it did n
 Clause: when --only names a package or position the stream does not hold, or --match or --only is given with --static → refuses with exit 2 and says what it did not find
 --- a/cmd/gotest/spec.go
 +++ b/cmd/gotest/spec.go
-@@ -273,7 +273,7 @@
- 		return 2
+@@ -334,7 +334,7 @@
+ 		}
  	}
  
 -	if err := gotestspec.CheckView(tree, view...); err != nil {

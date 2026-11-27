@@ -6,12 +6,12 @@ Expect: ^FAIL .*conformance/discovery DiscoveryLoadCost / LintAfterATestFileChan
 Judge: ./internal/pkgload LoadTestSuite/TestNeverBuildsATestVariant
 --- a/internal/pkgload/pkgload.go
 +++ b/internal/pkgload/pkgload.go
-@@ -36,7 +36,7 @@
+@@ -39,7 +39,7 @@
  	// graphMode lists without compiling: any of CompiledGoFiles, Syntax,
  	// Types, TypesInfo or TypesSizes makes go list run the build actions
  	// of every test variant and test main.
--	graphMode = packages.NeedName | packages.NeedFiles | packages.NeedImports | packages.NeedDeps | packages.NeedModule
-+	graphMode = packages.NeedName | packages.NeedFiles | packages.NeedImports | packages.NeedDeps | packages.NeedModule | packages.NeedTypes
+-	graphMode = packages.NeedName | packages.NeedFiles | packages.NeedImports | packages.NeedDeps | packages.NeedModule | packages.NeedEmbedFiles
++	graphMode = packages.NeedName | packages.NeedFiles | packages.NeedImports | packages.NeedDeps | packages.NeedModule | packages.NeedEmbedFiles | packages.NeedTypes
  	// exportMode builds only plain packages, which the test build needs anyway.
  	exportMode = packages.NeedName | packages.NeedExportFile | packages.NeedImports | packages.NeedDeps | packages.NeedTypesSizes
  	// reportMode is the load a package with errors is reported from.

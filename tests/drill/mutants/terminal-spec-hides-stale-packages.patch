@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/cli CLIInputHash .* / the terminal and Markdown spec and the summary mark the stale package, and exit as without --check-fresh \(
+Clause: when spec --check-fresh reads a run's stream after one of its packages changed, and go test's own stream → the terminal and Markdown spec and the summary mark the stale package, and exit as without --check-fresh
+--- a/internal/gotestspec/terminal.go
++++ b/internal/gotestspec/terminal.go
+@@ -180,7 +180,6 @@
+ 			heading += " — FAILED"
+ 		}
+ 		if pkg.Freshness == FreshStale {
+-			heading += " — " + StaleMark
+ 		}
+ 		if !cfg.withoutVerdicts {
+ 			if counts := countsPhrase(CollectStats([]*Package{pkg})); counts != "" {

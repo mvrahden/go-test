@@ -2,11 +2,11 @@ Expect: ^FAIL .*conformance/audit AuditEvidence / CurrentAndStaleEvidence / when
 Clause: when a current and a stale stream judge one behavior → states the current stream's verdict and names the stale one's among the others
 --- a/internal/gotestaudit/evidence.go
 +++ b/internal/gotestaudit/evidence.go
-@@ -390,7 +390,7 @@
+@@ -444,7 +444,7 @@
  		if js[i].verdict == VerdictNone {
  			continue
  		}
--		if pick < 0 || trees[i].stream.Current && !trees[pick].stream.Current {
+-		if pick < 0 || trees[i].current(pkg) && !trees[pick].current(pkg) {
 +		if pick < 0 {
  			pick = i
  		}

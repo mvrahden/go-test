@@ -2,11 +2,11 @@ Expect: ^FAIL .*conformance/cli .* / spec notes on stderr that F_ narrows the ru
 Clause: when spec or summary runs, outside CI mode, a package holding a focused method → spec notes on stderr that F_ narrows the run, naming the method where it is declared, and exits 0
 --- a/cmd/gotest/spec.go
 +++ b/cmd/gotest/spec.go
-@@ -122,7 +122,7 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
+@@ -116,7 +116,7 @@
+ 	if !ok {
+ 		return 2
  	}
- 	loaded, broken, noTestFiles := pkgs.Loaded, pkgs.Broken, pkgs.NoTestFiles
- 
--	if code, err := focusGate(loaded, cfg.CI); err != nil {
+-	if code, err := focusGate(pkgs.Loaded, cfg.CI); err != nil {
 +	if code, err := focusGate(nil, cfg.CI); err != nil {
  		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
  		return 2
