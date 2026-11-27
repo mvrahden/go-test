@@ -60,6 +60,22 @@ func resolveBase(ref string) (*gitBase, error) {
 	return &gitBase{ref: ref, commit: commit, short: short, branch: branchOf(cwd, ref), top: topAsSpelled(cwd, prefix, top), prefix: prefix}, nil
 }
 
+// ancestryNote is the note for a base git knows to be no ancestor of HEAD;
+// "" for an ancestor and where git cannot tell, as in a shallow checkout.
+func ancestryNote(g *gitBase) string {
+	shallow, err := gitOutput(g.top, "rev-parse", "--is-shallow-repository")
+	if err != nil || shallow != "false" {
+		return ""
+	}
+	cmd := exec.Command("git", "merge-base", "--is-ancestor", g.commit, "HEAD") //nolint:gosec // G204: git with a verified commit
+	cmd.Dir = g.top
+	var exit *exec.ExitError
+	if err := cmd.Run(); !errors.As(err, &exit) || exit.ExitCode() != 1 {
+		return ""
+	}
+	return fmt.Sprintf("note: --base %s (%s) is not an ancestor of HEAD: what it holds and HEAD lacks reads as removed; for the merge base give --base=$(git merge-base %s HEAD)", g.ref, g.short, g.ref)
+}
+
 // topAsSpelled is the checkout's root spelled as the current directory is,
 // as go list names package directories: git resolves symlinks (macOS's /var)
 // and short names (Windows' RUNNER~1). It is git's top where the two differ.

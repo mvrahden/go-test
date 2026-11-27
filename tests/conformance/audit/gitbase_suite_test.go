@@ -94,6 +94,7 @@ func (s *AuditGitBaseTestSuite) TestABaseFromGit(t *gotest.T) {
 		w.It("compares that commit's tree with the working tree's, as the records of both would", func(it *gotest.T) {
 			gotest.Equal(it, 0, s.viaGit.Exit, "stderr: %s", s.viaGit.Stderr)
 			gotest.Equal(it, 0, s.viaFiles.Exit, "stderr: %s", s.viaFiles.Stderr)
+			gotest.NotContains(it, s.viaGit.Stderr, "note: --base")
 			lists := func(stdout string) string {
 				var doc struct {
 					Findings  json.RawMessage `json:"findings"`

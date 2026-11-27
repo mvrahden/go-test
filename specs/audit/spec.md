@@ -91,6 +91,17 @@ The audit SHALL exit 0 whatever it finds unless `--fail-on` names finding classe
 - **WHEN** audit --base names no commit of the checkout
 - **THEN** exits 2 naming --base-record and --head-record
 
+### Requirement: A base beside HEAD
+Where git knows the commit `--base` names to be no ancestor of `HEAD`, the audit SHALL say so in one note on stderr, naming the merge base, and compare the commit all the same; in a shallow checkout, where git cannot know, it SHALL print none.
+
+#### Scenario: A base that is no ancestor of HEAD
+- **WHEN** audit --base names a commit that is no ancestor of HEAD
+- **THEN** prints one note on stderr naming the ref, its commit and the merge base, and compares the commit the ref names
+
+#### Scenario: A base in a shallow checkout
+- **WHEN** audit --base names a commit a shallow checkout holds no path to
+- **THEN** prints no note on stderr
+
 ### Requirement: Evidence from runs
 `gotest audit --evidence=<stream>`, repeatable, SHALL state for each behavior the comparison lists as added, reworded, moved or changed and each finding's behavior its verdict, the assertions the run counted, whether it passed vacuous, its `AssertsBy` and the stream it was judged by, reading the stream's test names as the spec tree does. A behavior the stream does not report SHALL read as not run, skipped where X_ excludes it, and as no evidence where no stream holds its package.
 
