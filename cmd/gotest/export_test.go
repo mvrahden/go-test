@@ -3,13 +3,18 @@ package main
 import (
 	"encoding/json"
 	"io"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/config"
+	"github.com/mvrahden/go-test/internal/gotestaudit"
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
 	"github.com/mvrahden/go-test/internal/gotestspec"
 	"github.com/mvrahden/go-test/internal/lint"
+	"github.com/mvrahden/go-test/internal/mutate"
 )
 
 // Test-only exports, one block per source file.
@@ -344,4 +349,143 @@ func ExportLiveStream(ownArgs []string, jsonMode bool, env map[string]string) (b
 func ExportRunsEntryJSON(k *gotestrunner.KeptRun) string {
 	data, _ := json.Marshal(entryOf(k, nil))
 	return string(data)
+}
+
+// audit.go, auditmutate.go, auditmutate_run.go
+
+// ExportAuditView is what an audit's flags set for --mutate.
+type ExportAuditView struct {
+	Mutate, Run, Strings bool
+	Budget               time.Duration
+	Parallel             int
+}
+
+// ExportParseAudit reads audit's own flags and the rest as runAudit does.
+func ExportParseAudit(args []string) (ExportAuditView, error) {
+	own, rest, err := SplitArgs(args, auditAllowed)
+	if err != nil {
+		return ExportAuditView{}, err
+	}
+	a, err := parseAuditArgs(own, rest)
+	return ExportAuditView{Mutate: a.mutate, Run: a.run, Strings: a.mutateStrings, Budget: a.mutateBudget, Parallel: a.parallel}, err
+}
+
+// ExportMutationJobs is how many mutants run at once under --parallel.
+func ExportMutationJobs(parallel int) (jobs, per int) {
+	return (&auditArgs{parallel: parallel}).mutationJobs()
+}
+
+// ExportRunEnv and ExportCoverageEnv are the environments of a run on the
+// mutants of the overlay and of the coverage run keeping suites in dir.
+func ExportRunEnv(env []string, overlay string, id int) []string {
+	return (&mutation{overlay: overlay}).runEnv(env, id)
+}
+
+func ExportCoverageEnv(env []string, dir string) []string {
+	return (&mutation{dir: dir}).coverageEnv(env)
+}
+
+// ExportWriteOverlay writes the mutants' overlay of files in dir and returns
+// its replacements.
+func ExportWriteOverlay(dir string, files map[string][]byte) (map[string]string, error) {
+	m := &mutation{dir: dir, overlay: filepath.Join(dir, "overlay.json"), plan: &mutate.Plan{Files: files}}
+	if err := os.MkdirAll(filepath.Join(dir, "src"), 0o700); err != nil {
+		return nil, err
+	}
+	if err := m.writeOverlay(); err != nil {
+		return nil, err
+	}
+	data, err := os.ReadFile(m.overlay)
+	if err != nil {
+		return nil, err
+	}
+	var o struct{ Replace map[string]string }
+	return o.Replace, json.Unmarshal(data, &o)
+}
+
+var ExportTestsFirst = testsFirst
+
+// ExportReadStream writes a -json stream in chunks to the writer a mutant's
+// run reads, and returns what it read.
+func ExportReadStream(chunks []string, collect bool) (killedBy string, failed []string, took map[string]time.Duration) {
+	w := &streamWriter{collect: collect, took: map[string]time.Duration{}}
+	if !collect {
+		w.first = make(chan string, 1)
+	}
+	for _, c := range chunks {
+		_, _ = w.Write([]byte(c))
+	}
+	return w.killedBy, w.failed, w.took
+}
+
+// ExportLimit is a mutant's limit over suites, given their zero-run times
+// and the runner's overhead, before and after a run that took observed.
+func ExportLimit(took map[string]time.Duration, overhead, observed time.Duration, suites ...string) (before, after time.Duration) {
+	j := &mutantJudge{took: took, overhead: overhead}
+	var runs []*suiteRun
+	for _, s := range suites {
+		pkg, name, _ := strings.Cut(s, " ")
+		runs = append(runs, &suiteRun{pkg: pkg, name: name})
+	}
+	before = j.limit(runs)
+	j.observe(observed, runs)
+	return before, j.limit(runs)
+}
+
+// ExportBaseline is what readBaseline made of a coverage run.
+type ExportBaseline struct {
+	Passed   bool
+	Failed   []string
+	Suites   []string
+	Ran      map[string][]int // per suite, the lines of file it executed
+	Binaries int
+}
+
+// ExportReadBaseline reads the coverage run kept in dir/suites for the
+// mutated pkgs, its executed lines told for file.
+func ExportReadBaseline(dir string, pkgs []string, events []gotestspec.TestEvent, exit int, profile, file string) (ExportBaseline, error) {
+	b, n, err := (&mutation{dir: dir, pkgs: pkgs}).readBaseline(events, exit, profile)
+	if err != nil {
+		return ExportBaseline{}, err
+	}
+	out := ExportBaseline{Passed: b.passed, Failed: b.failed, Binaries: n, Ran: map[string][]int{}}
+	for _, s := range b.suites {
+		out.Suites = append(out.Suites, s.label())
+		for l := 1; l <= 200; l++ {
+			if s.executed[file][l] {
+				out.Ran[s.label()] = append(out.Ran[s.label()], l)
+			}
+		}
+	}
+	return out, nil
+}
+
+// ExportMutate prepares the mutants of files in the current directory and
+// judges them as audit --mutate does, by a baseline in which suite ran
+// every line of them and passed when passed, its runs made by runner.
+func ExportMutate(files []gotestaudit.ProdFile, budget time.Duration, suite string, passed bool, runner string) (*gotestaudit.Document, error) {
+	a := &auditArgs{mutate: true, run: true, mutateBudget: budget, patterns: []string{"./..."}}
+	doc := &gotestaudit.Document{}
+	m, err := a.prepareMutation(doc, files)
+	if err != nil || m == nil {
+		return doc, err
+	}
+	defer m.release()
+	if err := m.testPackages(a); err != nil {
+		return doc, err
+	}
+	pkg, name, _ := strings.Cut(suite, " ")
+	s := &suiteRun{pkg: pkg, name: name, executed: mutate.Executed{}}
+	for i := range m.all {
+		mu := &m.all[i]
+		s.executed.Add([]mutate.Block{{File: mutate.ProfileFile(mu), StartLine: mu.Line, EndLine: mu.Line, Ran: true}})
+	}
+	b := &baseline{passed: passed, suites: []*suiteRun{s}}
+	if !passed {
+		b.failed = []string{suite}
+	}
+	defer func(prev func() (string, error)) { mutantRunner = prev }(mutantRunner)
+	mutantRunner = func() (string, error) { return runner, nil }
+	a.judge(doc, m, b)
+	return doc, nil
 }

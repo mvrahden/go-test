@@ -1,7 +1,7 @@
 # Audit Specification
 
 ## Purpose
-How `gotest audit` records the test estate a tree declares without running it, how it compares the record of a head tree with that of a base, which facts it lists as weakenings, what the runs and the coverage given prove of the change, how it writes the comparison as text, JSON and Markdown, when it exits non-zero, how `--base` obtains a base from git, and what it does with a tree that does not compile.
+How `gotest audit` records the test estate a tree declares without running it, how it compares the record of a head tree with that of a base, which facts it lists as weakenings, what the runs and the coverage given prove of the change, whether a test notices a changed line made wrong, how it writes the comparison as text, JSON and Markdown, when it exits non-zero, how `--base` obtains a base from git, and what it does with a tree that does not compile.
 
 ## Requirements
 
@@ -174,7 +174,7 @@ When `gotest audit --run` measures coverage it SHALL give the run a `GOCOVERDIR`
 - **AND** notes that a binary a test starts counts when built with go build -cover
 
 ### Requirement: Proof in the policy
-`--fail-on` SHALL take the proof classes `failing`, `not-run`, `vacuous`, `stale` and `unproven`, and `proof` for the five; `all` SHALL stay every weakening, without them, for they judge the evidence given, not the change. A proof class with nothing to judge SHALL be refused with exit 2. The closing line SHALL count the evidence and the unproven lines.
+`--fail-on` SHALL take the proof classes `failing`, `not-run`, `vacuous`, `stale`, `unproven` and `survived`, and `proof` for the six; `all` SHALL stay every weakening, without them, for they judge the evidence given, not the change. A proof class with nothing to judge SHALL be refused with exit 2. The closing line SHALL count the evidence and the unproven lines.
 
 #### Scenario: A policy on the proof
 - **WHEN** --fail-on names failing and a stream fails a behavior the comparison names
@@ -254,3 +254,83 @@ A record SHALL list a package that does not compile with its errors and no suite
 - **WHEN** the head tree holds a package that does not compile
 - **THEN** audit --record lists the package with its errors and no suites and exits 2
 - **AND** audit compares none of its behaviors, names it as not compared and exits 2
+
+### Requirement: Mutants of the changed lines
+`gotest audit --mutate` SHALL write, from the syntax and types of the packages, mutants of each changed executable line of their non-test files: a comparison negated or its boundary moved, `&&` and `||` swapped, an `if` or `for` condition negated, a statement removed, a return of zero values first, `true`, `false`, `0` and `1` flipped, a string emptied only under `--mutate-strings`. It SHALL compile them into one build, each switched on alone, and leave the module as it was.
+
+#### Scenario: Mutating a change
+- **WHEN** audit --mutate is given a diff that changes the lines of a package
+- **THEN** lists each changed line holding a mutant once, with each mutant's operator, original text and mutated text
+- **AND** leaves the module as it was
+
+### Requirement: The suites that judge a mutant
+Before any mutant, `--mutate` SHALL run, as `--run` does, every package the patterns match that holds tests, measuring each suite's coverage of the mutated packages, a binary a test starts built with `go build -cover` included, whether or not the test imports them. A mutant SHALL be judged by the suites that executed its line; one of a line no suite executed SHALL read as not covered and not be run.
+
+#### Scenario: Suites by coverage
+- **WHEN** audit --mutate judges lines only another package's tests or a binary a test starts execute
+- **THEN** judges each line's mutants by the suites that executed it, that package's suite and the one starting the binary among them
+- **AND** reads the mutants of a line no test executed as not covered
+
+### Requirement: A mutant's verdict
+A mutant SHALL be run through gotest's runner with only the suites that judge it: killed at their first failing test, which it names, survived when they pass, a timeout when they outrun three times their time with no mutant on. Before any mutant, those suites SHALL pass on the build with none switched on; else no mutant SHALL be judged, the failures named among what was not compared, and the audit exits 2 unless the policy failed.
+
+#### Scenario: A weakly tested change
+- **WHEN** audit --mutate runs the mutants of a change one of whose lines no test checks at its boundary
+- **THEN** marks each mutant a test fails killed, naming that test
+- **AND** marks the boundary mutant survived, naming the suites that ran its line
+- **AND** marks a mutant that keeps its suite from ending a timeout, apart from the killed ones
+
+#### Scenario: Suites that fail with no mutant
+- **WHEN** a suite that judges a mutant fails before any mutant is switched on
+- **THEN** judges no mutant, names the failing test among what was not compared and exits 2
+
+### Requirement: The mutation budget
+`--mutate-budget`, three minutes unless given, SHALL bound the time the mutants run: once it is spent, no mutant SHALL start and each left, and each a run the budget's end stopped, SHALL read as not judged, never killed or survived. The first mutant of every line SHALL run before the second of any, the lines of packages holding a changed behavior first; `--parallel` SHALL bound the tests the runs make at once.
+
+#### Scenario: A budget spent
+- **WHEN** audit --mutate is given a budget spent before its first mutant
+- **THEN** reads each mutant it would run as not judged and none as killed or survived
+- **AND** names the budget and the time spent
+
+### Requirement: Mutants in the document
+The JSON document SHALL hold, only under `--mutate`, a `mutation` section and its counts under `summary`: one entry per mutated line with an `id` made from its module, file, function and text, never its number, its module, file, package, line, function, `group`, `order`, worst verdict, counts per verdict, the suites that ran it and its mutants. Text SHALL write per file the lines a reader acts on, survivors first, count the rest and add a closing-line segment; Markdown a table.
+
+#### Scenario: Mutants as JSON
+- **WHEN** a tool reads the document of audit --mutate as JSON
+- **THEN** finds a mutation section whose lines carry an id, module, file, line, verdict, order, counts, the suites that ran them and their mutants
+- **AND** finds the mutants counted by verdict in the summary
+- **AND** finds neither in a document made without --mutate
+
+#### Scenario: Mutants as text
+- **WHEN** audit --mutate renders text
+- **THEN** writes per file the survived and timed-out lines first, each with its mutants, function and suites, and counts the other lines
+- **AND** the closing line counts the mutants survived, killed, timed out and not judged
+
+#### Scenario: Mutants as Markdown
+- **WHEN** audit --mutate renders --format=md
+- **THEN** writes the survived and timed-out lines as a table
+
+### Requirement: Survivors in the policy
+`survived`, a line holding a mutant that survived, SHALL be a proof class: `proof` names it, `all` does not. `--fail-on` naming it without `--mutate` SHALL be refused with exit 2.
+
+#### Scenario: A policy on survivors
+- **WHEN** --fail-on names survived and a mutant survives
+- **THEN** exits 1 and the closing line names the class
+
+#### Scenario: Survivors without mutants
+- **WHEN** --fail-on names survived without --mutate
+- **THEN** audit refuses it with exit 2, naming --mutate
+
+### Requirement: Keeping a line from mutation
+A `//gotest:mutate-ignore <reason>` comment SHALL keep from mutation the line it ends or, on a line of its own, the declaration or statement below it, a whole function when it is one; one without a reason SHALL keep none, and `--mutate` says so. A record SHALL list each such comment of the packages' non-test files with its scope and reason, and the audit SHALL list one the head adds as a suppression finding.
+
+#### Scenario: Ignored lines
+- **WHEN** audit --mutate meets a comment with a reason at the end of a changed line, and one without a reason above a function
+- **THEN** reads the mutants of the first line as ignored, giving the reason
+- **AND** judges the function's mutants and notes that the comment without a reason keeps no line
+
+#### Scenario: A comment added
+- **WHEN** the head adds mutate-ignore comments
+- **THEN** audit --record lists each with its file, line, scope and reason
+- **AND** audit lists each as a suppression finding naming the comment
+

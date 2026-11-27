@@ -83,7 +83,8 @@ jobs:
   tests (`audit: auto`; `true` also audits a push against
   `github.event.before`, `false` never), with the run's stream and coverage
   as evidence, and appends it to the step summary. It only reports unless
-  `audit-fail-on` names classes. `attest: true` attests the run with the
+  `audit-fail-on` names classes; `audit-mutate: 5m` adds `--mutate`
+  within that budget, off by default. `attest: true` attests the run with the
   in-toto test-result predicate through `actions/attest`; the job must grant
   `id-token: write` and `attestations: write`, or the attestation is
   skipped with a summary line. Do not add a separate audit or attest step.

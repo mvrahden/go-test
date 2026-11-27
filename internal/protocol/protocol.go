@@ -41,6 +41,14 @@ const (
 	// under -v. The runner creates the file; the runtime takes the variable
 	// out of its environment.
 	EnvAssertionsFile = "GOTEST_ASSERTIONS_FILE"
+
+	// EnvMutantOverlay names an overlay file whose replacements a run adds
+	// to its harness's, and gives its suites in GOFLAGS: the mutants audit
+	// --mutate compiles in.
+	EnvMutantOverlay = "GOTEST_MUTANT_OVERLAY"
+	// EnvSuiteCoverage names a directory where a run with -coverprofile
+	// keeps each suite process's own profile and coverage data directory.
+	EnvSuiteCoverage = "GOTEST_SUITE_COVERAGE"
 )
 
 // LeafCount is one line of the file EnvAssertionsFile names: what a leaf's

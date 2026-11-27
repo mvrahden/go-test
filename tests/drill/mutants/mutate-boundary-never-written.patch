@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/audit AuditMutate / MutantsOfTheChangedLines / when audit --mutate is given a diff that changes the lines of a package / lists each changed line holding a mutant once, with each mutant's operator, original text and mutated text \(
+Expect: ^FAIL .*conformance/audit AuditMutate / AMutantsVerdict / when audit --mutate runs the mutants of a change one of whose lines no test checks at its boundary / marks the boundary mutant survived, naming the suites that ran its line \(
+Clause: when audit --mutate is given a diff that changes the lines of a package → lists each changed line holding a mutant once, with each mutant's operator, original text and mutated text
+Clause: when audit --mutate runs the mutants of a change one of whose lines no test checks at its boundary → marks the boundary mutant survived, naming the suites that ran its line
+--- a/internal/mutate/schemata.go
++++ b/internal/mutate/schemata.go
+@@ -247,7 +247,7 @@
+ 	switch x.Op {
+ 	case token.LSS, token.LEQ, token.GTR, token.GEQ:
+ 		a := compareAlts[x.Op]
+-		alts, ops, op = []token.Token{a[0], a[1]}, []string{OpBoundary, OpNegate}, OpBoundary
++		alts, ops, op = []token.Token{a[1]}, []string{OpNegate}, OpNegate
+ 	case token.EQL, token.NEQ:
+ 		alts = []token.Token{swapped[x.Op]}
+ 	case token.LAND, token.LOR:

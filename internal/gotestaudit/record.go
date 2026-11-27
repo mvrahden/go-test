@@ -24,7 +24,10 @@ type Record struct {
 	// Suppressions are the nolint comments that can suppress a rule of
 	// gotest lint, in lint -suppressions' order.
 	Suppressions []Suppression `json:"suppressions"`
-	Snapshots    []Snapshot    `json:"snapshots"`
+	// MutateIgnores are the //gotest:mutate-ignore comments of the
+	// packages' non-test files, by module, file and line.
+	MutateIgnores []MutateIgnore `json:"mutateIgnores,omitempty"`
+	Snapshots     []Snapshot     `json:"snapshots"`
 	// Unread names what could not be read beyond a package, such as the
 	// suppressions; a comparison then leaves it out.
 	Unread []string `json:"unread,omitempty"`

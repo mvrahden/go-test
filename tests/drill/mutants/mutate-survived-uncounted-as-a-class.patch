@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditMutate / SurvivorsInThePolicy / when --fail-on names survived and a mutant survives / exits 1 and the closing line names the class \(
+Clause: when --fail-on names survived and a mutant survives → exits 1 and the closing line names the class
+--- a/internal/gotestaudit/mutation.go
++++ b/internal/gotestaudit/mutation.go
+@@ -236,7 +236,7 @@
+ 	d.Mutation = m
+ 	counts := m.Counts
+ 	d.Summary.Mutation = &counts
+-	setClass(&d.Summary, ClassSurvived, m.Counts.SurvivedLines)
++	setClass(&d.Summary, ClassSurvived, 0)
+ 	d.normalize()
+ }
+ 

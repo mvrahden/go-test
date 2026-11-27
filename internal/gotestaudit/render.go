@@ -66,6 +66,9 @@ func RenderText(w io.Writer, d *Document, v Verdict) {
 	if d.Coverage != nil {
 		writeUnproven(w, d, v.Verbose)
 	}
+	if d.Mutation != nil {
+		writeMutation(w, d, v.Verbose)
+	}
 	notes := d.Notes
 	if folded > 0 {
 		notes = append(slices.Clone(notes), fmt.Sprintf("%d rows alike are grouped by package and suite; -v lists every one", folded))
@@ -426,6 +429,9 @@ func ClosingLine(d *Document, v Verdict) string {
 	if d.Coverage != nil {
 		segments = append(segments, fmt.Sprintf("unproven: %d of %d lines", d.Summary.Unproven, d.Summary.ChangedLines)+noCoverage(&d.Summary))
 	}
+	if d.Mutation != nil {
+		segments = append(segments, mutationSegment(d.Mutation))
+	}
 	if d.Summary.Incomplete > 0 {
 		segments = append(segments, fmt.Sprintf("not compared: %d", d.Summary.Incomplete))
 	}
@@ -630,6 +636,9 @@ func RenderMarkdown(w io.Writer, d *Document, v Verdict) {
 				fmt.Fprintf(w, "| %s | %s | %s |\n", mdCell(u.File), mdCell(shortPackage(d, u.Package)), mdCell(unprovenText(u, true)))
 			}
 		}
+	}
+	if d.Mutation != nil {
+		writeMutationMarkdown(w, d)
 	}
 	for _, list := range []struct {
 		title string

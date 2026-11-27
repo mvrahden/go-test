@@ -1244,6 +1244,28 @@ shards of one run do not add up to every mutant exactly once.
 | `audit-run-child-note-dropped` | no note says how a binary a test starts counts | audit conformance: the note It finds no such note |
 | `audit-run-interrupt-kills-the-audit` | an interrupt ends the audit with its run unstopped | audit conformance: the interrupted-run It sees no exit 130 |
 | `audit-last-stream-wins` | of two current streams the last judges a behavior | audit conformance: the two-current-streams It finds the fresh/c rows judged by the second stream |
+| `mutate-boundary-never-written` | an ordering gets no boundary mutant, only its negation | audit conformance: the mutants It and the survivor It find no boundary mutant |
+| `mutate-schemata-written-into-the-module` | the mutants' source is also written beside each file of the module | audit conformance: the module It finds a file the audit added |
+| `mutate-tests-of-the-mutated-package-only` | only the mutated package's own tests judge its mutants | audit conformance: the suites It finds Grade's line judged by no suite |
+| `mutate-children-coverage-unread` | what a binary a test starts executed is not read | audit conformance: the suites It finds Label's line judged by no suite |
+| `mutate-uncovered-line-run-by-every-suite` | a mutant no suite executes is run by every suite | audit conformance: the not-covered It finds Unused's line judged |
+| `mutate-killer-unnamed` | a killed mutant names its package, not the test that failed | audit conformance: the killed It finds no test named |
+| `mutate-survivor-suites-dropped` | a line names its last suite by name alone | audit conformance: the survivor It finds the suite without its package |
+| `mutate-timeout-read-as-killed` | a run past its limit counts as killed | audit conformance: the timeout It finds the i-- mutant killed |
+| `mutate-judged-on-a-failing-run` | mutants are classified as judged although the coverage run failed | audit conformance: the failing-suite It counts mutants not covered |
+| `mutate-budget-never-spent` | the scheduler is given an hour more than the budget | audit conformance: the budget It finds mutants killed under a budget of 1ns |
+| `mutate-spent-read-as-the-budget` | the time spent is written as the budget | audit conformance: the budget It reads 1ns spent |
+| `mutate-group-without-function` | a line's group leaves out its function | audit conformance: the JSON It finds the group without the function |
+| `mutate-summary-uncounted` | the summary holds no mutation counts | audit conformance: the summary It finds none |
+| `mutate-section-in-every-document` | the summary writes its mutation counts as null without --mutate | audit conformance: the plain-document It finds a mutation key |
+| `mutate-text-timeouts-folded` | a timed-out line counts among the others instead of being listed | audit conformance: the text and Markdown Its miss the timeout line |
+| `mutate-closing-line-without-timeouts` | the closing line leaves out the timeouts | audit conformance: the closing-line It misses the timeout count |
+| `mutate-survived-uncounted-as-a-class` | no line counts in the survived class | audit conformance: the policy It sees exit 0 |
+| `mutate-survived-taken-without-mutate` | --fail-on=survived is taken with --run alone | audit conformance: the refusal It sees the audit run |
+| `mutate-ignore-keeps-nothing` | a comment at a line's end does not keep that line | audit conformance: the ignored It finds the loop's mutants judged |
+| `mutate-ignore-without-a-reason-keeps` | a comment without a reason keeps its function | audit conformance: the reasonless It finds Half's mutant ignored |
+| `mutate-ignores-unrecorded` | a record lists no mutate-ignore comment | audit conformance: the record It finds none |
+| `mutate-ignores-not-compared` | mutate-ignore comments are left out of the comparison | audit conformance: the suppression It finds no finding |
 
 ## Adding a mutant
 

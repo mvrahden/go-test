@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditMutate / MutantsInTheDocument / when a tool reads the document of audit --mutate as JSON / finds the mutants counted by verdict in the summary \(
+Clause: when a tool reads the document of audit --mutate as JSON → finds the mutants counted by verdict in the summary
+--- a/internal/gotestaudit/mutation.go
++++ b/internal/gotestaudit/mutation.go
+@@ -235,7 +235,7 @@
+ 	}
+ 	d.Mutation = m
+ 	counts := m.Counts
+-	d.Summary.Mutation = &counts
++	_ = counts
+ 	setClass(&d.Summary, ClassSurvived, m.Counts.SurvivedLines)
+ 	d.normalize()
+ }

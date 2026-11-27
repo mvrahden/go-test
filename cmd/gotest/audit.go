@@ -8,6 +8,9 @@ import (
 	"io"
 	"os"
 	"slices"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestaudit"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
@@ -15,7 +18,8 @@ import (
 )
 
 var auditAllowed = flagSet("--record", "--base", "--base-record", "--head-record", "--fail-on", "--format", "--output",
-	"--evidence", "--base-evidence", "--run", "--coverage", "--diff", "--agent", "--control")
+	"--evidence", "--base-evidence", "--run", "--coverage", "--diff", "--agent", "--control",
+	"--mutate", "--mutate-budget", "--mutate-strings", "--parallel")
 
 // auditUsage is what an audit without a base is told.
 const auditUsage = "audit compares the tree with a base: give --base-record=<file> with a record --record wrote, or --base=<ref> to record a commit of this checkout"
@@ -105,21 +109,49 @@ type auditArgs struct {
 	// control hands standard input to the run --run makes; stopped says a
 	// stop ended that run before its end.
 	control, stopped bool
+	// mutate judges the changed lines' mutants within mutateBudget;
+	// mutateStrings adds the string operator. parallel is --parallel's
+	// method budget, 0 for the runner's own.
+	mutate, mutateStrings bool
+	mutateBudget          time.Duration
+	parallel              int
+	// failOnNamed are the classes --fail-on names as written.
+	failOnNamed []string
 }
 
 func parseAuditArgs(own OwnFlags, rest []string) (auditArgs, error) {
 	a := auditArgs{
-		record:       own.Bool("--record"),
-		baseRef:      own.Value("--base"),
-		baseFile:     own.Value("--base-record"),
-		headFile:     own.Value("--head-record"),
-		output:       own.Value("--output"),
-		evidence:     own.Values("--evidence"),
-		baseEvidence: own.Values("--base-evidence"),
-		run:          own.Bool("--run"),
-		coverage:     own.Value("--coverage"),
-		diff:         own.Value("--diff"),
-		control:      own.Given("--control"),
+		record:        own.Bool("--record"),
+		baseRef:       own.Value("--base"),
+		baseFile:      own.Value("--base-record"),
+		headFile:      own.Value("--head-record"),
+		output:        own.Value("--output"),
+		evidence:      own.Values("--evidence"),
+		baseEvidence:  own.Values("--base-evidence"),
+		run:           own.Bool("--run"),
+		coverage:      own.Value("--coverage"),
+		diff:          own.Value("--diff"),
+		control:       own.Given("--control"),
+		mutate:        own.Bool("--mutate"),
+		mutateStrings: own.Bool("--mutate-strings"),
+		mutateBudget:  defaultMutateBudget,
+	}
+	if a.mutate {
+		a.run = true
+	}
+	if own.Given("--mutate-budget") {
+		d, err := time.ParseDuration(own.Value("--mutate-budget"))
+		if err != nil || d <= 0 {
+			return a, fmt.Errorf("invalid --mutate-budget %q: give a positive duration such as 3m", own.Value("--mutate-budget"))
+		}
+		a.mutateBudget = d
+	}
+	if own.Given("--parallel") {
+		n, err := strconv.Atoi(own.Value("--parallel"))
+		if err != nil || n < 1 {
+			return a, fmt.Errorf("invalid --parallel %q: give a positive count", own.Value("--parallel"))
+		}
+		a.parallel = n
 	}
 	if _, err := parseControlFlag(own); err != nil {
 		return a, err
@@ -138,6 +170,7 @@ func parseAuditArgs(own OwnFlags, rest []string) (auditArgs, error) {
 			return a, fmt.Errorf("--fail-on: %w", err)
 		}
 		a.failOn = classes
+		a.failOnNamed = strings.Split(own.Value("--fail-on"), ",")
 	}
 	rest, a.verbose = cutVerbose(rest)
 	classified := gotestrunner.ClassifyGoTestArgs(rest)
@@ -170,7 +203,28 @@ func cutVerbose(args []string) (rest []string, verbose bool) {
 }
 
 // proofFlags are the flags that say what runs and coverage prove.
-var proofFlags = []string{"--evidence", "--base-evidence", "--run", "--coverage", "--diff"}
+var proofFlags = []string{"--evidence", "--base-evidence", "--run", "--coverage", "--diff", "--mutate"}
+
+// checkMutate refuses the mutation flags where they cannot apply.
+func (a *auditArgs) checkMutate(own OwnFlags) error {
+	for _, f := range []string{"--mutate-budget", "--mutate-strings"} {
+		if own.Given(f) && !a.mutate {
+			return fmt.Errorf("%s goes with --mutate", f)
+		}
+	}
+	if own.Given("--parallel") && !a.run {
+		return errors.New("--parallel bounds the run --run or --mutate makes; give it with one")
+	}
+	for _, c := range a.failOnNamed {
+		if strings.TrimSpace(c) == gotestaudit.ClassSurvived && !a.mutate {
+			return errors.New("--fail-on=survived judges mutants: give --mutate, with --base or --diff")
+		}
+	}
+	if a.mutate && !a.record && a.diff == "" && a.baseRef == "" {
+		return errors.New("--mutate mutates the changed lines: give --base=<ref> or --diff=<file>")
+	}
+	return nil
+}
 
 // check refuses flags that do not go together.
 func (a *auditArgs) check(own OwnFlags) error {
@@ -181,6 +235,9 @@ func (a *auditArgs) check(own OwnFlags) error {
 		case a.diff == "-" || slices.Contains(a.evidence, "-") || slices.Contains(a.baseEvidence, "-"):
 			return errors.New("--control=stdin and a stream or diff from - both read standard input; save it to a file")
 		}
+	}
+	if err := a.checkMutate(own); err != nil {
+		return err
 	}
 	if a.record {
 		for _, f := range append([]string{"--base", "--base-record", "--head-record", "--fail-on"}, proofFlags...) {
@@ -361,7 +418,8 @@ behaviors itself. Each behavior the comparison names gets its verdict, its
 run-time assertions and the stream it came from, current when that stream
 ran the head's commit with neither tree dirty, else stale. --coverage and
 the changed lines (git diff of --base and the files on disk, or --diff)
-list the changed production lines no test executed.
+list the changed production lines no test executed. --mutate asks, of each
+changed line a test executed, whether a test notices it made wrong.
 
 Packages default to ./... .
 
@@ -378,6 +436,15 @@ Flags:
   --run                 Run the packages of the changed behaviors, with
                         coverage of the changed production packages, as
                         current evidence
+  --mutate              Run as --run does, then judge the mutants of the
+                        changed lines by the suites that executed each:
+                        killed, survived, timeout, or not judged once the
+                        budget is spent. //gotest:mutate-ignore <reason>
+                        keeps a line or a function from mutation
+  --mutate-budget=<d>   The time the mutants may take (default 3m)
+  --mutate-strings      Mutate string literals too
+  --parallel=<n>        The tests the runs make at once (default: the
+                        runner's own)
   --coverage=<file>     A coverage profile of the head, for the unproven lines
   --diff=<file|->       The changed lines as a unified diff, without --base
   --fail-on=<classes>   Exit 1 when the document lists a finding of one of the
@@ -385,7 +452,7 @@ Flags:
                         guard, budget, suppression, snapshot, assertions,
                         asserts-by, changed; all is every class but changed.
                         Proof classes: failing, not-run, vacuous, stale,
-                        unproven; proof is the five
+                        unproven, survived; proof is the six
   --format=<fmt>        text (default), json or md
   --output=<file>       Write to a file instead of stdout
   --control=stdin       Hand stop and force lines on stdin to the run --run
@@ -401,6 +468,7 @@ compared; 130 the run --run made was stopped.
 Examples:
   gotest audit --base=origin/main
   gotest audit --base=origin/main --run --fail-on=all,proof
+  gotest audit --base=origin/main --mutate --mutate-budget=5m --fail-on=survived
   gotest audit --base=origin/main --evidence=run.json --coverage=cover.out
   gotest audit --record --output=base.json ./...
   gotest audit --base-record=base.json --fail-on=removed,focus,excluded --format=md

@@ -846,6 +846,43 @@ lock, and writes by a rename
 ([The packages of a record](specs/cli/spec.md#requirement-the-packages-of-a-record),
 [Run records kept](specs/cli/spec.md#requirement-run-records-kept)).
 
+### Mutation Runs
+
+`gotest audit --mutate` judges a change's lines through this runner, never
+by starting test binaries itself
+([Mutants of the changed lines](specs/audit/spec.md#requirement-mutants-of-the-changed-lines)).
+`internal/mutate` writes, from `go/types`, every mutant of the changed
+lines into one copy of each file (mutant schemata): an operator becomes a
+chain that evaluates only the active branch, a statement a guarded block,
+and each rendering keeps the source's newlines, so a compiler error names
+the mutant's own line. A file `gotest_mutant_schemata.go` per package reads
+the active id once from `GOTEST_MUTANT`. The files go to an overlay at a
+path fixed per checkout under `audit-mutate/` in the gotest cache, held
+under a lock like the base export, so its binary cache entry is one per
+checkout; `go build` drops the mutants of a line it refuses.
+
+Three kinds of run follow, each a child CLI as `--run`'s:
+
+1. The coverage run, of the tree as it is: `GOTEST_SUITE_COVERAGE` makes
+   the runner keep each suite's profile and give each suite process a
+   `GOCOVERDIR` of its own, so a line maps to the suites that executed it,
+   a binary they start with `-cover` included. It cannot carry the
+   mutants: `go test -cover` compiles a file an overlay replaces from disk
+   and fails on one it adds.
+2. The zero run: `GOTEST_MUTANT_OVERLAY` names the mutants' overlay, which
+   the runner adds to its harness overlay and to its suites' `GOFLAGS`, so
+   a binary a test builds holds the mutants too; no mutant is switched on,
+   and every suite that judges one must pass and is timed.
+3. One run per mutant of only its suites, `--live --control=stdin -json`:
+   the first `fail` event gets a `stop` line, a run past three times its
+   suites' zero-run time plus twice the runner's overhead a `stop`, a
+   `force`, then a kill. A run on the mutants records nothing for
+   `--failed` or `--changed`.
+
+The runs share the scheduling, shared fixtures, exclusive locks, process
+trees and stop of any run; `internal/mutate`'s scheduler only bounds how
+many go at once and when the budget ends.
+
 ### Per-Suite Fixture Readiness
 
 Each suite has a set of shared fixture keys it needs (including transitive
@@ -1491,12 +1528,13 @@ Arrows read "imports". Third-party modules are named where a package needs one.
 
 | Package | Role | Imports of this module |
 |---|---|---|
-| `cmd/gotest` | The CLI: arguments, subcommands, signals, watch | `internal/{about,config,filewrite,gotestast,gotestaudit,gotestbench,gotestscenarios,gotestgen,gotestrunner,gotestspec,inputhash,lint,migrate,pkgpattern,protocol,refactor,scaffold,unidiff}`, `skills`; third-party: `fsnotify`, `x/tools` |
+| `cmd/gotest` | The CLI: arguments, subcommands, signals, watch | `internal/{about,config,filewrite,gotestast,gotestaudit,gotestbench,gotestscenarios,gotestgen,gotestrunner,gotestspec,inputhash,lint,migrate,mutate,pkgpattern,protocol,refactor,scaffold,unidiff}`, `skills`; third-party: `fsnotify`, `x/tools` |
 | `internal/gotestast` | Suite and fixture model read from syntax and types | `internal/{about,protocol,typeclass}`; third-party: `x/tools` |
 | `internal/gotestgen` | Loading, collection, binding, rendering of the harness | `internal/{about,genstub,gotestast,goversion,pkgload,pkgpattern,protocol}`; third-party: `x/mod`, `x/tools` |
 | `internal/gotestrunner` | Overlay, compile, shared fixtures, one process per suite | `internal/{about,control,gotestgen,proctree,protocol,protocol/sharedwire,schedinfo}` |
 | `internal/gotestspec` | Event stream → tree → terminal, Markdown and JSON renderers; the census | `internal/{about,protocol}` |
-| `internal/gotestaudit` | A tree's test estate read from source into a record; two records compared into the audit document; its text, JSON and Markdown | `internal/{about,gotestast,gotestgen,gotestspec,lint,protocol}`; third-party: `x/tools` |
+| `internal/gotestaudit` | A tree's test estate read from source into a record; two records compared into the audit document; its text, JSON and Markdown | `internal/{about,gotestast,gotestgen,gotestspec,lint,mutate,protocol}`; third-party: `x/tools` |
+| `internal/mutate` | The mutants of a change's lines, compiled into one build; the comments that keep a line; the budget's order and scheduler | third-party: `x/tools` |
 | `internal/gotestscenarios` | OpenSpec scenarios read from spec files, bound to a tree's `When`/`It` labels by text; the scenarios document, its policy and its text, JSON and Markdown | `internal/{about,gotestspec}` |
 | `internal/gotestbench` | Benchmark baselines, deltas and the gate | `internal/gotestspec` |
 | `internal/lint` | The analyzer and its fix driver | `internal/{about,filewrite,genstub,gotestast,gotestgen,goversion,pkgload,pkgpattern,protocol,refactor,typeclass}`; third-party: `x/tools` |

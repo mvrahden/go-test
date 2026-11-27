@@ -25,12 +25,18 @@ type AuditBase struct {
 func (b *AuditBase) Release() { b.release() }
 
 // auditBaseRoot is where the exports live.
-func auditBaseRoot() (string, error) {
+func auditBaseRoot() (string, error) { return auditRoot("audit") }
+
+// auditMutateRoot is where audit --mutate keeps each checkout's mutants:
+// a fixed overlay path keeps one binary cache entry per checkout.
+func auditMutateRoot() (string, error) { return auditRoot("audit-mutate") }
+
+func auditRoot(sub string) (string, error) {
 	root, err := cacheRoot()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(root, "audit"), nil
+	return filepath.Join(root, sub), nil
 }
 
 // auditBaseKey names the checkout at top among the exports.
@@ -46,6 +52,20 @@ func LockAuditBase(top string) (*AuditBase, error) {
 	if err != nil {
 		return nil, err
 	}
+	return lockAuditDir(root, top)
+}
+
+// LockAuditMutate takes the mutants' directory of the checkout at top, as
+// LockAuditBase takes its export's.
+func LockAuditMutate(top string) (*AuditBase, error) {
+	root, err := auditMutateRoot()
+	if err != nil {
+		return nil, err
+	}
+	return lockAuditDir(root, top)
+}
+
+func lockAuditDir(root, top string) (*AuditBase, error) {
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		return nil, err
 	}
@@ -67,6 +87,17 @@ func LockAuditBase(top string) (*AuditBase, error) {
 // and the directory they live in.
 func ClearAuditBases() (removed, inUse int, dir string, err error) {
 	root, err := auditBaseRoot()
+	if err != nil {
+		return 0, 0, "", err
+	}
+	removed, inUse = clearAuditBases(root)
+	return removed, inUse, root, nil
+}
+
+// ClearAuditMutations removes every mutants' directory no audit holds, as
+// ClearAuditBases does the exports.
+func ClearAuditMutations() (removed, inUse int, dir string, err error) {
+	root, err := auditMutateRoot()
 	if err != nil {
 		return 0, 0, "", err
 	}

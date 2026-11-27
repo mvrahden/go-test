@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/audit AuditMutate / TheSuitesThatJudgeAMutant / when audit --mutate judges lines only another package's tests or a binary a test starts execute / reads the mutants of a line no test executed as not covered \(
+Clause: when audit --mutate judges lines only another package's tests or a binary a test starts execute → reads the mutants of a line no test executed as not covered
+--- a/cmd/gotest/auditmutate_run.go
++++ b/cmd/gotest/auditmutate_run.go
+@@ -206,8 +206,7 @@
+ 				}
+ 			}
+ 			if len(covering[mu.ID]) == 0 {
+-				r.Verdict = gotestaudit.MutantNotCovered
+-				continue
++				covering[mu.ID] = b.suites
+ 			}
+ 			r.Verdict = gotestaudit.MutantNotJudged
+ 			todo = append(todo, *mu)

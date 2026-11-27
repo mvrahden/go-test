@@ -1004,3 +1004,24 @@ func ExportVacuousInText(counts, stdout string) (vacuous []string, counted bool)
 	}
 	return vacuous, x.counted
 }
+
+// mutation.go
+var (
+	ExportMutantOverlay   = mutantOverlay
+	ExportWithMutantFlags = withMutantFlags
+)
+
+// ExportSuiteCoverage gives each target, by package and suite name, the
+// profile path given, its env the suite's GOCOVERDIR, and writes the index.
+func ExportSuiteCoverage(env []string, targets [][3]string) [][]string {
+	var ts []SuiteTarget
+	var envs [][]string
+	for _, t := range targets {
+		st := SuiteTarget{CoverProfile: t[2]}
+		st.Package, st.SuiteName = t[0], t[1]
+		ts = append(ts, st)
+		envs = append(envs, withSuiteCoverDir(env, &st))
+	}
+	writeSuiteCoverage(ts)
+	return envs
+}

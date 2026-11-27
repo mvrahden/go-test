@@ -366,7 +366,7 @@ func buildBaseEnv(cfg PipelineConfig) []string { //nolint:gocritic // hugeParam:
 	if cfg.CI {
 		env = append(env, protocol.EnvCI+"=1")
 	}
-	return env
+	return withMutantFlags(env)
 }
 
 // benchPrep is what a bench run has when its compile and fixture setup are

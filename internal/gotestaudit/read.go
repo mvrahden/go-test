@@ -18,6 +18,7 @@ import (
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestspec"
 	"github.com/mvrahden/go-test/internal/lint"
+	"github.com/mvrahden/go-test/internal/mutate"
 )
 
 // Options say which tree to read and how its packages load.
@@ -57,6 +58,7 @@ func Read(ctx context.Context, opts *Options) (rec Record, unmatched []string, e
 		rec.Snapshots = append(rec.Snapshots, snapshotsIn(pkgs.Broken[i].Dir, m)...)
 		mods = append(mods, m)
 	}
+	rec.MutateIgnores = mutateIgnores(pkgs.Graph)
 	rec.ModuleDirs = moduleDirs(mods)
 	slices.SortFunc(rec.Packages, func(a, b Package) int { return cmp.Compare(a.Path, b.Path) })
 	slices.SortFunc(rec.Snapshots, func(a, b Snapshot) int {
@@ -220,6 +222,37 @@ func snapshotsIn(pkgDir string, m module) []Snapshot {
 		sum := sha256.Sum256(bytes.ReplaceAll(data, []byte("\r\n"), []byte("\n")))
 		out = append(out, Snapshot{Module: m.path, File: m.rel(f), SHA256: hex.EncodeToString(sum[:])})
 	}
+	return out
+}
+
+// mutateIgnores lists the //gotest:mutate-ignore comments of the matched
+// packages' non-test files, by module, file and line.
+func mutateIgnores(graph []*packages.Package) []MutateIgnore {
+	var out []MutateIgnore
+	seen := map[string]bool{}
+	for _, p := range graph {
+		if p.ID != p.PkgPath {
+			continue // a test variant or a test main
+		}
+		for _, name := range p.GoFiles {
+			if seen[name] || strings.HasSuffix(name, "_test.go") {
+				continue
+			}
+			seen[name] = true
+			src, err := os.ReadFile(name) //nolint:gosec // G304: a file of a package being recorded
+			if err != nil {
+				continue
+			}
+			root := rootWithGoMod(filepath.Dir(name))
+			m := module{path: gotestspec.ReadModulePath(root), dir: root}
+			for _, ig := range mutate.Ignores(name, src) {
+				out = append(out, MutateIgnore{Module: m.path, File: m.rel(name), Line: ig.Line, Scope: ig.Scope, Start: ig.Start, End: ig.End, Func: ig.Func, Reason: ig.Reason})
+			}
+		}
+	}
+	slices.SortFunc(out, func(a, b MutateIgnore) int {
+		return cmp.Or(cmp.Compare(a.Module, b.Module), cmp.Compare(a.File, b.File), cmp.Compare(a.Line, b.Line))
+	})
 	return out
 }
 

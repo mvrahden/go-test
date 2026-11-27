@@ -103,6 +103,17 @@ func clearCache(args []string) int {
 	if held > 0 {
 		fmt.Fprintf(os.Stderr, "note: %d audit base tree%s left in place: a running audit is using %s\n", held, plural(held), itThem(held))
 	}
+	mutations, busy, mutateDir, err := gotestrunner.ClearAuditMutations()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
+	if mutations > 0 {
+		fmt.Fprintf(os.Stderr, "removed %d audit mutants director%s from %s\n", mutations, pluralY(mutations), mutateDir)
+	}
+	if busy > 0 {
+		fmt.Fprintf(os.Stderr, "note: %d audit mutants director%s left in place: a running audit is using %s\n", busy, pluralY(busy), itThem(busy))
+	}
 	checkouts, writing, runsDir, err := gotestrunner.ClearRuns()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
@@ -142,4 +153,11 @@ func generatedFiles(dir string) []string {
 func isGenerated(path string) bool {
 	src, err := os.ReadFile(path) //nolint:gosec // G304: a file in a package directory clean was pointed at
 	return err == nil && about.IsGeneratedSource(src)
+}
+
+func pluralY(n int) string {
+	if n == 1 {
+		return "y"
+	}
+	return "ies"
 }

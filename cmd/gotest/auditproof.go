@@ -33,8 +33,22 @@ func (a *auditArgs) prove(doc *gotestaudit.Document, base, head *gotestaudit.Rec
 	}
 	var inputs []gotestaudit.StreamInput
 	profile := a.coverage
+	var mut *mutation
+	if a.mutate {
+		var err error
+		if mut, err = a.prepareMutation(doc, files); err != nil {
+			return err
+		}
+		defer mut.release()
+		if mut != nil {
+			if err := mut.testPackages(a); err != nil {
+				return err
+			}
+		}
+	}
+	var zero *baseline
 	if a.run {
-		in, ranProfile, err := a.runChanged(doc, files)
+		in, ranProfile, err := a.runChanged(doc, files, mut)
 		if err != nil {
 			return err
 		}
@@ -44,6 +58,11 @@ func (a *auditArgs) prove(doc *gotestaudit.Document, base, head *gotestaudit.Rec
 		defer removeProfile(ranProfile)
 		if profile == "" {
 			profile = ranProfile
+		}
+		if mut != nil && in != nil {
+			if zero, err = a.readMutationBaseline(doc, mut, in.Events, ranProfile); err != nil {
+				return err
+			}
 		}
 	}
 	for _, side := range []struct {
@@ -75,6 +94,9 @@ func (a *auditArgs) prove(doc *gotestaudit.Document, base, head *gotestaudit.Rec
 		}
 		shown := a.coverage
 		gotestaudit.AddUnproven(doc, files, blocks, gotestaudit.Coverage{Profile: shown, Lines: lines})
+	}
+	if mut != nil {
+		a.judge(doc, mut, zero)
 	}
 	return nil
 }
@@ -219,7 +241,7 @@ func (a *auditArgs) changedFiles(git *gitBase) ([]gotestaudit.ProdFile, string, 
 		if err != nil {
 			continue
 		}
-		out = append(out, gotestaudit.ProdFile{Module: mod, File: filepath.ToSlash(rel), Package: pkg, Lines: c.Lines})
+		out = append(out, gotestaudit.ProdFile{Module: mod, File: filepath.ToSlash(rel), Package: pkg, Lines: c.Lines, Abs: abs})
 	}
 	return out, from, nil
 }
@@ -261,27 +283,8 @@ func moduleRootOf(dir string) (root, path string) {
 // behaviors the document names and, when the unproven lines are asked for,
 // the changed production packages, measuring their coverage. It returns
 // the run's stream, nil when there is nothing to run, and its profile.
-func (a *auditArgs) runChanged(doc *gotestaudit.Document, files []gotestaudit.ProdFile) (*gotestaudit.StreamInput, string, error) {
-	var run []string
-	for i := range doc.Behaviors {
-		if c := &doc.Behaviors[i]; c.Head != nil {
-			run = append(run, c.Package)
-		}
-	}
-	for i := range doc.Findings {
-		if f := &doc.Findings[i]; f.Package != "" && f.Class != gotestaudit.ClassRemoved {
-			run = append(run, f.Package)
-		}
-	}
-	var cover []string
-	for i := range files {
-		cover = append(cover, files[i].Package)
-	}
-	slices.Sort(cover)
-	cover = slices.Compact(cover)
-	run = append(run, cover...)
-	slices.Sort(run)
-	run = slices.Compact(run)
+func (a *auditArgs) runChanged(doc *gotestaudit.Document, files []gotestaudit.ProdFile, mut *mutation) (*gotestaudit.StreamInput, string, error) {
+	run, cover := runSet(doc, files, mut)
 	if len(run) == 0 {
 		doc.Notes = append(doc.Notes, "--run: no package holds a changed behavior or a changed production file, so nothing ran")
 		return nil, "", nil
@@ -291,6 +294,9 @@ func (a *auditArgs) runChanged(doc *gotestaudit.Document, files []gotestaudit.Pr
 		return nil, "", err
 	}
 	args := append([]string{"-json"}, a.loadFlags...)
+	if a.parallel > 0 {
+		args = append([]string{fmt.Sprintf("--parallel=%d", a.parallel)}, args...)
+	}
 	if a.control {
 		args = append([]string{"--control=stdin"}, args...)
 	}
@@ -314,12 +320,25 @@ func (a *auditArgs) runChanged(doc *gotestaudit.Document, files []gotestaudit.Pr
 	if covdir != "" {
 		cmd.Env = withCoverDir(os.Environ(), covdir)
 	}
+	if mut != nil {
+		if cmd.Env == nil {
+			cmd.Env = os.Environ()
+		}
+		cmd.Env = mut.coverageEnv(cmd.Env)
+		if err := os.MkdirAll(mut.suiteDir(), 0o700); err != nil {
+			_ = os.RemoveAll(dir)
+			return nil, "", err
+		}
+	}
 	var stdout strings.Builder
 	cmd.Stdout, cmd.Stderr = &stdout, os.Stderr
 	if a.control {
 		cmd.Stdin = os.Stdin
 	}
 	runErr := runForwarding(cmd)
+	if mut != nil {
+		mut.exit = exitCodeOf(runErr)
+	}
 	var exit *exec.ExitError
 	if runErr != nil && !errors.As(runErr, &exit) {
 		_ = os.RemoveAll(dir)
@@ -335,7 +354,7 @@ func (a *auditArgs) runChanged(doc *gotestaudit.Document, files []gotestaudit.Pr
 		_ = os.RemoveAll(dir)
 		return nil, "", fmt.Errorf("--run: the run wrote no stream: %v", runErr)
 	}
-	if covdir != "" {
+	if covdir != "" && mut == nil {
 		switch n, err := foldChildCoverage(covdir, profile, cover); {
 		case err != nil:
 			doc.Notes = append(doc.Notes, "--run: the coverage data of the binaries the tests started was not read: "+err.Error())
@@ -357,4 +376,48 @@ func (a *auditArgs) runChanged(doc *gotestaudit.Document, files []gotestaudit.Pr
 		doc.Notes = append(doc.Notes, "--run: coverage is of the packages the run ran: "+strings.Join(run, " "))
 	}
 	return &gotestaudit.StreamInput{Side: gotestaudit.SideHead, Ran: true, Events: events}, profile, nil
+}
+
+// readMutationBaseline reads the run --mutate made with no mutant on as the
+// baseline, its children's coverage folded into the run's profile.
+func (a *auditArgs) readMutationBaseline(doc *gotestaudit.Document, mut *mutation, events []gotestspec.TestEvent, profile string) (*baseline, error) {
+	b, n, err := mut.readBaseline(events, mut.exit, profile)
+	if err != nil {
+		return nil, err
+	}
+	switch {
+	case n == 0 && !a.stopped:
+		doc.Notes = append(doc.Notes, childCoverNote)
+	case n > 0:
+		doc.Notes = append(doc.Notes, fmt.Sprintf("--run: the coverage counts what %s the tests started executed", binaries(n)))
+	}
+	return b, nil
+}
+
+// runSet is what --run runs: the packages of the behaviors the document
+// names, the changed production packages and, under --mutate, every one
+// holding tests; and the packages it measures coverage of.
+func runSet(doc *gotestaudit.Document, files []gotestaudit.ProdFile, mut *mutation) (run, cover []string) {
+	for i := range doc.Behaviors {
+		if c := &doc.Behaviors[i]; c.Head != nil {
+			run = append(run, c.Package)
+		}
+	}
+	for i := range doc.Findings {
+		if f := &doc.Findings[i]; f.Package != "" && f.Class != gotestaudit.ClassRemoved {
+			run = append(run, f.Package)
+		}
+	}
+	for i := range files {
+		cover = append(cover, files[i].Package)
+	}
+	slices.Sort(cover)
+	cover = slices.Compact(cover)
+	run = append(run, cover...)
+	if mut != nil {
+		run = append(run, mut.tests...)
+	}
+	slices.Sort(run)
+	run = slices.Compact(run)
+	return run, cover
 }

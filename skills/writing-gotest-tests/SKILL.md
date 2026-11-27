@@ -78,7 +78,13 @@ added, removed, reworded, moved and changed: a test removed, an `X_` or
 rewritten snapshot, fewer assertions, a new `AssertsBy`. Each one is what
 the change meant, said in your report, or a mistake to undo. Add `--run` to
 run what changed: each behavior then shows its verdict, and the changed
-production lines no test executed are listed. The gotest plugin's stop hook
+production lines no test executed are listed. When the change adds logic,
+add `--mutate` (v1.42+) within its budget: it makes each changed line a
+test executed wrong and reports the lines no test noticed. For a survivor,
+write the assertion that tells the mutant apart; only a mutant no test can
+tell apart, such as a heuristic's equally valid result, takes
+`//gotest:mutate-ignore <the true reason>`, which audit lists as a
+suppression. The gotest plugin's stop hook
 runs the same audit when you end a turn and hands you each new weakening
 once: undo it, or name it in your final message.
 
