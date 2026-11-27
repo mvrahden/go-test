@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -480,4 +481,56 @@ func (s *AnnotationsTestSuite) TestCollectAnnotations_PathsTheCompilerPrinted(t 
 			gotest.Equal(it, r.message, annotations[0].Message)
 		}
 	}
+}
+
+// suiteOf is the stream of one suite whose methods carry the given assertion
+// counts and verdicts.
+func suiteOf(methods ...[2]string) string {
+	var b strings.Builder
+	b.WriteString(`{"Action":"run","Package":"example.com/p","Test":"TestS"}` + "\n")
+	for i, m := range methods {
+		name := "TestS/TestM" + strconv.Itoa(i)
+		b.WriteString(`{"Action":"run","Package":"example.com/p","Test":"` + name + `"}` + "\n")
+		b.WriteString(`{"Action":"attr","Package":"example.com/p","Test":"` + name + `","Key":"gotest.assertions","Value":"` + m[0] + `"}` + "\n")
+		b.WriteString(`{"Action":"` + m[1] + `","Package":"example.com/p","Test":"` + name + `"}` + "\n")
+	}
+	b.WriteString(`{"Action":"pass","Package":"example.com/p","Test":"TestS"}` + "\n")
+	b.WriteString(`{"Action":"pass","Package":"example.com/p"}` + "\n")
+	return b.String()
+}
+
+func (s *AnnotationsTestSuite) TestRunFailureAnnotation(t *gotest.T, _ *annotationsCtx) {
+	exit := func(n int) *gotestspec.RunInfo { return &gotestspec.RunInfo{ExitCode: &n} }
+	vacuous, asserted, failed := [2]string{"0", "pass"}, [2]string{"1", "pass"}, [2]string{"1", "fail"}
+	fiveVacuous := suiteOf(vacuous, vacuous, vacuous, vacuous, vacuous, asserted)
+	for sub, r := range gotest.Each(t, []struct {
+		Desc    string
+		stream  string
+		run     *gotestspec.RunInfo
+		ok      bool
+		message string
+	}{
+		{Desc: "exit 1, five vacuous", stream: fiveVacuous, run: exit(1), ok: true, message: "exit 1 and no test failed: 5 tests passed without an assertion, which fails a run in CI mode"},
+		{Desc: "exit 1, one vacuous", stream: suiteOf(vacuous, asserted), run: exit(1), ok: true, message: "exit 1 and no test failed: 1 test passed without an assertion, which fails a run in CI mode"},
+		{Desc: "exit 1, none vacuous", stream: suiteOf(asserted, asserted), run: exit(1), ok: true, message: "exit 1 and no test failed: the run's own output names what failed it"},
+		{Desc: "exit 2, five vacuous", stream: fiveVacuous, run: exit(2), ok: true, message: "exit 2 and no test failed: the run's own output names what failed it"},
+		{Desc: "no run", stream: fiveVacuous},
+		{Desc: "no exit code", stream: fiveVacuous, run: &gotestspec.RunInfo{}},
+		{Desc: "exit 0", stream: fiveVacuous, run: exit(0)},
+		{Desc: "exit 1 over a failed test", stream: suiteOf(vacuous, failed), run: exit(1)},
+	}) {
+		a, ok := gotestspec.RunFailureAnnotation(treeOf(sub, r.stream), r.run)
+		gotest.Equal(sub, r.ok, ok)
+		want := gotestspec.Annotation{}
+		if r.ok {
+			want = gotestspec.Annotation{Title: "gotest run failed", Message: r.message}
+		}
+		gotest.Equal(sub, want, a)
+	}
+}
+
+func (s *AnnotationsTestSuite) TestWriteGitHubAnnotations_WithoutAFile(t *gotest.T, _ *annotationsCtx) {
+	var buf bytes.Buffer
+	gotestspec.WriteGitHubAnnotations(&buf, []gotestspec.Annotation{{Title: "gotest run failed", Message: "exit 1 and no test failed"}})
+	gotest.Equal(t, "::error title=gotest run failed::exit 1 and no test failed\n", buf.String())
 }

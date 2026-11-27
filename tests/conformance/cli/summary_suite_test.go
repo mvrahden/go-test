@@ -3,6 +3,7 @@ package cli_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/testkit"
@@ -125,6 +126,86 @@ func (s *CLISummaryTestSuite) TestAnnotations(t *gotest.T) {
 			gotest.NoError(it, err)
 			gotest.Equal(it, 1, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
 			gotest.Regexp(it, `(?m)^::error file=failing/failing_suite_test\.go,line=9,`, run.Stdout)
+		})
+	})
+}
+
+// runFailedHeadline opens the summary of the assertcount package's --ci run.
+const runFailedHeadline = `Run failed with exit 1, no test failed: 12 passed, 1 skipped, 5 vacuous \(`
+
+func (s *CLISummaryTestSuite) TestARunThatFailedWithNoFailedTest(t *gotest.T) {
+	t.When("gotest summary --ci runs a package whose only problem is tests that passed without an assertion", func(w *gotest.T) {
+		w.It("the headline opens with Run failed with exit 1, says no test failed and counts the passed, skipped and vacuous tests", func(it *gotest.T) {
+			run, err := testkit.RunCLI(it.Context(), ".", "summary", "--ci", "--no-color", vacuousPkg)
+			gotest.NoError(it, err)
+			gotest.Equal(it, 1, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.Regexp(it, `^`+runFailedHeadline, run.Stdout)
+			gotest.Contains(it, run.Stdout, "VACUOUS  ")
+		})
+		w.It("the Markdown headline and the GitHub step summary open so too", func(it *gotest.T) {
+			md, err := testkit.RunCLI(it.Context(), ".", "summary", "--ci", "--no-color", "--format=md", vacuousPkg)
+			gotest.NoError(it, err)
+			gotest.Regexp(it, `^### `+runFailedHeadline, md.Stdout, "stderr: %s", md.Stderr)
+			step := filepath.Join(it.TempDir(), "step.md")
+			run, err := testkit.RunCLIWithEnv(it.Context(), ".", []string{"GITHUB_STEP_SUMMARY=" + step}, "summary", "--github", "--ci", "--no-color", vacuousPkg)
+			gotest.NoError(it, err)
+			file, err := os.ReadFile(step)
+			gotest.NoError(it, err, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.Regexp(it, `^### `+runFailedHeadline, string(file))
+		})
+		w.It("the summary of the run's saved stream opens so too", func(it *gotest.T) {
+			events := filepath.Join(it.TempDir(), "events.json")
+			live, err := testkit.RunCLI(it.Context(), ".", "summary", "--ci", "--no-color", "--events-file="+events, vacuousPkg)
+			gotest.NoError(it, err)
+			gotest.Equal(it, 1, live.Exit, "stderr: %s", live.Stderr)
+			replay, err := testkit.RunCLI(it.Context(), ".", "summary", "--no-color", "--input="+events)
+			gotest.NoError(it, err)
+			gotest.Equal(it, 1, replay.Exit, "stderr: %s", replay.Stderr)
+			gotest.Regexp(it, `^`+runFailedHeadline, replay.Stdout)
+		})
+	})
+
+	t.When("gotest summary --min=100 runs a package whose tests pass and cover nothing", func(w *gotest.T) {
+		w.It("the headline opens with Run failed with exit 1, says no test failed and counts the passed test", func(it *gotest.T) {
+			events := filepath.Join(it.TempDir(), "events.json")
+			run, err := testkit.RunCLI(it.Context(), ".", "summary", "--no-color", "--min=100", "--events-file="+events, "../testdata/passing/")
+			gotest.NoError(it, err)
+			gotest.Equal(it, 1, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.Regexp(it, `^Run failed with exit 1, no test failed: 1 passed \(`, run.Stdout)
+			gotest.Contains(it, run.Stderr, "FAIL: 0.0% coverage (minimum 100%)")
+			// The saved stream replays as the run ended: the limit is in its exit code.
+			replay, err := testkit.RunCLI(it.Context(), ".", "summary", "--no-color", "--input="+events)
+			gotest.NoError(it, err)
+			gotest.Equal(it, 1, replay.Exit, "stderr: %s", replay.Stderr)
+			gotest.Regexp(it, `^Run failed with exit 1, no test failed: 1 passed \(`, replay.Stdout)
+		})
+		w.It("the Markdown headline does not say All", func(it *gotest.T) {
+			md, err := testkit.RunCLI(it.Context(), ".", "summary", "--no-color", "--format=md", "--min=100", "../testdata/passing/")
+			gotest.NoError(it, err)
+			gotest.Regexp(it, `^### Run failed with exit 1, no test failed: 1 passed \(`, md.Stdout, "stderr: %s", md.Stderr)
+			gotest.NotContains(it, md.Stdout, "All")
+		})
+	})
+}
+
+func (s *CLISummaryTestSuite) TestTheRunFailureAnnotation(t *gotest.T) {
+	t.When("gotest summary --github --ci runs a package whose only problem is tests that passed without an assertion", func(w *gotest.T) {
+		w.It("writes one error annotation without a file, naming exit 1 and the 5 tests that passed without an assertion", func(it *gotest.T) {
+			run, err := testkit.RunCLI(it.Context(), ".", "summary", "--github", "--ci", "--no-color", vacuousPkg)
+			gotest.NoError(it, err)
+			gotest.Equal(it, 1, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.Equal(it, 1, strings.Count(run.Stdout, "::error "), "stdout: %s", run.Stdout)
+			gotest.Contains(it, run.Stdout, "\n::error title=gotest run failed::exit 1 and no test failed: 5 tests passed without an assertion, which fails a run in CI mode\n")
+		})
+	})
+
+	t.When("gotest summary --github --min=100 runs a package whose tests pass and cover nothing", func(w *gotest.T) {
+		w.It("writes one error annotation without a file, naming exit 1 and the run's own output", func(it *gotest.T) {
+			run, err := testkit.RunCLI(it.Context(), ".", "summary", "--github", "--no-color", "--min=100", "../testdata/passing/")
+			gotest.NoError(it, err)
+			gotest.Equal(it, 1, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.Equal(it, 1, strings.Count(run.Stdout, "::error "), "stdout: %s", run.Stdout)
+			gotest.Contains(it, run.Stdout, "\n::error title=gotest run failed::exit 1 and no test failed: the run's own output names what failed it\n")
 		})
 	})
 }

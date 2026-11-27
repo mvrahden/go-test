@@ -441,6 +441,20 @@ gotest summary's first line SHALL count as passed only the tests that passed and
 - **WHEN** gotest summary runs a package with failed, passed and skipped tests
 - **THEN** the headline opens with the failed count, then the passed and the skipped
 
+### Requirement: The headline of a run that failed with no failed test
+gotest summary's first line, in its terminal and Markdown summaries and the GitHub step summary, of a run that ended with another exit code than 0 while no test and no package failed SHALL open with Run failed, that exit code and that no test failed, then the passed, skipped, not-run and vacuous counts that are not zero, and SHALL NOT say All.
+
+#### Scenario: A run that failed with no failed test
+- **WHEN** gotest summary --ci runs a package whose only problem is tests that passed without an assertion
+- **THEN** the headline opens with Run failed with exit 1, says no test failed and counts the passed, skipped and vacuous tests
+- **AND** the Markdown headline and the GitHub step summary open so too
+- **AND** the summary of the run's saved stream opens so too
+
+#### Scenario: A run that failed on its coverage limit
+- **WHEN** gotest summary --min=100 runs a package whose tests pass and cover nothing
+- **THEN** the headline opens with Run failed with exit 1, says no test failed and counts the passed test
+- **AND** the Markdown headline does not say All
+
 ### Requirement: Annotations of a summary
 gotest summary --github SHALL annotate a failed test at its file in its package's directory, and a package that failed to build at the path the compiler printed, which already names the file from the working directory.
 
@@ -451,6 +465,17 @@ gotest summary --github SHALL annotate a failed test at its file in its package'
 #### Scenario: A failed test
 - **WHEN** gotest summary --github runs a package with a failed test
 - **THEN** annotates the failure at the test file in its package's directory
+
+### Requirement: The annotation of a run that failed with no failed test
+gotest summary --github SHALL give a run that ended with another exit code than 0 while no test and no package failed one error annotation without a file, titled gotest run failed, naming the exit code and, for exit code 1 with tests that passed without an assertion, how many did; any other such run's annotation points to the run's own output.
+
+#### Scenario: A run that failed with no failed test
+- **WHEN** gotest summary --github --ci runs a package whose only problem is tests that passed without an assertion
+- **THEN** writes one error annotation without a file, naming exit 1 and the 5 tests that passed without an assertion
+
+#### Scenario: A run that failed on its coverage limit
+- **WHEN** gotest summary --github --min=100 runs a package whose tests pass and cover nothing
+- **THEN** writes one error annotation without a file, naming exit 1 and the run's own output
 
 ### Requirement: A run's result as an in-toto predicate
 `gotest summary --input=<stream> --format=intoto-test-result` SHALL print the in-toto test-result predicate, v0.1, of the run the stream records: FAILED when a test or package failed or the run did not exit 0, WARNED when a test passed without an assertion, else PASSED; each leaf test as `<package>.<test>` in its list; the CLI and Go versions and the arguments from the manifest; the Actions run's url under GitHub Actions. A stream without a manifest SHALL exit 2.

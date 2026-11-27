@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/cli .* / writes one error annotation without a file, naming exit 1 and the 5 tests that passed without an assertion \(
+Expect: ^FAIL .*conformance/cli .* / writes one error annotation without a file, naming exit 1 and the run's own output \(
+Clause: when gotest summary --github --ci runs a package whose only problem is tests that passed without an assertion → writes one error annotation without a file, naming exit 1 and the 5 tests that passed without an assertion
+Clause: when gotest summary --github --min=100 runs a package whose tests pass and cover nothing → writes one error annotation without a file, naming exit 1 and the run's own output
+--- a/cmd/gotest/summary.go
++++ b/cmd/gotest/summary.go
+@@ -305,7 +305,7 @@
+ 		modulePath := gotestspec.ReadModulePath(".")
+ 		annotations := gotestspec.CollectAnnotations(tree, modulePath, ".")
+ 		if a, ok := gotestspec.RunFailureAnnotation(tree, run); ok {
+-			annotations = append(annotations, a)
++			_ = a // the run's own failure gets no annotation
+ 		}
+ 		gotestspec.WriteGitHubAnnotations(os.Stdout, annotations)
+ 

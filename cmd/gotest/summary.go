@@ -161,7 +161,7 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	if note := stdlibNote(overlay.Plan.StdlibTests()); note != "" {
 		notes = []string{note}
 	}
-	if err := writeSummaryOutput(tree, format, output, coverageProfile, noColor, github, elapsed, badgePath, groupRuns(result.Groups), notes, runOptions(events, &code)); err != nil {
+	if err := writeSummaryOutput(tree, format, output, coverageProfile, noColor, github, elapsed, badgePath, groupRuns(result.Groups), notes, runInfo(events, &code)); err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		gotestrunner.EndRun(2)
 		return 2
@@ -213,7 +213,7 @@ func runSummaryFromInput(input, format, output, coverageProfile string, noColor,
 		}
 	}
 
-	if err := writeSummaryOutput(tree, format, output, coverageProfile, noColor, github, 0, badgePath, nil, nil, runOptions(events, nil)); err != nil {
+	if err := writeSummaryOutput(tree, format, output, coverageProfile, noColor, github, 0, badgePath, nil, nil, runInfo(events, nil)); err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
@@ -244,7 +244,7 @@ func stdlibNote(byPkg map[string]int) string {
 
 // notes go under the Markdown headline only: the terminal summary and the
 // JSON document leave them on stderr.
-func writeSummaryOutput(tree []*gotestspec.Package, format, output, coverageProfile string, noColor, github bool, elapsed time.Duration, badgePath string, groups []gotestspec.GroupRun, notes []string, run []gotestspec.RenderOption) error {
+func writeSummaryOutput(tree []*gotestspec.Package, format, output, coverageProfile string, noColor, github bool, elapsed time.Duration, badgePath string, groups []gotestspec.GroupRun, notes []string, run *gotestspec.RunInfo) error {
 	var w io.Writer = os.Stdout
 	var closeFunc func()
 	if output != "" {
@@ -269,6 +269,9 @@ func writeSummaryOutput(tree []*gotestspec.Package, format, output, coverageProf
 	if len(groups) > 0 {
 		renderOpts = append(renderOpts, gotestspec.WithGroups(groups))
 	}
+	if run != nil {
+		renderOpts = append(renderOpts, gotestspec.WithRun(run))
+	}
 
 	if coverageProfile != "" {
 		report, err := gotestspec.ParseCoverageProfile(coverageProfile)
@@ -291,7 +294,7 @@ func writeSummaryOutput(tree []*gotestspec.Package, format, output, coverageProf
 	case "md", "markdown":
 		gotestspec.RenderMarkdownSummary(w, tree, mdOpts...)
 	case "json":
-		gotestspec.RenderJSON(w, tree, append(renderOpts, run...)...)
+		gotestspec.RenderJSON(w, tree, renderOpts...)
 	default:
 		gotestspec.RenderSummary(w, tree, renderOpts...)
 	}
@@ -301,6 +304,9 @@ func writeSummaryOutput(tree []*gotestspec.Package, format, output, coverageProf
 	if github && format == "terminal" {
 		modulePath := gotestspec.ReadModulePath(".")
 		annotations := gotestspec.CollectAnnotations(tree, modulePath, ".")
+		if a, ok := gotestspec.RunFailureAnnotation(tree, run); ok {
+			annotations = append(annotations, a)
+		}
 		gotestspec.WriteGitHubAnnotations(os.Stdout, annotations)
 
 		if summaryPath := os.Getenv("GITHUB_STEP_SUMMARY"); summaryPath != "" {

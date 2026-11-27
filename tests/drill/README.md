@@ -1070,6 +1070,9 @@ shards of one run do not add up to every mutant exactly once.
 | `annotation-test-path-unprefixed` | a failed test is annotated at its file's base name, without its package directory | cli conformance: a failed test's annotation names the file in its package's directory |
 | `summary-markdown-all-dropped` | the Markdown headline of a run in which every test passed does not say All | cli conformance: the Markdown headline of an all-pass run says All |
 | `summary-headline-no-pass-unsaid` | the headline of a run in which nothing passed does not say so | cli conformance: an all-skipped run's headline says no tests passed |
+| `run-failure-annotation-with-an-empty-file` | the annotation of a run that failed with no failed test is written with an empty `file=` | cli conformance: no `::error title=gotest run failed::` line |
+| `summary-heading-passes-a-policy-failure` | the summary of a run that failed with no failed test opens with the passed count | cli conformance: the vacuous-only and the coverage-limit run's headline says tests passed |
+| `summary-policy-failure-unannotated` | a run that failed with no failed test gets no annotation | cli conformance: the vacuous-only run's `--github` summary holds no `::error` line |
 | `summary-failed-headline-drops-passes` | the headline of a run with failures leaves out the passed count | cli conformance: a failed run's headline names the failed, passed and skipped counts |
 | `summary-markdown-all-beside-skips` | the Markdown headline says All beside skipped tests | cli conformance: the Markdown headline of a run with skips does not say All |
 | `summary-markdown-all-beside-a-note` | the Markdown headline says All above a note of stdlib tests not run | cli conformance: the Markdown summary with the stdlib note does not say All |

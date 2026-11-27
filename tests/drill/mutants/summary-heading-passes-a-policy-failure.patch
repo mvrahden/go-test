@@ -1,0 +1,21 @@
+Expect: ^FAIL .*conformance/cli .* / the headline opens with Run failed with exit 1, says no test failed and counts the passed, skipped and vacuous tests \(
+Expect: ^FAIL .*conformance/cli .* / the Markdown headline and the GitHub step summary open so too \(
+Expect: ^FAIL .*conformance/cli .* / the summary of the run's saved stream opens so too \(
+Expect: ^FAIL .*conformance/cli .* / the headline opens with Run failed with exit 1, says no test failed and counts the passed test \(
+Expect: ^FAIL .*conformance/cli .* / the Markdown headline does not say All \(
+Clause: when gotest summary --ci runs a package whose only problem is tests that passed without an assertion → the headline opens with Run failed with exit 1, says no test failed and counts the passed, skipped and vacuous tests
+Clause: when gotest summary --ci runs a package whose only problem is tests that passed without an assertion → the Markdown headline and the GitHub step summary open so too
+Clause: when gotest summary --ci runs a package whose only problem is tests that passed without an assertion → the summary of the run's saved stream opens so too
+Clause: when gotest summary --min=100 runs a package whose tests pass and cover nothing → the headline opens with Run failed with exit 1, says no test failed and counts the passed test
+Clause: when gotest summary --min=100 runs a package whose tests pass and cover nothing → the Markdown headline does not say All
+--- a/internal/gotestspec/summary.go
++++ b/internal/gotestspec/summary.go
+@@ -164,7 +164,7 @@
+ // failed: passedPhrase, or runFailedPhrase when the run still ended with
+ // another exit code than 0, which runFailed reports.
+ func greenPhrase(run *RunInfo, s Stats) (phrase string, clean, runFailed bool) { //nolint:gocritic // hugeParam: as renderSummary
+-	if code, ok := run.failed(); ok {
++	if code, ok := run.failed(); ok && code == 0 {
+ 		return runFailedPhrase(code, s), false, true
+ 	}
+ 	phrase, clean = passedPhrase(s)
