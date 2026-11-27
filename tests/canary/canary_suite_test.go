@@ -460,6 +460,39 @@ func (s *CanaryTestSuite) TestSnapshotsKeyOnTheExactName(t *gotest.T) {
 	}
 }
 
+// A test that has already failed leaves its baseline as it was: nothing is
+// rewritten under an update and no missing section is written, while a row
+// that passed is still updated and a failed row is still compared.
+func (s *CanaryTestSuite) TestAFailedTestLeavesItsBaselineAlone(t *gotest.T) {
+	const kept = "=== SNAP TestAMethod ===\nold\n=== SNAP TestRows/kept ===\nold\n=== SNAP TestRows/passing ===\n"
+	for _, c := range []struct {
+		how  string
+		env  []string
+		file string
+		says []string
+	}{
+		{"updating", []string{"SNAP_VALUE=new", "GOTEST_UPDATE_SNAPSHOTS=1"}, kept + "new\n",
+			[]string{"snapshot [TestRows/kept] not updated: the test had already failed", "snapshot [TestAMethod] not updated: the test had already failed"}},
+		{"comparing", []string{"SNAP_VALUE=new"}, kept + "old\n",
+			[]string{"snapshot [TestRows/fresh] not written: the test had already failed", "snapshot [TestAFreshMethod] not written: the test had already failed", "snapshot mismatch [TestRows/kept]"}},
+	} {
+		dir := stage(t, "snapfailed")
+		r := s.runIn(t, dir, "./snapfailed/", "snapfailed", t.TempDir(), c.env)
+		if r.code != 1 {
+			t.Errorf("snapfailed %s: exit code %d, want 1", c.how, r.code)
+		}
+		after, _ := os.ReadFile(filepath.Join(dir, "snapfailed", "testdata", "__snapshots__", "TestSnapFailedTestSuite.snap")) //nolint:gosec // G304: the staged copy of the canary's own fixture
+		if string(after) != c.file {
+			t.Errorf("snapfailed %s: the baseline is\n%s\nwant\n%s", c.how, after, c.file)
+		}
+		for _, want := range c.says {
+			if !strings.Contains(r.stream, want) {
+				t.Errorf("snapfailed %s: no output says %q", c.how, want)
+			}
+		}
+	}
+}
+
 // legacyRows are the verdicts of the snapshotlegacy fixture's tests, each
 // keyed by its path below the suite.
 func legacyRows(rows []string) map[string]string {

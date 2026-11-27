@@ -97,6 +97,35 @@ func (s *SnapshotKeysTestSuite) TestUpdateSwitch(t *gotest.T) {
 	})
 }
 
+func (s *SnapshotKeysTestSuite) TestAFailedRecorder(t *gotest.T) {
+	t.Setenv(protocol.EnvCI, "0")
+	t.When("MatchSnapshot is given a recorder that has already failed", func(w *gotest.T) {
+		w.It("writes no baseline and rewrites none", func(it *gotest.T) {
+			gotest.Record(func(r *gotest.R) { gotest.MatchSnapshot(r, "baseline", "kept") })
+			gotest.Record(func(r *gotest.R) {
+				r.Errorf("failed first")
+				gotest.MatchSnapshot(r, "fresh", "fresh")
+			})
+			it.Setenv(protocol.EnvUpdateSnapshots, "1")
+			gotest.Record(func(r *gotest.R) {
+				r.Errorf("failed first")
+				gotest.MatchSnapshot(r, "changed", "kept")
+			})
+			data, err := os.ReadFile(filepath.Join(s.snapDir, "unknown_ext.snap"))
+			gotest.NoError(it, err)
+			gotest.Equal(it, "=== SNAP kept ===\nbaseline\n", string(data))
+		})
+		w.It("still fails on a missing section under GOTEST_CI", func(it *gotest.T) {
+			it.Setenv(protocol.EnvCI, "1")
+			m := gotest.Record(func(r *gotest.R) {
+				r.Errorf("failed first")
+				gotest.MatchSnapshot(r, "v", "absent")
+			})
+			gotest.Contains(it, m.Message(), `no baseline snapshot for "absent"`)
+		})
+	})
+}
+
 func (s *SnapshotKeysTestSuite) TestBenchAndFuzzNames(t *gotest.T) {
 	t.When("MatchSnapshot is given a benchmark's or fuzz target's wrapper", func(w *gotest.T) {
 		w.It("both carry the name testing gave them", func(it *gotest.T) {

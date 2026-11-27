@@ -460,6 +460,21 @@ MatchSnapshot SHALL refuse a name that spans lines or spells a section header, b
 - **WHEN** a snapshot name spans lines or spells a section header
 - **THEN** is refused before anything is written
 
+### Requirement: Snapshots of a failed test
+MatchSnapshot called for a test that has already failed SHALL write no baseline. With GOTEST_UPDATE_SNAPSHOTS on it SHALL leave the test's section as it was and add none; with updates off and no section it SHALL add none. Each time it SHALL say so in one line of the test's output, at the line of the call, naming the section. With updates off it SHALL still compare the value against a section that exists, and under GOTEST_CI a missing section SHALL still fail.
+
+#### Scenario: A failed row while updating
+- **WHEN** an Each row that has failed matches a snapshot with GOTEST_UPDATE_SNAPSHOTS on
+- **THEN** leaves its section as it was and adds none, says so in the row's output, and still rewrites the section of a row that passed
+
+#### Scenario: A failed row without a baseline
+- **WHEN** an Each row that has failed matches a snapshot whose section is missing, updates off
+- **THEN** writes no section and says so in the row's output, and a failed row whose section exists is still compared
+
+#### Scenario: A failed method
+- **WHEN** a method that failed without stopping matches a snapshot
+- **THEN** its section is not rewritten under an update, and none is written when it is missing
+
 ### Requirement: Sections no test read
 When a suite ran whole and passed under GOTEST_CI or GOTEST_UPDATE_SNAPSHOTS, MatchSnapshot SHALL name in one line the sections of the suite's snapshot file that no test of the run read, and SHALL leave the file and the verdict as they are. A run that -run narrows to a subtest, or -skip narrows at all, names none, and a section of a method that skipped itself is not unread.
 
