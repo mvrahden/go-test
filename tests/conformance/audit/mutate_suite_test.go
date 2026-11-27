@@ -16,12 +16,15 @@ import (
 // AuditMutateTestSuite: audit --mutate over testdata/audit/mutate, whose
 // calc/calc.go is changed whole. Its verdicts are stated by hand: calc's
 // own suite never gives Discount 100, so that boundary survives; only
-// report's suite calls Grade; only the label binary a test builds calls
-// Label; no test calls Unused; removing Sum's i-- loops forever.
+// report's suite calls Grade, and under json waits out its first mutant
+// run; only the label binary a test builds calls Label; no test calls
+// Unused; removing Sum's i-- loops forever.
 type AuditMutateTestSuite struct {
 	// base is the module's own record: the audits with --mutate change no
 	// behavior, so no suite runs for a changed behavior.
 	dir, module, diff, empty, base string
+	// stall is where report's suite logs each mutant run of json.
+	stall string
 	// tree is the module's files before the audits.
 	tree map[string]string
 	// json, text and md audit with --mutate; spent with a budget spent at
@@ -56,7 +59,10 @@ func (s *AuditMutateTestSuite) BeforeAll(t *gotest.T) {
 	s.base = filepath.Join(dir, "base.json")
 	gotest.Equal(t, 0, s.cli(t, nil, "audit", "--record", "--output="+s.base).Exit)
 
-	s.json = s.audit(t, nil, "--mutate", "--format=json")
+	// Under json, report's first mutant run waits until it is stopped.
+	s.stall = filepath.Join(dir, "stall")
+	gotest.NoError(t, os.Mkdir(s.stall, 0o700))
+	s.json = s.audit(t, []string{"MUTMOD_STALL=" + s.stall}, "--mutate", "--format=json")
 	s.text = s.audit(t, nil, "--mutate", "--fail-on=survived")
 	s.md = s.audit(t, nil, "--mutate", "--format=md")
 	s.spent = s.audit(t, nil, "--mutate", "--mutate-budget=1ns", "--format=json")
@@ -238,6 +244,23 @@ func (s *AuditMutateTestSuite) TestAMutantsVerdict(t *gotest.T) {
 			doc := readMutation(it, s.json)
 			gotest.Equal(it, []string{"delete-stmt i-- →  timeout"}, verdicts(doc.line(it, 25)))
 			gotest.Equal(it, 1, doc.Mutation.Counts.Timeout)
+		})
+	})
+	t.When("a mutant's first run outruns its limit and its second run ends in time", func(w *gotest.T) {
+		w.It("judges the mutant by its second run, run alone after the other mutants", func(it *gotest.T) {
+			doc := readMutation(it, s.json)
+			gotest.Equal(it, []string{
+				"early-return if score >= 50 { return \"pass\" } → return \"\" killed mutmod/report TestReportTestSuite/TestGrades",
+				"boundary score >= 50 → score > 50 killed mutmod/report TestReportTestSuite/TestGrades",
+				"negate-compare score >= 50 → score < 50 killed mutmod/report TestReportTestSuite/TestGrades",
+			}, verdicts(doc.line(it, 6)))
+			data, err := os.ReadFile(filepath.Join(s.stall, "runs"))
+			gotest.NoError(it, err)
+			runs := strings.Fields(string(data))
+			gotest.Len(it, runs, 4)
+			stalled, err := os.ReadFile(filepath.Join(s.stall, "stalled"))
+			gotest.NoError(it, err)
+			gotest.Equal(it, string(stalled), runs[3], "the stalled mutant runs again after report's others: %v", runs)
 		})
 	})
 	t.When("a suite that judges a mutant fails before any mutant is switched on", func(w *gotest.T) {

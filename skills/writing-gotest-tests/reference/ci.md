@@ -32,6 +32,14 @@ jobs:
         run: go tool gotest lint ./...
 ```
 
+- When the lint step would be red from its first run only because of
+  tests not yet migrated (`stdlib-test` and `testify` findings), keep
+  the step and make it pass on purpose: a `//nolint:stdlib-test,testify
+  // <reason>` trailing the `package` line of each such file (the rules
+  stay live for every other file), or those two migration rules in
+  `.gotest.yml` `lint.skip`. Say which in your report; never leave the
+  lint step out to keep CI green.
+
 - The action's `version` input defaults to `gomod`: the CLI version is
   resolved from the consumer's go.mod — the same skew-free property as the
   tool directive. The action builds that CLI once per job; without a

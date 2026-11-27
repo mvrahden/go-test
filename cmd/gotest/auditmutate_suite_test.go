@@ -289,10 +289,11 @@ func (s *AuditMutateRunTestSuite) TestJudged(t *gotest.T) {
 			gotest.True(it, doc.Mutation.Baseline.Passed)
 			gotest.Equal(it, 1, doc.Mutation.Baseline.Suites)
 		})
-		w.It("runs the suites alone on the mutants' build, live and stoppable, first with none switched on", func(it *gotest.T) {
+		w.It("runs the suites alone on the mutants' build, live and stoppable, first with none switched on, a timeout twice", func(it *gotest.T) {
 			calls := s.calls(it)
-			gotest.Len(it, calls, 13)
+			gotest.Len(it, calls, 14)
 			gotest.Equal(it, "0 --live --control=stdin -json -run=^(TestR)$ ops/refused", calls[0])
+			gotest.Regexp(it, `^2 `, calls[13], "the run past its limit runs again last")
 		})
 		w.It("notes how the mutants were built and how a survivor is kept", func(it *gotest.T) {
 			gotest.Len(it, doc.Notes, 2)

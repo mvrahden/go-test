@@ -2,6 +2,7 @@ package mutate_test
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"sync"
 	"time"
@@ -11,8 +12,9 @@ import (
 )
 
 // PlanTestSuite: which lines a comment keeps, the order a budget spends
-// mutants in, the budget itself on a clock the suite drives, and the
-// mapping of a refused build back to its mutants.
+// mutants in, the budget itself on a clock the suite drives, the second
+// run of a mutant that timed out, and the mapping of a refused build back
+// to its mutants.
 type PlanTestSuite struct{}
 
 func (s *PlanTestSuite) SuiteConfig() gotest.SuiteConfig {
@@ -146,6 +148,60 @@ func (s *PlanTestSuite) TestTheBudget(t *gotest.T) {
 				return mutate.Outcome{Verdict: mutate.Survived}
 			})
 			gotest.Equal(it, []mutate.Outcome{{Verdict: mutate.Killed}, {Verdict: mutate.NotJudged}, {Verdict: mutate.NotJudged}}, out)
+		})
+	})
+}
+
+func (s *PlanTestSuite) TestATimeoutRunTwice(t *gotest.T) {
+	list := muts(mutate.Mutant{Line: 1}, mutate.Mutant{Line: 2}, mutate.Mutant{Line: 3})
+	// judge answers line 1 a timeout once, line 2 always, line 3 survived,
+	// logging each run and how many ran at once.
+	judge := func(log *[]string, mu *sync.Mutex, busy *int) func(context.Context, *mutate.Mutant) mutate.Outcome {
+		runs := map[int]int{}
+		return func(_ context.Context, m *mutate.Mutant) mutate.Outcome {
+			mu.Lock()
+			*busy++
+			runs[m.Line]++
+			n := runs[m.Line]
+			*log = append(*log, fmt.Sprintf("%d#%d with %d", m.Line, n, *busy))
+			mu.Unlock()
+			if n == 1 {
+				time.Sleep(20 * time.Millisecond)
+			}
+			mu.Lock()
+			*busy--
+			mu.Unlock()
+			switch {
+			case m.Line == 1 && n == 1, m.Line == 2:
+				return mutate.Outcome{Verdict: mutate.Timeout}
+			case m.Line == 1:
+				return mutate.Outcome{Verdict: mutate.Killed, By: "TestX"}
+			}
+			return mutate.Outcome{Verdict: mutate.Survived}
+		}
+	}
+	t.When("a mutant's run times out", func(w *gotest.T) {
+		w.It("runs it once more, alone after the others, and judges it by that run", func(it *gotest.T) {
+			var log []string
+			var mu sync.Mutex
+			busy := 0
+			sched := mutate.Scheduler{Jobs: 3, Budget: time.Hour}
+			out, _ := sched.Run(it.Context(), list, judge(&log, &mu, &busy))
+			gotest.Equal(it, []mutate.Outcome{{Verdict: mutate.Killed, By: "TestX"}, {Verdict: mutate.Timeout}, {Verdict: mutate.Survived}}, out)
+			gotest.Len(it, log, 5)
+			gotest.Equal(it, []string{"1#2 with 1", "2#2 with 1"}, log[3:])
+		})
+	})
+	t.When("the budget is spent before the second run", func(w *gotest.T) {
+		w.It("reads the mutant as not judged", func(it *gotest.T) {
+			c := &clock{now: time.Unix(0, 0)}
+			sched := mutate.Scheduler{Jobs: 1, Budget: 25 * time.Second, Now: c.Now,
+				AfterFunc: func(time.Duration, func()) func() bool { return func() bool { return true } }}
+			out, _ := sched.Run(it.Context(), list[1:2], func(context.Context, *mutate.Mutant) mutate.Outcome {
+				c.advance(30 * time.Second)
+				return mutate.Outcome{Verdict: mutate.Timeout}
+			})
+			gotest.Equal(it, []mutate.Outcome{{Verdict: mutate.NotJudged}}, out)
 		})
 	})
 }

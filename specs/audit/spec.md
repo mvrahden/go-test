@@ -272,13 +272,17 @@ Before any mutant, `--mutate` SHALL run, as `--run` does, every package the patt
 - **AND** reads the mutants of a line no test executed as not covered
 
 ### Requirement: A mutant's verdict
-A mutant SHALL be run through gotest's runner with only the suites that judge it: killed at their first failing test, which it names, survived when they pass, a timeout when they outrun three times their time with no mutant on. Before any mutant, those suites SHALL pass on the build with none switched on; else no mutant SHALL be judged, the failures named among what was not compared, and the audit exits 2 unless the policy failed.
+A mutant SHALL be run through gotest's runner with only the suites that judge it: killed at their first failing test, which it names, survived when they pass, a timeout when they outrun three times their time with no mutant on in two runs, the second alone after the other mutants. Before any mutant, those suites SHALL pass on the build with none switched on; else no mutant SHALL be judged, the failures named among what was not compared, and the audit exits 2 unless the policy failed.
 
 #### Scenario: A weakly tested change
 - **WHEN** audit --mutate runs the mutants of a change one of whose lines no test checks at its boundary
 - **THEN** marks each mutant a test fails killed, naming that test
 - **AND** marks the boundary mutant survived, naming the suites that ran its line
 - **AND** marks a mutant that keeps its suite from ending a timeout, apart from the killed ones
+
+#### Scenario: A run a busy machine slowed
+- **WHEN** a mutant's first run outruns its limit and its second run ends in time
+- **THEN** judges the mutant by its second run, run alone after the other mutants
 
 #### Scenario: Suites that fail with no mutant
 - **WHEN** a suite that judges a mutant fails before any mutant is switched on

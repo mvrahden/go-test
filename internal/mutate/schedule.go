@@ -118,8 +118,9 @@ type Scheduler struct {
 
 // Run judges muts in order with run, starting none once the budget is
 // spent or ctx is done: those, and any run the budget's end cut short, are
-// not judged. It returns each mutant's outcome by index and how long the
-// mutants took.
+// not judged. A mutant whose run timed out runs once more, alone, after the
+// others, and is judged by that run. It returns each mutant's outcome by
+// index and how long the mutants took.
 func (s *Scheduler) Run(ctx context.Context, muts []Mutant, run func(ctx context.Context, m *Mutant) Outcome) ([]Outcome, time.Duration) {
 	out := make([]Outcome, len(muts))
 	for i := range out {
@@ -163,5 +164,21 @@ func (s *Scheduler) Run(ctx context.Context, muts []Mutant, run func(ctx context
 		}()
 	}
 	wg.Wait()
+	// A timeout is a second run's: each runs once more, alone, so a run a
+	// busy machine slowed is not taken for one that never ends.
+	for i := range out {
+		if out[i].Verdict != Timeout {
+			continue
+		}
+		out[i].Verdict = NotJudged
+		if budget.Err() != nil || now().Sub(start) >= s.Budget {
+			continue
+		}
+		o := run(budget, &muts[i])
+		if budget.Err() != nil && o.Verdict != Killed && o.Verdict != Survived {
+			o.Verdict = NotJudged
+		}
+		out[i] = o
+	}
 	return out, now().Sub(start)
 }
