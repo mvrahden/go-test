@@ -698,6 +698,8 @@ shards of one run do not add up to every mutant exactly once.
 | `profiled-binary-stripped` | a run with a profile flag strips its binary all the same | cli conformance: a `-cpuprofile` run's binary has no DWARF |
 | `placed-binary-run-before-go-confirms-it` | a cached binary placed for go to confirm is handed out while go still runs, before go touched or replaced it | cli conformance: a run after a source change prints the old value |
 | `shared-touch-read-as-confirmation` | the cache key leaves out GOFLAGS and a newer mtime on the placed binary counts as go's confirmation, though another run's go touches the same entry | cli conformance: a run with a GOFLAGS build tag beside a plain one executes the untagged binary |
+| `goflags-n-accepted` | a `-n` the go command reads from `GOFLAGS` is no longer refused | cli conformance: a run under `GOFLAGS=-n` is not refused with the usage error |
+| `go-settings-read-from-the-environment-alone` | the go command's settings are taken from the process environment and the host, never from `go env` | cli conformance: a `-n` set in go's env file is not refused |
 | `goflags-dropped-from-the-build` | the go command that builds a run's binaries is started with `GOFLAGS` emptied | cli conformance: build tags and link flags given in GOFLAGS do not reach the binary |
 | `stage-builds-without-vet` | the compile stage passes `-vet=off` to every build | cli conformance: a run without `-vet=off` misses a vet finding |
 | `publish-leaves-its-temp-file` | a rebuilt binary is copied onto its cache entry and its temporary file is left beside it | cli conformance: runs at once leave a temporary file in the cache |

@@ -198,7 +198,7 @@ Each suite process SHALL run only its own suite under a -run pattern: for every 
 - **THEN** runs the test methods and replays no fuzz seed, as go test does
 
 ### Requirement: Go test flags gotest implements
-A go test flag gotest implements itself SHALL keep the meaning go test gives it, or SHALL be refused with a reason. The cases are the table in `tests/conformance/cli/goflags_suite_test.go`.
+A go test flag gotest implements itself SHALL keep the meaning go test gives it, or SHALL be refused with a reason. The cases are the table in `tests/conformance/cli/goflags_suite_test.go`. A -n the go command reads from GOFLAGS, set in the environment or in go's env file, SHALL be refused with exit 2 as the argument is, by every command that builds test binaries; -n=false is no dry run and is accepted.
 
 #### Scenario: A go test flag gotest takes over
 - **WHEN** a go test flag gotest implements itself is given
@@ -212,6 +212,11 @@ A go test flag gotest implements itself SHALL keep the meaning go test gives it,
 #### Scenario: A build-only mode or the fuzz engine
 - **WHEN** -c, -n or -fuzz is given to a run
 - **THEN** refuses each with exit 2, naming what does that job instead
+
+#### Scenario: A dry run asked for through GOFLAGS
+- **WHEN** GOFLAGS carries -n for a run after a test file changed since a passing run
+- **THEN** refuses the run with exit 2 before anything is built, naming GOFLAGS, and prints nothing on stdout
+- **AND** refuses it the same when go's env file sets GOFLAGS
 
 #### Scenario: A profile flag over several suite processes
 - **WHEN** -cpuprofile, -memprofile, -blockprofile, -mutexprofile or -trace is given to a run that starts two suite processes
