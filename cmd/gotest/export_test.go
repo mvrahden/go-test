@@ -15,6 +15,7 @@ import (
 	"github.com/mvrahden/go-test/internal/gotestspec"
 	"github.com/mvrahden/go-test/internal/lint"
 	"github.com/mvrahden/go-test/internal/mutate"
+	"github.com/mvrahden/go-test/internal/protocol"
 )
 
 // Test-only exports, one block per source file.
@@ -491,15 +492,30 @@ func ExportMutate(files []gotestaudit.ProdFile, budget time.Duration, suite stri
 // ExportNarrowedTo is the Changed of a run that runs pkgs.
 var ExportNarrowedTo = narrowedTo
 
+// recordstamp.go
+
 // ExportHeldCurrent is whether --changed holds a recorded verdict as current.
 var ExportHeldCurrent = heldCurrent
 
 // ExportStampRecord stamps a run's record with its mode and narrowing.
 var ExportStampRecord = stampRecord
 
+// changed.go
+
 // ExportNarrowedBy is the narrowing of a run given its flags, groups,
 // --failed selection, --changed --failed selection and focus.
 func ExportNarrowedBy(args, groups []string, failedOnly, changedFailedOnly map[string]string, focused bool) func(string) bool {
 	cfg := &ExecConfig{GoTestArgs: args, Groups: groups, Only: failedOnly}
 	return narrowedBy(cfg, &runPlan{only: changedFailedOnly, focused: focused})
+}
+
+// runs.go
+
+// ExportRunWord is the word gotest runs prints for a run's result.
+func ExportRunWord(exit, packagesPassed int, tests *protocol.Tally) string {
+	r := runsResult{ExitCode: exit, Packages: runsTally{Passed: packagesPassed}}
+	if tests != nil {
+		r.Tests = &runsTally{Passed: tests.Passed, Failed: tests.Failed, Skipped: tests.Skipped}
+	}
+	return runWord(&r)
 }

@@ -1035,6 +1035,13 @@ Each run that records itself SHALL also keep its record alone, with the path of 
 - **THEN** lists it among the records as imported, with its packages and the file's path
 - **AND** refuses with exit 2 a file that holds no package verdict
 
+### Requirement: The word of a listed run
+The text format of `gotest runs` SHALL print for each run the closing line's word: FAIL for a non-zero exit code, EMPTY for exit 0 with nothing passed, tests where the run counted them and packages otherwise, and PASS for any other.
+
+#### Scenario: A run that ran nothing
+- **WHEN** gotest runs follows a --changed run that left every package out
+- **THEN** the text format prints EMPTY exit 0 for it and PASS exit 0 for the run before it
+
 ### Requirement: An agent's hook events
 `gotest hook <event>` SHALL read a coding agent's hook event as JSON on stdin and never deny the agent a tool: it SHALL exit 0, writing nothing or one JSON object, for post-edit and pre-shell one whose hookSpecificOutput carries additionalContext and no permission decision, and SHALL exit 1, never 2, on an event it does not know.
 

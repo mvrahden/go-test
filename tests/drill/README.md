@@ -1285,6 +1285,7 @@ shards of one run do not add up to every mutant exactly once.
 | `empty-changed-run-replaces-the-record` | a `--changed` run that ran no package overwrites the record's run | cli conformance: the record holds exit code 0 and the --changed arguments |
 | `failed-with-nothing-left-passes` | `--failed` reruns a failure whose test is gone, runs nothing and passes | cli conformance: the rerun after the rename exits 0 |
 | `coverage-minimum-judged-with-nothing-run` | a `--changed` run that ran no package still reads a coverage profile for the minimum | cli conformance: the run exits 2 on the profile |
+| `runs-call-an-empty-run-a-pass` | `gotest runs` prints PASS for a run in which nothing passed | cli conformance: the --changed run's line reads PASS exit 0 |
 
 ## Adding a mutant
 

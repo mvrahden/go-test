@@ -212,6 +212,22 @@ func (s *CLIRunRecordsTestSuite) TestNothingRecorded(t *gotest.T) {
 	})
 }
 
+func (s *CLIRunRecordsTestSuite) TestARunThatRanNothing(t *gotest.T) {
+	tr := stageRecords(t)
+	gotest.Equal(t, 0, tr.run(t, "./good/").Exit)
+	gotest.Equal(t, 0, tr.run(t, "--changed", "./good/").Exit)
+	text := tr.run(t, "runs")
+
+	t.When("gotest runs follows a --changed run that left every package out", func(w *gotest.T) {
+		w.It("the text format prints EMPTY exit 0 for it and PASS exit 0 for the run before it", func(it *gotest.T) {
+			lines := strings.Split(strings.TrimRight(text.Stdout, "\n"), "\n")
+			gotest.Len(it, lines, 2)
+			gotest.Regexp(it, `\| EMPTY exit 0 \| packages: 0 current, 0 stale, 0 unknown \| .*gotest --changed \./good/$`, lines[0])
+			gotest.Regexp(it, `\| PASS exit 0 \| packages: 1 current, 0 stale, 0 unknown \| .*gotest \./good/$`, lines[1])
+		})
+	})
+}
+
 func (s *CLIRunRecordsTestSuite) TestImportingAStream(t *gotest.T) {
 	ci, local := stageFresh(t), stageFresh(t)
 	saved, _ := ci.stream(t, "./b/", "./c/")

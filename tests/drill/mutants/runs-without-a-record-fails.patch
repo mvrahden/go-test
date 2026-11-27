@@ -2,7 +2,7 @@ Expect: ^FAIL .*conformance/cli CLIRunRecords .* / says no run is recorded and e
 Clause: when gotest runs is given in a working directory without a record → says no run is recorded and exits 0
 --- a/cmd/gotest/runs.go
 +++ b/cmd/gotest/runs.go
-@@ -220,10 +220,6 @@
+@@ -276,10 +276,6 @@
  
  // writeRuns lists the records as text, one line each, newest first.
  func writeRuns(w io.Writer, doc *runsDocument) {
@@ -12,4 +12,4 @@ Clause: when gotest runs is given in a working directory without a record → sa
 -	}
  	for i := range doc.Runs {
  		e := &doc.Runs[i]
- 		verdict := "PASS"
+ 		verdict := runWord(&e.Result)
