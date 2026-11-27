@@ -64,6 +64,8 @@ type Run struct {
 	ExitCode  *int     `json:"exitCode,omitempty"`
 	// Packages are the packages the stream reports.
 	Packages []string `json:"packages"`
+	// Failed says the run --verify made exited non-zero.
+	Failed bool `json:"failed,omitempty"`
 }
 
 // Summary counts the scenarios by status.
@@ -132,6 +134,7 @@ func newDocument(opt *Options) Document {
 	if opt.Run != nil {
 		doc.Run = runOf(opt.Run)
 		doc.Run.Packages = append([]string{}, opt.RunPackages...)
+		doc.Run.Failed = opt.Evidence == EvidenceRun && opt.Run.ExitCode != nil && *opt.Run.ExitCode != 0
 	}
 	return doc
 }

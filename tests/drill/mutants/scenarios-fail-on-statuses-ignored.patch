@@ -2,12 +2,12 @@ Expect: ^FAIL .*conformance/scenarios ScenariosDocument / ThePolicyExit / when -
 Clause: when --fail-on=unbound is given and a scenario is unbound → exits 1
 --- a/internal/gotestscenarios/policy.go
 +++ b/internal/gotestscenarios/policy.go
-@@ -63,7 +63,7 @@
- // of one of classes.
+@@ -66,7 +66,7 @@
+ // of one of classes, or a failed run of its own where failing is one.
  func Breaks(d *Document, classes []string) bool {
  	for _, c := range classes {
--		if c == ClassUnstated && d.Summary.Unstated > 0 || d.Summary.Statuses[c] > 0 {
-+		if c == ClassUnstated && d.Summary.Unstated > 0 {
+-		if c == ClassUnstated && d.Summary.Unstated > 0 || d.Summary.Statuses[c] > 0 || c == StatusFailing && d.RunFailed() {
++		if c == ClassUnstated && d.Summary.Unstated > 0 || c == StatusFailing && d.RunFailed() {
  			return true
  		}
  	}

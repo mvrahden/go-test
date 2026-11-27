@@ -59,11 +59,14 @@ func ParseClasses(list string, evidence bool) ([]string, error) {
 	return out, nil
 }
 
+// RunFailed reports whether the run --verify made exited non-zero.
+func (d *Document) RunFailed() bool { return d.Run != nil && d.Run.Failed }
+
 // Breaks reports whether the document holds a scenario, or an unstated It,
-// of one of classes.
+// of one of classes, or a failed run of its own where failing is one.
 func Breaks(d *Document, classes []string) bool {
 	for _, c := range classes {
-		if c == ClassUnstated && d.Summary.Unstated > 0 || d.Summary.Statuses[c] > 0 {
+		if c == ClassUnstated && d.Summary.Unstated > 0 || d.Summary.Statuses[c] > 0 || c == StatusFailing && d.RunFailed() {
 			return true
 		}
 	}

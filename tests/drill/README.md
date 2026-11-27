@@ -1194,6 +1194,8 @@ shards of one run do not add up to every mutant exactly once.
 | `scenarios-unknown-status-taken` | an unknown status is taken | scenarios conformance: the It of its clause fails |
 | `scenarios-evidence-status-taken` | an evidence status is taken without evidence | scenarios conformance: the It of its clause fails |
 | `scenarios-broken-package-passes` | a package that does not compile leaves the exit at 0 | scenarios conformance: the It of its clause fails |
+| `scenarios-verify-exit-ignored` | the exit of the run --verify made is not judged | scenarios conformance: the It of its clause fails |
+| `scenarios-verify-passing-run-failed` | a run of --verify that passed is marked failed | scenarios conformance: the It of its clause fails |
 | `input-hash-on-test-events` | the input hash is stamped on test verdicts too, not only on a package's | cli conformance: a -json run's test events carry an InputHash |
 | `spec-json-drops-the-input-hash` | spec's JSON gives no package its `inputHash` | cli conformance: the document's hashes are not the stream's |
 | `input-hash-skips-dependencies` | a package's hash leaves out the packages it imports | cli conformance: a dependency's edit leaves its importer current |

@@ -94,6 +94,18 @@ With `--input=<events file>`, or `--verify`, which runs the packages that hold a
 - **WHEN** scenarios is given --verify
 - **THEN** runs the packages that hold a bound It and no other, and judges the scenarios by that run
 
+### Requirement: A run of its own that fails
+When the run `--verify` made exits non-zero, the command SHALL count it as a failing finding of its own, whatever the scenarios read: `failing` in `--fail-on`, the default with evidence included, SHALL then exit 1. The text format SHALL name the run on a `failing` line of its own, before the scenarios, and in the closing line's evidence segment, and the JSON document SHALL mark its `run` as `failed`.
+
+#### Scenario: A hook that fails under --verify
+- **WHEN** --verify runs bound packages whose BeforeAll fails
+- **THEN** exits 1 under the default policy, the closing line naming FAIL and evidence: run, exited 1
+- **AND** lists the run on a failing line of its own and marks it failed in the JSON document
+
+#### Scenario: A run that passes under --verify
+- **WHEN** --verify runs bound packages that pass
+- **THEN** exits 0, the closing line naming evidence: run, and marks no run failed
+
 ### Requirement: The scenarios document
 With `--format=json` the command SHALL print one document opening with `version` and `schema` that holds the evidence, the run, the spec files, a summary and each scenario with its clauses and their `It`s, in file and line order, with module-relative paths. The text format SHALL list the scenarios not bound or verified first and end stdout with one `gotest scenarios:` closing line; `--format=md` SHALL write a table per capability.
 
