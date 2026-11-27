@@ -72,6 +72,8 @@ type runPlan struct {
 	only map[string]string
 	// mode is the mode the run's verdicts are taken under.
 	mode protocol.VerdictMode
+	// focused marks a run some focused suite or method narrows.
+	focused bool
 }
 
 // planRun hashes the loaded packages and, under --changed, keeps only
@@ -81,7 +83,7 @@ type runPlan struct {
 // the run cannot go on.
 func planRun(cfg *ExecConfig, pkgs *gotestgen.RunPackages) (*runPlan, bool) {
 	classified := gotestrunner.ClassifyGoTestArgs(cfg.GoTestArgs)
-	plan := &runPlan{inputs: startInputs(pkgs, classified.BuildFlags), mode: runMode(cfg)}
+	plan := &runPlan{inputs: startInputs(pkgs, classified.BuildFlags), mode: runMode(cfg), focused: cfg.Focused}
 	if cfg.Manifest != nil {
 		cfg.Manifest.Build = plan.inputs.flags
 	}
@@ -190,11 +192,12 @@ type recordOptions struct {
 	narrowed func(pkg string) bool
 }
 
-// narrowedBy is the narrowing a run's flags make of each package: -run,
-// -skip, --group and --skip-group narrow all, --failed's selection the
-// packages it narrows.
+// narrowedBy is the narrowing a run makes of each package: flags that
+// select tests or leave none to run, --group, --skip-group and a focused
+// suite or method narrow all; --failed every package it does not rerun
+// whole.
 func narrowedBy(cfg *ExecConfig, plan *runPlan) func(string) bool {
-	all := hasFlag(cfg.GoTestArgs, "-run") || hasFlag(cfg.GoTestArgs, "-skip") || len(cfg.Groups)+len(cfg.SkipGroups) > 0
+	all := gotestrunner.SelectsTests(cfg.GoTestArgs) || len(cfg.Groups)+len(cfg.SkipGroups) > 0 || plan != nil && plan.focused
 	only := cfg.Only
 	if plan != nil && plan.only != nil {
 		only = plan.only
@@ -203,8 +206,11 @@ func narrowedBy(cfg *ExecConfig, plan *runPlan) func(string) bool {
 		if all {
 			return true
 		}
+		if only == nil {
+			return false
+		}
 		sel, ok := only[pkg]
-		return ok && sel != ""
+		return !ok || sel != ""
 	}
 }
 

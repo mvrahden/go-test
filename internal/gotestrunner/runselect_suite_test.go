@@ -33,3 +33,25 @@ func (s *RunSelectTestSuite) TestShortMode(t *gotest.T) {
 		gotest.Equal(sub, r.want, gotestrunner.ShortMode(r.args))
 	}
 }
+
+func (s *RunSelectTestSuite) TestFlagsThatSelectTests(t *gotest.T) {
+	for sub, r := range gotest.Each(t, []struct {
+		Desc string
+		args []string
+		want bool
+	}{
+		{"no flags", []string{"./..."}, false},
+		{"-run", []string{"-run", "X", "./..."}, true},
+		{"-skip", []string{"-skip=X", "./..."}, true},
+		{"-count=0", []string{"-count=0", "./..."}, true},
+		{"-count=1", []string{"-count=1", "./..."}, false},
+		{"-short, -v and -race", []string{"-short", "-v", "-race", "./..."}, false},
+		{"-test.run after -args", []string{"./...", "-args", "-test.run=X"}, true},
+		{"-test.count=0 after -args", []string{"./...", "-args", "-test.count=0"}, true},
+		{"-test.bench after -args", []string{"./...", "-args", "-test.bench=."}, true},
+		{"-h after -args", []string{"./...", "-args", "-h"}, true},
+		{"a flag of the test's own after -args", []string{"./...", "-args", "-custom"}, false},
+	}) {
+		gotest.Equal(sub, r.want, gotestrunner.SelectsTests(r.args))
+	}
+}

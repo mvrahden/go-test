@@ -116,7 +116,7 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	if !ok {
 		return 2
 	}
-	if code, err := focusGate(pkgs.Loaded, cfg.CI); err != nil {
+	if code, err := focusGate(pkgs.Loaded, &cfg); err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	} else if code != 0 {

@@ -8,6 +8,8 @@ Expect: ^FAIL .*conformance/cli CLIRecordTrust .* / after a --ci run, a plain --
 Clause: when --changed follows a run of a package unchanged since, one of the two under --ci → after a --ci run, a plain --changed run leaves the package out
 Expect: ^FAIL .*conformance/cli CLIRecordTrust .* / leaves them out on the next --changed run \(
 Clause: when --changed reads a record whose packages carry no mode → leaves them out on the next --changed run
+Expect: ^FAIL .*conformance/cli CLIRecordTrust .* / leaves all four out as unchanged \(
+Clause: when --changed follows a run of a package whose methods are all excluded, one holding only benchmarks, one without test files and one that passed → leaves all four out as unchanged
 --- a/cmd/gotest/recordstamp.go
 +++ b/cmd/gotest/recordstamp.go
 @@ -15,8 +15,6 @@

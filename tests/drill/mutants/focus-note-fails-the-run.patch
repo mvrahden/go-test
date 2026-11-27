@@ -7,6 +7,6 @@ Clause: when a run outside CI mode holds a focused method → exits 0 when what 
  	}
  	if violations := CheckFocusViolations(suites); len(violations) > 0 {
 +		defer os.Exit(1)
+ 		cfg.Focused = true
  		fmt.Fprintf(os.Stderr, "note: F_ narrows this run to the focused suites and methods (%d, first %s) — the rest is skipped; remove F_ to run everything, --ci refuses it\n", len(violations), strings.Join(strings.Fields(violations[0].String()), " "))
  	}
- 	return 0, nil

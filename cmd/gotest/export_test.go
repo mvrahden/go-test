@@ -496,3 +496,10 @@ var ExportHeldCurrent = heldCurrent
 
 // ExportStampRecord stamps a run's record with its mode and narrowing.
 var ExportStampRecord = stampRecord
+
+// ExportNarrowedBy is the narrowing of a run given its flags, groups,
+// --failed selection, --changed --failed selection and focus.
+func ExportNarrowedBy(args, groups []string, failedOnly, changedFailedOnly map[string]string, focused bool) func(string) bool {
+	cfg := &ExecConfig{GoTestArgs: args, Groups: groups, Only: failedOnly}
+	return narrowedBy(cfg, &runPlan{only: changedFailedOnly, focused: focused})
+}

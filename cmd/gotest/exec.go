@@ -46,7 +46,7 @@ func execRun(cfg ExecConfig) (exit int, judged *gotestrunner.PipelineResult, pla
 
 	// The focus guard sees every package given, those --changed leaves out
 	// among them.
-	if code, err := focusGate(pkgs.Loaded, cfg.CI); err != nil {
+	if code, err := focusGate(pkgs.Loaded, &cfg); err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2, nil, nil, ""
 	} else if code != 0 {

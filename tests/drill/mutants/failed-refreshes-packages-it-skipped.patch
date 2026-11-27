@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLIRecordTrust .* / runs that package again and exits 1 \(
+Clause: when --changed follows a --failed run given two packages, the one that had not failed broken since → runs that package again and exits 1
+--- a/cmd/gotest/changed.go
++++ b/cmd/gotest/changed.go
+@@ -210,7 +210,7 @@
+ 			return false
+ 		}
+ 		sel, ok := only[pkg]
+-		return !ok || sel != ""
++		return ok && sel != ""
+ 	}
+ }
+ 

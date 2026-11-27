@@ -928,6 +928,29 @@ A verdict without a mode, as a record written before modes were stamped holds, S
 - **THEN** runs every package given once, saying so on stderr
 - **AND** leaves them out on the next --changed run
 
+### Requirement: A verdict of a part of a package's tests
+A record SHALL mark a package's verdict as of a part of its tests, `Narrowed`, when the run selected among the tests by anything outside the package's own source: -run, -skip, --group or --skip-group; --failed, for every package it did not rerun whole; -count=0; -test.run, -test.skip, -test.list, -test.bench or -test.count=0 after -args, or a flag there asking the binary for its usage; and a focused suite or method anywhere among the packages given, for every package of the run.
+
+#### Scenario: A run narrowed by focus
+- **WHEN** --changed follows a run that a focused method in one package narrowed, the focus removed since
+- **THEN** runs again the other package, whose failing test the focus kept from running, and exits 1
+
+#### Scenario: A --failed run given packages
+- **WHEN** --changed follows a --failed run given two packages, the one that had not failed broken since
+- **THEN** runs that package again and exits 1
+
+#### Scenario: Flags that leave nothing to run
+- **WHEN** --changed follows a passing run of a package with a failing test given -count=0, or -test.run, -test.count=0 or -h after -args
+- **THEN** each such run's record marks the package's verdict as of a part
+- **AND** --changed after the -count=0 run runs the package again and exits 1
+
+### Requirement: A verdict of a part is never current
+A verdict of a part of a package's tests SHALL never be held as current. A package in which nothing ran for a reason in its own source, having no test files, every method excluded or benchmarks only, SHALL not be marked so: its input hash covers the reason.
+
+#### Scenario: Packages that run nothing by their own source
+- **WHEN** --changed follows a run of a package whose methods are all excluded, one holding only benchmarks, one without test files and one that passed
+- **THEN** leaves all four out as unchanged
+
 ### Requirement: Run records kept
 Each run that records itself SHALL also keep its record alone, with the path of its --events-file, as a file of its own in the checkout's history under the gotest cache, written by a rename; each write SHALL remove all but the newest 50 and those kept over 30 days. gotest clean --cache SHALL remove the records of every checkout no run is writing.
 

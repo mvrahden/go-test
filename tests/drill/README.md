@@ -1215,7 +1215,7 @@ shards of one run do not add up to every mutant exactly once.
 | `changed-lists-the-packages-left-out` | a `--changed` run's manifest lists in `Changed` every loaded package, those it left out too | cli conformance: `Changed.Packages` names the unchanged package |
 | `changed-without-a-record-lists-nothing` | a `--changed` run without a record lists no package in `Changed` | cli conformance: `Changed.Packages` is empty |
 | `changed-run-narrows-with-run` | a `--changed` run narrows itself with `-run`, which stands the census down | cli conformance: the closing event has no count of units not run |
-| `record-ignores-run-narrowing` | a `-run` narrowed run's packages are recorded as whole | cli conformance: the recorded package is not marked narrowed |
+| `record-ignores-run-narrowing` | a run whose flags select its tests records its packages as whole | cli conformance: the recorded package is not marked narrowed |
 | `changed-run-replaces-the-record` | a `--changed` run replaces the record instead of keeping the packages it left out | cli conformance: the record holds only the packages the run ran |
 | `record-forgets-the-events-file` | a run's kept record never names its `--events-file` | cli conformance: the third record names no events file |
 | `clean-keeps-run-records` | `gotest clean --cache` leaves the run records | cli conformance: the history and last.json are still there |
@@ -1275,6 +1275,8 @@ shards of one run do not add up to every mutant exactly once.
 | `mutate-ignores-not-compared` | mutate-ignore comments are left out of the comparison | audit conformance: the suppression It finds no finding |
 | `changed-ignores-the-mode` | `--changed` holds a verdict as current whatever mode it was taken under | cli conformance: the package judged under -short does not run again |
 | `record-forgets-the-mode` | a run's record stamps no package with its mode | cli conformance: the record's package has no Mode, and an unchanged package runs again |
+| `focus-leaves-the-record-whole` | a run narrowed by `F_` records its packages as whole | cli conformance: the package the focus kept from running is left out |
+| `failed-refreshes-packages-it-skipped` | `--failed` records as whole a package given that it ran nothing of | cli conformance: the package broken since is left out |
 
 ## Adding a mutant
 

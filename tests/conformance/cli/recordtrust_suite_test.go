@@ -193,3 +193,89 @@ func (s *CLIRecordTrustTestSuite) TestARecordWithoutModes(t *gotest.T) {
 		})
 	})
 }
+
+// fixBad makes both methods of records/bad pass.
+func fixBad(t *gotest.T, tr freshTree) {
+	tr.replace(t, "bad/bad_suite_test.go", "gotest.Equal(t, 1, 2)", "gotest.Equal(t, 1, 1)")
+	tr.replace(t, "bad/bad_suite_test.go", "gotest.Equal(t, 2, 1)", "gotest.Equal(t, 2, 2)")
+}
+
+func (s *CLIRecordTrustTestSuite) TestARunNarrowedByFocus(t *gotest.T) {
+	tr := stageRecords(t)
+	tr.replace(t, "good/good_suite_test.go", "TestHolds", "F_TestHolds")
+	gotest.Equal(t, 0, tr.run(t, "./good/", "./bad/").Exit)
+	tr.replace(t, "good/good_suite_test.go", "F_TestHolds", "TestHolds")
+	changed := tr.run(t, "--changed", "./good/", "./bad/")
+
+	t.When("--changed follows a run that a focused method in one package narrowed, the focus removed since", func(w *gotest.T) {
+		w.It("runs again the other package, whose failing test the focus kept from running, and exits 1", func(it *gotest.T) {
+			gotest.Equal(it, 1, changed.Exit, "stderr: %s", changed.Stderr)
+			gotest.Equal(it, []string{"records/bad", "records/good"}, ranOf(changed.Stdout, "records/bad", "records/good"), "stdout: %s", changed.Stdout)
+			gotest.Equal(it, "gotest: FAIL exit 1 | packages: 1 passed, 1 failed, 0 skipped | changed only: 2 ran, 0 unchanged", lastLine(changed.Stderr))
+		})
+	})
+}
+
+func (s *CLIRecordTrustTestSuite) TestAFailedRunGivenPackages(t *gotest.T) {
+	tr := stageRecords(t)
+	gotest.Equal(t, 1, tr.run(t, "./sound/", "./bad/").Exit)
+	tr.replace(t, "sound/sound_suite_test.go", "gotest.Equal(t, 1, 1)", "gotest.Equal(t, 1, 2)")
+	fixBad(t, tr)
+	gotest.Equal(t, 0, tr.run(t, "--failed", "./sound/", "./bad/").Exit)
+	changed := tr.run(t, "--changed", "./sound/", "./bad/")
+
+	t.When("--changed follows a --failed run given two packages, the one that had not failed broken since", func(w *gotest.T) {
+		w.It("runs that package again and exits 1", func(it *gotest.T) {
+			gotest.Equal(it, 1, changed.Exit, "stderr: %s", changed.Stderr)
+			gotest.Contains(it, changed.Stdout, "FAIL\trecords/sound\t")
+			gotest.Equal(it, "gotest: FAIL exit 1 | packages: 1 passed, 1 failed, 0 skipped | changed only: 2 ran, 0 unchanged", lastLine(changed.Stderr))
+		})
+	})
+}
+
+func (s *CLIRecordTrustTestSuite) TestFlagsThatLeaveNothingToRun(t *gotest.T) {
+	t.When("--changed follows a passing run of a package with a failing test given -count=0, or -test.run, -test.count=0 or -h after -args", func(w *gotest.T) {
+		w.It("each such run's record marks the package's verdict as of a part", func(it *gotest.T) {
+			for sub, r := range gotest.Each(it, []struct {
+				Desc string
+				args []string
+			}{
+				{"-count=0", []string{"-count=0", "./bad/"}},
+				{"-test.run after -args", []string{"./bad/", "-args", "-test.run=NoSuchTest"}},
+				{"-test.count=0 after -args", []string{"./bad/", "-args", "-test.count=0"}},
+				{"-h after -args", []string{"./bad/", "-args", "-h"}},
+			}) {
+				tr := stageRecords(sub)
+				run := tr.run(sub, r.args...)
+				gotest.Equal(sub, 0, run.Exit, "stderr: %s", run.Stderr)
+				p := tr.record(sub).of("records/bad")
+				gotest.Equal(sub, "pass", p.Verdict)
+				gotest.True(sub, p.Narrowed)
+			}
+		})
+		w.It("--changed after the -count=0 run runs the package again and exits 1", func(it *gotest.T) {
+			tr := stageRecords(it)
+			gotest.Equal(it, 0, tr.run(it, "-count=0", "./bad/").Exit)
+			changed := tr.run(it, "--changed", "./bad/")
+			gotest.Equal(it, 1, changed.Exit, "stderr: %s", changed.Stderr)
+			gotest.Equal(it, "gotest: FAIL exit 1 | packages: 0 passed, 1 failed, 0 skipped | changed only: 1 ran, 0 unchanged", lastLine(changed.Stderr))
+		})
+	})
+}
+
+func (s *CLIRecordTrustTestSuite) TestPackagesThatRunNothingByTheirOwnSource(t *gotest.T) {
+	tr := stageRecords(t)
+	pkgs := []string{"./excluded/", "./benches/", "./plain/", "./good/"}
+	gotest.Equal(t, 0, tr.run(t, pkgs...).Exit)
+	rec := tr.record(t)
+	changed := tr.run(t, append([]string{"--changed"}, pkgs...)...)
+
+	t.When("--changed follows a run of a package whose methods are all excluded, one holding only benchmarks, one without test files and one that passed", func(w *gotest.T) {
+		w.It("leaves all four out as unchanged", func(it *gotest.T) {
+			gotest.Equal(it, 0, changed.Exit, "stderr: %s", changed.Stderr)
+			gotest.Equal(it, "gotest: EMPTY exit 0 | packages: 0 passed, 0 failed, 0 skipped | changed only: 0 ran, 4 unchanged", lastLine(changed.Stderr))
+			gotest.False(it, rec.of("records/excluded").Narrowed)
+			gotest.False(it, rec.of("records/benches").Narrowed)
+		})
+	})
+}

@@ -375,7 +375,7 @@ func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode, specMode, bench
 		return 2, benchNs
 	}
 
-	if code, err := focusGate(loaded, cfg.CI); err != nil {
+	if code, err := focusGate(loaded, &cfg); err != nil {
 		if jsonMode {
 			fmt.Printf("{\"Action\":\"watch-error\",\"Output\":%q}\n", err.Error())
 		} else {

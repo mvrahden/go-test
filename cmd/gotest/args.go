@@ -71,6 +71,8 @@ type ExecConfig struct {
 	GlobalTimeout   time.Duration
 	Debug           bool
 	CI              bool
+	// Focused marks a run some focused suite or method narrows; focusGate sets it.
+	Focused         bool
 	JSON            bool
 	UpdateSnapshots bool
 	NoCache         bool
