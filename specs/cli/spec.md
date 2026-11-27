@@ -598,7 +598,7 @@ A run SHALL link its test binaries without the symbol table and debug informatio
 - **THEN** the test prints the value and the binary carries debug information
 
 ### Requirement: A run never executes a stale binary
-A run SHALL execute a test binary built from the sources, build tags and link flags it was given, whatever an earlier run left in the cache.
+A run SHALL execute a test binary built from the sources, build tags and link flags it was given, whatever an earlier run left in the cache. A cached binary the go command neither rebuilt nor found up to date in this run SHALL NOT be executed: its package is built again without the cache.
 
 #### Scenario: A dependency changes and changes back
 - **WHEN** a dependency's source is changed, run, and restored

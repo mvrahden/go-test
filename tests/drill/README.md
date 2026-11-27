@@ -703,6 +703,7 @@ shards of one run do not add up to every mutant exactly once.
 | `stage-slot-named-for-the-host` | a package's stage slot is named for the CLI's own operating system, not the one go builds for | cli conformance: under another `GOOS` the package fails to build instead of failing at its start |
 | `binary-cache-keyed-for-the-host` | the binary cache key takes the CLI's own platform, not the one go builds for | cli conformance: a run for another `GOOS` replaces the host's cached binary |
 | `foreign-binary-start-unexplained` | a suite whose binary did not start is reported without the platform it was built for | cli conformance: the stderr of a run for another `GOOS` lacks the platform line |
+| `unseen-cached-binary-confirmed` | a placed cached binary counts as confirmed once go exited 0, though go never touched it | runner: the row "same file, not newer, exit 0" reads confirmed, and the package is not built again |
 | `goflags-dropped-from-the-build` | the go command that builds a run's binaries is started with `GOFLAGS` emptied | cli conformance: build tags and link flags given in GOFLAGS do not reach the binary |
 | `stage-builds-without-vet` | the compile stage passes `-vet=off` to every build | cli conformance: a run without `-vet=off` misses a vet finding |
 | `publish-leaves-its-temp-file` | a rebuilt binary is copied onto its cache entry and its temporary file is left beside it | cli conformance: runs at once leave a temporary file in the cache |

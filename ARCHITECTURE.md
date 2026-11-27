@@ -795,16 +795,22 @@ compiled. The rest is built in groups:
    Each group gets one `go test -c -json -o <work dir>/bin/<n>/` call
    (`compileGroup`), under the Level 1 semaphore.
 2. **Staging.** Before go runs, `stageGroup` places each package's cached
-   binary in the group's stage dir under go's name: a hard link from the
-   cache, or a copy on Windows and wherever the link is refused, taken
-   under the entry's lock and only when the entry still matches its
+   binary in the group's stage dir under the name go gives it for the
+   platform it builds for (`GoSettings`, `go env GOOS GOARCH`): a hard link
+   from the cache, or a copy on Windows and wherever the link is refused,
+   taken under the entry's lock and only when the entry still matches its
    checksum record. go then leaves an up-to-date binary alone and links a
    stale one anew.
 3. **Readiness.** The stage dir is polled while go runs (`binaryReady`). A
    newly linked binary is ready as soon as go has renamed it into place,
    where go renames (`renameSafe`), else when go exits. A placed binary is
-   confirmed only when this run's go exits 0 and left it there: every run's
-   slot links the same entry, so another run's go touching it says nothing.
+   confirmed only when this run's go exits 0 and the file's modification
+   time has moved since it was placed: go touches a target it finds up to
+   date. A moved time alone confirms nothing, since every run's slot links
+   the same entry and another run's go touches it too. A placed binary go
+   exited 0 without touching is unseen: its package is built again in a
+   call of its own, without the cache
+   ([A run never executes a stale binary](specs/cli/spec.md#requirement-a-run-never-executes-a-stale-binary)).
    Each package is emitted once, its binary or its failure.
 4. **Failures.** Build failures are read from go's `-json` build events,
    attributed by package (`buildevents.go`). A package go left without a
@@ -1597,7 +1603,7 @@ It is why the project's rule is "never call `t.T().Helper()` with gotest asserti
    so an overlay at a new path each run costs no rebuild. The test binaries do
    get reuse: each is cached in
    `~/.cache/gotest/bin/<key>/`, keyed by working directory, build flags,
-   platform and Go version, and a run hard-links it into its own work dir
+   the platform go builds for and Go version, and a run hard-links it into its own work dir
    before go builds there, so go skips the link for an unchanged package; a
    rebuilt binary is published back by a rename (The Compile Stage). Each
    key records its checkout in `.cwd`, and every run's start evicts the

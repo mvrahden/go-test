@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestrunner"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -212,6 +213,75 @@ func (s *CompileGroupTestSuite) TestATargetPlatform(t *gotest.T, ctx *groupCtx) 
 			gotest.Empty(it, failures)
 			gotest.Len(it, results, 1)
 			gotest.Equal(it, name, filepath.Base(results[0].BinaryPath))
+		})
+	})
+}
+
+func (s *CompileGroupTestSuite) TestACachedBinaryGoLeftUnseen(t *gotest.T, ctx *groupCtx) {
+	writeCached(t, ctx.cache, "m/a", "old")
+	var stages []string
+	var slotHeld []bool
+	ctx.fake = func(stage string, pkgs []string, _ io.Writer) error {
+		_, err := os.Stat(binaryAt(stage, "m/a"))
+		stages, slotHeld = append(stages, stage), append(slotHeld, err == nil)
+		if len(stages) == 1 {
+			writeBinary(stage, "m/b", "built")
+			return nil // exits 0 and never looks at m/a's slot
+		}
+		writeBinary(stage, "m/a", "fresh")
+		return nil
+	}
+	results, failures := gotestrunner.CompilePackages(t.Context(), []string{"m/a", "m/b"}, "-overlay=o.json", nil, ctx.out, ctx.cache, 0)
+	t.When("go exits 0 and leaves a placed cached binary as it was", func(w *gotest.T) {
+		w.It("asks go again for that package alone, in a stage dir that holds no cached binary", func(it *gotest.T) {
+			gotest.Len(it, ctx.calls, 2)
+			gotest.Equal(it, []bool{true, false}, slotHeld)
+			_, again := fakeTarget(ctx.calls[1])
+			gotest.Equal(it, []string{"m/a"}, again)
+			gotest.NotEqual(it, stages[0], stages[1])
+		})
+		w.It("hands out the binary go then wrote, never the cached one", func(it *gotest.T) {
+			gotest.Empty(it, failures)
+			gotest.Len(it, results, 2)
+			for _, r := range results {
+				if r.Package == "m/a" {
+					gotest.Equal(it, "fresh", string(gotest.Must(os.ReadFile(r.BinaryPath))))
+				}
+			}
+		})
+		w.It("leaves the cache entry as it was", func(it *gotest.T) {
+			gotest.Equal(it, "old", readCached(it, ctx.cache, "m/a"))
+		})
+	})
+}
+
+func (s *CompileGroupTestSuite) TestACachedBinaryGoConfirms(t *gotest.T, ctx *groupCtx) {
+	writeCached(t, ctx.cache, "m/a", "old")
+	ctx.fake = func(stage string, pkgs []string, _ io.Writer) error {
+		later := time.Now().Add(2 * time.Second)
+		return os.Chtimes(binaryAt(stage, "m/a"), later, later) // go's touch of an up-to-date target
+	}
+	results, failures := gotestrunner.CompilePackages(t.Context(), []string{"m/a"}, "-overlay=o.json", nil, ctx.out, ctx.cache, 0)
+	t.When("go exits 0 and has touched a placed cached binary", func(w *gotest.T) {
+		w.It("hands out the cached binary after one go call", func(it *gotest.T) {
+			gotest.Len(it, ctx.calls, 1)
+			gotest.Empty(it, failures)
+			gotest.Len(it, results, 1)
+			gotest.Equal(it, "old", string(gotest.Must(os.ReadFile(results[0].BinaryPath))))
+		})
+	})
+}
+
+func (s *CompileGroupTestSuite) TestGoWritesNothing(t *gotest.T, ctx *groupCtx) {
+	writeCached(t, ctx.cache, "m/a", "old")
+	ctx.fake = func(string, []string, io.Writer) error { return nil }
+	results, failures := gotestrunner.CompilePackages(t.Context(), []string{"m/a"}, "-overlay=o.json", nil, ctx.out, ctx.cache, 0)
+	t.When("go exits 0 twice and writes no binary", func(w *gotest.T) {
+		w.It("fails the package after the second call, as a build that wrote no binary", func(it *gotest.T) {
+			gotest.Len(it, ctx.calls, 2)
+			gotest.Empty(it, results)
+			gotest.Len(it, failures, 1)
+			gotest.Equal(it, "compile m/a: go test -c wrote no test binary", failures[0].Err.Error())
 		})
 	})
 }

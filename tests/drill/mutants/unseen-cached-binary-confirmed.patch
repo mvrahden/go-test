@@ -1,0 +1,15 @@
+Judge: ./internal/gotestrunner CompileStageTestSuite/TestReadiness CompileGroupTestSuite/TestACachedBinaryGoLeftUnseen
+Expect: ^FAIL .*internal/gotestrunner CompileStage .* / same file, not newer, exit 0 \(
+Expect: ^FAIL .*internal/gotestrunner CompileGroup .* / asks go again for that package alone, in a stage dir that holds no cached binary \(
+--- a/internal/gotestrunner/compilestage.go
++++ b/internal/gotestrunner/compilestage.go
+@@ -272,9 +272,6 @@
+ 		return notReady
+ 	case placed != nil && os.SameFile(placed, now):
+ 		if exited == 0 {
+-			if now.ModTime().Equal(placed.ModTime()) {
+-				return unseen
+-			}
+ 			return confirmed
+ 		}
+ 		return notReady

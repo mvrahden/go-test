@@ -4,11 +4,14 @@ Expect: ^FAIL .*conformance/cli CLIStaleBinary .* ADependencyChanges / .* / each
 Expect: ^FAIL .*conformance/cli CLIStaleBinary .* ATestFileChanges / .* / each run prints the value its sources hold \(
 --- a/internal/gotestrunner/compilestage.go
 +++ b/internal/gotestrunner/compilestage.go
-@@ -227,7 +227,7 @@
+@@ -271,10 +271,7 @@
  	case now == nil:
  		return notReady
  	case placed != nil && os.SameFile(placed, now):
 -		if exited == 0 {
+-			if now.ModTime().Equal(placed.ModTime()) {
+-				return unseen
+-			}
 +		if exited <= 0 {
  			return confirmed
  		}

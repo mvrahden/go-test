@@ -10,7 +10,8 @@ import (
 )
 
 // GoSettingsTestSuite: the go command's own GOOS, GOARCH and GOFLAGS, and
-// what a failed start says about them. Sequential: it sets the environment.
+// what a failed start says about them.
+// Sequential: it sets the environment.
 type GoSettingsTestSuite struct{}
 
 func (s *GoSettingsTestSuite) TestRead(t *gotest.T) {

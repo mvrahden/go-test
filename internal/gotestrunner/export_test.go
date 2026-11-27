@@ -886,6 +886,7 @@ const (
 	ExportNotReady  = notReady
 	ExportConfirmed = confirmed
 	ExportRebuilt   = rebuilt
+	ExportUnseen    = unseen
 )
 
 var (
