@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditUntested / WhatTheRunTestedNothingOf / when audit --run compares a head that adds a package declaring only a type / lists no unproven file and --fail-on=unproven exits 0 \(
+Clause: when audit --run compares a head that adds a package declaring only a type → lists no unproven file and --fail-on=unproven exits 0
+--- a/internal/gotestaudit/unproven.go
++++ b/internal/gotestaudit/unproven.go
+@@ -140,7 +140,7 @@
+ func Executable(files []ProdFile) []ProdFile {
+ 	var out []ProdFile
+ 	for i := range files {
+-		if inFunction(&files[i]) {
++		if true {
+ 			out = append(out, files[i])
+ 		}
+ 	}

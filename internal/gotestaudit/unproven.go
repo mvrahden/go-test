@@ -4,6 +4,9 @@ import (
 	"bufio"
 	"cmp"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"io"
 	"path"
 	"slices"
@@ -131,6 +134,50 @@ type ProdFile struct {
 
 // key is the name a coverage profile gives the file.
 func (f *ProdFile) key() string { return f.Package + "/" + path.Base(f.File) }
+
+// Executable are the files of which a changed line lies in a function's
+// body; a file that cannot be parsed counts.
+func Executable(files []ProdFile) []ProdFile {
+	var out []ProdFile
+	for i := range files {
+		if inFunction(&files[i]) {
+			out = append(out, files[i])
+		}
+	}
+	return out
+}
+
+// inFunction reports whether a changed line of f lies between the first
+// statement's first line and the last statement's last line of a function
+// or function literal.
+func inFunction(f *ProdFile) bool {
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, f.Abs, nil, parser.SkipObjectResolution)
+	if err != nil {
+		return true
+	}
+	found := false
+	ast.Inspect(file, func(n ast.Node) bool {
+		var body *ast.BlockStmt
+		switch fn := n.(type) {
+		case *ast.FuncDecl:
+			body = fn.Body
+		case *ast.FuncLit:
+			body = fn.Body
+		}
+		if found || body == nil || len(body.List) == 0 {
+			return !found
+		}
+		from, to := fset.Position(body.List[0].Pos()).Line, fset.Position(body.List[len(body.List)-1].End()).Line
+		for _, l := range f.Lines {
+			if from <= l && l <= to {
+				found = true
+			}
+		}
+		return !found
+	})
+	return found
+}
 
 // AddUnproven lists, per changed production file, the changed lines the
 // profile's blocks know as executable and that no block covering them

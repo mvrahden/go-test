@@ -177,6 +177,17 @@ Given a coverage profile, `--coverage` or the one `--run` measured, and the chan
 - **WHEN** audit --base with --coverage runs in a checkout with uncommitted and untracked production files
 - **THEN** takes the changed lines from the commit to the files on disk, every line of an untracked file included
 
+### Requirement: A change the run tested nothing of
+Where the run `--run` made executed no test and so wrote no profile, a changed non-test file with a changed line inside a function's body SHALL read as without coverage data, and one with none SHALL not be listed.
+
+#### Scenario: A changed package the run executed no test for
+- **WHEN** audit --run compares a head that adds a package with a function and no test
+- **THEN** lists the package's file as without coverage data and --fail-on=unproven exits 1
+
+#### Scenario: A changed file without a function
+- **WHEN** audit --run compares a head that adds a package declaring only a type
+- **THEN** lists no unproven file and --fail-on=unproven exits 0
+
 ### Requirement: Coverage of the binaries a test starts
 When `gotest audit --run` measures coverage it SHALL give the run a `GOCOVERDIR` under its own directory and count, beside the test binaries' profiles, what each binary built with `go build -cover` that a test starts wrote there. A file only binaries built without it execute SHALL read as without coverage data, and where no binary wrote any a note SHALL say how one counts. Nothing SHALL be written into the module, and the directory SHALL go with the run's.
 

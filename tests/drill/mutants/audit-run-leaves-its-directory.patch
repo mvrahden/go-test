@@ -4,9 +4,9 @@ Clause: when audit --run runs a test that starts a binary built with go build -c
 Clause: when audit --run is interrupted while its run is under way → leaves no directory of the run behind
 --- a/cmd/gotest/auditproof.go
 +++ b/cmd/gotest/auditproof.go
-@@ -41,7 +41,7 @@
+@@ -57,7 +57,7 @@
  		if in != nil {
- 			inputs = append(inputs, *in)
+ 			inputs, ran = append(inputs, *in), true
  		}
 -		defer removeProfile(ranProfile)
 +		defer removeProfile("")

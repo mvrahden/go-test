@@ -48,13 +48,14 @@ func (a *auditArgs) prove(doc *gotestaudit.Document, base, head *gotestaudit.Rec
 		}
 	}
 	var zero *baseline
+	ran := false
 	if a.run {
 		in, ranProfile, err := a.runChanged(doc, files, tests, mut)
 		if err != nil {
 			return err
 		}
 		if in != nil {
-			inputs = append(inputs, *in)
+			inputs, ran = append(inputs, *in), true
 		}
 		defer removeProfile(ranProfile)
 		if profile == "" {
@@ -87,7 +88,8 @@ func (a *auditArgs) prove(doc *gotestaudit.Document, base, head *gotestaudit.Rec
 	if len(inputs) > 0 {
 		gotestaudit.AddEvidence(doc, base, head, inputs)
 	}
-	if a.unproven() && profile != "" {
+	switch {
+	case a.unproven() && profile != "":
 		// The run's own profile may hold no block: then no file has data.
 		blocks, err := readProfile(profile, a.coverage == "")
 		if err != nil {
@@ -95,6 +97,11 @@ func (a *auditArgs) prove(doc *gotestaudit.Document, base, head *gotestaudit.Rec
 		}
 		shown := a.coverage
 		gotestaudit.AddUnproven(doc, files, blocks, gotestaudit.Coverage{Profile: shown, Lines: lines})
+	case a.unproven() && ran && !a.stopped:
+		// The run executed no test, so it wrote no profile.
+		if untested := gotestaudit.Executable(files); len(untested) > 0 {
+			gotestaudit.AddUnproven(doc, untested, nil, gotestaudit.Coverage{Lines: lines})
+		}
 	}
 	if mut != nil {
 		a.judge(doc, mut, zero)

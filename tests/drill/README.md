@@ -1259,6 +1259,8 @@ shards of one run do not add up to every mutant exactly once.
 | `audit-skips-of-an-uncounted-record` | skip counts are compared where a record has none | audit conformance: the old-record It finds findings and no note |
 | `audit-skipped-row-proven` | a row the run skipped counts as proven | audit conformance: the guard It counts 0 not run |
 | `audit-excluded-row-unproven` | a row X_ excludes counts as not run | audit conformance: the X_ It counts 3 not run |
+| `audit-untested-package-proven` | a changed package the run tested nothing of lists no file | audit conformance: the untested It sees exit 0 |
+| `audit-unproven-without-a-function` | a changed file without a function reads as without coverage data | audit conformance: the type-only It finds docs/doc.go listed |
 | `mutate-boundary-never-written` | an ordering gets no boundary mutant, only its negation | audit conformance: the mutants It and the survivor It find no boundary mutant |
 | `mutate-schemata-written-into-the-module` | the mutants' source is also written beside each file of the module | audit conformance: the module It finds a file the audit added |
 | `mutate-tests-of-the-mutated-package-only` | only the mutated package's own tests judge its mutants | audit conformance: the suites It finds Grade's line judged by no suite |
