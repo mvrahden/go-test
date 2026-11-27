@@ -822,6 +822,14 @@ A test run, a -json run, spec and summary SHALL record, when they run their pack
 - **WHEN** --failed is given without a record, after a run that failed nothing, or with a package that did not fail
 - **THEN** runs nothing and exits 2, saying why on stderr
 
+### Requirement: A failure whose test is gone
+--failed SHALL run nothing and exit 1, naming the failures on stderr, when a failure it would rerun in a package given names no test that package declares any more: rerunning it would run nothing and pass.
+
+#### Scenario: A failure whose test is gone
+- **WHEN** --failed follows a run of which a failed method was renamed since
+- **THEN** runs nothing and exits 1, naming on stderr the failure that names no test any more
+- **AND** spec --failed and summary --failed exit 1 with the same line
+
 ### Requirement: A package's input hash
 A run SHALL stamp each package's verdict event in the -json stream with `InputHash`, a digest of the source the verdict judged: the files of the package and of each package it reaches in a main module, generated files aside, with what they embed; the testdata trees of its directory and of those above it in its module; every other module's version; the go, toolchain and godebug lines of go.mod and go.work; the build flags, Go version, platform and CLI version.
 

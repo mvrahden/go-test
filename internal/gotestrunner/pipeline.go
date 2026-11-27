@@ -334,6 +334,9 @@ func RunPipeline(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult
 	if err := overlay.selectGroups(cfg.Groups, cfg.SkipGroups); err != nil {
 		return PipelineResult{}, err
 	}
+	if refuseGoneReruns(cfg, overlay) {
+		return PipelineResult{ExitCode: 1}, nil
+	}
 	pf := ParseExecFlags(cfg.GoTestArgs)
 
 	// Only when seed corpora actually replay in this run: a stale entry is

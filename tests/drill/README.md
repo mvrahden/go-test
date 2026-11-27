@@ -1283,6 +1283,7 @@ shards of one run do not add up to every mutant exactly once.
 | `teardown-failure-kept-from-the-record` | a teardown failure beside a failed test is not told to the record | cli conformance: --changed runs only the package that had failed |
 | `unexplained-exit-refreshes-passes` | a run that exits non-zero with no failed package records its passes as whole | cli conformance: --changed under the minimum runs nothing |
 | `empty-changed-run-replaces-the-record` | a `--changed` run that ran no package overwrites the record's run | cli conformance: the record holds exit code 0 and the --changed arguments |
+| `failed-with-nothing-left-passes` | `--failed` reruns a failure whose test is gone, runs nothing and passes | cli conformance: the rerun after the rename exits 0 |
 
 ## Adding a mutant
 

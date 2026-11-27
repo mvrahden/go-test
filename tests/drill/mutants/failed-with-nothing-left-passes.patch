@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/cli CLIRecordTrust .* / runs nothing and exits 1, naming on stderr the failure that names no test any more / the suite renamed \(
+Clause: when --failed follows a run of which a failed method was renamed since → runs nothing and exits 1, naming on stderr the failure that names no test any more
+Expect: ^FAIL .*conformance/cli CLIRecordTrust .* / spec --failed and summary --failed exit 1 with the same line \(
+Clause: when --failed follows a run of which a failed method was renamed since → spec --failed and summary --failed exit 1 with the same line
+--- a/internal/gotestrunner/runselect.go
++++ b/internal/gotestrunner/runselect.go
+@@ -51,7 +51,7 @@
+ 			continue
+ 		}
+ 		for _, alt := range strings.Split(only[pkg], "|") {
+-			if slices.ContainsFunc(units, func(d CensusCase) bool { return d.Pkg == pkg && declares(alt, d.Path) }) {
++			if true || slices.ContainsFunc(units, func(d CensusCase) bool { return d.Pkg == pkg && declares(alt, d.Path) }) {
+ 				continue
+ 			}
+ 			levels := strings.Split(alt, "/")

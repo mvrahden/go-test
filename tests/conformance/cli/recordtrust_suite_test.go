@@ -380,3 +380,43 @@ func (s *CLIRecordTrustTestSuite) TestAChangedRunThatRanNothing(t *gotest.T) {
 		})
 	})
 }
+
+func (s *CLIRecordTrustTestSuite) TestAFailureWhoseTestIsGone(t *gotest.T) {
+	const gone = " of the last run name no test any more (records/bad TestBadTestSuite/TestFails"
+	const then = "), so there is nothing to rerun for them; run the packages themselves\n"
+
+	t.When("--failed follows a run of which a failed method was renamed since", func(w *gotest.T) {
+		w.It("runs nothing and exits 1, naming on stderr the failure that names no test any more", func(it *gotest.T) {
+			for sub, r := range gotest.Each(it, []struct {
+				Desc string
+				edit func(*gotest.T, freshTree)
+				says string
+			}{
+				{"one of two renamed, the other fixed", func(t *gotest.T, tr freshTree) {
+					tr.replace(t, "bad/bad_suite_test.go", "TestFails", "TestMoved")
+					tr.replace(t, "bad/bad_suite_test.go", "gotest.Equal(t, 2, 1)", "gotest.Equal(t, 2, 2)")
+				}, "FAIL: --failed: 1 failure(s)" + gone + then},
+				{"the suite renamed", func(t *gotest.T, tr freshTree) {
+					tr.replace(t, "bad/bad_suite_test.go", "BadTestSuite", "WorseTestSuite")
+				}, "FAIL: --failed: 2 failure(s)" + gone + ", records/bad TestBadTestSuite/TestAlsoFails" + then},
+			}) {
+				tr := stageRecords(sub)
+				gotest.Equal(sub, 1, tr.run(sub, "./bad/", "./good/").Exit)
+				r.edit(sub, tr)
+				run := tr.run(sub, "--failed")
+				gotest.Equal(sub, 1, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+				gotest.Empty(sub, run.Stdout)
+				gotest.Contains(sub, run.Stderr, r.says)
+			}
+		})
+		w.It("spec --failed and summary --failed exit 1 with the same line", func(it *gotest.T) {
+			tr := stageRecords(it)
+			gotest.Equal(it, 1, tr.run(it, "./bad/", "./good/").Exit)
+			tr.replace(it, "bad/bad_suite_test.go", "BadTestSuite", "WorseTestSuite")
+			for _, run := range []testkit.Run{tr.run(it, "spec", "--failed", "--no-color"), tr.run(it, "summary", "--failed")} {
+				gotest.Equal(it, 1, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+				gotest.Contains(it, run.Stderr, "FAIL: --failed: 2 failure(s)"+gone)
+			}
+		})
+	})
+}

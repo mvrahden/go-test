@@ -2,17 +2,17 @@ Expect: ^FAIL .*conformance/cli .* / exits 2 before any build, naming the known 
 Clause: when --group or --skip-group names a group no suite declares → exits 2 before any build, naming the known groups
 --- a/internal/gotestrunner/pipeline.go
 +++ b/internal/gotestrunner/pipeline.go
-@@ -298,9 +298,6 @@
+@@ -331,9 +331,6 @@
  			cfg.CI = true
  		}
  	}
 -	if err := overlay.selectGroups(cfg.Groups, cfg.SkipGroups); err != nil {
 -		return PipelineResult{}, err
 -	}
- 	pf := ParseExecFlags(cfg.GoTestArgs)
- 
- 	// Only when seed corpora actually replay in this run: a stale entry is
-@@ -320,7 +317,11 @@
+ 	if refuseGoneReruns(cfg, overlay) {
+ 		return PipelineResult{ExitCode: 1}, nil
+ 	}
+@@ -360,7 +357,11 @@
  			return PipelineResult{}, fmt.Errorf("%s writes one file, and this run starts %d suite processes that would each write it: select one suite of one package with -run '^Test<Suite>$'", name, n)
  		}
  	}
