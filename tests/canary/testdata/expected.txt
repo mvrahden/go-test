@@ -302,3 +302,10 @@ emptyreason exit 1
 emptyreason fail -
 emptyreason fail TestEmptyReasonTestSuite
 emptyreason fail TestEmptyReasonTestSuite/TestEmpty
+eachfailpanic exit 1
+eachfailpanic fail -
+eachfailpanic fail TestEachFailPanicTestSuite
+eachfailpanic fail TestEachFailPanicTestSuite/TestARowPanics
+eachfailpanic fail TestEachFailPanicTestSuite/TestARowPanics/second
+eachfailpanic pass TestEachFailPanicTestSuite/TestARowPanics/first
+eachfailpanic pass TestEachFailPanicTestSuite/TestLater

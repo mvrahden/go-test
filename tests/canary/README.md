@@ -51,6 +51,7 @@ Each directory under `testdata/` is one package with one suite:
 | `fuzzhooks` | a fuzz execution whose `BeforeEach` fails or panics still runs its `AfterEach` |
 | `eachbreak` | a loop that breaks out of an `Each` table stops at the break: no later row runs and the method goes on after the loop |
 | `eachskip` | a skipping `Each` row skips itself and the method, the rows before it pass; a row that skips or fails the method's own `T` ends the method with that verdict alone |
+| `eachfailpanic` | an `Each` row that panics after an assertion on its `T` failed fails with the panic's value at its line and no stack; its method ends there, saying how many rows did not run, and `AfterEach`, the method after it and `AfterAll` run |
 | `hookpanics` | a panic in `BeforeEach` is reported even when `AfterEach` then fails a fatal assertion, for a test method and a fuzz execution |
 | `fuzzskiphook` | a fuzz execution whose `BeforeEach` skips is skipped, its body never runs and its `AfterEach` still runs |
 | `hookoverrun` | a fixture `BeforeEach` or `AfterEach`, or a suite `BeforeEach`, that sleeps or waits on its context past the suite's `Timeout` fails the method, located at the hook and naming it; after a `BeforeEach` that overran, neither a later fixture's `BeforeEach`, the suite's `BeforeEach` nor the body runs, and a hook waiting on its context sees it end |

@@ -1,0 +1,13 @@
+Expect: eachfailpanic: the row does not say its panic
+Judge: ./tests/canary CanaryTestSuite/TestARowPanicAfterAFailureEndsItsMethod
+Clause: when a row of an Each table panics after an assertion on its T failed → fails that row with the panic's value at the line that panicked, and prints no stack
+--- a/pkg/gotest/utils.go
++++ b/pkg/gotest/utils.go
+@@ -138,7 +138,6 @@
+ 	if !tt.Failed() {
+ 		return false
+ 	}
+-	fmt.Fprintln(tt.Output(), located(site, fmt.Sprintf("panic after the row failed: %v", captured.Unwrap())))
+ 	return true
+ }
+ 

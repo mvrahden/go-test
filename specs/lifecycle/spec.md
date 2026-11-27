@@ -6,7 +6,7 @@ How a suite's tests end, the hooks and the body going wrong, FailFast, panics am
 ## Requirements
 
 ### Requirement: A hook or body going wrong
-A suite hook, a fixture's per-method hook or the body that fails, panics or overruns the Timeout SHALL fail the run and its method or suite, located at that hook, and SHALL run the later hooks that release what ran, a fixture's AfterEach only after its BeforeEach returned: after an overrun only AfterEach hooks, after a panic in a method no further method. The cases are the tables in `tests/conformance/lifecycle/hooks_suite_test.go`.
+A suite hook, a fixture's per-method hook or the body that fails, panics or overruns the Timeout SHALL fail the run and its method or suite, located at that hook, and SHALL run the later hooks that release what ran, a fixture's AfterEach only after its BeforeEach returned: after an overrun only AfterEach hooks, after a panic in a method no further method, except the panic of an Each row that had already failed. The cases are the tables in `tests/conformance/lifecycle/hooks_suite_test.go`.
 
 #### Scenario: Each hook and each way it goes wrong
 - **WHEN** a suite hook or the body fails an assertion, panics or overruns the Timeout
@@ -92,6 +92,19 @@ Every row of an Each table SHALL be its own subtest with its own verdict. An ass
 #### Scenario: The loop breaks
 - **WHEN** the loop over an Each table breaks
 - **THEN** stops at the break and the method goes on
+
+### Requirement: A row that panics
+A row that panics after its T failed SHALL fail with the panic's value at the line that panicked, without a stack, and SHALL end the method there as failed, the method naming the row and how many rows after it did not run; AfterEach, the methods after it and AfterAll SHALL run as after any failed method. A row that panics before its T failed SHALL end the suite as a panic in the method's body does.
+
+#### Scenario: A row panics after it failed
+- **WHEN** a row of an Each table panics after an assertion on its T failed
+- **THEN** fails that row with the panic's value at the line that panicked, and prints no stack
+- **AND** ends the method there as failed, naming the row and how many rows after it did not run
+- **AND** runs AfterEach, the method after it and AfterAll
+
+#### Scenario: Every way a row fails before it panics
+- **WHEN** a row panics after it failed in a helper given its T, on NewTWithDeadline of it, in Eventually given it or in an It on it
+- **THEN** the method ends there as failed and the method after it runs
 
 ### Requirement: Goroutines started by gotest.Go
 A fatal assertion on a goroutine started by gotest.Go SHALL fail the method at the wait, a skip there SHALL skip the method at the wait, and a goroutine that leaves through runtime.Goexit with neither SHALL fail the method with a message that says so; the wait SHALL be held to the method's declared Timeout, and no other cleanup of the method SHALL be.

@@ -336,6 +336,31 @@ func (s *CanaryTestSuite) TestEachRowsGoOnPastAFailure(t *gotest.T) {
 	}
 }
 
+// A row that panics after an assertion on its T failed ends its own method:
+// the row says the panic at its line, with no stack, the method says where
+// it ended, and AfterEach, the method after it and AfterAll run.
+func (s *CanaryTestSuite) TestARowPanicAfterAFailureEndsItsMethod(t *gotest.T) {
+	r := s.check(t, "eachfailpanic")
+	data, _ := os.ReadFile(filepath.Join(r.dir, testkit.MarkersFile))
+	got := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if !slices.Contains(got, "later method") {
+		t.Errorf("eachfailpanic: the method after a row that panicked after it failed did not run: %v", got)
+	}
+	want := []string{"row first", "row second", "after each TestEachFailPanicTestSuite/TestARowPanics", "later method", "after each TestEachFailPanicTestSuite/TestLater", "after all"}
+	if !slices.Equal(got, want) {
+		t.Errorf("eachfailpanic: markers %v, want %v", got, want)
+	}
+	if !strings.Contains(r.stream, "eachfailpanic_suite_test.go:37: panic after the row failed: runtime error: invalid memory address or nil pointer dereference") {
+		t.Errorf("eachfailpanic: the row does not say its panic")
+	}
+	if !strings.Contains(r.stream, "eachfailpanic_suite_test.go:34: ended at row second: it panicked after it failed; rows after it not run: 1") {
+		t.Errorf("eachfailpanic: the method does not say how many rows did not run")
+	}
+	if strings.Contains(r.stream, "goroutine ") || strings.Contains(r.stderr, "goroutine ") {
+		t.Errorf("eachfailpanic: the run printed a stack")
+	}
+}
+
 // A failure inside a helper names the helper's line and the caller's, also
 // under -trimpath in a module whose path has no dot, which the standard
 // library's import paths resemble.

@@ -3,9 +3,9 @@ Judge: ./tests/canary CanaryTestSuite/TestEachRowsGoOnPastAFailure
 Clause: when one row of an Each table fails → fails that row and the method, and the rows after it still run
 --- a/pkg/gotest/utils.go
 +++ b/pkg/gotest/utils.go
-@@ -103,7 +103,6 @@
- 	func() {
- 		defer func() { captured = capturedFrom(recover(), "Each entry") }()
+@@ -122,7 +122,6 @@
+ 			captured = capturedFrom(v, "Each entry")
+ 		}()
  		row := parent.sub(tt)
 -		row.soft = true
  		result = yield(row, entry)

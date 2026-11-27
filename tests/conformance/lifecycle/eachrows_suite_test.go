@@ -7,8 +7,9 @@ import (
 
 // EachRowsTestSuite: every row of an Each table is its own subtest with its
 // own verdict; a failing assertion in a row, a helper's, a deadline T's or
-// a poll's included, lets the row and the next row run, and a row that leaves
-// early ends the method there.
+// a poll's included, lets the row and the next row run, a row that leaves
+// early ends the method there, and a row that panics after it failed ends its
+// method, not the suite.
 type EachRowsTestSuite struct{}
 
 func (s *EachRowsTestSuite) SuiteConfig() gotest.SuiteConfig {
@@ -93,6 +94,45 @@ func (s *EachRowsTestSuite) TestRowsAreSubtests(t *gotest.T) {
 			gotest.Contains(it, run.Markers, "break first")
 			gotest.NotContains(it, run.Markers, "break second")
 			gotest.Contains(it, run.Markers, "after the break")
+		})
+	})
+	t.When("a row of an Each table panics after an assertion on its T failed", func(w *gotest.T) {
+		const method = "TestEachRowsTestSuite/TestARowPanicsAfterFailing"
+		w.It("fails that row with the panic's value at the line that panicked, and prints no stack", func(it *gotest.T) {
+			gotest.Equal(it, "pass", run.Verdict(method+"/first"))
+			gotest.Equal(it, "fail", run.Verdict(method+"/second"))
+			gotest.Contains(it, run.Stdout, "eachrows_suite_test.go:135: panic after the row failed: runtime error: invalid memory address or nil pointer dereference")
+			gotest.NotContains(it, run.Stdout, "goroutine ")
+			gotest.NotContains(it, run.Stdout+run.Stderr, "recovered from Each entry")
+		})
+		w.It("ends the method there as failed, naming the row and how many rows after it did not run", func(it *gotest.T) {
+			gotest.Equal(it, "fail", run.Verdict(method))
+			gotest.Empty(it, run.Verdict(method+"/third"))
+			gotest.Contains(it, run.Markers, "panic second")
+			gotest.NotContains(it, run.Markers, "panic third")
+			gotest.NotContains(it, run.Markers, "after the panic")
+			gotest.Contains(it, run.Stdout, "eachrows_suite_test.go:132: ended at row second: it panicked after it failed; rows after it not run: 2")
+		})
+		w.It("runs AfterEach, the method after it and AfterAll", func(it *gotest.T) {
+			gotest.True(it, run.MarkerOrder("after each "+method, "the method after the panics", "after all"), "markers: %v", run.Markers)
+			gotest.Equal(it, "pass", run.Verdict("TestEachRowsTestSuite/TestTheMethodAfterThePanics"))
+		})
+	})
+	t.When("a row panics after it failed in a helper given its T, on NewTWithDeadline of it, in Eventually given it or in an It on it", func(w *gotest.T) {
+		w.It("the method ends there as failed and the method after it runs", func(it *gotest.T) {
+			for method, value := range map[string]string{
+				"TestPanicAfterAHelper":    "after the helper",
+				"TestPanicAfterADeadline":  "after the deadline T",
+				"TestPanicAfterEventually": "after Eventually",
+				"TestPanicAfterAnIt":       "after the It",
+			} {
+				gotest.Equal(it, "fail", run.Verdict("TestEachRowsTestSuite/"+method+"/first"), method)
+				gotest.Equal(it, "fail", run.Verdict("TestEachRowsTestSuite/"+method), method)
+				gotest.Contains(it, run.Stdout, "panic after the row failed: "+value)
+				gotest.Contains(it, run.Markers, "after each TestEachRowsTestSuite/"+method)
+			}
+			gotest.Contains(it, run.Stdout, "ended at row first: it panicked after it failed\\n")
+			gotest.Equal(it, "pass", run.Verdict("TestEachRowsTestSuite/TestTheMethodAfterThePanics"))
 		})
 	})
 }

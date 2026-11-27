@@ -1273,6 +1273,9 @@ shards of one run do not add up to every mutant exactly once.
 | `mutate-ignore-without-a-reason-keeps` | a comment without a reason keeps its function | audit conformance: the reasonless It finds Half's mutant ignored |
 | `mutate-ignores-unrecorded` | a record lists no mutate-ignore comment | audit conformance: the record It finds none |
 | `mutate-ignores-not-compared` | mutate-ignore comments are left out of the comparison | audit conformance: the suppression It finds no finding |
+| `failed-row-panic-ends-the-suite` | a panic in an Each row that had failed is raised again past the method | canary: the eachfailpanic method after the panicking row never runs |
+| `failed-row-panic-unsaid` | a failed Each row that panics does not report the panic | canary: the eachfailpanic row's output lacks the panic's value and line |
+| `failed-row-panic-rows-uncounted` | a method ended by a failed row's panic does not say how many rows were left | canary: the eachfailpanic method's line lacks the count of rows not run |
 
 ## Adding a mutant
 

@@ -1,0 +1,14 @@
+Expect: eachfailpanic: the method does not say how many rows did not run
+Judge: ./tests/canary CanaryTestSuite/TestARowPanicAfterAFailureEndsItsMethod
+Clause: when a row of an Each table panics after an assertion on its T failed → ends the method there as failed, naming the row and how many rows after it did not run
+--- a/pkg/gotest/utils.go
++++ b/pkg/gotest/utils.go
+@@ -90,7 +90,7 @@
+ 		close(done)
+ 		<-finished
+ 		if ended {
+-			logAtUser(parent.t, rowPanicEnded(name, rest))
++			logAtUser(parent.t, rowPanicEnded(name, 0))
+ 			parent.t.FailNow()
+ 		}
+ 		if captured != nil {
