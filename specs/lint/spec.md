@@ -180,7 +180,7 @@ Lint --github SHALL escape each annotation's message and properties as a workflo
 - **THEN** lint refuses it with exit 2, naming the value
 
 ### Requirement: Assertion rewrites keep the verdict
-An assertion rewrite SHALL leave the test's verdict as it was, and lint SHALL offer no fix where the operand's type would change the verdict; the operand types and assertions are the table in tests/conformance/lint/rewrites_suite_test.go. Lint SHALL report an assertion as redundant only where both check the same operand and every argument of both is a name, field, element or literal, which evaluating cannot change.
+An assertion rewrite SHALL leave the test's verdict as it was, and lint SHALL offer no fix where the operand's type would change the verdict; the operand types and assertions are the table in tests/conformance/lint/rewrites_suite_test.go.
 
 #### Scenario: Nil checks
 - **WHEN** an assertion checks an operand against nil
@@ -220,10 +220,14 @@ An assertion rewrite SHALL leave the test's verdict as it was, and lint SHALL of
 - **WHEN** ErrorIs is given a nil target or ErrorContains an empty substring
 - **THEN** the assertion the guard names is offered without a fix
 
+### Requirement: Assertions reported as redundant
+Lint SHALL report an assertion as redundant only where both check the same operand and every argument of both is a name, field, element or literal, which evaluating cannot change. It SHALL report a NotNil as redundant only for an operand of a pointer, channel, slice, map or func type.
+
 #### Scenario: Redundant assertions
 - **WHEN** an assertion is followed by one that checks the same operand
 - **THEN** the first is removed only where the second fails on every input the first fails
 - **AND** operands that call a function or receive from a channel are left unreported, since each assertion evaluates its own
+- **AND** a NotNil of an interface, or of a type parameter with no core type, is left unreported, since it fails values the second accepts
 
 ### Requirement: Failure guards on an Each row
 fail-guard SHALL leave unreported a guard whose failing call is given an Each row's T, the first variable of a `range gotest.Each` loop or a plain alias of it, where the guard ends the method with FailNow or a return or holds more than one condition, as an or-chain or an else-if chain. A guard of one condition whose Fail or Errorf goes on SHALL be reported with its fix and no claim that an assertion halts.

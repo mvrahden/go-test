@@ -56,19 +56,20 @@ type rewriteRow struct {
 }
 
 const (
-	groupConcrete  = "concrete"
-	groupInterface = "interface"
-	groupCore      = "core"
-	groupBool      = "bool"
-	groupErrorMsg  = "errormsg"
-	groupOrdering  = "ordering"
-	groupLen       = "len"
-	groupEquality  = "equality"
-	groupTypeArgs  = "typeargs"
-	groupErrorsIs  = "errorsis"
-	groupGuards    = "guards"
-	groupRedundant = "redundant"
-	groupImpure    = "impure"
+	groupConcrete       = "concrete"
+	groupInterface      = "interface"
+	groupCore           = "core"
+	groupBool           = "bool"
+	groupErrorMsg       = "errormsg"
+	groupOrdering       = "ordering"
+	groupLen            = "len"
+	groupEquality       = "equality"
+	groupTypeArgs       = "typeargs"
+	groupErrorsIs       = "errorsis"
+	groupGuards         = "guards"
+	groupRedundant      = "redundant"
+	groupRedundantIface = "redundantiface"
+	groupImpure         = "impure"
 )
 
 const (
@@ -210,6 +211,23 @@ var rewriteRows = []rewriteRow{
 		body: "b := box{items: []int{1}}\n\tgotest.NotNil(t, b.items)\n\tgotest.Contains(t, b.items, 1)", rules: []string{redundant}, gone: "gotest.NotNil(t, b.items)", verdict: "pass"},
 	{Desc: "NotEmpty of a map element before Len", group: groupRedundant,
 		body: "m := map[string][]int{\"k\": {1}}\n\tgotest.NotEmpty(t, m[\"k\"])\n\tgotest.Len(t, m[\"k\"], 1)", rules: []string{redundant}, gone: "gotest.NotEmpty(t, m[\"k\"])", verdict: "pass"},
+	{Desc: "NotNil of a slice before Len", group: groupRedundant,
+		body: "s := []int{1}\n\tgotest.NotNil(t, s)\n\tgotest.Len(t, s, 1)", rules: []string{redundant}, gone: "gotest.NotNil(t, s)", verdict: "pass"},
+	{Desc: "NotNil of a slice before NotEmpty", group: groupRedundant,
+		body: "s := []int{1}\n\tgotest.NotNil(t, s)\n\tgotest.NotEmpty(t, s)", rules: []string{redundant}, gone: "gotest.NotNil(t, s)", verdict: "pass"},
+	{Desc: "NotNil of a type parameter over []int before Contains", group: groupRedundant, decls: "func check[P ~[]int](t *testing.T, p P) {\n\tgotest.NotNil(t, p)\n\tgotest.Contains(t, p, 1)\n}\n",
+		body: "check(t, []int{1})", rules: []string{redundant}, gone: "gotest.NotNil(t, p)", verdict: "pass"},
+
+	// NotNil fails its type guard on what an interface or a type parameter
+	// holds; the assertion after it accepts the value.
+	{Desc: "NotNil of an any holding a string before Len", group: groupRedundantIface,
+		body: "m := map[string]any{\"name\": \"abc\"}\n\tgotest.NotNil(t, m[\"name\"])\n\tgotest.Len(t, m[\"name\"], 3)", rules: []string{simplify}, verdict: "fail"},
+	{Desc: "NotNil of an any holding a string before NotEmpty", group: groupRedundantIface,
+		body: "var v any = \"abc\"\n\tgotest.NotNil(t, v)\n\tgotest.NotEmpty(t, v)", rules: []string{simplify}, verdict: "fail"},
+	{Desc: "NotNil of an any holding a string before Contains", group: groupRedundantIface,
+		body: "var v any = \"abc\"\n\tgotest.NotNil(t, v)\n\tgotest.Contains(t, v, \"b\")", rules: []string{simplify}, verdict: "fail"},
+	{Desc: "NotNil of a type parameter holding a string before NotEmpty", group: groupRedundantIface, decls: "func check[P any](t *testing.T, p P) {\n\tgotest.NotNil(t, p)\n\tgotest.NotEmpty(t, p)\n}\n",
+		body: "check(t, \"abc\")", verdict: "fail"},
 
 	// Each assertion evaluates its own operand: a call or a receive is no repeat.
 	{Desc: "NotEmpty of a call before Len of the same call", group: groupImpure,
@@ -378,6 +396,9 @@ func (s *LinterRewritesTestSuite) TestRedundancies(t *gotest.T) {
 		})
 		w.It("operands that call a function or receive from a channel are left unreported, since each assertion evaluates its own", func(it *gotest.T) {
 			s.checkRows(it, groupImpure)
+		})
+		w.It("a NotNil of an interface, or of a type parameter with no core type, is left unreported, since it fails values the second accepts", func(it *gotest.T) {
+			s.checkRows(it, groupRedundantIface)
 		})
 	})
 }

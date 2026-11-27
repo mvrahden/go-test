@@ -854,6 +854,7 @@ shards of one run do not add up to every mutant exactly once.
 | `lint-errors-is-fixed` | `True(errors.Is(err, target))` gets an `ErrorIs` fix | conformance: the lint It for `errors.Is` finds the nil-target row's verdict changed |
 | `lint-guard-fixed` | `ErrorIs` with a nil target is rewritten into `NoError` | conformance: the lint It for guards finds the row's verdict changed |
 | `lint-redundant-notnil-unguarded` | a `NotNil` that fails its type guard is removed as redundant | conformance: the lint It for redundant assertions finds the string row's verdict changed |
+| `lint-redundant-notnil-of-an-interface` | a `NotNil` of an interface or of a type parameter with no core type is removed as redundant | conformance: the lint It for such operands finds the `NotNil` removed and the verdict changed |
 | `lint-redundant-impure-operand` | an assertion before one on the same call or receive is removed as redundant | conformance: the lint It for impure operands finds the call rows' verdicts changed |
 | `lint-redundant-impure-argument` | only the checked operand must be pure; a call among the other arguments may write it | conformance: the lint It for impure operands finds the target-call row's verdict changed |
 | `lint-bool-rewrite-any-operand` | `Equal(t, true, v)` becomes `True(t, v)` whatever `v`'s type | conformance: the lint It for bool literals sees the fix for a named bool and an `any` fail to compile |

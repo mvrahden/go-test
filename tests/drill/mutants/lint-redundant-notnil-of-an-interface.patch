@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterRewrites .* / a NotNil of an interface, or of a type parameter with no core type, is left unreported, since it fails values the second accepts( / .*)? \(
+Clause: when an assertion is followed by one that checks the same operand → a NotNil of an interface, or of a type parameter with no core type, is left unreported, since it fails values the second accepts
+--- a/internal/lint/redundant.go
++++ b/internal/lint/redundant.go
+@@ -114,7 +114,7 @@
+ 	weaker, stronger, strongerCall := first.name, second.name, second.call
+ 	if weaker == "NotNil" {
+ 		// Only a pointer, channel, slice, map or func fails NotNil exactly when nil.
+-		if k := nilKindOf(pass, first.guardedArg); k != comparableNil && k != uncomparableNil {
++		if k := nilKindOf(pass, first.guardedArg); k == notNilable {
+ 			return ""
+ 		}
+ 	}
