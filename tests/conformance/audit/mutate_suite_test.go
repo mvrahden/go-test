@@ -265,7 +265,12 @@ func (s *AuditMutateTestSuite) TestTheMutationBudget(t *gotest.T) {
 		w.It("names the budget and the time spent", func(it *gotest.T) {
 			doc := readMutation(it, s.spent)
 			gotest.Equal(it, "1ns", doc.Mutation.Budget)
-			gotest.Equal(it, "0s", doc.Mutation.Spent)
+			// A coarse clock reads the 1ns as unspent and lets one mutant
+			// start, so the time is whatever its stopped run took.
+			spent, err := time.ParseDuration(doc.Mutation.Spent)
+			gotest.NoError(it, err)
+			gotest.NotEqual(it, doc.Mutation.Budget, doc.Mutation.Spent)
+			gotest.Less(it, spent, time.Minute)
 			gotest.Equal(it, "3m0s", readMutation(it, s.json).Mutation.Budget)
 		})
 	})
