@@ -10,6 +10,10 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
+// rawCheck is what a raw check declares on its test: it asserts without
+// gotest's assertions, which a broken kernel could not pass.
+const rawCheck = "a raw check of ring 0"
+
 // fatalf records a failure and halts the test through testing.T alone.
 func fatalf(t *gotest.T, format string, args ...any) {
 	t.Errorf(format, args...)
@@ -19,6 +23,7 @@ func fatalf(t *gotest.T, format string, args ...any) {
 // mustFail checks that a kernel verdict is a failure message carrying every
 // expected fragment.
 func mustFail(t *gotest.T, verdict, what string, fragments ...string) {
+	t.AssertsBy(rawCheck)
 	if verdict == "" {
 		fatalf(t, "expected a failure message for %s", what)
 	}
@@ -31,6 +36,7 @@ func mustFail(t *gotest.T, verdict, what string, fragments ...string) {
 
 // mustPass checks that a kernel verdict is the empty success string.
 func mustPass(t *gotest.T, verdict, what string) {
+	t.AssertsBy(rawCheck)
 	if verdict != "" {
 		t.Errorf("expected no failure for %s, got: %q", what, verdict)
 	}

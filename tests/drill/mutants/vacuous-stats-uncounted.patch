@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/spec .* / stats count the vacuous leaves \(
+Clause: when a run holds leaves that pass with assertions, pass with none and fail with none → stats count the vacuous leaves
+--- a/internal/gotestspec/tree.go
++++ b/internal/gotestspec/tree.go
+@@ -929,9 +929,6 @@
+ // countAssertions counts a leaf as vacuous, as asserting by other means and
+ // as excluded.
+ func countAssertions(n *Node, s *Stats, excluded bool) {
+-	if n.Vacuous() {
+-		s.Vacuous++
+-	}
+ 	if n.AssertsBy != "" {
+ 		s.AssertsBy++
+ 	}

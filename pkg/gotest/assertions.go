@@ -56,6 +56,7 @@ type regexpPattern interface {
 
 // Consistently asserts that fn passes on every poll for the entire waitFor duration.
 func Consistently(t testingT, waitFor, tick time.Duration, fn func(poll *R)) {
+	countAssertion(t)
 	if !pollArgs(t, "Consistently", waitFor, tick) {
 		return
 	}
@@ -169,6 +170,7 @@ func sleepUntil(at time.Time) {
 
 // Contains asserts that haystack contains needle (substring for strings, element for slices/arrays, key for maps).
 func Contains(t testingT, haystack, needle any, msgAndArgs ...any) {
+	countAssertion(t)
 	found, guard := assert.IncludesElement(haystack, needle)
 	if guard != "" {
 		fail(t, "Contains failed:\n  "+guard, msgAndArgs)
@@ -181,6 +183,7 @@ func Contains(t testingT, haystack, needle any, msgAndArgs ...any) {
 
 // ElementsMatch asserts that a and b contain the same elements regardless of order.
 func ElementsMatch[V comparable](t testingT, a, b []V, msgAndArgs ...any) {
+	countAssertion(t)
 	if msg := assert.CheckElementsMatch(a, b); msg != "" {
 		fail(t, msg, msgAndArgs)
 	}
@@ -192,6 +195,7 @@ func ElementsMatch[V comparable](t testingT, a, b []V, msgAndArgs ...any) {
 // a pointer to a struct or a number included (e.g. int, bool, func, *T); use Nil
 // or Zero instead.
 func Empty(t testingT, object any, msgAndArgs ...any) {
+	countAssertion(t)
 	if !assert.IsEmptyable(object) {
 		guard := "Empty: type %T cannot be empty; for nil checks, use Nil; for zero-value checks, use Zero"
 		if reflect.ValueOf(object).Kind() == reflect.Ptr {
@@ -207,6 +211,7 @@ func Empty(t testingT, object any, msgAndArgs ...any) {
 
 // Equal asserts that expected and actual are deeply equal.
 func Equal[V any](t testingT, expected, actual V, msgAndArgs ...any) {
+	countAssertion(t)
 	if msg := assert.CheckEqual(expected, actual); msg != "" {
 		fail(t, msg, msgAndArgs)
 	}
@@ -214,6 +219,7 @@ func Equal[V any](t testingT, expected, actual V, msgAndArgs ...any) {
 
 // Error asserts that err is not nil.
 func Error(t testingT, err error, msgAndArgs ...any) {
+	countAssertion(t)
 	if err == nil {
 		fail(t, "Error failed:\n  expected an error but got nil", msgAndArgs)
 	}
@@ -221,6 +227,7 @@ func Error(t testingT, err error, msgAndArgs ...any) {
 
 // ErrorAs asserts that the error chain of err contains a value of type E and returns it.
 func ErrorAs[E error](t testingT, err error, msgAndArgs ...any) E {
+	countAssertion(t)
 	var target E
 	if !errors.As(err, &target) {
 		fail(t, fmt.Sprintf("ErrorAs failed:\n  error %v: nothing in its chain is of type %s", err, reflect.TypeFor[E]()), msgAndArgs)
@@ -231,6 +238,7 @@ func ErrorAs[E error](t testingT, err error, msgAndArgs ...any) E {
 // ErrorContains asserts that err is not nil and its message contains the given substring.
 // Fails with a type guard error when substr is empty; for non-nil error checks use Error.
 func ErrorContains(t testingT, err error, substr string, msgAndArgs ...any) {
+	countAssertion(t)
 	if substr == "" {
 		fail(t, "ErrorContains: contains is empty; for non-nil error checks, use Error", msgAndArgs)
 		return
@@ -247,6 +255,7 @@ func ErrorContains(t testingT, err error, substr string, msgAndArgs ...any) {
 // ErrorIs asserts that errors.Is(err, target) is true.
 // Fails with a type guard error when target is nil; for nil error checks use NoError.
 func ErrorIs(t testingT, err, target error, msgAndArgs ...any) {
+	countAssertion(t)
 	if target == nil {
 		fail(t, "ErrorIs: target is nil; for nil error checks, use NoError", msgAndArgs)
 		return
@@ -258,6 +267,7 @@ func ErrorIs(t testingT, err, target error, msgAndArgs ...any) {
 
 // Eventually asserts that fn passes without assertion failures within waitFor, polling every tick.
 func Eventually(t testingT, waitFor, tick time.Duration, fn func(poll *R)) {
+	countAssertion(t)
 	if !pollArgs(t, "Eventually", waitFor, tick) {
 		return
 	}
@@ -284,11 +294,13 @@ func Eventually(t testingT, waitFor, tick time.Duration, fn func(poll *R)) {
 
 // Fail immediately fails the test.
 func Fail(t testingT, msgAndArgs ...any) {
+	countAssertion(t)
 	fail(t, "Fail", msgAndArgs)
 }
 
 // False asserts that value is false.
 func False(t testingT, value bool, msgAndArgs ...any) {
+	countAssertion(t)
 	if value {
 		fail(t, "False failed:\n  expected: false\n  actual:   true", msgAndArgs)
 	}
@@ -296,6 +308,7 @@ func False(t testingT, value bool, msgAndArgs ...any) {
 
 // Greater asserts that a > b.
 func Greater[V cmp.Ordered](t testingT, a, b V, msgAndArgs ...any) {
+	countAssertion(t)
 	if msg := assert.CheckGreater(a, b); msg != "" {
 		fail(t, msg, msgAndArgs)
 	}
@@ -303,6 +316,7 @@ func Greater[V cmp.Ordered](t testingT, a, b V, msgAndArgs ...any) {
 
 // GreaterOrEqual asserts that a >= b.
 func GreaterOrEqual[V cmp.Ordered](t testingT, a, b V, msgAndArgs ...any) {
+	countAssertion(t)
 	if msg := assert.CheckGreaterOrEqual(a, b); msg != "" {
 		fail(t, msg, msgAndArgs)
 	}
@@ -310,6 +324,7 @@ func GreaterOrEqual[V cmp.Ordered](t testingT, a, b V, msgAndArgs ...any) {
 
 // InDelta asserts that expected and actual differ by at most delta.
 func InDelta[V numeric](t testingT, expected, actual V, delta float64, msgAndArgs ...any) {
+	countAssertion(t)
 	if msg := assert.CheckInDelta(expected, actual, delta); msg != "" {
 		fail(t, msg, msgAndArgs)
 	}
@@ -321,6 +336,7 @@ func InDelta[V numeric](t testingT, expected, actual V, delta float64, msgAndArg
 // encoding.TextMarshaler; text with invalid UTF-8 fails, naming the byte. Any
 // other value is marshaled first.
 func JSONEq(t testingT, expected, actual any, msgAndArgs ...any) {
+	countAssertion(t)
 	expNorm, err := assert.NormalizeJSON(expected)
 	if err != nil {
 		fail(t, fmt.Sprintf("JSONEq failed:\n  could not normalize expected: %v", err), msgAndArgs)
@@ -340,6 +356,7 @@ func JSONEq(t testingT, expected, actual any, msgAndArgs ...any) {
 
 // Len asserts that object has the given length. Applies to slices, arrays, maps, channels, and strings.
 func Len(t testingT, object any, length int, msgAndArgs ...any) {
+	countAssertion(t)
 	if object == nil {
 		fail(t, fmt.Sprintf("Len failed:\n  object is nil, expected length %d", length), msgAndArgs)
 		return
@@ -356,6 +373,7 @@ func Len(t testingT, object any, length int, msgAndArgs ...any) {
 
 // Less asserts that a < b.
 func Less[V cmp.Ordered](t testingT, a, b V, msgAndArgs ...any) {
+	countAssertion(t)
 	if msg := assert.CheckLess(a, b); msg != "" {
 		fail(t, msg, msgAndArgs)
 	}
@@ -363,6 +381,7 @@ func Less[V cmp.Ordered](t testingT, a, b V, msgAndArgs ...any) {
 
 // LessOrEqual asserts that a <= b.
 func LessOrEqual[V cmp.Ordered](t testingT, a, b V, msgAndArgs ...any) {
+	countAssertion(t)
 	if msg := assert.CheckLessOrEqual(a, b); msg != "" {
 		fail(t, msg, msgAndArgs)
 	}
@@ -370,6 +389,7 @@ func LessOrEqual[V cmp.Ordered](t testingT, a, b V, msgAndArgs ...any) {
 
 // NoError asserts that err is nil.
 func NoError(t testingT, err error, msgAndArgs ...any) {
+	countAssertion(t)
 	if err != nil {
 		fail(t, "NoError failed:\n  unexpected error: "+assert.ErrorText(err), msgAndArgs)
 	}
@@ -377,6 +397,7 @@ func NoError(t testingT, err error, msgAndArgs ...any) {
 
 // NotContains asserts that haystack does NOT contain needle.
 func NotContains(t testingT, haystack, needle any, msgAndArgs ...any) {
+	countAssertion(t)
 	found, guard := assert.IncludesElement(haystack, needle)
 	if guard != "" {
 		fail(t, "NotContains failed:\n  "+guard, msgAndArgs)
@@ -390,6 +411,7 @@ func NotContains(t testingT, haystack, needle any, msgAndArgs ...any) {
 // Nil asserts that object is nil. Intended for non-comparable nilable types (slices, maps, funcs).
 // Fails with a type guard error for non-nilable types; for comparable nilables use Zero.
 func Nil(t testingT, object any, msgAndArgs ...any) {
+	countAssertion(t)
 	if !assert.IsNilable(object) {
 		fail(t, fmt.Sprintf("Nil: type %T is not nilable; for zero-value checks, use Zero", object), msgAndArgs)
 		return
@@ -405,6 +427,7 @@ func Nil(t testingT, object any, msgAndArgs ...any) {
 // guard error, a pointer to a struct or a number included (e.g. int, bool, func,
 // *T); use NotNil or NotZero instead.
 func NotEmpty(t testingT, object any, msgAndArgs ...any) {
+	countAssertion(t)
 	if !assert.IsEmptyable(object) {
 		guard := "NotEmpty: type %T cannot be empty; for nil checks, use NotNil; for zero-value checks, use NotZero"
 		if reflect.ValueOf(object).Kind() == reflect.Ptr {
@@ -421,6 +444,7 @@ func NotEmpty(t testingT, object any, msgAndArgs ...any) {
 // NotNil asserts that object is not nil. Intended for non-comparable nilable types (slices, maps, funcs).
 // Fails with a type guard error for non-nilable types; for comparable nilables use NotZero.
 func NotNil(t testingT, object any, msgAndArgs ...any) {
+	countAssertion(t)
 	if !assert.IsNilable(object) {
 		fail(t, fmt.Sprintf("NotNil: type %T is not nilable; for zero-value checks, use NotZero", object), msgAndArgs)
 		return
@@ -432,6 +456,7 @@ func NotNil(t testingT, object any, msgAndArgs ...any) {
 
 // NotEqual asserts that expected and actual are NOT deeply equal.
 func NotEqual[V any](t testingT, expected, actual V, msgAndArgs ...any) {
+	countAssertion(t)
 	if msg := assert.CheckNotEqual(expected, actual); msg != "" {
 		fail(t, msg, msgAndArgs)
 	}
@@ -440,6 +465,7 @@ func NotEqual[V any](t testingT, expected, actual V, msgAndArgs ...any) {
 // Same asserts that expected and actual are the same pointer. Equal on
 // pointers compares what they point at; Same compares where they point.
 func Same[V any](t testingT, expected, actual *V, msgAndArgs ...any) {
+	countAssertion(t)
 	if expected != actual {
 		fail(t, fmt.Sprintf("Same failed:\n  expected: %p\n  actual:   %p", expected, actual), msgAndArgs)
 	}
@@ -447,6 +473,7 @@ func Same[V any](t testingT, expected, actual *V, msgAndArgs ...any) {
 
 // NotSame asserts that expected and actual are distinct pointers.
 func NotSame[V any](t testingT, expected, actual *V, msgAndArgs ...any) {
+	countAssertion(t)
 	if expected == actual {
 		fail(t, fmt.Sprintf("NotSame failed:\n  both: %p", actual), msgAndArgs)
 	}
@@ -454,6 +481,7 @@ func NotSame[V any](t testingT, expected, actual *V, msgAndArgs ...any) {
 
 // NotZero asserts that value is NOT the zero value for its type.
 func NotZero[V comparable](t testingT, value V, msgAndArgs ...any) {
+	countAssertion(t)
 	var zero V
 	if value == zero {
 		fail(t, fmt.Sprintf("NotZero failed:\n  value is the zero value: %#v", value), msgAndArgs)
@@ -462,6 +490,7 @@ func NotZero[V comparable](t testingT, value V, msgAndArgs ...any) {
 
 // Panics asserts that f panics and returns the recovered value.
 func Panics(t testingT, f func(), msgAndArgs ...any) any {
+	countAssertion(t)
 	recovered, didPanic := assert.DidPanic(f)
 	if !didPanic {
 		fail(t, "Panics failed:\n  expected the function to panic but it did not", msgAndArgs)
@@ -471,6 +500,7 @@ func Panics(t testingT, f func(), msgAndArgs ...any) any {
 
 // Regexp asserts that str matches the regular expression pattern rx (string or *regexp.Regexp).
 func Regexp[P regexpPattern](t testingT, rx P, str string, msgAndArgs ...any) {
+	countAssertion(t)
 	var re *regexp.Regexp
 	switch v := any(rx).(type) {
 	case *regexp.Regexp:
@@ -529,6 +559,7 @@ func compilePattern(pattern string) (*regexp.Regexp, error) {
 
 // Subset asserts that every element of subset exists in list.
 func Subset[V comparable](t testingT, list, subset []V, msgAndArgs ...any) {
+	countAssertion(t)
 	if msg := assert.CheckSubset(list, subset); msg != "" {
 		fail(t, msg, msgAndArgs)
 	}
@@ -536,11 +567,17 @@ func Subset[V comparable](t testingT, list, subset []V, msgAndArgs ...any) {
 
 // TimeIsNow asserts that ts is within tolerance of time.Now().
 func TimeIsNow(t testingT, ts time.Time, tolerance time.Duration, msgAndArgs ...any) {
-	TimeWithin(t, time.Now(), ts, tolerance, msgAndArgs...)
+	countAssertion(t)
+	timeWithin(t, time.Now(), ts, tolerance, msgAndArgs)
 }
 
 // TimeWithin asserts that expected and actual are within tolerance of each other.
 func TimeWithin(t testingT, expected, actual time.Time, tolerance time.Duration, msgAndArgs ...any) {
+	countAssertion(t)
+	timeWithin(t, expected, actual, tolerance, msgAndArgs)
+}
+
+func timeWithin(t testingT, expected, actual time.Time, tolerance time.Duration, msgAndArgs []any) {
 	diff := expected.Sub(actual)
 	if diff < 0 {
 		diff = -diff
@@ -552,6 +589,7 @@ func TimeWithin(t testingT, expected, actual time.Time, tolerance time.Duration,
 
 // True asserts that value is true.
 func True(t testingT, value bool, msgAndArgs ...any) {
+	countAssertion(t)
 	if !value {
 		fail(t, "True failed:\n  expected: true\n  actual:   false", msgAndArgs)
 	}
@@ -559,6 +597,7 @@ func True(t testingT, value bool, msgAndArgs ...any) {
 
 // Zero asserts that value is the zero value for its type.
 func Zero[V comparable](t testingT, value V, msgAndArgs ...any) {
+	countAssertion(t)
 	var zero V
 	if value != zero {
 		fail(t, fmt.Sprintf("Zero failed:\n  expected: %#v (zero value)\n  actual:   %#v", zero, value), msgAndArgs)

@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"regexp"
 	"slices"
@@ -40,6 +41,7 @@ type SuiteTarget struct {
 	Group        string   // SuiteConfig.ExclusiveGroup: the scope the suite runs in, "" for the default group
 	FuzzFuncs    []string // generated Fuzz<Suite>_<Method> wrapper names whose seed corpus replays alongside SuiteName in a plain run (ignored when Bench is true or RunFilter is set)
 	Exec         []string // go test's -exec: the command the binary runs under (empty = the binary itself)
+	CountsDir    string   // where a text run's process writes its leaves' assertion counts (empty = it writes none)
 }
 
 // SuiteResult holds the output from running a single suite subprocess.
@@ -60,6 +62,9 @@ type SuiteResult struct {
 	// StoppedBy is the reason the suite process gave for a stop the runner
 	// did not send, such as "signal:SIGTERM"; empty when there was none.
 	StoppedBy string
+	// Counts holds the protocol.LeafCount lines a text run's process wrote;
+	// nil when none was asked for or none was written.
+	Counts []byte
 }
 
 // RunMode controls how a run executes its suites and collects their output.
@@ -287,6 +292,8 @@ func waitRetry(ctx context.Context, d time.Duration) error {
 // outside the group that keeps the pipes open holds the result for the drain
 // delay at most.
 func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2json bool) SuiteResult { //nolint:gocritic // hugeParam: stable API
+	counts, env := askCounts(target, env, test2json)
+	defer removeCounts(counts)
 	start := time.Now()
 	s, err := suiteStart(ctx, target, env, test2json)
 	for retry := time.Duration(0); errors.Is(err, syscall.ETXTBSY) && retry < startRetryLimit; {
@@ -343,6 +350,37 @@ func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2
 		CutShort:    cutShort.Load(),
 		DeadlineCut: deadlineCut,
 		StoppedBy:   mp.StoppedBy(),
+		Counts:      readCounts(counts),
+	}
+}
+
+// askCounts creates the file a text run's suite process writes its leaves'
+// counts to and names it in env; "" and env as given for a process that
+// writes none. testing prints the counts' attributes only under -v.
+func askCounts(target SuiteTarget, env []string, test2json bool) (string, []string) { //nolint:gocritic // hugeParam: as RunSingleSuite
+	if target.CountsDir == "" || test2json || target.Bench {
+		return "", env
+	}
+	f, err := os.CreateTemp(target.CountsDir, "*.jsonl")
+	if err != nil {
+		return "", env
+	}
+	_ = f.Close()
+	return f.Name(), append(slices.Clone(env), protocol.EnvAssertionsFile+"="+f.Name())
+}
+
+// readCounts is what the process wrote to path, nil for none.
+func readCounts(path string) []byte {
+	if path == "" {
+		return nil
+	}
+	data, _ := os.ReadFile(path) //nolint:gosec // G304: the file askCounts created
+	return data
+}
+
+func removeCounts(path string) {
+	if path != "" {
+		_ = os.Remove(path)
 	}
 }
 

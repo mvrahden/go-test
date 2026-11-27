@@ -170,6 +170,7 @@ func (s *EqualTestSuite) TestCheckEqual_UnexportedOnlyDifference_IsDiffed(t *got
 func joinLines(lines ...string) string { return strings.Join(lines, "\n") }
 
 func mustEqualMessage(t *gotest.T, what, got, want string) {
+	t.AssertsBy(rawCheck)
 	if got != want {
 		fatalf(t, "%s: message\n%s\nwant\n%s", what, got, want)
 	}
@@ -470,6 +471,7 @@ func (s *EqualTestSuite) TestCheckEqual_DifferenceBeyondTheLineCap_IsNamed(t *go
 }
 
 func mustNotContain(t *gotest.T, what, got, fragment string) {
+	t.AssertsBy(rawCheck)
 	if strings.Contains(got, fragment) {
 		t.Errorf("%s: message should not contain %q, got: %q", what, fragment, got)
 	}
@@ -684,6 +686,7 @@ func (s *EqualTestSuite) TestCheckEqual_CutRenderings_NameTheFirstDifferingKey(t
 }
 
 func (s *EqualTestSuite) TestCheckEqual_CutRenderings_ShowTheValuesThere(t *gotest.T, _ *ring0Ctx) {
+	t.AssertsBy(rawCheck)
 	a, b := make([]int, 60000), make([]int, 60000)
 	a[59999], b[59999] = 7, 8
 	const want = "the values first differ at [59999]\n  expected there: 7\n  actual there:   8"

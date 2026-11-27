@@ -8,6 +8,10 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest/internal/snapfile"
 )
 
+// rawCheck is what a raw check declares on its test: it asserts without
+// gotest's assertions, which a broken kernel could not pass.
+const rawCheck = "a raw check of ring 0"
+
 // SnapfileTestSuite covers the snapshot file format: parsing, serialization
 // with sorted keys, CRLF tolerance, and the header-injection guard.
 type SnapfileTestSuite struct{}
@@ -23,6 +27,7 @@ type snapfileCtx struct{}
 func (s *SnapfileTestSuite) BeforeEach(t *gotest.T) *snapfileCtx { return &snapfileCtx{} }
 
 func mustSections(t *gotest.T, got []snapfile.Section, want ...snapfile.Section) {
+	t.AssertsBy(rawCheck)
 	if len(got) != len(want) {
 		t.Errorf("sections: got %d, want %d: %#v", len(got), len(want), got)
 		t.FailNow()
@@ -38,6 +43,7 @@ func mustSections(t *gotest.T, got []snapfile.Section, want ...snapfile.Section)
 }
 
 func mustString(t *gotest.T, got, want string) {
+	t.AssertsBy(rawCheck)
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
@@ -102,30 +108,35 @@ func (s *SnapfileTestSuite) TestParse_CRLFLineEndings(t *gotest.T, _ *snapfileCt
 }
 
 func (s *SnapfileTestSuite) TestValidateContent_Clean(t *gotest.T, _ *snapfileCtx) {
+	t.AssertsBy(rawCheck)
 	if err := snapfile.ValidateContent("normal content\nmore lines\n"); err != nil {
 		t.Errorf("clean content rejected: %v", err)
 	}
 }
 
 func (s *SnapfileTestSuite) TestValidateContent_ContainsHeader(t *gotest.T, _ *snapfileCtx) {
+	t.AssertsBy(rawCheck)
 	if err := snapfile.ValidateContent("line\n=== SNAP injected ===\nmore\n"); err == nil {
 		t.Errorf("an embedded header must be rejected")
 	}
 }
 
 func (s *SnapfileTestSuite) TestValidateContent_HeaderOnly(t *gotest.T, _ *snapfileCtx) {
+	t.AssertsBy(rawCheck)
 	if err := snapfile.ValidateContent("=== SNAP injected ==="); err == nil {
 		t.Errorf("a header-only content must be rejected")
 	}
 }
 
 func (s *SnapfileTestSuite) TestValidateContent_PartialHeaderMatch(t *gotest.T, _ *snapfileCtx) {
+	t.AssertsBy(rawCheck)
 	if err := snapfile.ValidateContent("=== SNAP foo ===extra"); err != nil {
 		t.Errorf("a partial header match is not a header: %v", err)
 	}
 }
 
 func (s *SnapfileTestSuite) TestValidateContent_IncompleteHeader(t *gotest.T, _ *snapfileCtx) {
+	t.AssertsBy(rawCheck)
 	if err := snapfile.ValidateContent("=== SNAP foo"); err != nil {
 		t.Errorf("an incomplete header is not a header: %v", err)
 	}

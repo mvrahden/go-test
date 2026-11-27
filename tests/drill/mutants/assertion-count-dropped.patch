@@ -1,0 +1,14 @@
+Expect: assertcount: TestCountTestSuite/TestEverywhere gotest\.assertions is "0"
+Judge: ./tests/canary CanaryTestSuite/TestAssertionsAreCounted
+Clause: when a leaf asserts on its T, its *testing.T, Ts made from them, in a helper, on a gotest.Go goroutine, in a poll and with TimeIsNow → reports one assertion per call, none for what the poll's R asserts
+--- a/pkg/gotest/census.go
++++ b/pkg/gotest/census.go
+@@ -79,7 +79,7 @@
+ 		c = censusOf(v)
+ 	}
+ 	if c != nil {
+-		c.n.Add(1)
++		c.n.Add(0)
+ 	}
+ }
+ 

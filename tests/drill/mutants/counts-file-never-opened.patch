@@ -1,0 +1,14 @@
+Expect: assertcount text: the run ended with <nil>, want exit 1
+Judge: ./tests/canary CanaryTestSuite/TestATextRunReadsTheCounts
+Clause: when --ci runs a package whose only problem is a test that passed without an assertion → fails with exit 1, naming the test on stderr, in a text run with and without -v
+--- a/pkg/gotest/census.go
++++ b/pkg/gotest/census.go
+@@ -64,7 +64,7 @@
+ func openCountsFile() *os.File {
+ 	path, ok := os.LookupEnv(protocol.EnvAssertionsFile)
+ 	_ = os.Unsetenv(protocol.EnvAssertionsFile) // the test's own children are not this run's
+-	if !ok || path == "" || subtestsField == nil {
++	if ok || path == "" || subtestsField == nil {
+ 		return nil
+ 	}
+ 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND, 0) //nolint:gosec // G304: the file the runner created

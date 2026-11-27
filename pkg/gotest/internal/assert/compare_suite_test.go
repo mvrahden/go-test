@@ -77,6 +77,7 @@ func (s *CompareTestSuite) TestCheckLessOrEqual_GreaterFails(t *gotest.T, _ *rin
 }
 
 func (s *CompareTestSuite) TestCheckInDelta_NaNDeltaFailsInShape(t *gotest.T, _ *ring0Ctx) {
+	t.AssertsBy(rawCheck)
 	verdict := assert.CheckInDelta(1.0, 1.0, math.NaN())
 	if !strings.HasPrefix(verdict, "InDelta failed:\n  ") || !strings.Contains(verdict, "delta is NaN") {
 		t.Errorf("a NaN delta: got %q, want an InDelta failed: message naming the NaN delta", verdict)

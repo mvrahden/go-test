@@ -32,6 +32,7 @@ func (s *CanaryBudgetsTestSuite) budgetStopped(t *gotest.T, env ...string) (took
 // Timeout and its 1s SetupTimeout with the headroom, and lingers past it is
 // killed once that budget is spent, not the default's 5m30s.
 func (s *CanaryBudgetsTestSuite) TestAStoppedSuiteIsKilledAtTheBudgetItReported(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	took, _, out, markers := s.budgetStopped(t, "STOPBUDGET_LINGER=75s")
 	if slices.Contains(markers, "lingered") || took < 30*time.Second || took > 60*time.Second {
 		t.Errorf("stopbudget: the suite was not killed at its 32s teardown budget (the run ended %s after the stop, markers %v):\n%s", took, markers, out)
@@ -41,6 +42,7 @@ func (s *CanaryBudgetsTestSuite) TestAStoppedSuiteIsKilledAtTheBudgetItReported(
 // A stopped suite whose reported teardown budget outlasts its 40s linger is
 // left to end on its own.
 func (s *CanaryBudgetsTestSuite) TestAStoppedSuiteWithinItsBudgetEndsOnItsOwn(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	took, _, out, markers := s.budgetStopped(t, "STOPBUDGET_LINGER=40s", "STOPBUDGET_TIMEOUT=2m")
 	if !slices.Contains(markers, "lingered") {
 		t.Errorf("stopbudget: the suite was killed before its teardown budget was spent (the run ended %s after the stop, markers %v):\n%s", took, markers, out)

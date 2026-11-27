@@ -144,7 +144,7 @@ func (s *SharedStopClockTestSuite) TestATimeoutOnEveryPipeline(t *gotest.T) {
 				gotest.Contains(sub, out, "FAIL: global --timeout exceeded after "+budget.String()+" while running: "+pkg+row.running)
 				gotest.Contains(sub, out, row.shows)
 				gotest.NotContains(sub, out, "=== global --timeout")
-				gotest.NotContains(sub, out, "census")
+				gotest.NotContains(sub, out, "census:")
 				gotest.Contains(sub, run.Markers, "shared.AfterAll ends", out)
 			}
 		})

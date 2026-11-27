@@ -17,5 +17,5 @@ func (s *AppTestSuite) AfterAll(t *gotest.T)   {}
 func (s *AppTestSuite) BeforeEach(t *gotest.T) {}
 func (s *AppTestSuite) AfterEach(t *gotest.T)  {}
 
-func (s *AppTestSuite) TestCreate(t *gotest.T) { DoWork() }
-func (s *AppTestSuite) TestDelete(t *gotest.T) { DoWork() }
+func (s *AppTestSuite) TestCreate(t *gotest.T) { gotest.NotZero(t, s.App); DoWork() }
+func (s *AppTestSuite) TestDelete(t *gotest.T) { gotest.NotZero(t, s.App); DoWork() }

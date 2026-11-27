@@ -19,6 +19,7 @@ func (s *PanicSiteTestSuite) SuiteConfig() gotest.SuiteConfig {
 }
 
 func (s *PanicSiteTestSuite) TestAMethodPanicCarriesNoSecondStack(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	var got any
 	func() {
 		defer func() { got = recover() }()

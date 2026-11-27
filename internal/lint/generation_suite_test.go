@@ -22,11 +22,13 @@ func (s *GenerationRejectsTestSuite) SuiteConfig() gotest.SuiteConfig {
 func (s *GenerationRejectsTestSuite) TestGenerationRejects(t *gotest.T) {
 	t.When("a suite holds what the generator rejects", func(w *gotest.T) {
 		w.It("reports each rejection with the generator's message, except on a line another rule reported", func(it *gotest.T) {
+			it.AssertsBy(byAnalysistest)
 			analysistest.Run(it.T(), analysistest.TestData(), lint.Analyzer, "withgeneration")
 		})
 	})
 	t.When("a type named like a suite declares no case", func(w *gotest.T) {
 		w.It("reports it at its declaration, and not a suite whose only case is excluded", func(it *gotest.T) {
+			it.AssertsBy(byAnalysistest)
 			analysistest.Run(it.T(), analysistest.TestData(), lint.Analyzer, "withcaseless")
 		})
 	})

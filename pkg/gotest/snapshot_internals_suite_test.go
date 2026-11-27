@@ -11,6 +11,10 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
+// rawCheck is what a raw check declares on its test: it asserts without
+// gotest's assertions, which a broken kernel could not pass.
+const rawCheck = "a raw check of ring 0"
+
 // SnapshotInternalsTestSuite covers the machinery below MatchSnapshot:
 // caller-package detection and its cache, test-name splitting, the read-only
 // CI switch and CRLF normalization.
@@ -46,6 +50,7 @@ func (s *SnapshotInternalsTestSuite) snap(name string) string {
 // Without a redirect, snapshots live in testdata/__snapshots__ beside the
 // file MatchSnapshot is called from.
 func (s *SnapshotInternalsTestSuite) TestDefaultSnapshotDir(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	caller := filepath.Join(s.dir, "x_test.go")
 	want := filepath.Join(s.dir, "testdata", "__snapshots__")
 	if got := gotest.ExportDefaultSnapshotDir(caller); got != want {
@@ -59,6 +64,7 @@ func fatalf(t *gotest.T, format string, args ...any) {
 }
 
 func (s *SnapshotInternalsTestSuite) TestIsExternalPackage(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	ptest := filepath.Join(s.dir, "export_test.go")
 	pxtest := filepath.Join(s.dir, "snapshot_internals_suite_test.go")
 
@@ -92,6 +98,7 @@ func (s *SnapshotInternalsTestSuite) TestIsExternalPackage(t *gotest.T) {
 }
 
 func (s *SnapshotInternalsTestSuite) TestSplitTestName(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	for sub, tc := range gotest.Each(t, []struct {
 		Desc         string
 		input        string
@@ -211,6 +218,7 @@ func (s *SnapshotInternalsTestSuite) TestMatchSnapshot_MatchesAfterCRLFFileCorru
 }
 
 func (s *SnapshotInternalsTestSuite) TestSnapshotReadonly(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	for sub, tc := range gotest.Each(t, []struct {
 		Desc     string
 		value    string
@@ -244,6 +252,7 @@ func (m *mockT) Errorf(format string, args ...any) {
 }
 
 func (s *SnapshotInternalsTestSuite) TestMatchSnapshot_CIMode_FailsOnMissingBaseline(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	snapFile := s.snap("TestMatchSnapshot_CIMode_FailsOnMissingBaseline_ext.snap")
 	s.snap("TestMatchSnapshot_CIMode_FailsOnMissingBaseline.snap")
 	t.Setenv("GOTEST_CI", "1")
@@ -276,6 +285,7 @@ func (s *SnapshotInternalsTestSuite) TestMatchSnapshot_CIMode_ComparesExistingBa
 // The _ext suffix follows the caller's package as the function symbol names
 // it, which -trimpath leaves intact where it rewrites the file's path.
 func (s *SnapshotInternalsTestSuite) TestExternalBySymbol(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	for sub, tc := range gotest.Each(t, []struct {
 		Desc   string
 		symbol string
@@ -296,6 +306,7 @@ func (s *SnapshotInternalsTestSuite) TestExternalBySymbol(t *gotest.T) {
 }
 
 func (s *SnapshotInternalsTestSuite) TestMatchSnapshot_InAPollIsKeyedByItsTest(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	// GOTEST_CI=0: the poll writes a fresh baseline, which CI mode refuses.
 	t.Setenv("GOTEST_CI", "0")
 	// A poll runs on a goroutine of its own, so the recorder's FailNow ends

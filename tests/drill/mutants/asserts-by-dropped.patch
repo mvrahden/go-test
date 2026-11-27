@@ -1,0 +1,15 @@
+Expect: assertcount: TestCountTestSuite/TestDeclared gotest\.asserts-by is ""
+Judge: ./tests/canary CanaryTestSuite/TestAssertionsAreCounted
+Clause: when a leaf declares a reason and makes no assertion → reports the reason and a count of 0
+--- a/pkg/gotest/census.go
++++ b/pkg/gotest/census.go
+@@ -101,8 +101,7 @@
+ 		fail(t, "AssertsBy: the reason is empty; say how the test asserts", nil)
+ 		return
+ 	}
+-	if c := t.census(); c != nil {
+-		c.by.Store(&reason)
++	if t.census() != nil {
+ 		return
+ 	}
+ 	t.by = &reason // a T whose test counts nothing still hands it down

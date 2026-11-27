@@ -168,7 +168,7 @@
       "gating": {
         "direct": {
           "exitCode": 0,
-          "stdout": "{\"version\":\"dev (source checkout)\",\"packages\":[{\"path\":\"example.com/labels\",\"status\":\"pass\",\"duration\":0.02,\"nodes\":[{\"name\":\"TestPathsTestSuite\",\"display\":\"Paths\",\"kind\":\"suite\",\"status\":\"pass\",\"duration\":0.01,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"TestRead\",\"display\":\"Read\",\"kind\":\"method\",\"status\":\"pass\",\"duration\":0,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"reading\",\"display\":\"reading\",\"kind\":\"block\",\"status\":\"pass\",\"duration\":0,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"reads_a/b_paths\",\"display\":\"reads a/b paths\",\"kind\":\"block\",\"status\":\"pass\",\"duration\":0,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[]},{\"name\":\"keeps_\\u003cb\\u003e\\u0026\\\"_text\",\"display\":\"keeps \\u003cb\\u003e\\u0026\\\" text\",\"kind\":\"block\",\"status\":\"pass\",\"duration\":0,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[]}]}]}]},{\"name\":\"TestX_ParkedTestSuite\",\"display\":\"Parked\",\"kind\":\"suite\",\"status\":\"skip\",\"duration\":0,\"focused\":false,\"excluded\":true,\"external\":false,\"output\":[],\"children\":[]}],\"output\":[]}],\"stats\":{\"suites\":2,\"behaviors\":3,\"tests\":0,\"benchmarks\":0,\"fuzzers\":0,\"passed\":2,\"failed\":0,\"skipped\":1}}\n",
+          "stdout": "{\"version\":\"dev (source checkout)\",\"packages\":[{\"path\":\"example.com/labels\",\"status\":\"pass\",\"duration\":0.02,\"nodes\":[{\"name\":\"TestPathsTestSuite\",\"display\":\"Paths\",\"kind\":\"suite\",\"status\":\"pass\",\"duration\":0.01,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"TestRead\",\"display\":\"Read\",\"kind\":\"method\",\"status\":\"pass\",\"duration\":0,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"reading\",\"display\":\"reading\",\"kind\":\"block\",\"status\":\"pass\",\"duration\":0,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"reads_a/b_paths\",\"display\":\"reads a/b paths\",\"kind\":\"block\",\"status\":\"pass\",\"duration\":0,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[]},{\"name\":\"keeps_\\u003cb\\u003e\\u0026\\\"_text\",\"display\":\"keeps \\u003cb\\u003e\\u0026\\\" text\",\"kind\":\"block\",\"status\":\"pass\",\"duration\":0,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[]}]}]}]},{\"name\":\"TestX_ParkedTestSuite\",\"display\":\"Parked\",\"kind\":\"suite\",\"status\":\"skip\",\"duration\":0,\"focused\":false,\"excluded\":true,\"external\":false,\"output\":[],\"children\":[]}],\"output\":[]}],\"stats\":{\"suites\":2,\"behaviors\":3,\"tests\":0,\"benchmarks\":0,\"fuzzers\":0,\"passed\":2,\"failed\":0,\"skipped\":1,\"excluded\":1}}\n",
           "stderr": ""
         },
         "goRun": {
@@ -180,7 +180,7 @@
       "renderOnly": {
         "direct": {
           "exitCode": 0,
-          "stdout": "{\"version\":\"dev (source checkout)\",\"packages\":[{\"path\":\"example.com/labels\",\"status\":\"pass\",\"duration\":0.02,\"nodes\":[{\"name\":\"TestPathsTestSuite\",\"display\":\"Paths\",\"kind\":\"suite\",\"status\":\"pass\",\"duration\":0.01,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"TestRead\",\"display\":\"Read\",\"kind\":\"method\",\"status\":\"pass\",\"duration\":0,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"reading\",\"display\":\"reading\",\"kind\":\"block\",\"status\":\"pass\",\"duration\":0,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"reads_a/b_paths\",\"display\":\"reads a/b paths\",\"kind\":\"block\",\"status\":\"pass\",\"duration\":0,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[]},{\"name\":\"keeps_\\u003cb\\u003e\\u0026\\\"_text\",\"display\":\"keeps \\u003cb\\u003e\\u0026\\\" text\",\"kind\":\"block\",\"status\":\"pass\",\"duration\":0,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[]}]}]}]},{\"name\":\"TestX_ParkedTestSuite\",\"display\":\"Parked\",\"kind\":\"suite\",\"status\":\"skip\",\"duration\":0,\"focused\":false,\"excluded\":true,\"external\":false,\"output\":[],\"children\":[]}],\"output\":[]}],\"stats\":{\"suites\":2,\"behaviors\":3,\"tests\":0,\"benchmarks\":0,\"fuzzers\":0,\"passed\":2,\"failed\":0,\"skipped\":1}}\n",
+          "stdout": "{\"version\":\"dev (source checkout)\",\"packages\":[{\"path\":\"example.com/labels\",\"status\":\"pass\",\"duration\":0.02,\"nodes\":[{\"name\":\"TestPathsTestSuite\",\"display\":\"Paths\",\"kind\":\"suite\",\"status\":\"pass\",\"duration\":0.01,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"TestRead\",\"display\":\"Read\",\"kind\":\"method\",\"status\":\"pass\",\"duration\":0,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"reading\",\"display\":\"reading\",\"kind\":\"block\",\"status\":\"pass\",\"duration\":0,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"reads_a/b_paths\",\"display\":\"reads a/b paths\",\"kind\":\"block\",\"status\":\"pass\",\"duration\":0,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[]},{\"name\":\"keeps_\\u003cb\\u003e\\u0026\\\"_text\",\"display\":\"keeps \\u003cb\\u003e\\u0026\\\" text\",\"kind\":\"block\",\"status\":\"pass\",\"duration\":0,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[]}]}]}]},{\"name\":\"TestX_ParkedTestSuite\",\"display\":\"Parked\",\"kind\":\"suite\",\"status\":\"skip\",\"duration\":0,\"focused\":false,\"excluded\":true,\"external\":false,\"output\":[],\"children\":[]}],\"output\":[]}],\"stats\":{\"suites\":2,\"behaviors\":3,\"tests\":0,\"benchmarks\":0,\"fuzzers\":0,\"passed\":2,\"failed\":0,\"skipped\":1,\"excluded\":1}}\n",
           "stderr": ""
         },
         "goRun": {
@@ -246,7 +246,7 @@
       "gating": {
         "direct": {
           "exitCode": 0,
-          "stdout": "{\"version\":\"dev (source checkout)\",\"packages\":[{\"path\":\"example.com/excluded\",\"status\":\"pass\",\"duration\":0,\"nodes\":[{\"name\":\"TestX_ExcludedTestSuite\",\"display\":\"Excluded\",\"kind\":\"suite\",\"status\":\"skip\",\"duration\":0,\"focused\":false,\"excluded\":true,\"external\":false,\"output\":[\"--- SKIP: TestX_ExcludedTestSuite (0.00s)\\n\",\"    test suite was excluded by user\\n\"],\"children\":[]}],\"output\":[]},{\"path\":\"example.com/plain\",\"status\":\"pass\",\"duration\":0.010092732,\"nodes\":[{\"name\":\"TestPlainTestSuite\",\"display\":\"Plain\",\"kind\":\"suite\",\"status\":\"pass\",\"duration\":0,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[\"=== RUN   TestPlainTestSuite\\n\",\"--- PASS: TestPlainTestSuite (0.00s)\\n\"],\"children\":[]}],\"output\":[\"testing: warning: no tests to run\\n\"]}],\"stats\":{\"suites\":2,\"behaviors\":2,\"tests\":0,\"benchmarks\":0,\"fuzzers\":0,\"passed\":1,\"failed\":0,\"skipped\":1}}\n",
+          "stdout": "{\"version\":\"dev (source checkout)\",\"packages\":[{\"path\":\"example.com/excluded\",\"status\":\"pass\",\"duration\":0,\"nodes\":[{\"name\":\"TestX_ExcludedTestSuite\",\"display\":\"Excluded\",\"kind\":\"suite\",\"status\":\"skip\",\"duration\":0,\"focused\":false,\"excluded\":true,\"external\":false,\"skipReason\":\"test suite was excluded by user\",\"output\":[\"--- SKIP: TestX_ExcludedTestSuite (0.00s)\\n\",\"    test suite was excluded by user\\n\"],\"children\":[]}],\"output\":[]},{\"path\":\"example.com/plain\",\"status\":\"pass\",\"duration\":0.010092732,\"nodes\":[{\"name\":\"TestPlainTestSuite\",\"display\":\"Plain\",\"kind\":\"suite\",\"status\":\"pass\",\"duration\":0,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[\"=== RUN   TestPlainTestSuite\\n\",\"--- PASS: TestPlainTestSuite (0.00s)\\n\"],\"children\":[]}],\"output\":[\"testing: warning: no tests to run\\n\"]}],\"stats\":{\"suites\":2,\"behaviors\":2,\"tests\":0,\"benchmarks\":0,\"fuzzers\":0,\"passed\":1,\"failed\":0,\"skipped\":1,\"excluded\":1}}\n",
           "stderr": ""
         },
         "goRun": {
@@ -258,7 +258,7 @@
       "renderOnly": {
         "direct": {
           "exitCode": 0,
-          "stdout": "{\"version\":\"dev (source checkout)\",\"packages\":[{\"path\":\"example.com/excluded\",\"status\":\"pass\",\"duration\":0,\"nodes\":[{\"name\":\"TestX_ExcludedTestSuite\",\"display\":\"Excluded\",\"kind\":\"suite\",\"status\":\"skip\",\"duration\":0,\"focused\":false,\"excluded\":true,\"external\":false,\"output\":[\"--- SKIP: TestX_ExcludedTestSuite (0.00s)\\n\",\"    test suite was excluded by user\\n\"],\"children\":[]}],\"output\":[]},{\"path\":\"example.com/plain\",\"status\":\"pass\",\"duration\":0.010092732,\"nodes\":[{\"name\":\"TestPlainTestSuite\",\"display\":\"Plain\",\"kind\":\"suite\",\"status\":\"pass\",\"duration\":0,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[\"=== RUN   TestPlainTestSuite\\n\",\"--- PASS: TestPlainTestSuite (0.00s)\\n\"],\"children\":[]}],\"output\":[\"testing: warning: no tests to run\\n\"]}],\"stats\":{\"suites\":2,\"behaviors\":2,\"tests\":0,\"benchmarks\":0,\"fuzzers\":0,\"passed\":1,\"failed\":0,\"skipped\":1}}\n",
+          "stdout": "{\"version\":\"dev (source checkout)\",\"packages\":[{\"path\":\"example.com/excluded\",\"status\":\"pass\",\"duration\":0,\"nodes\":[{\"name\":\"TestX_ExcludedTestSuite\",\"display\":\"Excluded\",\"kind\":\"suite\",\"status\":\"skip\",\"duration\":0,\"focused\":false,\"excluded\":true,\"external\":false,\"skipReason\":\"test suite was excluded by user\",\"output\":[\"--- SKIP: TestX_ExcludedTestSuite (0.00s)\\n\",\"    test suite was excluded by user\\n\"],\"children\":[]}],\"output\":[]},{\"path\":\"example.com/plain\",\"status\":\"pass\",\"duration\":0.010092732,\"nodes\":[{\"name\":\"TestPlainTestSuite\",\"display\":\"Plain\",\"kind\":\"suite\",\"status\":\"pass\",\"duration\":0,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[\"=== RUN   TestPlainTestSuite\\n\",\"--- PASS: TestPlainTestSuite (0.00s)\\n\"],\"children\":[]}],\"output\":[\"testing: warning: no tests to run\\n\"]}],\"stats\":{\"suites\":2,\"behaviors\":2,\"tests\":0,\"benchmarks\":0,\"fuzzers\":0,\"passed\":1,\"failed\":0,\"skipped\":1,\"excluded\":1}}\n",
           "stderr": ""
         },
         "goRun": {
@@ -1302,6 +1302,20 @@
           "OutputType": "frame"
         },
         {
+          "Action": "attr",
+          "Package": "github.com/mvrahden/go-test/cmd/gotest/testdata/census/plain",
+          "Test": "TestPlainTestSuite/TestOne",
+          "Key": "gotest.assertions",
+          "Value": "1"
+        },
+        {
+          "Action": "output",
+          "Package": "github.com/mvrahden/go-test/cmd/gotest/testdata/census/plain",
+          "Test": "TestPlainTestSuite/TestOne",
+          "Output": "=== ATTR  TestPlainTestSuite/TestOne gotest.assertions 1\n",
+          "OutputType": "frame"
+        },
+        {
           "Action": "output",
           "Package": "github.com/mvrahden/go-test/cmd/gotest/testdata/census/plain",
           "Test": "TestPlainTestSuite/TestOne",
@@ -1327,6 +1341,20 @@
           "Package": "github.com/mvrahden/go-test/cmd/gotest/testdata/census/plain",
           "Test": "TestPlainTestSuite/TestTwo",
           "Output": "=== RUN   TestPlainTestSuite/TestTwo\n",
+          "OutputType": "frame"
+        },
+        {
+          "Action": "attr",
+          "Package": "github.com/mvrahden/go-test/cmd/gotest/testdata/census/plain",
+          "Test": "TestPlainTestSuite/TestTwo",
+          "Key": "gotest.assertions",
+          "Value": "1"
+        },
+        {
+          "Action": "output",
+          "Package": "github.com/mvrahden/go-test/cmd/gotest/testdata/census/plain",
+          "Test": "TestPlainTestSuite/TestTwo",
+          "Output": "=== ATTR  TestPlainTestSuite/TestTwo gotest.assertions 1\n",
           "OutputType": "frame"
         },
         {
@@ -1382,7 +1410,8 @@
               "Failed": 0,
               "Skipped": 1
             },
-            "NotRun": 0
+            "NotRun": 0,
+            "Vacuous": 0
           }
         }
       ]

@@ -38,6 +38,7 @@ type runEvent struct {
 		Packages struct{ Passed, Failed, Skipped int }
 		Tests    struct{ Passed, Failed, Skipped int }
 		NotRun   *int
+		Vacuous  *int
 	}
 }
 

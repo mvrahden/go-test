@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / a run whose tests reported no count closes it with no Vacuous \(
+Clause: when a -json run holds tests that passed without an assertion → a run whose tests reported no count closes it with no Vacuous
+--- a/internal/gotestrunner/vacuous.go
++++ b/internal/gotestrunner/vacuous.go
+@@ -186,7 +186,7 @@
+ 	c.mu.Lock()
+ 	defer c.mu.Unlock()
+ 	vacuous := c.assertions.vacuous
+-	if c.assertions.counted {
++	if true {
+ 		n := len(vacuous)
+ 		c.vacuous = &n
+ 		c.starts.vacuity(n)

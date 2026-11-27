@@ -31,6 +31,9 @@ type Constructors[T, B, F any] struct {
 	// FuzzF is the F a suite's fuzz method gets: f with the suite's
 	// per-execution hooks and the wrapper's target.
 	FuzzF func(f *testing.F, beforeEach, afterEach func(T), target *FuzzTarget[T]) F
+	// Count counts the assertions of t, a test method, and reports them on
+	// t as it ends.
+	Count func(t *testing.T)
 }
 
 // Registered is the Constructors[*gotest.T, *gotest.B, *gotest.F] pkg/gotest

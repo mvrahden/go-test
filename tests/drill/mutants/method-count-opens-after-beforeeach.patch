@@ -1,0 +1,21 @@
+Expect: assertcount: TestHookTestSuite/TestBodyless gotest\.assertions is "1"
+Judge: ./tests/canary CanaryTestSuite/TestAssertionsAreCounted
+Clause: when a method asserts only in BeforeEach and AfterEach → reports the hooks' two assertions as the method's
+--- a/pkg/gotestruntime/methods.go
++++ b/pkg/gotestruntime/methods.go
+@@ -75,7 +75,6 @@
+ 		passed := t.Run(c.Name, func(it *testing.T) {
+ 			// Registered first, its cleanup runs last: every hook, cleanup
+ 			// and wait on a gotest.Go goroutine counts.
+-			ctors.Count(it)
+ 			// What a skipped method would have read is not unread.
+ 			it.Cleanup(func() {
+ 				if it.Skipped() {
+@@ -141,6 +140,7 @@
+ 				mt.enter("")
+ 				defer runstate.EnterBody(it, "a method")()
+ 				defer sayStopEnded(it)()
++				ctors.Count(it)
+ 				method()
+ 			})
+ 		})

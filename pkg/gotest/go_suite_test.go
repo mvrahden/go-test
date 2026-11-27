@@ -52,6 +52,7 @@ func (s *GoTestSuite) TestSetupWaits(t *gotest.T) {
 	t.When("Go is called with a T derived from BeforeAll's", func(w *gotest.T) {
 		set := inSuite(w, func(_ *testing.T, bt *gotest.T) {
 			gotest.Go(gotest.NewTWithDeadline(bt, time.Minute), func() {})
+			bt.AssertsBy("a hook under test, checked by the It beside it")
 			bt.It("in an It", func(it *gotest.T) {
 				gotest.Go(it, func() {})
 				for row := range gotest.Each(it, []int{1}) {
@@ -67,7 +68,9 @@ func (s *GoTestSuite) TestSetupWaits(t *gotest.T) {
 		set := inSuite(w, func(st *testing.T, _ *gotest.T) {
 			gotest.Go(gotest.NewT(st), func() {})
 			gotest.Go(gotest.NewTWithDeadline(st, time.Minute), func() {})
-			gotest.NewT(st).When("in a When", func(ww *gotest.T) { gotest.Go(ww, func() {}) })
+			hook := gotest.NewT(st)
+			hook.AssertsBy("a hook under test, checked by the It beside it")
+			hook.When("in a When", func(ww *gotest.T) { gotest.Go(ww, func() {}) })
 		})
 		w.It("finds the suite's set through the *testing.T", func(it *gotest.T) {
 			gotest.Len(it, set.Take(), 3)

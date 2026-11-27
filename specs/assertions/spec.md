@@ -29,6 +29,42 @@ An assertion that fails SHALL name the line it failed at and the assertion, in a
 - **WHEN** a helper fails in a file under a pkg/gotest directory of the user's module
 - **THEN** the failure names the helper's line and the caller's
 
+### Requirement: Counting assertions
+Each assertion, MatchSnapshot and poll SHALL count once for the test of the T it is given, a T made from it, its *testing.T and a gotest.Go goroutine's included; a poll SHALL count once whatever its *R asserts, and the hooks of a method SHALL count for the method. A leaf, a test that opened no It, When or Each row, SHALL report its count as the gotest.assertions attribute when it ends, unless it was skipped; no other test SHALL report one.
+
+#### Scenario: Assertions made in every place
+- **WHEN** a leaf asserts on its T, its *testing.T, Ts made from them, in a helper, on a gotest.Go goroutine, in a poll and with TimeIsNow
+- **THEN** reports one assertion per call, none for what the poll's R asserts
+
+#### Scenario: Assertions made in hooks
+- **WHEN** a method asserts only in BeforeEach and AfterEach
+- **THEN** reports the hooks' two assertions as the method's
+
+#### Scenario: Leaves below a method
+- **WHEN** a method's When holds Its and its Each table rows
+- **THEN** each It and each row reports its own count, and the method and the When report none
+- **AND** an It that asserts only on the method's T reports 0
+- **AND** a method whose Each table is empty reports 0
+
+#### Scenario: A skipped test
+- **WHEN** a test skips
+- **THEN** reports no count
+
+### Requirement: Declaring how a test asserts
+t.AssertsBy(reason) SHALL declare that the test checks its outcome by other means than gotest's assertions: each leaf of the test, itself or one opened below it afterwards, SHALL report the reason, its runs of whitespace folded to one space, as the gotest.asserts-by attribute when it ends. An empty reason SHALL fail the test at the call.
+
+#### Scenario: A leaf that declares how it asserts
+- **WHEN** a leaf declares a reason and makes no assertion
+- **THEN** reports the reason and a count of 0
+
+#### Scenario: A declaration above an It
+- **WHEN** a method declares a reason and then opens an It
+- **THEN** the It reports the method's reason
+
+#### Scenario: An empty reason
+- **WHEN** a test declares an empty reason
+- **THEN** fails at the line of the call
+
 ### Requirement: Named string types
 Regexp, Contains and JSONEq SHALL treat a value of a named string type as the string it holds; JSONEq marshals one that implements json.Marshaler or encoding.TextMarshaler.
 

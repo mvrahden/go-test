@@ -14,7 +14,7 @@ import (
 // NewT wraps a *testing.T, for a helper or a hook written against
 // *testing.T that calls code taking a *T.
 func NewT(t *testing.T) *T {
-	return &T{t: t, tb: t}
+	return &T{t: t, tb: t, c: censusOf(t)}
 }
 
 // T is the test a suite method runs as: assertions report to it, Context
@@ -26,6 +26,10 @@ type T struct {
 	ctx context.Context
 	// soft makes a failing assertion record its failure and return.
 	soft bool
+	// c counts the assertions of t's test; nil when it counts none.
+	c *census
+	// by is the reason AssertsBy declared on a T whose test counts none.
+	by *string
 }
 
 // T returns the underlying *testing.T. It is nil when a suite hook runs under
@@ -70,7 +74,7 @@ func NewTWithDeadline[TB *testing.T | *T](t TB, timeout time.Duration) *T {
 	}
 	ctx, cancel := context.WithTimeout(base.Context(), timeout)
 	base.testingTB().Cleanup(cancel)
-	return &T{t: base.t, tb: base.tb, ctx: ctx, soft: base.soft}
+	return &T{t: base.t, tb: base.tb, ctx: ctx, soft: base.soft, c: base.census(), by: base.by}
 }
 
 // NewTWithContext wraps t, overriding what [T.Context] reports. Use it when the
@@ -82,7 +86,7 @@ func NewTWithDeadline[TB *testing.T | *T](t TB, timeout time.Duration) *T {
 // It, When and Each panic.
 func NewTWithContext(tb testing.TB, ctx context.Context) *T {
 	t, _ := tb.(*testing.T)
-	return &T{t: t, tb: tb, ctx: ctx}
+	return &T{t: t, tb: tb, ctx: ctx, c: censusOf(t)}
 }
 
 // Errorf fails the test at the caller's line and goes on.
@@ -158,7 +162,10 @@ func (t *T) It(description string, testFn func(it *T)) {
 	if t.t == nil {
 		panic("gotest: It/When are unavailable in benchmark/fuzz lifecycle hooks")
 	}
+	t.opens()
+	by := t.declared()
 	t.t.Run(description, func(tt *testing.T) {
+		openCensus(tt, by)
 		execTestFn(testFn, t.sub(tt))
 	})
 }
@@ -171,7 +178,10 @@ func (t *T) When(description string, fn func(w *T)) {
 	if t.t == nil {
 		panic("gotest: It/When are unavailable in benchmark/fuzz lifecycle hooks")
 	}
+	t.opens()
+	by := t.declared()
 	t.t.Run(description, func(tt *testing.T) {
+		openCensus(tt, by)
 		execTestFn(fn, t.sub(tt))
 	})
 }

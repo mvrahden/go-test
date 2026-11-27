@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/cli .* / runs only their methods and exits 1 \(
+Clause: when --failed follows a --ci run that failed only on tests that passed without an assertion → runs only their methods and exits 1
+--- a/internal/gotestrunner/vacuous.go
++++ b/internal/gotestrunner/vacuous.go
+@@ -202,7 +202,6 @@
+ 	for _, v := range vacuous {
+ 		fmt.Fprintf(c.stderr, "  %s %s\n", v.Pkg, v.Path)
+ 	}
+-	c.vacuousFailed = vacuous
+ 	return max(code, 1)
+ }
+ 

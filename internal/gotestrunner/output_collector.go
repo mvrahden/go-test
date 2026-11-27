@@ -29,6 +29,8 @@ type OutputCollector struct {
 	captured bytes.Buffer
 	// verdicts indexes the JSON stream for the census as it is written.
 	verdicts verdictIndex
+	// assertions indexes the leaves' assertion counts as it is written.
+	assertions assertionIndex
 	// cutShort names the suites whose process the run's context ended.
 	cutShort []CensusCase
 
@@ -69,6 +71,10 @@ type OutputCollector struct {
 	// their count, nil when the census did not judge the run.
 	missing []CensusCase
 	notRun  *int
+	// vacuous counts the tests that passed without an assertion, nil when
+	// none reported a count; vacuousFailed are those --ci failed the run on.
+	vacuous       *int
+	vacuousFailed []CensusCase
 }
 
 type pkgState struct {
@@ -234,6 +240,7 @@ func (c *OutputCollector) recordResultLocked(pkg string, idx int, r SuiteResult)
 
 	switch c.mode {
 	case RunBatchText:
+		c.assertions.observeCounts(pkg, r.Counts, r.Stdout)
 		c.flushReadyText()
 	case RunStreamJSON, RunCaptureJSON:
 		w := c.jsonWriter()
@@ -505,7 +512,7 @@ func (c *OutputCollector) EmitSkippedSuites(skippedByPkg map[string][]string) {
 			})
 			writeJSONLine(&w, map[string]any{
 				"Time": now, "Action": "output", "Package": pkg, "Test": testFunc,
-				"Output": "    test suite was excluded by user\n",
+				"Output": "    " + protocol.ExcludedLine + "\n",
 			})
 			writeJSONLine(&w, map[string]any{
 				"Time": now, "Action": "skip", "Package": pkg, "Test": testFunc, "Elapsed": 0,
@@ -553,7 +560,7 @@ func (c *OutputCollector) flushTextPkg(s *pkgState, pkg string) {
 	if c.verbose || failed || c.list {
 		for i := range s.results {
 			r := &s.results[i]
-			_, _ = c.stdout.Write(StripTrailingStatus(r.Stdout))
+			_, _ = c.stdout.Write(dropCountLines(StripTrailingStatus(r.Stdout)))
 			if len(r.Stderr) > 0 {
 				_, _ = c.stderr.Write(r.Stderr)
 			}
@@ -583,7 +590,7 @@ func ranNothingNote(s *pkgState) string {
 // jsonWriter is where JSON events are written; the census indexes them on
 // the way.
 func (c *OutputCollector) jsonWriter() io.Writer {
-	return io.MultiWriter(c.jsonTarget(), &c.verdicts)
+	return io.MultiWriter(c.jsonTarget(), &c.verdicts, &c.assertions)
 }
 
 // bookRunFailure books a failure that happened outside any test binary as a

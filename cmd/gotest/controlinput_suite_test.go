@@ -60,11 +60,9 @@ func (r *controlledRun) end() {
 }
 
 func stopped(t *gotest.T, r *controlledRun) {
-	select {
-	case <-r.ctx.Done():
-	case <-time.After(3 * time.Second):
-		gotest.Fail(t, "the run was not stopped")
-	}
+	gotest.Eventually(t, 3*time.Second, 10*time.Millisecond, func(poll *gotest.R) {
+		gotest.Error(poll, r.ctx.Err(), "the run was not stopped")
+	})
 }
 
 func notStopped(t *gotest.T, r *controlledRun, d time.Duration) {

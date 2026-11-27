@@ -11,12 +11,12 @@ type row struct{ Desc string }
 
 func (s *LabelsTestSuite) TestMarkup(t *gotest.T) {
 	t.When("a label holds a | b", func(w *gotest.T) {
-		w.It("keeps <b>bold</b> and `code` as text", func(it *gotest.T) {})
+		w.It("keeps <b>bold</b> and `code` as text", func(it *gotest.T) { gotest.NotEmpty(it, it.Name()) })
 		w.It(`keeps a\b and a
-line break in one row`, func(it *gotest.T) {})
+line break in one row`, func(it *gotest.T) { gotest.NotEmpty(it, it.Name()) })
 	})
 	t.When("a label holds a [link](http://x)", func(w *gotest.T) {
-		w.It("keeps *stars*, _underscores_ and &#124; as written", func(it *gotest.T) {})
+		w.It("keeps *stars*, _underscores_ and &#124; as written", func(it *gotest.T) { gotest.NotEmpty(it, it.Name()) })
 	})
 	for it, r := range gotest.Each(t, []row{{"row | <i>x</i>"}}) {
 		gotest.NotEmpty(it, r.Desc)
@@ -31,11 +31,11 @@ func (s *LabelsTestSuite) TestOpenings(t *gotest.T) {
 
 func (s *LabelsTestSuite) TestPaths(t *gotest.T) {
 	t.When("a path is read", func(w *gotest.T) {
-		w.It("reads a/b paths", func(it *gotest.T) {})
+		w.It("reads a/b paths", func(it *gotest.T) { gotest.NotEmpty(it, it.Name()) })
 	})
 	t.When("a path is read after its parent", func(w *gotest.T) {
-		w.It("reads a", func(it *gotest.T) {})
-		w.It("reads a/b", func(it *gotest.T) {})
+		w.It("reads a", func(it *gotest.T) { gotest.NotEmpty(it, it.Name()) })
+		w.It("reads a/b", func(it *gotest.T) { gotest.NotEmpty(it, it.Name()) })
 	})
 }
 

@@ -78,6 +78,7 @@ func selfStopped(t *gotest.T, name string, markers []string) {
 // A suite process whose runner is killed while a method holds stops by
 // itself at its channel's end, and ends what its tests started.
 func (s *CanaryLifecycleTestSuite) TestASuiteWhoseRunnerIsKilledStops(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	dir := t.TempDir()
 	r := s.startRun(t, dir, []string{"STOPPING_CHILD=1"}, "-json", "./testdata/stopping/")
 	if !r.await(90*time.Second, "running", "pid=", "child=") {

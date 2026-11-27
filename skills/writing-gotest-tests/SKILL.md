@@ -87,7 +87,12 @@ The linter catches direct misuse (`t.T()` escapes even inside closures,
 outer-`t` in poll callbacks, testify idioms, focus leftovers, and
 `fail-guard`: any `if cond { gotest.Fail(t, …) }` or `if err != nil {
 t.Fatal(err) }` guard — assertions halt on failure, so state them
-directly: `gotest.NoError(t, err)`, never a guarded fail). Fixes can
+directly: `gotest.NoError(t, err)`, never a guarded fail). A test
+asserts, or says how it checks (v1.42+): a leaf that passes having made no
+assertion is vacuous, and `--ci` fails the run on it. Add the missing
+assertion; only a test that truly checks by other means (code given
+`t.T()`, a call that must not panic) declares it with
+`t.AssertsBy("<how>")`. Fixes can
 compose — a rewritten guard may itself be simplifiable; from v1.33 one
 `-fix` applies those too, below it re-run the pair until plain `lint` is
 clean. When two findings share a construct

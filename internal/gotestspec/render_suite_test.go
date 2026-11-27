@@ -90,7 +90,7 @@ func (s *RenderTestSuite) TestRenderTerminal_MultiPackage(t *gotest.T, _ *render
 }
 
 func (s *RenderTestSuite) TestRenderTerminal_SummaryLine(t *gotest.T, _ *renderCtx) {
-	for sub, tc := range gotest.Each(t, []struct {
+	for sub, tc := range gotest.Each(t, []struct { //nolint:gocritic // rangeValCopy: a few rows of a test
 		Desc  string
 		stats gotestspec.Stats
 		want  string

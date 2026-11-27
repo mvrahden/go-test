@@ -3,10 +3,10 @@ Judge: ./tests/canary CanaryTestSuite/TestEachRowsGoOnPastAFailure
 Clause: when an It runs on an Each row's T → an assertion that fails in its body ends the It there, and the row goes on
 --- a/pkg/gotest/t.go
 +++ b/pkg/gotest/t.go
-@@ -159,7 +159,9 @@
- 		panic("gotest: It/When are unavailable in benchmark/fuzz lifecycle hooks")
- 	}
+@@ -166,7 +166,9 @@
+ 	by := t.declared()
  	t.t.Run(description, func(tt *testing.T) {
+ 		openCensus(tt, by)
 -		execTestFn(testFn, t.sub(tt))
 +		it := t.sub(tt)
 +		it.soft = t.soft

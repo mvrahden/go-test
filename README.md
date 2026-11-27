@@ -684,6 +684,13 @@ val  := gotest.Must(cache.Get(key))
 ```
 
 All assertions work with `*gotest.T` (suites), `*testing.T` (standalone tests), `*gotest.B` and `*gotest.F` (benchmarks and fuzz targets), and `*gotest.R` (polling callbacks).
+
+A test that passes having made no assertion proves nothing. Every leaf counts its assertions ([Counting assertions](specs/assertions/spec.md#requirement-counting-assertions)): the spec marks one that passed with none as vacuous ([A pass that asserted nothing](specs/spec/spec.md#requirement-a-pass-that-asserted-nothing)), the run names it, and `--ci` fails the run ([Passes without an assertion under CI mode](specs/cli/spec.md#requirement-passes-without-an-assertion-under-ci-mode)). A test that checks by other means says so, and the reason shows beside it ([Declaring how a test asserts](specs/assertions/spec.md#requirement-declaring-how-a-test-asserts)):
+
+```go
+t.AssertsBy("gomock's controller, given t.T(), fails the test")
+```
+
 Assertion failures automatically trace back to the test call site — no `t.Helper()` calls needed in helper functions. The failure is located at the line that failed, a helper's included, and the message names the test's call site after it.
 
 ### Data-Driven Tests
@@ -996,7 +1003,7 @@ func (s *MySuite) X_TestFlaky(t *gotest.T)  {} // exclude a single test
 Focus spans the whole run: a focused suite or method in any package skips every unfocused suite in every package of the run ([Focus across a run](specs/discovery/spec.md#requirement-focus-across-a-run)).
 Outside CI mode a focused run, `gotest spec` and `gotest summary` say so on stderr before anything runs, with how many items carry `F_` and where the first is declared ([A focused run outside CI mode](specs/cli/spec.md#requirement-a-focused-run-outside-ci-mode)).
 
-Use `--ci` in CI to fail the build if any `F_` prefix slipped through and to enable snapshot read-only mode (missing baselines fail instead of being generated):
+Use `--ci` in CI to fail the build if any `F_` prefix slipped through or a test passed without an assertion, and to enable snapshot read-only mode (missing baselines fail instead of being generated). Every output mode judges it, a text run without `-v` too ([Passes without an assertion under CI mode](specs/cli/spec.md#requirement-passes-without-an-assertion-under-ci-mode)):
 
 ```bash
 gotest --ci ./... -v -race
@@ -1202,7 +1209,7 @@ An agent without skill support can still be pointed at the installed `SKILL.md` 
 Under an agent a run prints for it. Where `AI_AGENT` is set, or `CLAUDECODE=1`, a text run prints only what failed, whole, and ends stdout with one line that holds the verdict, the exit code, the counts and the command that reruns the failures, so `tail -1` cannot lose it ([Agent output](specs/cli/spec.md#requirement-agent-output), [The closing line](specs/cli/spec.md#requirement-the-closing-line)); `--agent=false` or `GOTEST_AGENT=0` turns it off, and `--agent` turns it on anywhere.
 Outside agent output the same line closes stderr, after go test's text on stdout.
 A suite binary that ran none of its tests, as under a `TestMain` that never calls `m.Run`, fails a text run as it fails `-json` ([The census in a text run](specs/cli/spec.md#requirement-the-census-in-a-text-run)).
-Every run leaves a record of what it failed in the gotest cache, and `gotest --failed` reruns only that, by method, in a text or `-json` run, `spec` or `summary` ([Rerunning what failed](specs/cli/spec.md#requirement-rerunning-what-failed)).
+Every run leaves a record of what it failed in the gotest cache, and `gotest --failed` reruns only that, by method, a pass without an assertion that failed a `--ci` run included, in a text or `-json` run, `spec` or `summary` ([Rerunning what failed](specs/cli/spec.md#requirement-rerunning-what-failed)).
 
 Two commands give an agent the specification without the source. `gotest spec --static ./...` prints what a package promises before anything runs, and `gotest discover ./...` emits the same tree as JSON with a `behaviorsComplete` flag per method, so an agent never presents a partial list as the whole specification.
 

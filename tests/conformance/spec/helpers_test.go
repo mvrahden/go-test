@@ -36,6 +36,11 @@ type specNode struct {
 	File     string     `json:"file"`
 	Line     int        `json:"line"`
 	Children []specNode `json:"children"`
+	// Assertions is nil when the node carries no count.
+	Assertions *int   `json:"assertions"`
+	Vacuous    bool   `json:"vacuous"`
+	AssertsBy  string `json:"assertsBy"`
+	SkipReason string `json:"skipReason"`
 }
 
 type specStats struct {
@@ -46,6 +51,9 @@ type specStats struct {
 	NotRun    int `json:"notRun"`
 	// FailedPackages counts packages that failed on their own.
 	FailedPackages int `json:"failedPackages"`
+	Vacuous        int `json:"vacuous"`
+	AssertsBy      int `json:"assertsBy"`
+	Excluded       int `json:"excluded"`
 }
 
 // spec runs gotest spec from this directory and fails t unless it exits as
@@ -70,7 +78,7 @@ func node(t *gotest.T, nodes []specNode, path ...string) specNode {
 	var found specNode
 	for _, name := range path {
 		ok := false
-		for _, n := range nodes {
+		for _, n := range nodes { //nolint:gocritic // rangeValCopy: a few rows of a test
 			if n.Name == name {
 				found, nodes, ok = n, n.Children, true
 				break

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec .* / the JSON spec gives no leaf a count and marks none vacuous \(
+Clause: when a saved stream's leaves carry no count, as a runtime's that reports none → the JSON spec gives no leaf a count and marks none vacuous
+--- a/internal/gotestspec/tree.go
++++ b/internal/gotestspec/tree.go
+@@ -974,7 +974,7 @@
+ func (n *Node) Vacuous() bool {
+ 	return n.Status == StatusPass && len(n.Children) == 0 && !n.NotRun &&
+ 		n.Kind != KindBenchmark && n.Kind != KindFuzz &&
+-		n.Assertions != nil && *n.Assertions == 0 && n.AssertsBy == ""
++		(n.Assertions == nil || *n.Assertions == 0) && n.AssertsBy == ""
+ }
+ 
+ // noVerdict reports a leaf the stream gave no verdict: it counts as not run

@@ -14,6 +14,14 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
+// rawCheck is what a raw check declares on its test: it asserts without
+// gotest's assertions, which a broken kernel could not pass.
+const rawCheck = "a raw check of ring 0"
+
+// underTest is what a method a test runs through the runtime declares: the
+// test running it checks what it did.
+const underTest = "a method under test, checked by the test that runs it"
+
 func fatalf(t *gotest.T, format string, args ...any) {
 	t.Errorf(format, args...)
 	t.FailNow()
@@ -31,24 +39,28 @@ func note(msgAndArgs []any) string {
 }
 
 func mustEqual(t *gotest.T, expected, actual any, msgAndArgs ...any) {
+	t.AssertsBy(rawCheck)
 	if !reflect.DeepEqual(expected, actual) {
 		t.Errorf("not equal%s\n  expected: %#v\n  actual:   %#v", note(msgAndArgs), expected, actual)
 	}
 }
 
 func mustLess[V cmp.Ordered](t *gotest.T, a, b V, msgAndArgs ...any) {
+	t.AssertsBy(rawCheck)
 	if a >= b {
 		t.Errorf("%v is not less than %v%s", a, b, note(msgAndArgs))
 	}
 }
 
 func mustGreater[V cmp.Ordered](t *gotest.T, a, b V, msgAndArgs ...any) {
+	t.AssertsBy(rawCheck)
 	if a <= b {
 		t.Errorf("%v is not greater than %v%s", a, b, note(msgAndArgs))
 	}
 }
 
 func mustGreaterOrEqual[V cmp.Ordered](t *gotest.T, a, b V, msgAndArgs ...any) {
+	t.AssertsBy(rawCheck)
 	if a < b {
 		t.Errorf("%v is not greater than or equal to %v%s", a, b, note(msgAndArgs))
 	}
@@ -72,18 +84,21 @@ func holds(container, elem any) bool {
 }
 
 func mustContain(t *gotest.T, container, elem any, msgAndArgs ...any) {
+	t.AssertsBy(rawCheck)
 	if !holds(container, elem) {
 		t.Errorf("%#v does not contain %#v%s", container, elem, note(msgAndArgs))
 	}
 }
 
 func mustNotContain(t *gotest.T, container, elem any, msgAndArgs ...any) {
+	t.AssertsBy(rawCheck)
 	if holds(container, elem) {
 		t.Errorf("%#v contains %#v%s", container, elem, note(msgAndArgs))
 	}
 }
 
 func mustErrorContain(t *gotest.T, err error, sub string, msgAndArgs ...any) {
+	t.AssertsBy(rawCheck)
 	if err == nil {
 		fatalf(t, "expected an error containing %q, got nil%s", sub, note(msgAndArgs))
 	}
@@ -93,24 +108,28 @@ func mustErrorContain(t *gotest.T, err error, sub string, msgAndArgs ...any) {
 }
 
 func mustErrorIs(t *gotest.T, err, target error, msgAndArgs ...any) {
+	t.AssertsBy(rawCheck)
 	if !errors.Is(err, target) {
 		t.Errorf("error %v is not %v%s", err, target, note(msgAndArgs))
 	}
 }
 
 func mustTrue(t *gotest.T, v bool, msgAndArgs ...any) {
+	t.AssertsBy(rawCheck)
 	if !v {
 		t.Errorf("expected true%s", note(msgAndArgs))
 	}
 }
 
 func mustFalse(t *gotest.T, v bool, msgAndArgs ...any) {
+	t.AssertsBy(rawCheck)
 	if v {
 		t.Errorf("expected false%s", note(msgAndArgs))
 	}
 }
 
 func mustLen(t *gotest.T, object any, n int, msgAndArgs ...any) {
+	t.AssertsBy(rawCheck)
 	if got := reflect.ValueOf(object).Len(); got != n {
 		fatalf(t, "length %d, want %d%s", got, n, note(msgAndArgs))
 	}

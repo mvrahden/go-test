@@ -1054,6 +1054,38 @@ shards of one run do not add up to every mutant exactly once.
 | `hook-lints-any-go-file` | `gotest hook post-edit` lints the package of any edited `.go` file, not only of a test file | cli conformance: an edited file that is not a test gets no answer |
 | `hook-note-keeps-go-test` | the `pre-shell` note gives the command line with `go test` left in it | cli conformance: the note's command line runs gotest in place of go test |
 | `hook-note-for-stdlib-tests` | a test file without a suite counts as declaring one | cli conformance: go test over a package with only stdlib tests gets no note |
+| `assertion-count-dropped` | an assertion counts nothing for its test | canary: the assertcount leaf that asserts everywhere reports 0 |
+| `assertion-on-testing-t-uncounted` | an assertion given a test's `*testing.T` counts nothing | canary: the assertcount leaf that asserts everywhere reports 5 |
+| `time-is-now-counted-twice` | `TimeIsNow` counts once and again through `TimeWithin` | canary: the assertcount leaf that asserts everywhere reports 7 |
+| `method-count-opens-after-beforeeach` | a method's count opens as its body starts, so what `BeforeEach` asserts counts nothing | canary: the assertcount method that asserts only in its hooks reports 1 |
+| `interior-tests-report-counts` | a test that opened an It, When or Each row still reports a count | canary: the assertcount method holding an It and a row reports one |
+| `skipped-tests-report-counts` | a skipped test reports a count | canary: the skipped assertcount method reports one |
+| `its-count-into-the-method` | an It counts into the method's count instead of its own | canary: the assertcount It that asserts on the method's T reports none |
+| `empty-each-opens-the-method` | ranging over an empty Each table marks the method as no leaf | canary: the assertcount method whose Each table is empty reports none |
+| `asserts-by-dropped` | `AssertsBy` on a counted test records no reason | canary: the assertcount leaf that declares a reason reports none |
+| `asserts-by-not-handed-down` | an It opened after `AssertsBy` does not get the reason | canary: the assertcount It below a declaration reports no reason |
+| `asserts-by-empty-reason-accepted` | `AssertsBy("")` is taken as a reason | canary: the emptyreason fixture passes |
+| `vacuous-passes-under-ci` | `--ci` keeps exit 0 for a run with a vacuous pass | cli conformance: a vacuous pass under --ci exits 0 |
+| `vacuous-declared-means-ignored` | the runner counts a pass that declared how it asserts as vacuous | cli conformance: the package's asserting tests fail under --ci |
+| `vacuous-note-dropped` | a run outside CI mode says nothing of its vacuous passes | cli conformance: no note names the vacuous pass |
+| `vacuous-count-left-out` | the run's closing event carries no `Vacuous` | cli conformance: the stream closes without a vacuous count |
+| `vacuous-count-without-counts` | a run whose tests reported no count closes with `Vacuous` 0 | cli conformance: the guarded run's stream closes with a vacuous count |
+| `vacuous-failed-leaves` | a failed leaf with no assertion is vacuous | spec conformance: the JSON spec marks the failed leaf vacuous |
+| `vacuous-stats-uncounted` | stats count no vacuous leaf | spec conformance: the JSON stats say 0 vacuous |
+| `vacuous-terminal-row-unmarked` | the terminal spec's row of a vacuous leaf carries no mark | spec conformance: the terminal row says nothing of it |
+| `vacuous-markdown-row-unmarked` | the Markdown spec's row of a vacuous leaf carries no mark | spec conformance: the Markdown row says nothing of it |
+| `vacuous-summary-unnamed` | the summary lists no vacuous leaf | spec conformance: the summary names none |
+| `unknown-count-read-as-zero` | a leaf with no count is read as one that made none | spec conformance: an older runtime's stream marks leaves vacuous |
+| `asserts-by-json-dropped` | the JSON spec drops a leaf's declared reason | spec conformance: the declared leaf carries no reason |
+| `asserts-by-terminal-dropped` | the terminal spec shows no declared reason | spec conformance: the declared row shows no reason |
+| `skip-reason-json-dropped` | the JSON spec drops a skipped node's reason | spec conformance: the guarded and the excluded suite carry no reason |
+| `excluded-uncounted` | stats count no excluded leaf | spec conformance: the JSON stats say 0 excluded |
+| `text-run-asks-no-counts` | a text run asks its suite processes for no assertion counts | cli conformance: a text run under --ci exits 0, with and without -v, notes nothing outside CI and its closing line counts nothing vacuous |
+| `closing-line-drops-the-vacuous-count` | the closing line never counts the tests vacuous | cli conformance: the text and the agent's closing line end the tests at not run |
+| `failed-skips-vacuous-passes` | the vacuous passes that failed a --ci run are not recorded as failed | cli conformance: --failed after that run has nothing to rerun |
+| `text-run-panic-read-as-a-pass` | a leaf that reported its count and then panicked reads as a pass in a text run | runner suite: the panicked leaf is vacuous |
+| `counts-file-never-opened` | the runtime writes no count to the file a text run names | canary: the assertcount text run under --ci exits 0 |
+| `raw-subtest-parent-a-text-leaf` | a test that ran a subtest through `t.T().Run` writes its count as a leaf's | canary: the assertcount text run names the raw parent vacuous |
 
 ## Adding a mutant
 

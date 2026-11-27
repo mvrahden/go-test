@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec .* / the summary names it \(
+Clause: when a run holds a vacuous leaf → the summary names it
+--- a/internal/gotestspec/summary.go
++++ b/internal/gotestspec/summary.go
+@@ -73,7 +73,7 @@
+ 
+ // renderVacuous lists the vacuous leaves, one line each.
+ func renderVacuous(w io.Writer, leaves []vacuousLeaf, c colors) { //nolint:gocritic // hugeParam: as renderSummary
+-	for _, v := range leaves {
++	for _, v := range leaves[:0] {
+ 		fmt.Fprintf(w, "%sVACUOUS%s  %s%s%s %s — passed without an assertion\n",
+ 			c.yellow, c.reset, c.dim, v.Package, c.reset, strings.Join(v.Display, " / "))
+ 	}

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec .* / the terminal spec shows the reason on the row \(
+Clause: when a run holds leaves that declared how they assert → the terminal spec shows the reason on the row
+--- a/internal/gotestspec/terminal.go
++++ b/internal/gotestspec/terminal.go
+@@ -252,7 +252,7 @@
+ 	case n.Vacuous():
+ 		return []tailPart{{" — " + am, c.yellow}}
+ 	}
+-	return []tailPart{{" — " + am, c.dim}}
++	return nil
+ }
+ 
+ // tailPart is text that follows a row's label, with its color.

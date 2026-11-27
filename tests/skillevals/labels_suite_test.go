@@ -106,6 +106,10 @@ var witnesses = []witness{
 	{file: "reference/cli.md", quote: "there is no record or nothing to rerun", label: "v1.42+", path: "cmd/gotest/flags.go", literal: "--failed"},
 	{file: "reference/cli.md", quote: "The plain text run is censused too", label: "v1.42+", path: "internal/gotestrunner/census.go", literal: "func reportsResult"},
 	{file: "reference/reporting.md", quote: "text run (v1.42+", label: "v1.42+", path: "internal/gotestrunner/census.go", literal: "func reportsResult"},
+	{file: "SKILL.md", quote: "asserts, or says how it checks (v1.42+)", label: "v1.42+", path: "pkg/gotest/census.go", literal: "func (t *T) AssertsBy(reason string)"},
+	{file: "reference/api.md", quote: "### A test asserts, or says how it checks", label: "v1.42+", path: "pkg/gotest/census.go", literal: "func (t *T) AssertsBy(reason string)"},
+	{file: "reference/api.md", quote: "the test checks by other means; never to silence the count", label: "v1.42+", path: "pkg/gotest/census.go", literal: "func (t *T) AssertsBy(reason string)"},
+	{file: "reference/ci.md", quote: "an assertion fails it (v1.42+", label: "v1.42+", path: "pkg/gotest/census.go", literal: "func (t *T) AssertsBy(reason string)"},
 }
 
 var (

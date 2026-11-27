@@ -6,6 +6,10 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
+// underTest is what a method under test declares: the Its beside it check
+// what its rows did.
+const underTest = "a method under test, checked by the Its beside it"
+
 // EachRowsTestSuite: how a row that leaves early ends the method around it.
 type EachRowsTestSuite struct{}
 
@@ -22,7 +26,9 @@ func (s *EachRowsTestSuite) TestSkipfInARow(t *gotest.T) {
 	var rowsRun []string
 	t.T().Run("method", func(mt *testing.T) { //nolint:suite-lifecycle // the method under test is a subtest of this one
 		defer func() { skipped, failed = mt.Skipped(), mt.Failed() }()
-		for it, r := range gotest.Each(gotest.NewT(mt), []eachRow{{"first"}, {"second"}, {"third"}}) {
+		method := gotest.NewT(mt)
+		method.AssertsBy(underTest)
+		for it, r := range gotest.Each(method, []eachRow{{"first"}, {"second"}, {"third"}}) {
 			rowsRun = append(rowsRun, r.Desc)
 			if r.Desc == "second" {
 				it.Skipf("the %s row is not for this run", r.Desc)
@@ -44,6 +50,7 @@ func (s *EachRowsTestSuite) TestMethodSkipsInARow(t *gotest.T) {
 	t.T().Run("method", func(mt *testing.T) { //nolint:suite-lifecycle // the method under test is a subtest of this one
 		defer func() { skipped, failed = mt.Skipped(), mt.Failed() }()
 		method := gotest.NewT(mt)
+		method.AssertsBy(underTest)
 		for _, r := range gotest.Each(method, []eachRow{{"first"}, {"second"}}) {
 			rowsRun = append(rowsRun, r.Desc)
 			method.Skipf("the method is not for this run")

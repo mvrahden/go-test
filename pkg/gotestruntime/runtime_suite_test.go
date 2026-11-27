@@ -1750,6 +1750,7 @@ func under(parent *gotestruntime.FixtureNode, children ...*gotestruntime.Fixture
 }
 
 func (s *RuntimeTestSuite) TestSetupDAG_BeforeAllLeavingThroughGoexitFails(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	released := false
 	node := &gotestruntime.FixtureNode{
 		Name:      "Probe",
@@ -1771,6 +1772,7 @@ func (s *RuntimeTestSuite) TestSetupDAG_BeforeAllLeavingThroughGoexitFails(t *go
 }
 
 func (s *RuntimeTestSuite) TestTeardownDAG_AfterAllLeavingThroughGoexitFails(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	node := &gotestruntime.FixtureNode{
 		Name:      "Probe",
 		Config:    gotest.DefaultFixtureConfig(),

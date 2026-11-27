@@ -321,6 +321,7 @@ func (s *FWrapperTestSuite) SuiteConfig() gotest.SuiteConfig {
 
 func (s *FWrapperTestSuite) TestAssertionContract(t *gotest.T) {
 	t.It("satisfies Errorf/FailNow/Skipf/Context like B and T", func(it *gotest.T) {
+		it.AssertsBy("compiling: the assignment below fails the build when F lacks a method")
 		var _ interface {
 			Errorf(format string, args ...any)
 			FailNow()

@@ -78,8 +78,17 @@ type jsonNode struct {
 	Reported string `json:"reported,omitempty"`
 	// File (relative to the package's dir) and Line say where the source
 	// declares the node; absent for a node only a run revealed.
-	File        string     `json:"file,omitempty"`
-	Line        int        `json:"line,omitempty"`
+	File string `json:"file,omitempty"`
+	Line int    `json:"line,omitempty"`
+	// SkipReason is the reason a skipped node's skip gave, when known.
+	SkipReason string `json:"skipReason,omitempty"`
+	// Assertions is how many assertions a leaf made; absent when the
+	// runtime did not report it, which is unknown, not zero.
+	Assertions *int `json:"assertions,omitempty"`
+	// Vacuous marks a leaf that passed without an assertion and declared
+	// no other means; AssertsBy is the means a leaf declared.
+	Vacuous     bool       `json:"vacuous,omitempty"`
+	AssertsBy   string     `json:"assertsBy,omitempty"`
 	Output      []string   `json:"output"`
 	Children    []jsonNode `json:"children"`
 	Iterations  int        `json:"iterations,omitempty"`
@@ -104,6 +113,12 @@ type jsonStats struct {
 	FailedPackages int `json:"failedPackages,omitempty"`
 	// NotRun counts declared behaviors the stream did not report (--declared).
 	NotRun int `json:"notRun,omitempty"`
+	// Vacuous counts the leaves that passed without an assertion and
+	// declared no other means; AssertsBy those that declared one.
+	Vacuous   int `json:"vacuous,omitempty"`
+	AssertsBy int `json:"assertsBy,omitempty"`
+	// Excluded counts the leaves the X_ prefix excludes.
+	Excluded int `json:"excluded,omitempty"`
 }
 
 func RenderJSON(w io.Writer, packages []*Package, opts ...RenderOption) {
@@ -178,6 +193,10 @@ func (c *renderConfig) convertNodes(all []*Node) []jsonNode {
 			Reported:    n.Reported,
 			File:        n.File,
 			Line:        n.Line,
+			SkipReason:  skipReason(n),
+			Assertions:  n.Assertions,
+			Vacuous:     n.Vacuous(),
+			AssertsBy:   n.AssertsBy,
 			Output:      n.Output,
 			Children:    c.convertNodes(n.Children),
 			Iterations:  n.Iterations,

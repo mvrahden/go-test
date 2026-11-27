@@ -34,6 +34,9 @@ const (
 	// in its verdict's FailedBuild.
 	ActionBuildOutput Action = "build-output"
 	ActionBuildFail   Action = "build-fail"
+	// go test (Go 1.25+) reports a test's t.Attr as an event of its own,
+	// carrying Key and Value.
+	ActionAttr Action = "attr"
 )
 
 type TestEvent struct {
@@ -47,6 +50,9 @@ type TestEvent struct {
 	ImportPath string `json:"ImportPath"`
 	// FailedBuild names the build whose failure failed this package.
 	FailedBuild string `json:"FailedBuild"`
+	// Key and Value are an attr event's attribute.
+	Key   string `json:"Key,omitempty"`
+	Value string `json:"Value,omitempty"`
 	// RunLevel marks an event of a package gotest's run booked for itself
 	// ("shared fixtures", "interrupted", …) rather than for an import path.
 	RunLevel bool `json:"RunLevel"`

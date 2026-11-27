@@ -6,8 +6,16 @@ import (
 
 type MyE2ETestSuite struct{}
 
-func (m *MyE2ETestSuite) Test_HelloWorld(t *gotest.T)     { HelloWorld() }
-func (m *MyE2ETestSuite) Test_HelloWorld_1(t *gotest.T)   { HelloWorld() }
-func (m *MyE2ETestSuite) Test_HelloWorld_2(t *gotest.T)   { HelloWorld() }
-func (m *MyE2ETestSuite) Test_HelloWorld_3(t *gotest.T)   { HelloWorld() }
-func (m *MyE2ETestSuite) X_Test_HelloWorld_4(t *gotest.T) { HelloWorld() }
+func (m *MyE2ETestSuite) Test_HelloWorld(t *gotest.T) { gotest.Equal(t, "Hello, World", HelloWorld()) }
+func (m *MyE2ETestSuite) Test_HelloWorld_1(t *gotest.T) {
+	gotest.Equal(t, "Hello, World", HelloWorld())
+}
+func (m *MyE2ETestSuite) Test_HelloWorld_2(t *gotest.T) {
+	gotest.Equal(t, "Hello, World", HelloWorld())
+}
+func (m *MyE2ETestSuite) Test_HelloWorld_3(t *gotest.T) {
+	gotest.Equal(t, "Hello, World", HelloWorld())
+}
+func (m *MyE2ETestSuite) X_Test_HelloWorld_4(t *gotest.T) {
+	gotest.Equal(t, "Hello, World", HelloWorld())
+}

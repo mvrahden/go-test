@@ -929,3 +929,14 @@ var (
 	ExportWriteRecordIn = writeRecordIn
 	ExportReadRecordIn  = readRecordIn
 )
+
+// ExportVacuousInText is what a text run's process of pkg leaves vacuous,
+// read from the counts it wrote and its stdout, and whether it counted.
+func ExportVacuousInText(counts, stdout string) (vacuous []string, counted bool) {
+	var x assertionIndex
+	x.observeCounts("pkg", []byte(counts), []byte(stdout))
+	for _, v := range x.vacuous {
+		vacuous = append(vacuous, v.Path)
+	}
+	return vacuous, x.counted
+}

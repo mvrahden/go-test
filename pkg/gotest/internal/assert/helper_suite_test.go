@@ -28,6 +28,7 @@ func (s *HelperTestSuite) BeforeEach(t *gotest.T) *ring0Ctx { return &ring0Ctx{}
 // The tracer marks frames through testing.T's unexported fields; a Go release
 // that renames or retypes them must fail here, not silently degrade locations.
 func (s *HelperTestSuite) TestGoTestingInternalsCompatible(t *gotest.T, _ *ring0Ctx) {
+	t.AssertsBy(rawCheck)
 	v := reflect.ValueOf(t.T()).Elem()
 	check := func(name string, wantType reflect.Type) {
 		f := v.FieldByName(name)
@@ -47,10 +48,12 @@ func (s *HelperTestSuite) TestGoTestingInternalsCompatible(t *gotest.T, _ *ring0
 }
 
 func (s *HelperTestSuite) TestSkipInternalFrames_NilT_NoPanic(t *gotest.T, _ *ring0Ctx) {
+	t.AssertsBy("the call must not panic")
 	assert.SkipInternalFrames(nil)
 }
 
 func (s *HelperTestSuite) TestSkipInternalFrames_MarksCallerAsHelper(t *gotest.T, _ *ring0Ctx) {
+	t.AssertsBy("the call must not panic")
 	sub := testing.T{}
 	assert.SkipInternalFrames(&sub)
 }
@@ -60,6 +63,7 @@ func helperThatCallsCallerFrame() string {
 }
 
 func (s *HelperTestSuite) TestCallerFrame_DirectCall_ReturnsFrame(t *gotest.T, _ *ring0Ctx) {
+	t.AssertsBy(rawCheck)
 	frame := assert.CallerFrame()
 	if frame == "" {
 		fatalf(t, "expected non-empty frame, got empty")
@@ -73,6 +77,7 @@ func (s *HelperTestSuite) TestCallerFrame_DirectCall_ReturnsFrame(t *gotest.T, _
 }
 
 func (s *HelperTestSuite) TestCallerFrame_ThroughHelper_ReturnsOutermostUserFrame(t *gotest.T, _ *ring0Ctx) {
+	t.AssertsBy(rawCheck)
 	frame := helperThatCallsCallerFrame()
 	if frame == "" {
 		fatalf(t, "expected non-empty frame, got empty")
@@ -83,6 +88,7 @@ func (s *HelperTestSuite) TestCallerFrame_ThroughHelper_ReturnsOutermostUserFram
 }
 
 func (s *HelperTestSuite) TestIsGotestSource_OnlyThisModule(t *gotest.T, _ *ring0Ctx) {
+	t.AssertsBy(rawCheck)
 	_, self, _, _ := runtime.Caller(0) // …/pkg/gotest/internal/assert/helper_suite_test.go
 	dir := filepath.ToSlash(filepath.Dir(self))
 	for _, c := range []struct {

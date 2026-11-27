@@ -47,6 +47,7 @@ func (s *CanaryDagTestSuite) TestAProcessTheSetupStartsGetsNoProtocol(t *gotest.
 // The CLI killed while a shared fixture is up: the fixture process releases
 // it, its AfterAll running to its end, then exits.
 func (s *CanaryDagTestSuite) TestAKilledCLIsFixtureStillReleases(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	dir := t.TempDir()
 	cmd := exec.Command(s.binary, "-json", "./testdata/killedcli/") //nolint:gosec // G204: controlled binary with fixed args
 	cmd.Env = childEnv(dir)

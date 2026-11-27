@@ -3,8 +3,8 @@ Judge: ./tests/canary CanaryTestSuite/TestEveryAssertionFamilyFails
 Clause: when ErrorAs is given an error of another type → names the type it expected
 --- a/pkg/gotest/assertions.go
 +++ b/pkg/gotest/assertions.go
-@@ -229,7 +229,7 @@
- func ErrorAs[E error](t testingT, err error, msgAndArgs ...any) E {
+@@ -230,7 +230,7 @@
+ 	countAssertion(t)
  	var target E
  	if !errors.As(err, &target) {
 -		fail(t, fmt.Sprintf("ErrorAs failed:\n  error %v: nothing in its chain is of type %s", err, reflect.TypeFor[E]()), msgAndArgs)

@@ -40,6 +40,9 @@ type goTestEvent struct {
 	Output      string  `json:",omitempty"`
 	OutputType  string  `json:",omitempty"`
 	FailedBuild string  `json:",omitempty"`
+	// Key and Value are an attr event's attribute (Go 1.25+).
+	Key   string `json:",omitempty"`
+	Value string `json:",omitempty"`
 	// RunLevel is gotest's own: it marks the packages a run books for
 	// itself, which go test's schema has no word for.
 	RunLevel bool `json:",omitempty"`
@@ -64,6 +67,7 @@ type goTestEvent struct {
 		Packages struct{ Passed, Failed, Skipped int }
 		Tests    struct{ Passed, Failed, Skipped int }
 		NotRun   *int `json:",omitempty"`
+		Vacuous  *int `json:",omitempty"`
 	} `json:",omitempty"`
 }
 

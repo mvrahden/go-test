@@ -1,0 +1,14 @@
+Expect: assertcount: TestCountTestSuite/TestEverywhere gotest\.assertions is "7"
+Judge: ./tests/canary CanaryTestSuite/TestAssertionsAreCounted
+Clause: when a leaf asserts on its T, its *testing.T, Ts made from them, in a helper, on a gotest.Go goroutine, in a poll and with TimeIsNow → reports one assertion per call, none for what the poll's R asserts
+--- a/pkg/gotest/assertions.go
++++ b/pkg/gotest/assertions.go
+@@ -568,7 +568,7 @@
+ // TimeIsNow asserts that ts is within tolerance of time.Now().
+ func TimeIsNow(t testingT, ts time.Time, tolerance time.Duration, msgAndArgs ...any) {
+ 	countAssertion(t)
+-	timeWithin(t, time.Now(), ts, tolerance, msgAndArgs)
++	TimeWithin(t, time.Now(), ts, tolerance, msgAndArgs...)
+ }
+ 
+ // TimeWithin asserts that expected and actual are within tolerance of each other.

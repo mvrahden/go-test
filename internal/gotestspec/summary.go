@@ -44,6 +44,41 @@ func collectFailedLeaves(pkgPath string, n *Node, display []string, out *[]failu
 	}
 }
 
+// vacuousLeaf is a leaf that passed without an assertion, named by its
+// package and display path.
+type vacuousLeaf struct {
+	Package string
+	Display []string
+}
+
+func collectVacuous(packages []*Package) []vacuousLeaf {
+	var out []vacuousLeaf
+	var walk func(pkg string, n *Node, display []string)
+	walk = func(pkg string, n *Node, display []string) {
+		cur := append(append([]string(nil), display...), n.pathName())
+		if n.Vacuous() {
+			out = append(out, vacuousLeaf{Package: pkg, Display: cur})
+		}
+		for _, c := range n.Children {
+			walk(pkg, c, cur)
+		}
+	}
+	for _, pkg := range packages {
+		for _, n := range pkg.Nodes {
+			walk(pkg.Path, n, nil)
+		}
+	}
+	return out
+}
+
+// renderVacuous lists the vacuous leaves, one line each.
+func renderVacuous(w io.Writer, leaves []vacuousLeaf, c colors) { //nolint:gocritic // hugeParam: as renderSummary
+	for _, v := range leaves {
+		fmt.Fprintf(w, "%sVACUOUS%s  %s%s%s %s — passed without an assertion\n",
+			c.yellow, c.reset, c.dim, v.Package, c.reset, strings.Join(v.Display, " / "))
+	}
+}
+
 type packageDiagnostic struct {
 	Package string
 	Output  []string
@@ -109,6 +144,9 @@ func otherCounts(s Stats, withPassed bool) []string { //nolint:gocritic // hugeP
 	if s.NotRun > 0 {
 		parts = append(parts, fmt.Sprintf("%d not run", s.NotRun))
 	}
+	if s.Vacuous > 0 {
+		parts = append(parts, fmt.Sprintf("%d vacuous", s.Vacuous))
+	}
 	return parts
 }
 
@@ -137,6 +175,7 @@ func RenderSummary(w io.Writer, packages []*Package, opts ...RenderOption) {
 		fmt.Fprintf(w, "%s%s%s (%s)\n",
 			passedColor, passed, c.reset,
 			formatDuration(effectiveDuration(&cfg, packages)))
+		renderVacuous(w, collectVacuous(packages), c)
 		renderGroups(w, cfg.groups, c)
 		if cfg.coverage != nil {
 			fmt.Fprintf(w, "%sCoverage: %.1f%%%s\n", c.dim, cfg.coverage.Total, c.reset)
@@ -177,6 +216,10 @@ func RenderSummary(w io.Writer, packages []*Package, opts ...RenderOption) {
 		for _, line := range filterOutput(d.Output) {
 			fmt.Fprintf(w, "      %s%s%s\n", c.red, line, c.reset)
 		}
+	}
+	if vacuous := collectVacuous(packages); len(vacuous) > 0 {
+		fmt.Fprintln(w)
+		renderVacuous(w, vacuous, c)
 	}
 
 	fmt.Fprintln(w)
@@ -238,6 +281,7 @@ func RenderMarkdownSummary(w io.Writer, packages []*Package, opts ...RenderOptio
 		fmt.Fprintf(w, "### %s%s (%s)\n",
 			all, passed, formatDuration(effectiveDuration(&cfg, packages)))
 		renderMarkdownNotes(w, cfg.notes)
+		renderMarkdownVacuous(w, collectVacuous(packages))
 		renderMarkdownGroups(w, cfg.groups)
 		if cfg.coverage != nil {
 			renderMarkdownCoverage(w, cfg.coverage)
@@ -254,6 +298,7 @@ func RenderMarkdownSummary(w io.Writer, packages []*Package, opts ...RenderOptio
 	renderMarkdownNotes(w, cfg.notes)
 
 	renderMarkdownFailures(w, failures)
+	renderMarkdownVacuous(w, collectVacuous(packages))
 
 	for _, d := range diags {
 		fmt.Fprintln(w)
@@ -293,10 +338,28 @@ func RenderMarkdownSummary(w io.Writer, packages []*Package, opts ...RenderOptio
 	if stats.NotRun > 0 {
 		trailer += fmt.Sprintf(", %d not run", stats.NotRun)
 	}
+	if stats.Vacuous > 0 {
+		trailer += fmt.Sprintf(", %d vacuous", stats.Vacuous)
+	}
 	if stats.FailedPackages > 0 {
 		trailer += ", " + countNoun(stats.FailedPackages, "failed package", "failed packages")
 	}
 	fmt.Fprintf(w, "%s: %s\n", strings.Join(parts, ", "), trailer)
+}
+
+// renderMarkdownVacuous lists the vacuous leaves.
+func renderMarkdownVacuous(w io.Writer, leaves []vacuousLeaf) {
+	if len(leaves) == 0 {
+		return
+	}
+	fmt.Fprintln(w)
+	for _, v := range leaves {
+		path := make([]string, len(v.Display))
+		for i, p := range v.Display {
+			path[i] = EscapeLabel(p)
+		}
+		fmt.Fprintf(w, "- **VACUOUS** %s — %s — passed without an assertion\n", EscapeLabel(v.Package), strings.Join(path, " / "))
+	}
 }
 
 // renderMarkdownFailures writes each failure as a <details> block. Names sit

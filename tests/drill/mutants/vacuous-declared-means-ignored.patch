@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / exits 0 for a package whose tests all assert or declare how \(
+Clause: when --ci runs a package whose only problem is a test that passed without an assertion → exits 0 for a package whose tests all assert or declare how
+--- a/internal/gotestrunner/vacuous.go
++++ b/internal/gotestrunner/vacuous.go
+@@ -120,7 +120,7 @@
+ 		return
+ 	}
+ 	delete(x.pending, key)
+-	if action == "pass" && c.known && c.n == 0 && !c.by && !x.parents[key] {
++	if action == "pass" && c.known && c.n == 0 && !x.parents[key] {
+ 		x.vacuous = append(x.vacuous, CensusCase{Pkg: key.pkg, Path: key.test})
+ 	}
+ }

@@ -16,13 +16,17 @@ func skipsAll(t *gotest.T) {
 	}
 }
 
-func (s *MixTestSuite) TestPasses(t *gotest.T) { skipsAll(t) }
+func (s *MixTestSuite) TestPasses(t *gotest.T) {
+	skipsAll(t)
+	gotest.NotEmpty(t, t.Name())
+}
 
 func (s *MixTestSuite) TestFailsOnDemand(t *gotest.T) {
 	skipsAll(t)
 	if os.Getenv("SUMMARYMIX") == "fail" {
 		gotest.Fail(t, "asked to fail")
 	}
+	gotest.NotEmpty(t, t.Name())
 }
 
 func (s *MixTestSuite) TestSkips(t *gotest.T) {

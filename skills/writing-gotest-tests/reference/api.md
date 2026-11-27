@@ -145,6 +145,29 @@ Assertions take the types they are given at face value and say what they cannot 
 - A first extra argument of any string kind formats the rest; any other puts every extra argument in the message, and `ErrorAs` names the type it expected ([Failure messages](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-failure-messages)).
 - `JSONEq` compares numbers by value ([JSON numbers](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-json-numbers)) and refuses anything after the value ([One JSON value](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-one-json-value)), and `Equal` on values that do not fit one short line marks the lines that differ in a diff of their field-by-field renderings, each hunk led by the path of its first change such as `at [1].Name:` ([Mismatch diffs](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-mismatch-diffs), [Renderings](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-renderings), [Mismatches without a diff](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-mismatches-without-a-diff)); it names different dynamic types, diffs values that render alike by their raw fields or says where the rendering hides the difference, and never shows an address ([Values that look alike](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-values-that-look-alike)).
 
+### A test asserts, or says how it checks (v1.42+)
+
+```go
+t.AssertsBy(reason string)                           // the test checks by other means than an assertion
+```
+
+```go
+t.AssertsBy("gomock's controller, given t.T(), fails the test")
+ctrl := gomock.NewController(t.T())
+```
+
+Each leaf counts the gotest assertions it made, the hooks' and a `gotest.Go`
+goroutine's included, a poll once. A leaf that passes having made none is vacuous: the
+spec marks it, the run names it, and `--ci` fails the run with exit 1
+([Counting assertions](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-counting-assertions),
+[Passes without an assertion under CI mode](https://github.com/mvrahden/go-test/blob/main/specs/cli/spec.md#requirement-passes-without-an-assertion-under-ci-mode)).
+Add the assertion the test lacks. Declare a means only when the test truly checks by
+one: code given `t.T()` that fails it, a call that must not panic, an assignment that
+fails the build. The reason shows beside the test and holds for the `It`s, `When`s and
+rows it opens afterwards ([Declaring how a test asserts](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-declaring-how-a-test-asserts)).
+An assertion that cannot fail, written to silence the count, is the weak test the count
+exists to show.
+
 ## Eventually & Consistently
 
 Package-level functions for async polling. Both use `*gotest.R` — an assertion recorder that captures failures without propagating them.
@@ -562,6 +585,7 @@ t.Context() context.Context                          // test context (respects d
 t.Skipf(format, args...)                             // skip the test with a formatted reason
 t.Errorf(format, args...)                            // fail and go on, at the caller's line
 t.FailNow()                                          // stop the test now
+t.AssertsBy(reason)                                  // v1.42+: the test checks by other means; never to silence the count
 t.Setenv(key, value)                                 // set env var, restored after test
 t.TempDir() string                                   // create a temp dir, cleaned up after test
 t.Name() string                                      // the test's name (the wrapper's in a hook under a benchmark or fuzz target)

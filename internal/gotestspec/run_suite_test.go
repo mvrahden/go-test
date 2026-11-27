@@ -63,6 +63,7 @@ func (s *RunEventsTestSuite) TestRunOfReadsTheManifestAndTheExitCode(t *gotest.T
 }
 
 func (s *RunEventsTestSuite) TestRunOfAStreamWithoutAManifest(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	cut := runStream[strings.Index(runStream, "\n")+1:]
 	events, err := gotestspec.ParseEvents(strings.NewReader(cut))
 	if err != nil {
@@ -74,6 +75,7 @@ func (s *RunEventsTestSuite) TestRunOfAStreamWithoutAManifest(t *gotest.T) {
 }
 
 func (s *RunEventsTestSuite) TestRunOfAStreamTheRunDidNotClose(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	open := runStream[:strings.LastIndex(strings.TrimRight(runStream, "\n"), "\n")+1]
 	events, err := gotestspec.ParseEvents(strings.NewReader(open))
 	if err != nil {

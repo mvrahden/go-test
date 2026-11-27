@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -24,6 +25,10 @@ import (
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
+
+// rawCheck is what a canary test declares on its test: it checks with plain
+// Go, never with gotest's assertions.
+const rawCheck = "a raw check of the canary"
 
 // canary is what every canary suite holds: the CLI it built and the golden
 // list. The canary is split into suites only so that the runner runs them
@@ -138,6 +143,7 @@ func (s *canary) runWith(t *gotest.T, pkg, canaryDir string, env []string, flags
 // runIn is runWith over the package at path, run from dir ("" for this
 // one); its rows are named pkg.
 func (s *canary) runIn(t *gotest.T, dir, path, pkg, canaryDir string, env []string, flags ...string) result {
+	t.AssertsBy(rawCheck)
 	args := append(append([]string{"-json"}, flags...), path)
 	cmd := exec.Command(s.binary, args...) //nolint:gosec // G204: controlled binary with fixed args
 	cmd.Dir = dir
@@ -213,6 +219,7 @@ func childEnv(canaryDir string, extra ...string) []string {
 }
 
 func (s *CanaryTestSuite) TestTheChildEnvKeepsOnlyTheSlowBuildThreshold(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	t.Setenv(protocol.EnvSlowBuildThreshold, "1ns")
 	t.Setenv(protocol.EnvCI, "1")
 	env := childEnv(t.TempDir())
@@ -333,6 +340,7 @@ func (s *CanaryTestSuite) TestEachRowsGoOnPastAFailure(t *gotest.T) {
 // under -trimpath in a module whose path has no dot, which the standard
 // library's import paths resemble.
 func (s *CanaryTestSuite) TestAHelperFailureNamesBothLinesUnderTrimpath(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	root, err := filepath.Abs("../..")
 	if err != nil {
 		fatalf(t, "abs: %v", err)
@@ -570,6 +578,7 @@ func expectTeardowns(t *gotest.T, dir string, want int) {
 // A bench run selects the benchmark wrapper alone, and the fixture it uses
 // must still be torn down when it finishes.
 func (s *CanaryTestSuite) TestPackageFixtureTearsDownAfterBench(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	dir := t.TempDir()
 	code, names := s.bench(t, "fixtureteardown", dir)
 	if code != 0 {
@@ -619,6 +628,7 @@ func (s *CanaryTestSuite) TestASetupFailureReachesTheStream(t *gotest.T) {
 // the benchmarks that read the fixture alone: the one that reads none and
 // the one that reads a fixture that came up both report a sample.
 func (s *CanaryTestSuite) TestASetupFailureFailsABenchRun(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	code, names := s.bench(t, "setupfailing", t.TempDir())
 	if code != 1 {
 		t.Errorf("setupfailing bench: exit code %d, want 1", code)
@@ -1050,6 +1060,7 @@ func (s *CanaryTestSuite) TestAFailedLastAttemptFailsTheRun(t *gotest.T) {
 // A run stopped while a shared fixture's dependency sets up runs no AfterAll
 // for the fixture, whose BeforeAll never ran, and the dependency's AfterAll.
 func (s *CanaryTestSuite) TestASetupCancelledBeforeBeforeAllReleasesNothing(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	got, out := s.interruptAt(t, "cancelbeforesetup", "hold.BeforeAll")
 	if want := []string{"hold.BeforeAll", "hold.AfterAll"}; !slices.Equal(got, want) {
 		t.Errorf("cancelbeforesetup: markers %v, want %v\n%s", got, want, out)
@@ -1059,6 +1070,7 @@ func (s *CanaryTestSuite) TestASetupCancelledBeforeBeforeAllReleasesNothing(t *g
 // A run stopped while a shared fixture's AfterAll releases a failed attempt
 // lets that AfterAll finish, starts no further attempt and releases once.
 func (s *CanaryTestSuite) TestAStopDuringTheReleaseBetweenAttemptsLetsItFinish(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	got, out := s.interruptAt(t, "releasestop", "retry.AfterAll")
 	if !slices.Contains(got, "retry.AfterAll finished") {
 		t.Errorf("releasestop: the stop cut the release short: markers %v\n%s", got, out)
@@ -1140,6 +1152,7 @@ func countOf(events []string, event string) int {
 // A suite binding a shared fixture has no state under plain go test: it fails
 // naming the fixture and the runner, before any method runs.
 func (s *CanaryTestSuite) TestASharedFixtureSuiteRefusesPlainGoTest(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	root, err := filepath.Abs("../..")
 	if err != nil {
 		fatalf(t, "abs: %v", err)
@@ -1182,6 +1195,7 @@ func (s *CanaryTestSuite) TestASharedFixtureSuiteRefusesPlainGoTest(t *gotest.T)
 // benchmark after it still reports, and AfterAll runs before the fixture is
 // released.
 func (s *CanaryTestSuite) TestAPanickingBenchmarkStillTearsDown(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	dir := t.TempDir()
 	code, names := s.bench(t, "benchpanic", dir)
 	if code != 1 {
@@ -1338,6 +1352,7 @@ func (s *canary) invokeIn(t *gotest.T, dir, canaryDir string, args ...string) (i
 // A gate of zero is no gate: the run compares and is not held to the sample
 // count a gate needs.
 func (s *CanaryTestSuite) TestAGateOfZeroIsNoGate(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	dir := t.TempDir()
 	baseline := foreignBaseline(t, dir)
 	code, _, stderr := s.benchRaw(t, "benching", dir, "--against="+baseline, "--gate=0")
@@ -1349,6 +1364,7 @@ func (s *CanaryTestSuite) TestAGateOfZeroIsNoGate(t *gotest.T) {
 // What follows -args is the test binary's; the -v a bench run adds for itself
 // goes in front of it.
 func (s *CanaryTestSuite) TestABenchRunKeepsTheBinaryWordsLast(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	dir := t.TempDir()
 	code, _, stderr := s.invoke(t, dir, "bench", "./testdata/benching/", "-args", "-test.benchtime=1x")
 	if code != 0 {
@@ -1360,6 +1376,7 @@ func (s *CanaryTestSuite) TestABenchRunKeepsTheBinaryWordsLast(t *gotest.T) {
 // from elsewhere shares none: the gate fails rather than passing on nothing,
 // and the report names what each side has that the other lacks.
 func (s *CanaryTestSuite) TestAGateWithNothingToCompareFails(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	dir := t.TempDir()
 	baseline := foreignBaseline(t, dir)
 	code, report := s.benchReport(t, "benching", dir, "--against="+baseline, "--gate=10", "-count=4")
@@ -1389,6 +1406,7 @@ func foreignBaseline(t *gotest.T, dir string) string {
 // A gate judges by a significance test, which needs four samples a side;
 // below -count=4 it refuses instead of guessing.
 func (s *CanaryTestSuite) TestAGateNeedsSamples(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	dir := t.TempDir()
 	baseline := foreignBaseline(t, dir)
 	code, _, stderr := s.benchRaw(t, "benching", dir, "--against="+baseline, "--gate=10")
@@ -1408,6 +1426,7 @@ func (s *CanaryTestSuite) TestAGateNeedsSamples(t *gotest.T) {
 // Saving the run to the file it is compared against would compare the run
 // with itself; the command refuses before anything runs.
 func (s *CanaryTestSuite) TestSaveAndAgainstOnOneFileIsRefused(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	dir := t.TempDir()
 	baseline := filepath.Join(dir, "baseline.json")
 	if err := os.WriteFile(baseline, []byte(`{"schemaVersion":1}`), 0o600); err != nil {
@@ -1431,6 +1450,7 @@ func (s *CanaryTestSuite) TestSaveAndAgainstOnOneFileIsRefused(t *gotest.T) {
 // the suite; a metric a benchmark reports is kept on its sample; the run's
 // GOMAXPROCS is recorded.
 func (s *CanaryTestSuite) TestEveryBenchmarkReportsAResult(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	code, report := s.benchReport(t, "benching", t.TempDir())
 	if code != 0 {
 		t.Errorf("benching: exit code %d, want 0", code)
@@ -1455,6 +1475,7 @@ func (s *CanaryTestSuite) TestEveryBenchmarkReportsAResult(t *gotest.T) {
 // A benchmark that fails, halts or skips reports no sample and turns the run
 // red; FailNow stops the method where it is called.
 func (s *CanaryTestSuite) TestFailingBenchmarksReportNoResult(t *gotest.T) {
+	t.AssertsBy(rawCheck)
 	dir := t.TempDir()
 	code, names := s.bench(t, "benchfailing", dir)
 	if code != 1 {
@@ -1466,4 +1487,96 @@ func (s *CanaryTestSuite) TestFailingBenchmarksReportNoResult(t *gotest.T) {
 	if _, err := os.Stat(filepath.Join(dir, "after-failnow")); err == nil {
 		t.Errorf("the statement after FailNow ran: the benchmark did not halt")
 	}
+}
+
+// Every assertion counts once for the test of the T it is given, a poll once
+// whatever its R asserts, the hooks for their method; only a leaf that ran
+// reports its count, beside the means it or a test above it declared. Under
+// --ci the passes that asserted nothing fail the run, named on stderr.
+func (s *CanaryTestSuite) TestAssertionsAreCounted(t *gotest.T) {
+	r := s.check(t, "assertcount", "--ci")
+	got := map[string]string{}
+	var vacuous *int
+	for _, line := range strings.Split(r.stream, "\n") {
+		var ev struct {
+			Action, Package, Test, Key, Value string
+			Result                            *struct{ Vacuous *int }
+		}
+		if json.Unmarshal([]byte(line), &ev) != nil {
+			continue
+		}
+		if ev.Action == "attr" {
+			got[ev.Test+" "+ev.Key] = ev.Value
+		}
+		if ev.Package == protocol.RunPackage && ev.Result != nil {
+			vacuous = ev.Result.Vacuous
+		}
+	}
+	count, by := " "+protocol.AttrAssertions, " "+protocol.AttrAssertsBy
+	want := map[string]string{
+		"TestCountTestSuite/TestEverywhere" + count:                       "6",
+		"TestCountTestSuite/TestNothing" + count:                          "0",
+		"TestCountTestSuite/TestNested/asserts_on_the_method's_T" + count: "0",
+		"TestCountTestSuite/TestNested/#0" + count:                        "1",
+		"TestCountTestSuite/TestNoRows" + count:                           "0",
+		"TestCountTestSuite/TestRaw" + count:                              "0",
+		"TestCountTestSuite/TestDeclared" + count:                         "0",
+		"TestCountTestSuite/TestDeclared" + by:                            "a raw check",
+		"TestCountTestSuite/TestDeclaredAbove/is_covered" + count:         "0",
+		"TestCountTestSuite/TestDeclaredAbove/is_covered" + by:            "a mock controller",
+		"TestHookTestSuite/TestBodyless" + count:                          "2",
+	}
+	for _, key := range slices.Sorted(maps.Keys(want)) {
+		if value, ok := got[key]; !ok || value != want[key] {
+			t.Errorf("assertcount: %s is %q (reported: %v), want %q", key, value, ok, want[key])
+		}
+	}
+	for _, key := range slices.Sorted(maps.Keys(got)) {
+		if _, ok := want[key]; !ok {
+			t.Errorf("assertcount: %s is reported, want none", key)
+		}
+	}
+	for _, test := range []string{"TestCountTestSuite/TestNothing", "TestCountTestSuite/TestNoRows", "TestCountTestSuite/TestNested/asserts_on_the_method's_T"} {
+		if !strings.Contains(r.stderr, "assertcount "+test+"\n") {
+			t.Errorf("assertcount: stderr does not name the vacuous pass %s:\n%s", test, r.stderr)
+		}
+	}
+	if vacuous == nil || *vacuous != 3 {
+		t.Errorf("assertcount: the run closed with Vacuous %v, want 3", vacuous)
+	}
+}
+
+// testing prints the counts only under -v; a text run without it reads
+// them from the file the runtime writes, and judges as the stream does.
+func (s *CanaryTestSuite) TestATextRunReadsTheCounts(t *gotest.T) {
+	t.AssertsBy(rawCheck)
+	cmd := exec.Command(s.binary, "--agent=false", "--ci", "./testdata/assertcount/") //nolint:gosec // G204: controlled binary with fixed args
+	cmd.Env = childEnv(t.TempDir())
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	err := cmd.Run()
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) || exitErr.ExitCode() != 1 {
+		t.Errorf("assertcount text: the run ended with %v, want exit 1\nstderr:\n%s", err, stderr.String())
+	}
+	var named []string
+	for line := range strings.Lines(stderr.String()) {
+		if _, test, ok := strings.Cut(strings.TrimSpace(line), "assertcount "); ok && strings.HasPrefix(line, "  ") {
+			named = append(named, test)
+		}
+	}
+	want := []string{"TestCountTestSuite/TestNothing", "TestCountTestSuite/TestNested/asserts_on_the_method's_T", "TestCountTestSuite/TestNoRows"}
+	slices.Sort(named)
+	slices.Sort(want)
+	if !slices.Equal(named, want) {
+		t.Errorf("assertcount text: stderr names the vacuous passes %q, want %q:\n%s", named, want, stderr.String())
+	}
+	if strings.Contains(stdout.String(), "ATTR") {
+		t.Errorf("assertcount text: stdout carries the attributes:\n%s", stdout.String())
+	}
+}
+
+// A test that declares an empty reason for how it asserts fails.
+func (s *CanaryTestSuite) TestAnEmptyReasonFails(t *gotest.T) {
+	s.check(t, "emptyreason")
 }

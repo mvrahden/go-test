@@ -73,6 +73,9 @@ func RunMethods(t *testing.T, cfg, budget gotest.SuiteConfig, m Methods) {
 			continue
 		}
 		passed := t.Run(c.Name, func(it *testing.T) {
+			// Registered first, its cleanup runs last: every hook, cleanup
+			// and wait on a gotest.Go goroutine counts.
+			ctors.Count(it)
 			// What a skipped method would have read is not unread.
 			it.Cleanup(func() {
 				if it.Skipped() {

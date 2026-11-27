@@ -1247,7 +1247,10 @@ the `gotest` import: a ring-0 suite may call `gotest.DefaultSuiteConfig`,
 `DefaultFixtureConfig`, `Each`, `Must`, the `Export*` shims and, in the
 suite that tests it, `gotest.MatchSnapshot`. Any other exported `gotest`
 function is an assertion and must not appear; `tests/conventions` fails the
-run for a ring-0 file that calls one. Ring-0 suites live in
+run for a ring-0 file that calls one. A raw check counts no assertion, so it
+declares itself: each raw-check helper, and a test that checks inline, calls
+`t.AssertsBy("a raw check of ring 0")`, and a ring-0 test that ran no check
+is still a vacuous pass. Ring-0 suites live in
 external test packages (`assert_test`, `gotestruntime_test`, …) so that the
 harness can import `gotest`; internals reach them through `export_test.go`
 shims. `package gotest` itself cannot host a suite, because the harness
@@ -1331,6 +1334,32 @@ guard:
    a push or a pull request CI dry-runs every patch and judges, in four
    shards, the mutants the change touches; the nightly run and a release
    judge all of them.
+
+**Vacuous passes.** A test that asserts nothing passes with a true `pass`,
+which no guard above questions. Every gotest assertion, `MatchSnapshot` and
+poll counts once for the test of the `T` it is given (`pkg/gotest/census.go`):
+one counter per running test, found by its `*testing.T`, so every `T`
+wrapping that test counts into it with one atomic add, and an assertion on a
+`T` of no counted test costs a nil check. The method loop opens a method's
+counter, `It`, `When` and `Each` their subtests'. A test that opened none is
+a leaf: as it ends it reports the count with `t.Attr`, which `go test -json`
+carries as an `attr` event, and the generated code calls nothing new. The
+runner reads the events as the stream is written
+(`internal/gotestrunner/vacuous.go`) and the tree marks a leaf that passed
+with a count of 0 and no `t.AssertsBy(reason)` as vacuous; `--ci` fails such
+a run with exit 1. testing prints attributes only under `-v`, so a text run
+reads them from a side file instead: the runner creates one per suite
+process and names it in `GOTEST_ASSERTIONS_FILE`, and the runtime appends a
+JSON line per leaf as it reports, marking one that had failed, and takes the
+variable out of its environment so the test's own children write none. A
+test that ran a subtest through `t.T().Run` is no leaf; the stream shows it
+by the subtest's `run` event, the side file by testing's unexported
+`hasSub`, read by reflection; where that field is missing the runtime
+writes no file. A leaf that panicked reports before testing fails it, so
+the runner reads a `--- FAIL` line no failed record accounts for as the
+name's last run failing. A count an older runtime does not report, by
+attribute or line, is unknown, never zero. The counter lives in what a test binary links, so its mutants
+are judged by the canary's `assertcount` fixture, read from the raw stream.
 
 A nightly workflow (`.github/workflows/nightly.yml`) re-runs the whole gate on
 main three times and lists every test whose verdict differed, measures coverage

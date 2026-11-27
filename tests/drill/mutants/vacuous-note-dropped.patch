@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/cli .* / notes on stderr how many passed without an assertion, naming the test, and exits 0 \(
+Clause: when a run outside CI mode holds a test that passed without an assertion → notes on stderr how many passed without an assertion, naming the test, and exits 0
+--- a/internal/gotestrunner/vacuous.go
++++ b/internal/gotestrunner/vacuous.go
+@@ -182,6 +182,7 @@
+ 		return code
+ 	}
+ 	if !ci {
++		return code
+ 		fmt.Fprintf(c.stderr, "note: %d test(s) passed without an assertion (%s) — assert, or declare the means with t.AssertsBy(reason); --ci fails the run\n", len(vacuous), unitNames(vacuous))
+ 		return code
+ 	}

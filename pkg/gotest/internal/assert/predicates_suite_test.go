@@ -25,6 +25,7 @@ type predicatesCtx struct{}
 func (s *PredicatesTestSuite) BeforeEach(t *gotest.T) *predicatesCtx { return &predicatesCtx{} }
 
 func (s *PredicatesTestSuite) TestIsNil(t *gotest.T, _ *predicatesCtx) {
+	t.AssertsBy(rawCheck)
 	var nilPtr *int
 	var nilMap map[string]int
 	var nilFn func()
@@ -50,6 +51,7 @@ func (s *PredicatesTestSuite) TestIsNil(t *gotest.T, _ *predicatesCtx) {
 }
 
 func (s *PredicatesTestSuite) TestIsNilable(t *gotest.T, _ *predicatesCtx) {
+	t.AssertsBy(rawCheck)
 	v := 1
 	for _, c := range []struct {
 		what string
@@ -72,6 +74,7 @@ func (s *PredicatesTestSuite) TestIsNilable(t *gotest.T, _ *predicatesCtx) {
 }
 
 func (s *PredicatesTestSuite) TestIsEmpty(t *gotest.T, _ *predicatesCtx) {
+	t.AssertsBy(rawCheck)
 	empty := []int{}
 	full := []int{1}
 	zero := 0
@@ -123,6 +126,7 @@ func (s *PredicatesTestSuite) TestIsEmpty(t *gotest.T, _ *predicatesCtx) {
 }
 
 func (s *PredicatesTestSuite) TestIncludesElement(t *gotest.T, _ *predicatesCtx) {
+	t.AssertsBy(rawCheck)
 	type named string
 	for _, c := range []struct {
 		what       string
@@ -169,6 +173,7 @@ func (s *PredicatesTestSuite) TestIncludesElement(t *gotest.T, _ *predicatesCtx)
 }
 
 func (s *PredicatesTestSuite) TestIncludesElementGuards(t *gotest.T, _ *predicatesCtx) {
+	t.AssertsBy(rawCheck)
 	type named string
 	for _, c := range []struct {
 		s, element any
@@ -207,6 +212,7 @@ func (s *PredicatesTestSuite) TestIncludesElementGuards(t *gotest.T, _ *predicat
 }
 
 func (s *PredicatesTestSuite) TestDidPanic(t *gotest.T, _ *predicatesCtx) {
+	t.AssertsBy(rawCheck)
 	recovered, panicked := assert.DidPanic(func() { panic("boom") })
 	if !panicked || recovered != "boom" {
 		t.Errorf("a panicking func: got (%v, %v), want (boom, true)", recovered, panicked)
@@ -218,6 +224,7 @@ func (s *PredicatesTestSuite) TestDidPanic(t *gotest.T, _ *predicatesCtx) {
 }
 
 func (s *PredicatesTestSuite) TestNormalizeJSON(t *gotest.T, _ *predicatesCtx) {
+	t.AssertsBy(rawCheck)
 	want := map[string]any{"a": json.Number("1")} // numbers stay as written
 	for _, c := range []struct {
 		what string
@@ -282,6 +289,7 @@ func (s shout) MarshalJSON() ([]byte, error) {
 }
 
 func (s *PredicatesTestSuite) TestReadAndRestore(t *gotest.T, _ *predicatesCtx) {
+	t.AssertsBy(rawCheck)
 	r := strings.NewReader("payload")
 	b, err := assert.ReadAndRestore(r)
 	if err != nil || string(b) != "payload" {
@@ -302,6 +310,7 @@ func (s *PredicatesTestSuite) TestReadAndRestore(t *gotest.T, _ *predicatesCtx) 
 }
 
 func (s *PredicatesTestSuite) TestLength(t *gotest.T, _ *predicatesCtx) {
+	t.AssertsBy(rawCheck)
 	ch := make(chan int, 3)
 	ch <- 1
 	ch <- 2
@@ -333,6 +342,7 @@ func (s *PredicatesTestSuite) TestLength(t *gotest.T, _ *predicatesCtx) {
 }
 
 func (s *PredicatesTestSuite) TestJSONEqual(t *gotest.T, _ *predicatesCtx) {
+	t.AssertsBy(rawCheck)
 	norm := func(v any) any {
 		out, err := assert.NormalizeJSON(v)
 		if err != nil {
@@ -378,6 +388,7 @@ type nilErr struct{ msg string }
 func (e *nilErr) Error() string { return e.msg }
 
 func (s *PredicatesTestSuite) TestErrorText(t *gotest.T, _ *predicatesCtx) {
+	t.AssertsBy(rawCheck)
 	if got := assert.ErrorText(io.EOF); got != "EOF" {
 		t.Errorf("ErrorText(io.EOF): got %q", got)
 	}
@@ -391,6 +402,7 @@ func (s *PredicatesTestSuite) TestErrorText(t *gotest.T, _ *predicatesCtx) {
 }
 
 func (s *PredicatesTestSuite) TestCheckElementsMatch_Unhashable(t *gotest.T, _ *predicatesCtx) {
+	t.AssertsBy(rawCheck)
 	a, b := []any{[]int{1}, "x"}, []any{"x", []int{1}}
 	const want = "an element of type []int cannot be compared with ==; compare such lists with Equal"
 	if got := assert.CheckElementsMatch(a, b); !strings.Contains(got, "ElementsMatch failed:") || !strings.Contains(got, want) {
