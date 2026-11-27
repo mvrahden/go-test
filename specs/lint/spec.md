@@ -180,7 +180,7 @@ Lint --github SHALL escape each annotation's message and properties as a workflo
 - **THEN** lint refuses it with exit 2, naming the value
 
 ### Requirement: Assertion rewrites keep the verdict
-An assertion rewrite SHALL leave the test's verdict as it was, and lint SHALL offer no fix where the operand's type would change the verdict; the operand types and assertions are the table in tests/conformance/lint/rewrites_suite_test.go.
+An assertion rewrite SHALL leave the test's verdict as it was, and lint SHALL offer no fix where the operand's type would change the verdict; the operand types and assertions are the table in tests/conformance/lint/rewrites_suite_test.go. It SHALL NOT rewrite an Equal called with an explicit type argument.
 
 #### Scenario: Nil checks
 - **WHEN** an assertion checks an operand against nil
@@ -209,7 +209,7 @@ An assertion rewrite SHALL leave the test's verdict as it was, and lint SHALL of
 - **THEN** pointers are compared with Same, values that reach no pointer with Equal, and nothing else is rewritten
 
 #### Scenario: Explicit type arguments
-- **WHEN** Equal compares an operand with nil under an explicit type argument
+- **WHEN** Equal is called with an explicit type argument
 - **THEN** Equal is not rewritten, since the type argument decides what it compares
 
 #### Scenario: errors.Is

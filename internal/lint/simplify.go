@@ -461,6 +461,9 @@ func simplifyEquality(pass *analysis.Pass, call *ast.CallExpr, negated bool) {
 	if len(call.Args) < 3 {
 		return
 	}
+	if hasTypeArgs(call.Fun) {
+		return // the explicit type converts the operands first
+	}
 	tArg := call.Args[0]
 	expected := call.Args[1]
 	actual := call.Args[2]
@@ -491,9 +494,6 @@ func simplifyEquality(pass *analysis.Pass, call *ast.CallExpr, negated bool) {
 		other := expected
 		if isNilIdent(expected) {
 			other = actual
-		}
-		if hasTypeArgs(call.Fun) {
-			return // the explicit type converts the operand first
 		}
 		switch nilKindOf(pass, other) {
 		case errorIface:

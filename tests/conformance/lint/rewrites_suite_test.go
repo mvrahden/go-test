@@ -183,6 +183,18 @@ var rewriteRows = []rewriteRow{
 		body: "var s []int\n\tgotest.Equal[any](t, nil, s)", verdict: "fail"},
 	{Desc: "Equal of nil and a nil slice", group: groupTypeArgs,
 		body: "var s []int\n\tgotest.Equal(t, nil, s)", rules: []string{simplify}, want: "gotest.Nil(t, s)", verdict: "pass"},
+	{Desc: "Equal[any] of \"\" and an empty named string", group: groupTypeArgs, decls: "type S string\n",
+		body: "v := S(\"\")\n\tgotest.Equal[any](t, \"\", v)", verdict: "fail"},
+	{Desc: "Equal[any] of a length and a float constant", group: groupTypeArgs,
+		body: "xs := []int{1, 2, 3}\n\tgotest.Equal[any](t, len(xs), 3.0)", verdict: "fail"},
+	{Desc: "Equal[any] of true and a bool", group: groupTypeArgs,
+		body: "ok := true\n\tgotest.Equal[any](t, true, ok)", verdict: "pass"},
+	{Desc: "Equal[string] of \"\" and an empty string", group: groupTypeArgs,
+		body: "s := \"\"\n\tgotest.Equal[string](t, \"\", s)", verdict: "pass"},
+	{Desc: "Equal of \"\" and an empty string", group: groupTypeArgs,
+		body: "s := \"\"\n\tgotest.Equal(t, \"\", s)", rules: []string{simplify}, want: "gotest.Empty(t, s)", verdict: "pass"},
+	{Desc: "Equal of a length and a float constant", group: groupTypeArgs,
+		body: "xs := []int{1, 2, 3}\n\tgotest.Equal(t, len(xs), 3.0)", rules: []string{simplify}, want: "gotest.Len(t, xs, 3.0)", verdict: "pass"},
 
 	// errors.Is matches a nil target to a nil error; ErrorIs fails it.
 	{Desc: "True of errors.Is with a target holding nil", group: groupErrorsIs, imports: []string{"errors"},
@@ -366,7 +378,7 @@ func (s *LinterRewritesTestSuite) TestEqualities(t *gotest.T) {
 }
 
 func (s *LinterRewritesTestSuite) TestTypeArguments(t *gotest.T) {
-	t.When("Equal compares an operand with nil under an explicit type argument", func(w *gotest.T) {
+	t.When("Equal is called with an explicit type argument", func(w *gotest.T) {
 		w.It("Equal is not rewritten, since the type argument decides what it compares", func(it *gotest.T) {
 			s.checkRows(it, groupTypeArgs)
 		})
