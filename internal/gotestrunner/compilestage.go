@@ -195,7 +195,7 @@ func stageGroup(group []string, stageDir, cacheDir string) ([]stagedBinary, erro
 	for i, pkg := range group {
 		b := &staged[i]
 		b.Package = pkg
-		b.Path = filepath.Join(stageDir, testBinaryName(pkg, runtime.GOOS))
+		b.Path = filepath.Join(stageDir, testBinaryName(pkg, goSettings().GOOS))
 		if cacheDir != "" {
 			b.Cached = filepath.Join(cacheDir, sanitizePkgName(pkg)+".test")
 			place(b)

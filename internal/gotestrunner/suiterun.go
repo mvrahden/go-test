@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"runtime"
 	"slices"
 	"sort"
 	"strings"
@@ -323,7 +324,7 @@ func runSuiteProcess(ctx context.Context, target SuiteTarget, env []string, test
 	if err != nil {
 		return SuiteResult{
 			Target:   target,
-			Stderr:   fmt.Appendf(nil, "gotest: %s did not start: %v\n", target.SuiteName, err),
+			Stderr:   fmt.Appendf(nil, "gotest: %s did not start: %v\n%s", target.SuiteName, err, foreignTargetNote(goSettings(), runtime.GOOS, runtime.GOARCH, target.Exec)),
 			ExitCode: 2,
 			Started:  start,
 			Duration: time.Since(start),

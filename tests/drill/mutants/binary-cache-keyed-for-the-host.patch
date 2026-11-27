@@ -1,0 +1,15 @@
+Clause: when a test file is changed after a passing run and the next run is given another operating system as GOOS → leaves the cached binary of the host's platform as the passing run left it
+Expect: ^FAIL .*conformance/cli CLIUnbuiltBinary .* / leaves the cached binary of the host's platform as the passing run left it \(
+--- a/internal/gotestrunner/bincache.go
++++ b/internal/gotestrunner/bincache.go
+@@ -27,9 +27,8 @@
+ func binaryCacheKey(cwd string, buildFlags []string) string {
+ 	flags := slices.Clone(buildFlags)
+ 	slices.Sort(flags)
+-	target := goSettings()
+ 	h := sha256.New()
+-	for _, part := range append([]string{cwd, target.GOOS, target.GOARCH, runtime.Version()}, flags...) {
++	for _, part := range append([]string{cwd, runtime.GOOS, runtime.GOARCH, runtime.Version()}, flags...) {
+ 		h.Write([]byte(part))
+ 		h.Write([]byte{0})
+ 	}

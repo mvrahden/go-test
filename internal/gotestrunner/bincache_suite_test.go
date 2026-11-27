@@ -37,6 +37,16 @@ func (s *BinaryCacheKeyTestSuite) TestKey(t *gotest.T) {
 		gotest.NotEqual(it, tagged, gotestrunner.ExportEnvKeyFlags(env(map[string]string{"GOEXPERIMENT": "-tags=probetag"})))
 		gotest.Equal(it, tagged, gotestrunner.ExportEnvKeyFlags(env(map[string]string{"GOFLAGS": "-x -tags=probetag -p=4"})), "trace flags change no binary")
 	})
+	t.It("changes with the platform go builds for", func(it *gotest.T) {
+		key := func(goos, goarch string) string {
+			restore := gotestrunner.ExportSetGoSettings(gotestrunner.GoSettings{GOOS: goos, GOARCH: goarch})
+			defer restore()
+			return gotestrunner.ExportBinaryCacheKey("/w", nil)
+		}
+		gotest.Equal(it, key("linux", "amd64"), key("linux", "amd64"))
+		gotest.NotEqual(it, key("linux", "amd64"), key("windows", "amd64"))
+		gotest.NotEqual(it, key("linux", "amd64"), key("linux", "arm64"))
+	})
 }
 
 func (s *BinaryCacheKeyTestSuite) TestDir(t *gotest.T) {

@@ -196,3 +196,22 @@ func (s *CompileGroupTestSuite) TestRebuiltBinariesReachTheCache(t *gotest.T, ct
 		gotest.Equal(it, "new", readCached(it, ctx.cache, "m/a"))
 	})
 }
+
+func (s *CompileGroupTestSuite) TestATargetPlatform(t *gotest.T, ctx *groupCtx) {
+	other, name := "windows", "a.test.exe"
+	if runtime.GOOS == "windows" {
+		other, name = "linux", "a.test"
+	}
+	ctx.restore = append(ctx.restore, gotestrunner.ExportSetGoSettings(gotestrunner.GoSettings{GOOS: other, GOARCH: runtime.GOARCH}))
+	ctx.fake = func(stage string, pkgs []string, _ io.Writer) error {
+		return os.WriteFile(filepath.Join(stage, name), []byte("built"), 0o600)
+	}
+	results, failures := gotestrunner.CompilePackages(t.Context(), []string{"m/a"}, "-overlay=o.json", nil, ctx.out, "", 0)
+	t.When("go builds for another operating system than the host's", func(w *gotest.T) {
+		w.It("hands out the binary under the name go gives it for that system", func(it *gotest.T) {
+			gotest.Empty(it, failures)
+			gotest.Len(it, results, 1)
+			gotest.Equal(it, name, filepath.Base(results[0].BinaryPath))
+		})
+	})
+}

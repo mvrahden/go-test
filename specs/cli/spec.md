@@ -632,6 +632,14 @@ A run SHALL execute a test binary built from the sources, build tags and link fl
 - **WHEN** a run that -run narrows to one package is followed by an unfiltered run
 - **THEN** the second run builds and runs the other package
 
+### Requirement: A run builds for the go command's target platform
+A run SHALL execute a test binary built for the target platform it was given, the go command's GOOS and GOARCH from the environment or go's env file: test binaries are named, built and cached for it, apart from every other platform's. gotest starts each binary on the host, or under -exec; a binary the host cannot start fails its suites with exit 2, naming the platform it was built for. The scenario below gives GOOS=linux on a Windows host and GOOS=windows on any other.
+
+#### Scenario: A target platform the host cannot execute
+- **WHEN** a test file is changed after a passing run and the next run is given another operating system as GOOS
+- **THEN** exits 2 with each suite reported as not started and the platform its binary is built for named on stderr, and prints nothing the cached binary would
+- **AND** leaves the cached binary of the host's platform as the passing run left it
+
 ### Requirement: Clearing the test binary cache
 gotest clean --cache SHALL remove every cached binary no run is linking or copying, with its lock and record, and say how many.
 
