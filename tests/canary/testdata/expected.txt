@@ -309,3 +309,9 @@ eachfailpanic fail TestEachFailPanicTestSuite/TestARowPanics
 eachfailpanic fail TestEachFailPanicTestSuite/TestARowPanics/second
 eachfailpanic pass TestEachFailPanicTestSuite/TestARowPanics/first
 eachfailpanic pass TestEachFailPanicTestSuite/TestLater
+eachpanic exit 1
+eachpanic fail -
+eachpanic fail TestEachPanicTestSuite
+eachpanic fail TestEachPanicTestSuite/TestRows
+eachpanic pass TestEachPanicTestSuite/TestRows/first
+eachpanic pass TestEachPanicTestSuite/TestRows/second

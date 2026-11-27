@@ -1,0 +1,14 @@
+Expect: eachpanic: TestEachPanicTestSuite/TestRows/second gotest\.assertions is reported, want none
+Judge: ./tests/canary CanaryTestSuite/TestAPanickingRowReportsNoCount
+Clause: when the body of an Each row panics → the row reports no count, and under --ci the run names no test as passing without an assertion
+--- a/pkg/gotest/census.go
++++ b/pkg/gotest/census.go
+@@ -41,7 +41,7 @@
+ 	tt.Cleanup(func() {
+ 		censuses.Delete(tt)
+ 		openCensuses.Add(-1)
+-		if c.nested.Load() || c.void.Load() || tt.Skipped() {
++		if c.nested.Load() || tt.Skipped() {
+ 			return
+ 		}
+ 		by, n := c.by.Load(), c.n.Load()

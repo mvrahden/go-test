@@ -361,6 +361,30 @@ func (s *CanaryTestSuite) TestARowPanicAfterAFailureEndsItsMethod(t *gotest.T) {
 	}
 }
 
+// A row that panics without having failed still ends the suite, and it
+// reports no count: under --ci nothing names it as a pass without an
+// assertion. The row before it keeps its count.
+func (s *CanaryTestSuite) TestAPanickingRowReportsNoCount(t *gotest.T) {
+	r := s.check(t, "eachpanic", "--ci")
+	counts := map[string]string{}
+	for _, line := range strings.Split(r.stream, "\n") {
+		var ev struct{ Action, Test, Key, Value string }
+		if json.Unmarshal([]byte(line), &ev) == nil && ev.Action == "attr" && ev.Key == protocol.AttrAssertions {
+			counts[ev.Test] = ev.Value
+		}
+	}
+	const rows = "TestEachPanicTestSuite/TestRows/"
+	if n, ok := counts[rows+"first"]; !ok || n != "1" {
+		t.Errorf("eachpanic: %sfirst gotest.assertions is %q (reported: %v), want \"1\"", rows, n, ok)
+	}
+	if _, ok := counts[rows+"second"]; ok {
+		t.Errorf("eachpanic: %ssecond gotest.assertions is reported, want none", rows)
+	}
+	if strings.Contains(r.stderr, "passed without an assertion") {
+		t.Errorf("eachpanic: stderr names a vacuous pass:\n%s", r.stderr)
+	}
+}
+
 // A failure inside a helper names the helper's line and the caller's, also
 // under -trimpath in a module whose path has no dot, which the standard
 // library's import paths resemble.

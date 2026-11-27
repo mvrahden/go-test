@@ -79,6 +79,28 @@ func (s *AssertionCountTestSuite) TestCountingAssertions(t *gotest.T) {
 	})
 }
 
+func (s *AssertionCountTestSuite) TestARowThatPanics(t *gotest.T) {
+	run, err := testkit.RunPackage(t.Context(), t.TempDir(), "../testdata/assertcountpanic/", "--ci")
+	gotest.NoError(t, err)
+	const suite = "TestCountPanicTestSuite/"
+	t.When("the body of an Each row panics", func(w *gotest.T) {
+		w.It("the row reports no count, and under --ci the run names no test as passing without an assertion", func(it *gotest.T) {
+			gotest.Equal(it, 1, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.Equal(it, "fail", run.Verdict(suite+"TestAFailedRow/failed"))
+			_, ok := run.Attr(suite+"TestAFailedRow/failed", protocol.AttrAssertions)
+			gotest.False(it, ok, "the failed row that panicked reported a count")
+			n, ok := run.Attr(suite+"TestRows/asserts", protocol.AttrAssertions)
+			gotest.True(it, ok, "the row before the panic reported no count")
+			gotest.Equal(it, "1", n)
+			gotest.Equal(it, "pass", run.Verdict(suite+"TestRows/panics"))
+			_, ok = run.Attr(suite+"TestRows/panics", protocol.AttrAssertions)
+			gotest.False(it, ok, "the row that panicked reported a count")
+			gotest.NotContains(it, run.Stderr, "passed without an assertion")
+			gotest.Contains(it, run.Stdout, "panic: the row panics before it asserts")
+		})
+	})
+}
+
 func (s *AssertionCountTestSuite) TestDeclaringHowATestAsserts(t *gotest.T) {
 	run, err := testkit.RunPackage(t.Context(), t.TempDir(), countPkg)
 	gotest.NoError(t, err)

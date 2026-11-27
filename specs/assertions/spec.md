@@ -30,7 +30,7 @@ An assertion that fails SHALL name the line it failed at and the assertion, in a
 - **THEN** the failure names the helper's line and the caller's
 
 ### Requirement: Counting assertions
-Each assertion, MatchSnapshot and poll SHALL count once for the test of the T it is given, a T made from it, its *testing.T and a gotest.Go goroutine's included; a poll SHALL count once whatever its *R asserts, and the hooks of a method SHALL count for the method. A leaf, a test that opened no It, When or Each row, SHALL report its count as the gotest.assertions attribute when it ends, unless it was skipped; no other test SHALL report one.
+Each assertion, MatchSnapshot and poll SHALL count once for the test of the T it is given, a T made from it, its *testing.T and a gotest.Go goroutine's included; a poll SHALL count once whatever its *R asserts, and the hooks of a method SHALL count for the method. A leaf, a test that opened no It, When or Each row, SHALL report its count as the gotest.assertions attribute when it ends, unless it was skipped or is an Each row whose body panicked; no other test SHALL report one.
 
 #### Scenario: Assertions made in every place
 - **WHEN** a leaf asserts on its T, its *testing.T, Ts made from them, in a helper, on a gotest.Go goroutine, in a poll and with TimeIsNow
@@ -49,6 +49,10 @@ Each assertion, MatchSnapshot and poll SHALL count once for the test of the T it
 #### Scenario: A skipped test
 - **WHEN** a test skips
 - **THEN** reports no count
+
+#### Scenario: A row that panics
+- **WHEN** the body of an Each row panics
+- **THEN** the row reports no count, and under --ci the run names no test as passing without an assertion
 
 ### Requirement: Declaring how a test asserts
 t.AssertsBy(reason) SHALL declare that the test checks its outcome by other means than gotest's assertions: each leaf of the test, itself or one opened below it afterwards, SHALL report the reason, its runs of whitespace folded to one space, as the gotest.asserts-by attribute when it ends. An empty reason SHALL fail the test at the call.

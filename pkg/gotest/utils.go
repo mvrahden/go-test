@@ -129,12 +129,14 @@ func eachRun[E any](parent *T, name string, entry E, rest int, yield func(*T, E)
 	return result
 }
 
-// rowPanicked reports whether a row's panic ends only its method: the row
-// had failed. It then says the panic on the row, which is still running.
+// rowPanicked voids the count of a row whose body panicked and reports
+// whether the panic ends only its method: the row had failed. It then says
+// the panic on the row, which is still running.
 func rowPanicked(tt *testing.T, captured *capturedPanic, site string) bool {
 	if captured == nil {
 		return false
 	}
+	voidCount(tt)
 	if !tt.Failed() {
 		return false
 	}
