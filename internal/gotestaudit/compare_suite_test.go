@@ -29,7 +29,7 @@ func test(name string, kids ...gotestaudit.Behavior) gotestaudit.Behavior {
 }
 
 func recordOf(suites ...gotestaudit.Suite) *gotestaudit.Record {
-	return &gotestaudit.Record{Schema: gotestaudit.Schema, Packages: []gotestaudit.Package{{Path: "m/p", Module: "m", Suites: suites}}}
+	return &gotestaudit.Record{Schema: gotestaudit.Schema, Notes: []string{gotestaudit.FloorNote, gotestaudit.SkipNote}, Packages: []gotestaudit.Package{{Path: "m/p", Module: "m", Suites: suites}}}
 }
 
 func changes(doc *gotestaudit.Document) []string {
@@ -89,7 +89,7 @@ func (s *AuditCompareTestSuite) TestClasses(t *gotest.T) {
 		w.It("takes every class but changed, in the document's order", func(it *gotest.T) {
 			got, err := gotestaudit.ParseClasses("snapshot,all")
 			gotest.NoError(it, err)
-			gotest.Equal(it, []string{"removed", "excluded", "focus", "guard", "budget", "suppression", "snapshot", "assertions", "asserts-by"}, got)
+			gotest.Equal(it, []string{"removed", "excluded", "skip", "focus", "guard", "budget", "suppression", "snapshot", "assertions", "asserts-by"}, got)
 		})
 	})
 	t.When("--fail-on names nothing", func(w *gotest.T) {
@@ -118,6 +118,55 @@ func (s *AuditCompareTestSuite) TestTheCountedFunctions(t *gotest.T) {
 			slices.Sort(want)
 			slices.Sort(got)
 			gotest.Equal(it, want, got)
+		})
+	})
+}
+
+// classFindings are a document's findings as {Class, Subject, Base, Head}.
+func classFindings(doc *gotestaudit.Document) [][4]string {
+	var out [][4]string
+	for _, f := range doc.Findings {
+		out = append(out, [4]string{f.Class, f.Subject, f.Base, f.Head})
+	}
+	return out
+}
+
+// skipping is a test X of suite A whose body writes n skip calls.
+func skipping(name string, n int) gotestaudit.Suite {
+	b := test(name)
+	b.Skips = n
+	return gotestaudit.Suite{Name: "ATestSuite", Display: "A", Methods: []gotestaudit.Behavior{b}}
+}
+
+func (s *AuditCompareTestSuite) TestSkips(t *gotest.T) {
+	for row, r := range gotest.Each(t, []struct {
+		Desc       string
+		base, head int
+		findings   [][4]string
+	}{
+		{Desc: "a call added", base: 0, head: 1, findings: [][4]string{{"skip", "A / X", "no skip call", "1 skip call"}}},
+		{Desc: "a second call added", base: 1, head: 3, findings: [][4]string{{"skip", "A / X", "1 skip call", "3 skip calls"}}},
+		{Desc: "a call kept", base: 1, head: 1},
+		{Desc: "a call dropped", base: 2, head: 1},
+	}) {
+		doc := gotestaudit.Compare(recordOf(skipping("TestX", r.base)), recordOf(skipping("TestX", r.head)))
+		gotest.Equal(row, r.findings, classFindings(&doc))
+	}
+	t.When("the head adds a test whose body writes skip calls", func(w *gotest.T) {
+		w.It("lists it as a skip weakening with no base value", func(it *gotest.T) {
+			head := recordOf(gotestaudit.Suite{Name: "ATestSuite", Display: "A", Methods: []gotestaudit.Behavior{test("TestX"), skipping("TestY", 2).Methods[0]}})
+			doc := gotestaudit.Compare(recordOf(skipping("TestX", 0)), head)
+			gotest.Equal(it, [][4]string{{"skip", "A / Y", "", "2 skip calls"}}, classFindings(&doc))
+			gotest.True(it, doc.Findings[0].Weakens)
+		})
+	})
+	t.When("the base record holds no skip counts", func(w *gotest.T) {
+		w.It("lists no skip finding and notes why", func(it *gotest.T) {
+			base := recordOf(skipping("TestX", 0))
+			base.Notes = []string{gotestaudit.FloorNote}
+			doc := gotestaudit.Compare(base, recordOf(skipping("TestX", 1)))
+			gotest.Empty(it, doc.Findings)
+			gotest.Equal(it, []string{gotestaudit.NoSkipsNote}, doc.Notes)
 		})
 	})
 }

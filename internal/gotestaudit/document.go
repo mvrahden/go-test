@@ -157,6 +157,7 @@ type Place struct {
 const (
 	ClassRemoved     = "removed"
 	ClassExcluded    = "excluded"
+	ClassSkip        = "skip"
 	ClassFocus       = "focus"
 	ClassGuard       = "guard"
 	ClassBudget      = "budget"
@@ -169,7 +170,7 @@ const (
 
 // Classes are the finding classes in order; all but changed weaken.
 var Classes = []string{
-	ClassRemoved, ClassExcluded, ClassFocus, ClassGuard, ClassBudget,
+	ClassRemoved, ClassExcluded, ClassSkip, ClassFocus, ClassGuard, ClassBudget,
 	ClassSuppression, ClassSnapshot, ClassAssertions, ClassAssertsBy, ClassChanged,
 }
 

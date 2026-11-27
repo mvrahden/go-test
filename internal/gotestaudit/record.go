@@ -11,6 +11,9 @@ const Schema = 1
 // FloorNote says what a record's assertion counts are.
 const FloorNote = "assertions counts the gotest assertion calls written in a body, a poll's call included and the calls in a poll's callback not; a helper's calls are not followed, so the count is a floor"
 
+// SkipNote says a record counts the calls that skip the test.
+const SkipNote = "skips counts the Skip, Skipf and SkipNow calls written in a body; a helper's calls are not followed"
+
 // Record is one tree's test estate as its source declares it.
 type Record struct {
 	// Version is the CLI that recorded it.
@@ -115,8 +118,11 @@ type Behavior struct {
 	// Assertions counts the assertion calls its own body makes; see FloorNote.
 	Assertions int  `json:"assertions"`
 	AssertsBy  bool `json:"assertsBy"`
-	Focused    bool `json:"focused"`
-	Excluded   bool `json:"excluded"`
+	// Skips counts the calls its own body makes that skip the test; see
+	// SkipNote.
+	Skips    int  `json:"skips,omitempty"`
+	Focused  bool `json:"focused"`
+	Excluded bool `json:"excluded"`
 	// Incomplete says its body declares behaviors the source does not name,
 	// so Children is a floor.
 	Incomplete bool       `json:"incomplete,omitempty"`

@@ -332,7 +332,7 @@ func (s *AuditEvidenceTestSuite) TestProofInThePolicy(t *gotest.T) {
 		w.It("--fail-on=all names every weakening class and no proof class", func(it *gotest.T) {
 			run := s.audit(it, "--fail-on=all")
 			gotest.Equal(it, 1, run.Exit, "stderr: %s", run.Stderr)
-			gotest.Regexp(it, `\| fail-on: removed,excluded,focus,guard,budget,suppression,snapshot,assertions,asserts-by\n$`, run.Stdout)
+			gotest.Regexp(it, `\| fail-on: removed,excluded,skip,focus,guard,budget,suppression,snapshot,assertions,asserts-by\n$`, run.Stdout)
 		})
 	})
 	t.When("--fail-on names a proof class and no stream or profile is given", func(w *gotest.T) {

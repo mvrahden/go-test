@@ -36,7 +36,7 @@ func (s *AuditRunFindingTestSuite) TestTheRunsExit(t *gotest.T) {
 		{Desc: "a run that was stopped", in: gotestaudit.StreamInput{Ran: true, Exit: 130}, classes: map[string]int{}},
 		{Desc: "a saved stream", in: gotestaudit.StreamInput{Ran: false, Exit: 1}, classes: map[string]int{}},
 	}) {
-		rec := &gotestaudit.Record{Schema: gotestaudit.Schema, Notes: []string{gotestaudit.FloorNote},
+		rec := &gotestaudit.Record{Schema: gotestaudit.Schema, Notes: []string{gotestaudit.FloorNote, gotestaudit.SkipNote},
 			Packages: []gotestaudit.Package{{Path: "m/p", Module: "m"}}}
 		doc := gotestaudit.Compare(rec, rec)
 		in := r.in

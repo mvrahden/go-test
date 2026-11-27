@@ -28,7 +28,10 @@ func Compare(base, head *Record) Document {
 	m.moved(bRoots, hRoots)
 	doc.Notes = append(doc.Notes, m.notes...)
 
-	c := &collector{doc: &doc}
+	c := &collector{doc: &doc, skips: slices.Contains(base.Notes, SkipNote) && slices.Contains(head.Notes, SkipNote)}
+	if !c.skips {
+		doc.Notes = append(doc.Notes, NoSkipsNote)
+	}
 	c.pairs(bRoots)
 	c.unmatched(bRoots, ChangeRemoved)
 	c.unmatched(hRoots, ChangeAdded)
@@ -117,8 +120,26 @@ func modulesOf(records ...*Record) []string {
 	return out
 }
 
-// collector turns the matched nodes into the document's lists.
-type collector struct{ doc *Document }
+// NoSkipsNote says a record holds no skip counts, so none were compared.
+const NoSkipsNote = "a record does not count skip calls, so a skip the head adds is not listed; record both sides with this gotest"
+
+// collector turns the matched nodes into the document's lists; skips says
+// both records count the calls that skip the test.
+type collector struct {
+	doc   *Document
+	skips bool
+}
+
+// skipText is a count of calls that skip the test.
+func skipText(n int) string {
+	switch n {
+	case 0:
+		return "no skip call"
+	case 1:
+		return "1 skip call"
+	}
+	return fmt.Sprintf("%d skip calls", n)
+}
 
 func (c *collector) find(class, pkg, subject, base, head string, loc Location) {
 	f := Finding{Class: class, Weakens: Weakens(class), Package: pkg, Subject: subject, Base: base, Head: head}
@@ -188,6 +209,10 @@ func (c *collector) pair(b, h *node) {
 	}
 	if h.b.Excluded && !b.b.Excluded {
 		c.find(ClassExcluded, h.pkg, subject(h), b.b.Name, h.b.Name, h.loc)
+		c.at(b, h)
+	}
+	if c.skips && h.b.Skips > b.b.Skips {
+		c.find(ClassSkip, h.pkg, subject(h), skipText(b.b.Skips), skipText(h.b.Skips), h.loc)
 		c.at(b, h)
 	}
 	if h.b.Focused && !b.b.Focused {
@@ -269,6 +294,10 @@ func (c *collector) marked(n *node) {
 	}
 	if excluded {
 		c.find(ClassExcluded, n.pkg, subject(n), "", name, n.loc)
+		c.at(nil, n)
+	}
+	if c.skips && n.b != nil && n.b.Skips > 0 {
+		c.find(ClassSkip, n.pkg, subject(n), "", skipText(n.b.Skips), n.loc)
 		c.at(nil, n)
 	}
 	if focused {

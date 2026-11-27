@@ -202,6 +202,25 @@ When `gotest audit --run` measures coverage it SHALL give the run a `GOCOVERDIR`
 - **WHEN** --fail-on names a proof class and no stream or profile is given
 - **THEN** audit refuses it with exit 2, naming the flags that give it
 
+### Requirement: A skip the head adds
+The audit SHALL list, as a finding of class `skip`, each behavior whose own body writes more calls that skip the test than the base's did, and each added behavior whose body writes one, naming both counts: `Skip`, `Skipf` and `SkipNow` of `testing`'s T, B, F and TB and `Skipf` of gotest's T, B and F, counted from source into the record, a helper's calls not followed. A body that writes no more of them than before SHALL be no such finding.
+
+#### Scenario: Skip calls added
+- **WHEN** the head adds calls that skip the test to two bodies and adds a test whose body writes one
+- **THEN** lists each as a finding of class skip naming the calls its body wrote before and writes now
+- **AND** --fail-on=all exits 1 and the closing line counts the three skip findings
+
+#### Scenario: A body that keeps its skip call
+- **WHEN** the head changes a body that wrote a skip call and still writes one
+- **THEN** lists no skip finding for it
+
+### Requirement: A record without skip counts
+Where a record was written without the counts of the calls that skip the test, the audit SHALL list no `skip` finding and say so in a note.
+
+#### Scenario: A record without skip counts
+- **WHEN** the base record was written without skip counts
+- **THEN** lists no skip finding and notes that a skip the head adds is not listed
+
 ### Requirement: Evidence in the renderings
 Text and Markdown SHALL mark each behavior and weakening with its verdict, a passing leaf's run-time assertions and `*` for a stale stream, name the streams read, list removed, weakened, failing, vacuous, not run and stale behaviors first, and list the unproven lines. Text SHALL fold five or more rows alike of one package and suite into one line, a failing row never, unless `-v` is given; JSON SHALL keep every row.
 

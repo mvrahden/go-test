@@ -126,7 +126,7 @@ func recordRef(g *gitBase, patterns, loadFlags []string) (*gotestaudit.Record, e
 	if len(present) == 0 {
 		// The commit has none of the directories: every package is new.
 		return &gotestaudit.Record{Version: about.ResolvedVersion(), Schema: gotestaudit.Schema, Provenance: prov, Patterns: patterns,
-			Notes: []string{gotestaudit.FloorNote}, Packages: []gotestaudit.Package{}, Suppressions: []gotestaudit.Suppression{}, Snapshots: []gotestaudit.Snapshot{}}, nil
+			Notes: []string{gotestaudit.FloorNote, gotestaudit.SkipNote}, Packages: []gotestaudit.Package{}, Suppressions: []gotestaudit.Suppression{}, Snapshots: []gotestaudit.Snapshot{}}, nil
 	}
 	out := filepath.Join(held.Dir, "base.json")
 	exe, err := os.Executable()
