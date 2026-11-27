@@ -18,6 +18,8 @@ type AuditSkipTestSuite struct {
 	// static compares the head; staticAll with --fail-on=all; oldBase
 	// against a base record without skip counts.
 	static, staticAll, oldBase testkit.Run
+	// ran runs the head's tests.
+	ran testkit.Run
 }
 
 func (s *AuditSkipTestSuite) SuiteConfig() gotest.SuiteConfig {
@@ -32,6 +34,7 @@ func (s *AuditSkipTestSuite) BeforeAll(t *gotest.T) {
 	co := gatesCheckout(t, dir, "skip", "skip")
 	s.static = auditIn(t, co, s.cache, "--base=HEAD", "--format=json")
 	s.staticAll = auditIn(t, co, s.cache, "--base=HEAD", "--fail-on=all")
+	s.ran = auditIn(t, co, s.cache, "--base=HEAD", "--run", "--format=json")
 
 	plain := gatesCheckout(t, dir, "plain")
 	baseFile := filepath.Join(dir, "base.json")
@@ -103,6 +106,25 @@ func (s *AuditSkipTestSuite) TestASkipTheHeadAdds(t *gotest.T) {
 			doc := readRunDoc(it, s.oldBase.Stdout)
 			gotest.Empty(it, doc.findings(true))
 			gotest.Equal(it, []string{"a record does not count skip calls, so a skip the head adds is not listed; record both sides with this gotest"}, doc.Notes)
+		})
+	})
+}
+
+func (s *AuditSkipTestSuite) TestATestTheHeadMakesSkip(t *gotest.T) {
+	t.When("audit --run runs tests the head added skip calls to", func(t *gotest.T) {
+		t.It("reads each as skip and counts it as not run, beside its skip finding", func(it *gotest.T) {
+			gotest.Equal(it, 0, s.ran.Exit, "stderr: %s", s.ran.Stderr)
+			doc := readRunDoc(it, s.ran.Stdout)
+			rows := map[string][2]any{}
+			for _, e := range doc.Evidence {
+				rows[strings.Join(e.Path, " / ")] = [2]any{e.Verdict, e.NeedsDecision}
+			}
+			for _, path := range []string{"Calc / Sub", "Calc / SubLater", "Calc / SubNever"} {
+				gotest.Equal(it, [2]any{"skip", true}, rows[path], path)
+			}
+			gotest.Equal(it, 4, doc.Summary.NotRun)
+			gotest.Equal(it, 3, doc.Summary.Classes["skip"])
+			gotest.Equal(it, 4, doc.Summary.Classes["not-run"])
 		})
 	})
 }

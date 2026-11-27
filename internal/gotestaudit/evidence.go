@@ -282,7 +282,7 @@ func missing(chain []*rnode, skippedAbove bool, reason string) judgment {
 	j := judgment{verdict: VerdictNotRun}
 	switch {
 	case excluded:
-		j.verdict, j.skipReason = VerdictSkip, "excluded by X_"
+		j.verdict, j.skipReason = VerdictSkip, skipExcluded
 	case skippedAbove:
 		j.verdict, j.skipReason = VerdictSkip, reason
 	}
@@ -625,9 +625,14 @@ func runtimeAssertions(d *Document, bIdx *recordIndex, bases []streamTree) {
 	}
 }
 
-// notProven reports an entry whose behavior, or a leaf beneath, did not run.
+// skipExcluded is the skip reason of a behavior X_ excludes.
+const skipExcluded = "excluded by X_"
+
+// notProven reports an entry whose behavior, or a leaf beneath, did not
+// run, or that the run skipped; one X_ excludes is judged by its finding.
 func (e *Evidence) notProven() bool {
-	return e.Verdict == VerdictNotRun || e.Verdict == VerdictNone || e.Leaves != nil && e.Leaves.NotRun > 0
+	skipped := e.Verdict == VerdictSkip && e.SkipReason != skipExcluded
+	return skipped || e.Verdict == VerdictNotRun || e.Verdict == VerdictNone || e.Leaves != nil && e.Leaves.NotRun > 0
 }
 
 // countEvidence counts the evidence into the summary and its classes.

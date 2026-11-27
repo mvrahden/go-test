@@ -311,7 +311,8 @@ type Evidence struct {
 	// Others are the other streams that hold a verdict on it.
 	Others []OtherVerdict `json:"others,omitempty"`
 	// NeedsDecision marks a row a reader must judge: failing, vacuous,
-	// not run, partly run, without evidence, or judged by a stale stream.
+	// not run, partly run, skipped by the run, without evidence, or judged
+	// by a stale stream.
 	NeedsDecision bool `json:"needsDecision"`
 	// Source is the judging stream's file, "--run" for the audit's run;
 	// Commit the commit that stream ran.

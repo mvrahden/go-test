@@ -1,0 +1,17 @@
+Expect: ^FAIL .*conformance/audit AuditGuardedRun / AGuardThatHolds / when audit --run runs a changed test whose suite's guard, as the base has it, keeps it from running / reads the test as skip with the guard's reason, counts it as not run and lists no weakening \(
+Expect: ^FAIL .*conformance/audit AuditGuardedRun / AGuardThatHolds / when audit --run runs a changed test whose suite's guard, as the base has it, keeps it from running / --fail-on=all exits 0 and --fail-on=not-run exits 1 \(
+Expect: ^FAIL .*conformance/audit AuditSkip / ATestTheHeadMakesSkip / when audit --run runs tests the head added skip calls to / reads each as skip and counts it as not run, beside its skip finding \(
+Clause: when audit --run runs a changed test whose suite's guard, as the base has it, keeps it from running → reads the test as skip with the guard's reason, counts it as not run and lists no weakening
+Clause: when audit --run runs a changed test whose suite's guard, as the base has it, keeps it from running → --fail-on=all exits 0 and --fail-on=not-run exits 1
+Clause: when audit --run runs tests the head added skip calls to → reads each as skip and counts it as not run, beside its skip finding
+--- a/internal/gotestaudit/evidence.go
++++ b/internal/gotestaudit/evidence.go
+@@ -631,7 +631,7 @@
+ // notProven reports an entry whose behavior, or a leaf beneath, did not
+ // run, or that the run skipped; one X_ excludes is judged by its finding.
+ func (e *Evidence) notProven() bool {
+-	skipped := e.Verdict == VerdictSkip && e.SkipReason != skipExcluded
++	skipped := false
+ 	return skipped || e.Verdict == VerdictNotRun || e.Verdict == VerdictNone || e.Leaves != nil && e.Leaves.NotRun > 0
+ }
+ 

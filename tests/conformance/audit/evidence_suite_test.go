@@ -224,6 +224,17 @@ func (s *AuditEvidenceTestSuite) TestEvidenceFromRuns(t *gotest.T) {
 	})
 }
 
+func (s *AuditEvidenceTestSuite) TestABehaviorXExcludes(t *gotest.T) {
+	t.When("a stream's run left out a behavior X_ excludes", func(w *gotest.T) {
+		w.It("reads it as skip and does not count it as not run", func(it *gotest.T) {
+			doc := readProof(it, s.json)
+			empty := doc.evidenceOf("Cart / Empty")
+			gotest.Equal(it, []string{"skip", "excluded by X_"}, []string{empty.Verdict, empty.SkipReason})
+			gotest.Contains(it, s.text.Stdout, "| evidence: 11 (failing 2, not run 2, vacuous 2, stale 0) |")
+		})
+	})
+}
+
 func (s *AuditEvidenceTestSuite) TestCurrentAndStaleEvidence(t *gotest.T) {
 	t.When("audit is given streams of another commit, of a tree with uncommitted changes and without a manifest", func(w *gotest.T) {
 		w.It("marks each stale, naming another commit, uncommitted changes and no manifest", func(it *gotest.T) {

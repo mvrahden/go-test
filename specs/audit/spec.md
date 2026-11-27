@@ -221,6 +221,22 @@ Where a record was written without the counts of the calls that skip the test, t
 - **WHEN** the base record was written without skip counts
 - **THEN** lists no skip finding and notes that a skip the head adds is not listed
 
+### Requirement: A behavior the run skipped
+An evidence row whose behavior the run skipped, by a call in the test, by its suite's guard or by a focus elsewhere, SHALL read `skip`, give the reason, and count as not run: under `not-run`, in the closing line and as a row that needs a decision. A row `X_` excludes SHALL not count: its `excluded` finding names it. A skip SHALL be no weakening by itself, so a changed test under a guard the base already has leaves `all` unbroken.
+
+#### Scenario: A changed test under a guard that holds
+- **WHEN** audit --run runs a changed test whose suite's guard, as the base has it, keeps it from running
+- **THEN** reads the test as skip with the guard's reason, counts it as not run and lists no weakening
+- **AND** --fail-on=all exits 0 and --fail-on=not-run exits 1
+
+#### Scenario: A test the head makes skip
+- **WHEN** audit --run runs tests the head added skip calls to
+- **THEN** reads each as skip and counts it as not run, beside its skip finding
+
+#### Scenario: A behavior X_ excludes
+- **WHEN** a stream's run left out a behavior X_ excludes
+- **THEN** reads it as skip and does not count it as not run
+
 ### Requirement: Evidence in the renderings
 Text and Markdown SHALL mark each behavior and weakening with its verdict, a passing leaf's run-time assertions and `*` for a stale stream, name the streams read, list removed, weakened, failing, vacuous, not run and stale behaviors first, and list the unproven lines. Text SHALL fold five or more rows alike of one package and suite into one line, a failing row never, unless `-v` is given; JSON SHALL keep every row.
 
