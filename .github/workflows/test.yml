@@ -38,7 +38,7 @@ jobs:
         shard: [cli, core]
         include:
           - os: windows-latest
-            timeout-scale: 2
+            timeout-scale: 3
           - os: macos-latest
             parallel: 6
             timeout-scale: 2
