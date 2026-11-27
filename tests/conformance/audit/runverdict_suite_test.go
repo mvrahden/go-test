@@ -14,6 +14,8 @@ import (
 type AuditRunVerdictTestSuite struct {
 	dir, cache                   string
 	added, addedFailing, addedMd testkit.Run
+	// hookOnly changes a hook alone; unchanged changes nothing.
+	hookOnly, unchanged testkit.Run
 }
 
 func (s *AuditRunVerdictTestSuite) SuiteConfig() gotest.SuiteConfig {
@@ -29,6 +31,8 @@ func (s *AuditRunVerdictTestSuite) BeforeAll(t *gotest.T) {
 	s.added = auditIn(t, co, s.cache, "--base=HEAD", "--run", "--format=json")
 	s.addedFailing = auditIn(t, co, s.cache, "--base=HEAD", "--run", "--fail-on=failing")
 	s.addedMd = auditIn(t, co, s.cache, "--base=HEAD", "--run", "--format=md")
+	s.hookOnly = auditIn(t, gatesCheckout(t, dir, "hook", "hook"), s.cache, "--base=HEAD", "--run", "--fail-on=failing", "--format=json")
+	s.unchanged = auditIn(t, gatesCheckout(t, dir, "plain"), s.cache, "--base=HEAD", "--run", "--format=json")
 }
 
 func (s *AuditRunVerdictTestSuite) AfterAll(t *gotest.T) {
@@ -60,6 +64,29 @@ func (s *AuditRunVerdictTestSuite) TestARunThatFails(t *gotest.T) {
 			gotest.Contains(it, s.addedFailing.Stdout, "\n\nrun:\n  failing  this audit's run exited 1\n")
 			gotest.Contains(it, s.addedMd.Stdout, "\n#### Run\n\n- failing: this audit's run exited 1\n")
 			gotest.Equal(it, 0, s.addedMd.Exit, "stderr: %s", s.addedMd.Stderr)
+		})
+	})
+}
+
+func (s *AuditRunVerdictTestSuite) TestAChangedTestFile(t *gotest.T) {
+	t.When("audit --run compares a head that changes only a suite's hook, which now fails", func(t *gotest.T) {
+		t.It("runs the suite's package though no behavior changed, and lists the failing run", func(it *gotest.T) {
+			doc := readRunDoc(it, s.hookOnly.Stdout)
+			gotest.Empty(it, doc.Behaviors)
+			gotest.Len(it, doc.Streams, 1)
+			gotest.True(it, doc.Streams[0].Ran)
+			gotest.NotZero(it, doc.Streams[0].Run)
+			gotest.Equal(it, []string{"-json", "gatesmod/calc"}, doc.Streams[0].Run.Args)
+			gotest.Equal(it, []finding{{"failing", "this audit's run", "", "exited 1"}}, doc.findings(false))
+			gotest.Equal(it, 1, s.hookOnly.Exit, "stderr: %s", s.hookOnly.Stderr)
+		})
+	})
+	t.When("audit --run compares a head that changes no Go file", func(t *gotest.T) {
+		t.It("runs nothing and notes that no package holds a changed behavior, a changed test file or a changed production file", func(it *gotest.T) {
+			gotest.Equal(it, 0, s.unchanged.Exit, "stderr: %s", s.unchanged.Stderr)
+			doc := readRunDoc(it, s.unchanged.Stdout)
+			gotest.Empty(it, doc.Streams)
+			gotest.Equal(it, []string{"--run: no package holds a changed behavior, a changed test file or a changed production file, so nothing ran"}, doc.Notes)
 		})
 	})
 }

@@ -1252,6 +1252,8 @@ shards of one run do not add up to every mutant exactly once.
 | `audit-run-exit-ignored` | the code of the run `--run` made is not kept | audit conformance: the failed-run It finds no finding |
 | `audit-text-run-unnamed` | the text format names no failed run | audit conformance: the renderings It finds no run: block |
 | `audit-markdown-run-unnamed` | the Markdown names no failed run | audit conformance: the renderings It finds no Run heading |
+| `audit-test-file-package-unrun` | a changed test file's package is not run | audit conformance: the hook-only It finds no run |
+| `audit-nothing-ran-unsaid` | an empty run set is not said | audit conformance: the nothing-to-run It finds no note |
 | `mutate-boundary-never-written` | an ordering gets no boundary mutant, only its negation | audit conformance: the mutants It and the survivor It find no boundary mutant |
 | `mutate-schemata-written-into-the-module` | the mutants' source is also written beside each file of the module | audit conformance: the module It finds a file the audit added |
 | `mutate-tests-of-the-mutated-package-only` | only the mutated package's own tests judge its mutants | audit conformance: the suites It finds Grade's line judged by no suite |

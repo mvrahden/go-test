@@ -140,12 +140,20 @@ With `--base-evidence=<stream>`, a stream of the base's run, a finding of class 
 - **THEN** the assertions finding carries the base's and the head's run-time counts
 
 ### Requirement: The audit's own run
-`gotest audit --run` SHALL run, through gotest's runner, the packages holding a behavior the comparison names and, when the changed lines are known, the changed production packages, measuring their coverage, and take that run as current evidence. Where no package holds one it SHALL run nothing and say so.
+`gotest audit --run` SHALL run, through gotest's runner, the packages holding a behavior the comparison names and, when the changed lines are known, the packages holding a changed test file and the changed production packages, measuring the coverage of the latter, and take that run as current evidence. Where no package holds one it SHALL run nothing and say so.
 
 #### Scenario: Running what changed
 - **WHEN** audit --run compares the working tree with a base
 - **THEN** runs the packages of the changed behaviors and states their verdicts as current evidence of that run
 - **AND** lists the changed production lines that run did not execute
+
+#### Scenario: A changed test file without a changed behavior
+- **WHEN** audit --run compares a head that changes only a suite's hook, which now fails
+- **THEN** runs the suite's package though no behavior changed, and lists the failing run
+
+#### Scenario: Nothing to run
+- **WHEN** audit --run compares a head that changes no Go file
+- **THEN** runs nothing and notes that no package holds a changed behavior, a changed test file or a changed production file
 
 ### Requirement: A run of the audit that fails
 When the run `gotest audit --run` made exits non-zero and was not stopped, the audit SHALL list one finding of class `failing` about the run, its exit code as the head value, whatever the evidence rows read. It is no weakening: `--fail-on` naming `failing` or `proof` SHALL exit 1 on it, `all` SHALL not, and without `--fail-on` the audit SHALL exit 0. The text format SHALL name it under `run:` and in a `run:` segment of the closing line, Markdown under a `Run` heading.

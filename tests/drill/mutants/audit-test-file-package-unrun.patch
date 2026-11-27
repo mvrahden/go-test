@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditRunVerdict / AChangedTestFile / when audit --run compares a head that changes only a suite's hook, which now fails / runs the suite's package though no behavior changed, and lists the failing run \(
+Clause: when audit --run compares a head that changes only a suite's hook, which now fails → runs the suite's package though no behavior changed, and lists the failing run
+--- a/cmd/gotest/auditproof.go
++++ b/cmd/gotest/auditproof.go
+@@ -426,7 +426,7 @@
+ 	slices.Sort(cover)
+ 	cover = slices.Compact(cover)
+ 	run = append(run, cover...)
+-	run = append(run, tests...)
++	_ = tests
+ 	if mut != nil {
+ 		run = append(run, mut.tests...)
+ 	}
