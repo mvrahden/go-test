@@ -14,7 +14,9 @@ type StreamInput struct {
 	File string
 	Side string
 	// Ran marks the run the audit made of the working tree itself.
-	Ran    bool
+	Ran bool
+	// Exit is the exit code of the run the audit made.
+	Exit   int
 	Events []gotestspec.TestEvent
 	// Fresh says, of each package whose verdict the stream stamped with an
 	// input hash, whether the head's tree still has that hash; nil when the
@@ -493,10 +495,40 @@ func subjects(d *Document) []*evidenceSubject {
 	return out
 }
 
+// RunSubject is the subject of the finding about the run the audit made.
+const RunSubject = "this audit's run"
+
+// stoppedExit is the code of a stopped run, named among what was not
+// compared instead.
+const stoppedExit = 130
+
+// runFinding is the finding of a run the audit made that exited code.
+func runFinding(code int) Finding {
+	f := Finding{Class: ClassFailing, Subject: RunSubject, Head: fmt.Sprintf("exited %d", code)}
+	f.ID = stableID(f.Class, f.Module, f.Package, f.Subject, f.Base, f.Head)
+	return f
+}
+
+// failedRuns counts the findings of class failing: runs the audit made.
+func (d *Document) failedRuns() int {
+	n := 0
+	for i := range d.Findings {
+		if d.Findings[i].Class == ClassFailing {
+			n++
+		}
+	}
+	return n
+}
+
 // AddEvidence states, for each behavior the document names, what the
 // streams of its side say, and counts it. base and head are the records
 // compared.
 func AddEvidence(d *Document, base, head *Record, inputs []StreamInput) {
+	for i := range inputs {
+		if in := &inputs[i]; in.Ran && in.Exit != 0 && in.Exit != stoppedExit {
+			d.Findings = append(d.Findings, runFinding(in.Exit))
+		}
+	}
 	hIdx, bIdx := indexRecord(head), indexRecord(base)
 	var heads, bases []streamTree
 	var headAt []int
@@ -617,7 +649,7 @@ func (d *Document) countEvidence() {
 			s.Stale++
 		}
 	}
-	setClass(s, ClassFailing, s.Failing)
+	setClass(s, ClassFailing, s.Failing+d.failedRuns())
 	setClass(s, ClassNotRun, s.NotRun)
 	setClass(s, ClassVacuous, s.Vacuous)
 	setClass(s, ClassStale, s.Stale)

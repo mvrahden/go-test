@@ -147,6 +147,15 @@ With `--base-evidence=<stream>`, a stream of the base's run, a finding of class 
 - **THEN** runs the packages of the changed behaviors and states their verdicts as current evidence of that run
 - **AND** lists the changed production lines that run did not execute
 
+### Requirement: A run of the audit that fails
+When the run `gotest audit --run` made exits non-zero and was not stopped, the audit SHALL list one finding of class `failing` about the run, its exit code as the head value, whatever the evidence rows read. It is no weakening: `--fail-on` naming `failing` or `proof` SHALL exit 1 on it, `all` SHALL not, and without `--fail-on` the audit SHALL exit 0. The text format SHALL name it under `run:` and in a `run:` segment of the closing line, Markdown under a `Run` heading.
+
+#### Scenario: A run that fails outside its rows
+- **WHEN** audit --run runs an added test whose suite's BeforeAll fails
+- **THEN** lists a failing finding about the run naming exit 1, beside the test read as not run, and exits 0 without --fail-on
+- **AND** --fail-on=failing exits 1 and the closing line names run: exited 1
+- **AND** names the run under run: in the text format and under a Run heading in Markdown
+
 ### Requirement: Unproven lines
 Given a coverage profile, `--coverage` or the one `--run` measured, and the changed lines, from `--diff` or from git between `--base` and the files on disk with untracked files whole, the audit SHALL list per changed non-test file of the packages audited the changed lines a block spans and none executed, as ranges with counts. A line no block spans SHALL not count; a file of a package no block covers SHALL read as without coverage data.
 

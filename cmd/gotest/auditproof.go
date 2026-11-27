@@ -375,7 +375,7 @@ func (a *auditArgs) runChanged(doc *gotestaudit.Document, files []gotestaudit.Pr
 	} else {
 		doc.Notes = append(doc.Notes, "--run: coverage is of the packages the run ran: "+strings.Join(run, " "))
 	}
-	return &gotestaudit.StreamInput{Side: gotestaudit.SideHead, Ran: true, Events: events}, profile, nil
+	return &gotestaudit.StreamInput{Side: gotestaudit.SideHead, Ran: true, Exit: exitCodeOf(runErr), Events: events}, profile, nil
 }
 
 // readMutationBaseline reads the run --mutate made with no mutant on as the

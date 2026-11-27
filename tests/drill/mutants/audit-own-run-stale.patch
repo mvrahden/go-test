@@ -2,12 +2,12 @@ Expect: ^FAIL .*conformance/audit AuditRun / TheAuditsOwnRun / when audit --run 
 Clause: when audit --run compares the working tree with a base → runs the packages of the changed behaviors and states their verdicts as current evidence of that run
 --- a/cmd/gotest/auditproof.go
 +++ b/cmd/gotest/auditproof.go
-@@ -397,7 +397,7 @@
+@@ -375,7 +375,7 @@
  	} else {
  		doc.Notes = append(doc.Notes, "--run: coverage is of the packages the run ran: "+strings.Join(run, " "))
  	}
--	return &gotestaudit.StreamInput{Side: gotestaudit.SideHead, Ran: true, Events: events}, profile, nil
-+	return &gotestaudit.StreamInput{Side: gotestaudit.SideHead, Events: events}, profile, nil
+-	return &gotestaudit.StreamInput{Side: gotestaudit.SideHead, Ran: true, Exit: exitCodeOf(runErr), Events: events}, profile, nil
++	return &gotestaudit.StreamInput{Side: gotestaudit.SideHead, Exit: exitCodeOf(runErr), Events: events}, profile, nil
  }
  
  // readMutationBaseline reads the run --mutate made with no mutant on as the

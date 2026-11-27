@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditRunVerdict / ARunThatFails / when audit --run runs an added test whose suite's BeforeAll fails / names the run under run: in the text format and under a Run heading in Markdown \(
+Clause: when audit --run runs an added test whose suite's BeforeAll fails → names the run under run: in the text format and under a Run heading in Markdown
+--- a/internal/gotestaudit/render.go
++++ b/internal/gotestaudit/render.go
+@@ -596,7 +596,7 @@
+ 		fmt.Fprintf(w, "\nEvidence: %s\n", gotestspec.EscapeLabel(streamsText(d)))
+ 	}
+ 	for i := range d.Findings {
+-		if f := &d.Findings[i]; f.Class == ClassFailing {
++		if f := &d.Findings[i]; f.Class == ClassFailing && false {
+ 			fmt.Fprintf(w, "\n#### Run\n\n- %s: %s\n", f.Class, gotestspec.EscapeLabel(findingText(d, f)))
+ 		}
+ 	}
