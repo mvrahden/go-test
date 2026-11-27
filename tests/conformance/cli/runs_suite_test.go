@@ -126,13 +126,22 @@ type runsDoc struct {
 			Args []string `json:"args"`
 		} `json:"manifest"`
 		Result struct {
-			ExitCode int `json:"exitCode"`
+			ExitCode int             `json:"exitCode"`
+			Tests    json.RawMessage `json:"tests"`
 		} `json:"result"`
 		Failed   []struct{ Package, Test string } `json:"failed"`
 		Packages struct {
 			Total, Current, Stale, Unknown int
 		} `json:"packages"`
+		Ran []ranPackage `json:"ran"`
 	} `json:"runs"`
+}
+
+// ranPackage is a package a listed run judged.
+type ranPackage struct {
+	Package   string `json:"package"`
+	Status    string `json:"status"`
+	InputHash string `json:"inputHash"`
 }
 
 func (tr freshTree) runs(t *gotest.T, args ...string) (runsDoc, testkit.Run) {
@@ -146,8 +155,10 @@ func (tr freshTree) runs(t *gotest.T, args ...string) (runsDoc, testkit.Run) {
 func (s *CLIRunRecordsTestSuite) TestTwoRunsListed(t *gotest.T) {
 	tr := stageFresh(t)
 	gotest.Equal(t, 1, tr.run(t, "./c/", "./d/").Exit)
+	first := tr.lastRecord(t)
 	tr.edit(t, "c/data.txt", "edited\n")
 	gotest.Equal(t, 0, tr.run(t, "./b/").Exit)
+	second := tr.lastRecord(t)
 	doc, run := tr.runs(t)
 	text := tr.run(t, "runs")
 
@@ -165,6 +176,18 @@ func (s *CLIRunRecordsTestSuite) TestTwoRunsListed(t *gotest.T) {
 		w.It("counts the changed package of the first stale and every other package current", func(it *gotest.T) {
 			gotest.Equal(it, struct{ Total, Current, Stale, Unknown int }{1, 1, 0, 0}, doc.Runs[0].Packages)
 			gotest.Equal(it, struct{ Total, Current, Stale, Unknown int }{2, 1, 1, 0}, doc.Runs[1].Packages)
+		})
+		w.It("lists the packages each run judged, sorted, with their verdict and InputHash", func(it *gotest.T) {
+			gotest.Len(it, doc.Runs, 2)
+			gotest.Equal(it, []ranPackage{{"fresh/b", "pass", second["fresh/b"].InputHash}}, doc.Runs[0].Ran)
+			gotest.Equal(it, []ranPackage{{"fresh/c", "pass", first["fresh/c"].InputHash}, {"fresh/d", "fail", first["fresh/d"].InputHash}}, doc.Runs[1].Ran)
+			gotest.NotEmpty(it, first["fresh/c"].InputHash)
+		})
+		w.It("gives the text runs no test counts", func(it *gotest.T) {
+			gotest.Len(it, doc.Runs, 2)
+			gotest.Empty(it, doc.Runs[0].Result.Tests)
+			gotest.Empty(it, doc.Runs[1].Result.Tests)
+			gotest.Contains(it, run.Stdout, `"result":{"exitCode":0,"packages":`)
 		})
 		w.It("the text format prints one line for each, newest first", func(it *gotest.T) {
 			gotest.Equal(it, 0, text.Exit, "stderr: %s", text.Stderr)

@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/cli CLIChanged .* / lists in Changed the packages it runs, sorted \(
+Clause: when a --changed run leaves packages out as unchanged → lists in Changed the packages it runs, sorted
+--- a/cmd/gotest/changed.go
++++ b/cmd/gotest/changed.go
+@@ -135,8 +135,8 @@
+ 		plan.only = cfg.Only
+ 	}
+ 	unchanged := len(pkgs.Order) - len(keep)
+-	narrowPackages(pkgs, keep)
+ 	plan.changed = narrowedTo(pkgs.Order, unchanged)
++	narrowPackages(pkgs, keep)
+ 	plan.setManifest(cfg)
+ 	return plan, true
+ }

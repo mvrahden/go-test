@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLIRunRecords .* / lists the packages each run judged, sorted, with their verdict and InputHash \(
+Clause: when gotest runs --format=json follows two runs, a package of the first changed since → lists the packages each run judged, sorted, with their verdict and InputHash
+--- a/cmd/gotest/runs.go
++++ b/cmd/gotest/runs.go
+@@ -194,7 +194,7 @@
+ 		e.Result.Tests = &tests
+ 	}
+ 	for _, p := range r.Packages {
+-		e.Ran = append(e.Ran, runsPackage{Package: p.Package, Status: p.Verdict, InputHash: p.InputHash})
++		_ = p
+ 	}
+ 	slices.SortStableFunc(e.Ran, func(a, b runsPackage) int { return strings.Compare(a.Package, b.Package) })
+ 	if e.Manifest.Args == nil {

@@ -123,7 +123,7 @@ func (s *startWriter) end(code int) {
 
 // resultLocked is what the stream has held so far, its exit code aside.
 func (r *runTally) resultLocked() protocol.RunResult {
-	result := protocol.RunResult{Tests: r.tests, NotRun: r.notRun, Vacuous: r.vacuous}
+	result := protocol.RunResult{Tests: new(r.tests), NotRun: r.notRun, Vacuous: r.vacuous}
 	for _, pkg := range r.order {
 		result.Packages.Add(r.packages[pkg])
 	}

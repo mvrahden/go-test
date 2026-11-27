@@ -797,11 +797,12 @@ A text run SHALL take the census of a -json run, under its rules: a suite whose 
 - **THEN** passes, noting that the census was skipped
 
 ### Requirement: A run's record
-A test run, a -json run, spec and summary SHALL record, when they run their packages, their manifest, their result and the units they failed in `runs/<key>/last.json` under the gotest cache, the key a hash of the working directory, replacing the record before it, but as a --changed run keeps it, and writing nothing into the module.
+A test run, a -json run, spec and summary SHALL record, when they run their packages, their manifest, their result and the units they failed in `runs/<key>/last.json` under the gotest cache, the key a hash of the working directory, replacing the record before it, but as a --changed run keeps it, and writing nothing into the module. A text run, which keeps no test verdicts, SHALL record no test counts rather than zeros.
 
 #### Scenario: The record of a failing run
 - **WHEN** a text run of a failing package ends
 - **THEN** its record names the failing method and exit code 1
+- **AND** its record holds no test counts
 - **AND** the module holds no file it did not hold before
 
 ### Requirement: Rerunning what failed
@@ -874,18 +875,20 @@ spec and summary given --input and --check-fresh SHALL hash the stream's package
 #### Scenario: Without a record
 - **WHEN** --changed is given in a working directory without a record
 - **THEN** runs every package and says on stderr that no run is recorded
+- **AND** -json --changed lists every package in its manifest's Changed
 
 #### Scenario: Beside --failed
 - **WHEN** --changed --failed follows a run in which one method of an unchanged package failed
 - **THEN** reruns only that method
 
 ### Requirement: A run narrowed to what changed
-A --changed run SHALL say how far it was narrowed: its manifest's `Changed` holds the packages it ran and those it left out unchanged, and its closing line SHALL end its counts with `changed only:` and both numbers, or say that it found no record and all ran. Its census SHALL judge the packages it ran, never those it left out.
+A --changed run SHALL say how far it was narrowed: its manifest's `Changed` counts the packages it ran and those it left out unchanged and lists in `Packages`, sorted, the import paths of those it runs, and its closing line SHALL end its counts with `changed only:` and both numbers, or say that it found no record and all ran. Its census SHALL judge the packages it ran, never those it left out.
 
 #### Scenario: A run that left packages out
 - **WHEN** a --changed run leaves packages out as unchanged
 - **THEN** ends stderr with a closing line counting the packages it ran and those unchanged
 - **AND** opens its -json stream with a manifest whose Changed holds both counts
+- **AND** lists in Changed the packages it runs, sorted
 - **AND** closes the stream with 0 units not run
 
 ### Requirement: The packages of a record
@@ -913,12 +916,14 @@ Each run that records itself SHALL also keep its record alone, with the path of 
 - **AND** the second no longer holds the old one
 
 ### Requirement: Listing the runs
-`gotest runs` SHALL list the working directory's kept records newest first, each with its time, manifest, result, failed units, events file and how many of its packages are current, stale and unknown in the working tree now, as text or with --format=json as one document opening with `version`, exiting 0 with no record too. `--import=<file>` SHALL keep a saved stream's run among them, refusing with exit 2 a file that holds no package verdict.
+`gotest runs` SHALL list the working directory's kept records newest first, each with its time, manifest, result, failed units, events file, its packages with verdict and InputHash, and how many of them are current, stale and unknown in the working tree now, as text or with --format=json as one document opening with `version`, exiting 0 with no record too. `--import=<file>` SHALL keep a saved stream's run among them, refusing with exit 2 a file that holds no package verdict.
 
 #### Scenario: Two runs listed
 - **WHEN** gotest runs --format=json follows two runs, a package of the first changed since
 - **THEN** prints one document opening with version that lists both newest first, with manifest, result and failed units
 - **AND** counts the changed package of the first stale and every other package current
+- **AND** lists the packages each run judged, sorted, with their verdict and InputHash
+- **AND** gives the text runs no test counts
 - **AND** the text format prints one line for each, newest first
 
 #### Scenario: Nothing recorded

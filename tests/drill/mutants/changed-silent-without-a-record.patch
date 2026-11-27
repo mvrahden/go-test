@@ -7,6 +7,6 @@ Clause: when --changed is given in a working directory without a record → runs
  	rec, err := gotestrunner.ReadRunRecord(dir)
  	if errors.Is(err, os.ErrNotExist) || err == nil && rec.Packages == nil {
 -		fmt.Fprintf(os.Stderr, "gotest: --changed: no run of %s is recorded, so every package runs\n", dir)
- 		plan.changed = &protocol.Changed{Ran: len(pkgs.Order), NoRecord: true}
+ 		plan.changed = narrowedTo(pkgs.Order, 0)
+ 		plan.changed.NoRecord = true
  		plan.setManifest(cfg)
- 		return plan, true

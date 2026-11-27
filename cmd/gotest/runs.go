@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -102,14 +103,25 @@ type runsEntry struct {
 	Result     runsResult    `json:"result"`
 	Failed     []runsUnit    `json:"failed"`
 	Packages   runsFreshness `json:"packages"`
+	// Ran are the packages the run judged, sorted; absent from a record
+	// that kept none.
+	Ran []runsPackage `json:"ran,omitzero"`
+}
+
+// runsPackage is one package a run judged.
+type runsPackage struct {
+	Package   string `json:"package"`
+	Status    string `json:"status"`
+	InputHash string `json:"inputHash,omitempty"`
 }
 
 type runsResult struct {
 	ExitCode int       `json:"exitCode"`
 	Packages runsTally `json:"packages"`
-	Tests    runsTally `json:"tests"`
-	NotRun   *int      `json:"notRun,omitempty"`
-	Vacuous  *int      `json:"vacuous,omitempty"`
+	// Tests is absent for a text run, which counts no tests.
+	Tests   *runsTally `json:"tests,omitempty"`
+	NotRun  *int       `json:"notRun,omitempty"`
+	Vacuous *int       `json:"vacuous,omitempty"`
 }
 
 type runsTally struct {
@@ -140,6 +152,9 @@ type runsChanged struct {
 	Ran       int  `json:"ran"`
 	Unchanged int  `json:"unchanged"`
 	NoRecord  bool `json:"noRecord,omitempty"`
+	// Packages are the import paths it ran, sorted; absent from a record
+	// older than the list.
+	Packages []string `json:"packages,omitzero"`
 }
 
 // changedOf is c as the listing prints it, nil for a run not narrowed.
@@ -147,7 +162,7 @@ func changedOf(c *protocol.Changed) *runsChanged {
 	if c == nil {
 		return nil
 	}
-	return &runsChanged{Ran: c.Ran, Unchanged: c.Unchanged, NoRecord: c.NoRecord}
+	return &runsChanged{Ran: c.Ran, Unchanged: c.Unchanged, NoRecord: c.NoRecord, Packages: c.Packages}
 }
 
 // runsFreshness counts a record's packages by whether their verdict still
@@ -167,13 +182,21 @@ func entryOf(k *gotestrunner.KeptRun, fresh map[string]map[string]string) runsEn
 		Manifest: runsManifest{Version: m.Version, GoVersion: m.GoVersion, Args: m.Args, Commit: m.Commit, Dirty: m.Dirty, Agent: m.Agent, Build: m.Build, Changed: changedOf(m.Changed)},
 		Result: runsResult{
 			ExitCode: r.Result.ExitCode, NotRun: r.Result.NotRun, Vacuous: r.Result.Vacuous,
-			Packages: runsTally(r.Result.Packages), Tests: runsTally(r.Result.Tests),
+			Packages: runsTally(r.Result.Packages),
 		},
 		Failed: []runsUnit{},
 	}
 	for _, u := range r.Failed {
 		e.Failed = append(e.Failed, runsUnit(u))
 	}
+	if t := r.Result.Tests; t != nil {
+		tests := runsTally(*t)
+		e.Result.Tests = &tests
+	}
+	for _, p := range r.Packages {
+		e.Ran = append(e.Ran, runsPackage{Package: p.Package, Status: p.Verdict, InputHash: p.InputHash})
+	}
+	slices.SortStableFunc(e.Ran, func(a, b runsPackage) int { return strings.Compare(a.Package, b.Package) })
 	if e.Manifest.Args == nil {
 		e.Manifest.Args = []string{}
 	}

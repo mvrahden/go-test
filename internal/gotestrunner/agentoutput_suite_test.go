@@ -57,7 +57,7 @@ func (s *AgentOutputTestSuite) TestTheClosingLine(t *gotest.T) {
 	}
 
 	t.It("counts the units the census booked as not run instead of failed", func(it *gotest.T) {
-		res := &protocol.RunResult{Tests: protocol.Tally{Failed: 3}, NotRun: intp(2), Packages: protocol.Tally{Failed: 1}}
+		res := &protocol.RunResult{Tests: &protocol.Tally{Failed: 3}, NotRun: intp(2), Packages: protocol.Tally{Failed: 1}}
 		gotest.Equal(it, &protocol.Tally{Failed: 1}, gotestrunner.ClosingOf(res, 2, true).Tests)
 		gotest.Zero(it, gotestrunner.ClosingOf(res, 2, false).Tests)
 	})

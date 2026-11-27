@@ -95,7 +95,8 @@ func planRun(cfg *ExecConfig, pkgs *gotestgen.RunPackages) (*runPlan, bool) {
 	rec, err := gotestrunner.ReadRunRecord(dir)
 	if errors.Is(err, os.ErrNotExist) || err == nil && rec.Packages == nil {
 		fmt.Fprintf(os.Stderr, "gotest: --changed: no run of %s is recorded, so every package runs\n", dir)
-		plan.changed = &protocol.Changed{Ran: len(pkgs.Order), NoRecord: true}
+		plan.changed = narrowedTo(pkgs.Order, 0)
+		plan.changed.NoRecord = true
 		plan.setManifest(cfg)
 		return plan, true
 	}
@@ -133,10 +134,21 @@ func planRun(cfg *ExecConfig, pkgs *gotestgen.RunPackages) (*runPlan, bool) {
 		}
 		plan.only = cfg.Only
 	}
-	plan.changed = &protocol.Changed{Ran: len(keep), Unchanged: len(pkgs.Order) - len(keep)}
+	unchanged := len(pkgs.Order) - len(keep)
 	narrowPackages(pkgs, keep)
+	plan.changed = narrowedTo(pkgs.Order, unchanged)
 	plan.setManifest(cfg)
 	return plan, true
+}
+
+// narrowedTo is the narrowing of a run that runs pkgs and left out
+// unchanged packages.
+func narrowedTo(pkgs []string, unchanged int) *protocol.Changed {
+	sorted := slices.Sorted(slices.Values(pkgs))
+	if sorted == nil {
+		sorted = []string{}
+	}
+	return &protocol.Changed{Ran: len(sorted), Unchanged: unchanged, Packages: sorted}
 }
 
 // planReport is planRun for spec and summary, whose run always opens a

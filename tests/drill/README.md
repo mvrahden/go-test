@@ -627,6 +627,7 @@ shards of one run do not add up to every mutant exactly once.
 | `text-census-counts-nothing-not-run` | a text run's census finds units without a verdict but counts none | CLI conformance: the closing line of those runs names no test not run |
 | `census-judges-a-zero-count` | the census judges a run given `-count=0` | CLI conformance: the `-json` run given `-count=0` exits 2 and neither run notes the census skipped |
 | `record-names-no-failure` | a run's record lists no failed unit | CLI conformance: the record of a failing run names no method |
+| `record-counts-text-tests-zero` | a text run records test counts of zero | CLI conformance: the record's result holds `Tests` |
 | `record-written-into-the-module` | a run's record is written under the working directory instead of the cache | CLI conformance: the cache holds no record and the module holds a new file |
 | `failed-reruns-whole-packages` | `--failed` reruns every suite of a package that failed | CLI conformance: the text, `-json` and spec reruns run the passing method too |
 | `failed-runs-packages-that-passed` | `--failed` over packages none of which failed runs them | CLI conformance: `--failed` given the passing package exits 0 with nothing to run |
@@ -1211,6 +1212,8 @@ shards of one run do not add up to every mutant exactly once.
 | `changed-failed-reruns-whole-packages` | `--changed --failed` reruns a failed package whole | cli conformance: the passing method of the failed package runs too |
 | `closing-line-hides-the-narrowing` | the closing line of a `--changed` run says nothing of the packages it left out | cli conformance: the closing line ends at the package counts |
 | `manifest-hides-the-narrowing` | a `--changed` run's manifest holds no `Changed` | cli conformance: the opening event has no Changed |
+| `changed-lists-the-packages-left-out` | a `--changed` run's manifest lists in `Changed` every loaded package, those it left out too | cli conformance: `Changed.Packages` names the unchanged package |
+| `changed-without-a-record-lists-nothing` | a `--changed` run without a record lists no package in `Changed` | cli conformance: `Changed.Packages` is empty |
 | `changed-run-narrows-with-run` | a `--changed` run narrows itself with `-run`, which stands the census down | cli conformance: the closing event has no count of units not run |
 | `record-ignores-run-narrowing` | a `-run` narrowed run's packages are recorded as whole | cli conformance: the recorded package is not marked narrowed |
 | `changed-run-replaces-the-record` | a `--changed` run replaces the record instead of keeping the packages it left out | cli conformance: the record holds only the packages the run ran |
@@ -1222,6 +1225,8 @@ shards of one run do not add up to every mutant exactly once.
 | `runs-count-every-hash-current` | `gotest runs` counts any recorded package the tree still has as current | cli conformance: the changed package counts current |
 | `runs-text-counts-stale-as-current` | the text listing counts stale packages as current | cli conformance: the older run's line counts 2 current, 0 stale |
 | `runs-without-a-record-fails` | `gotest runs` prints nothing without a record | cli conformance: stdout does not say no run is recorded |
+| `runs-list-no-packages` | `gotest runs` lists no package a run judged | cli conformance: the entries have no `ran` |
+| `runs-count-text-runs-zero-tests` | `gotest runs` gives a text run test counts of zero | cli conformance: the text runs' result has `tests` |
 | `import-forgets-the-file` | an imported run's record names no file | cli conformance: the imported entry has no events file |
 | `import-takes-an-empty-stream` | `--import` keeps a stream without a package verdict | cli conformance: the empty file is imported with exit 0 |
 | `audit-judges-hashed-streams-by-commit` | the audit judges a stream with input hashes by the tree's commit | audit conformance: the unchanged package's evidence is stale on the dirty tree |

@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/cli CLIChanged .* / -json --changed lists every package in its manifest's Changed \(
+Clause: when --changed is given in a working directory without a record → -json --changed lists every package in its manifest's Changed
+--- a/cmd/gotest/changed.go
++++ b/cmd/gotest/changed.go
+@@ -95,8 +95,7 @@
+ 	rec, err := gotestrunner.ReadRunRecord(dir)
+ 	if errors.Is(err, os.ErrNotExist) || err == nil && rec.Packages == nil {
+ 		fmt.Fprintf(os.Stderr, "gotest: --changed: no run of %s is recorded, so every package runs\n", dir)
+-		plan.changed = narrowedTo(pkgs.Order, 0)
+-		plan.changed.NoRecord = true
++		plan.changed = &protocol.Changed{Ran: len(pkgs.Order), NoRecord: true}
+ 		plan.setManifest(cfg)
+ 		return plan, true
+ 	}

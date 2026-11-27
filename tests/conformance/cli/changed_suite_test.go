@@ -105,15 +105,36 @@ func (s *CLIChangedTestSuite) TestAfterANarrowedRun(t *gotest.T) {
 	})
 }
 
+// changedOf is the Changed of the manifest a stream opens with.
+func changedOf(t *gotest.T, stdout string) *changedManifest {
+	var opened struct {
+		Manifest struct{ Changed *changedManifest }
+	}
+	gotest.NoError(t, json.Unmarshal([]byte(strings.SplitN(stdout, "\n", 2)[0]), &opened))
+	return opened.Manifest.Changed
+}
+
+type changedManifest struct {
+	Ran, Unchanged int
+	NoRecord       bool
+	Packages       []string
+}
+
 func (s *CLIChangedTestSuite) TestWithoutARecord(t *gotest.T) {
 	tr := stageFresh(t)
 	run := tr.run(t, "--changed", "./...")
+	stream := stageFresh(t).run(t, "-json", "--changed", "./...")
+	changed := changedOf(t, stream.Stdout)
 
 	t.When("--changed is given in a working directory without a record", func(w *gotest.T) {
 		w.It("runs every package and says on stderr that no run is recorded", func(it *gotest.T) {
 			gotest.Equal(it, []string{"fresh/a", "fresh/b", "fresh/c", "fresh/d"}, ranPackages(run.Stdout), "stdout: %s", run.Stdout)
 			gotest.Contains(it, run.Stderr, "gotest: --changed: no run of "+tr.dir+" is recorded, so every package runs\n")
 			gotest.Contains(it, run.Stderr, "| changed only: no record, all ran\n")
+		})
+		w.It("-json --changed lists every package in its manifest's Changed", func(it *gotest.T) {
+			gotest.NotZero(it, changed)
+			gotest.Equal(it, changedManifest{Ran: 4, NoRecord: true, Packages: []string{"fresh/a", "fresh/b", "fresh/c", "fresh/d"}}, *changed)
 		})
 	})
 }
@@ -139,12 +160,7 @@ func (s *CLIChangedTestSuite) TestARunThatLeftPackagesOut(t *gotest.T) {
 	tr.edit(t, "b/b.go", "// again\n")
 	stream := tr.run(t, "-json", "--changed", "./a/", "./b/", "./c/")
 	first, last := streamEnds(t, stream.Stdout)
-	var opened struct {
-		Manifest struct {
-			Changed *struct{ Ran, Unchanged int }
-		}
-	}
-	gotest.NoError(t, json.Unmarshal([]byte(strings.SplitN(stream.Stdout, "\n", 2)[0]), &opened))
+	changed := changedOf(t, stream.Stdout)
 
 	t.When("a --changed run leaves packages out as unchanged", func(w *gotest.T) {
 		w.It("ends stderr with a closing line counting the packages it ran and those unchanged", func(it *gotest.T) {
@@ -153,8 +169,13 @@ func (s *CLIChangedTestSuite) TestARunThatLeftPackagesOut(t *gotest.T) {
 		})
 		w.It("opens its -json stream with a manifest whose Changed holds both counts", func(it *gotest.T) {
 			gotest.Equal(it, "gotest run", first.Package)
-			gotest.NotZero(it, opened.Manifest.Changed)
-			gotest.Equal(it, struct{ Ran, Unchanged int }{2, 1}, *opened.Manifest.Changed)
+			gotest.NotZero(it, changed)
+			gotest.Equal(it, 2, changed.Ran)
+			gotest.Equal(it, 1, changed.Unchanged)
+		})
+		w.It("lists in Changed the packages it runs, sorted", func(it *gotest.T) {
+			gotest.NotZero(it, changed)
+			gotest.Equal(it, []string{"fresh/a", "fresh/b"}, changed.Packages)
 		})
 		w.It("closes the stream with 0 units not run", func(it *gotest.T) {
 			gotest.NotZero(it, last.Result)
