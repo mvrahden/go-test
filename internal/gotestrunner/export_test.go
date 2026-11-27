@@ -147,7 +147,7 @@ var ExportExitCodeAfterDispatch = exitCodeAfterDispatch
 // ExportApplyDeadlineFailure applies a run's deadline failure under the given
 // --timeout.
 func ExportApplyDeadlineFailure(c *OutputCollector, result *PipelineResult, globalTimeout time.Duration, dispatchErr error, running []CensusCase) {
-	applyDeadlineFailure(c, result, PipelineConfig{GlobalTimeout: globalTimeout}, dispatchErr, running)
+	applyDeadlineFailure(c, result, PipelineConfig{GlobalTimeout: globalTimeout}, dispatchErr, running, "")
 }
 
 var ExportUnitNames = unitNames
@@ -638,14 +638,15 @@ func BuildBenchTargets(compiled []CompileResult, benchesByPkg map[string][]strin
 func ExportPlannedOverlay(fixtures []gotestgen.SharedFixtureInfo, suites ...PlannedSuite) *OverlayResult { //nolint:gocritic // hugeParam: test literals
 	p := &RunPlan{}
 	at := map[string]int{}
-	for _, s := range suites {
+	for j := range suites {
+		s := &suites[j]
 		i, ok := at[s.Package]
 		if !ok {
 			i = len(p.Packages)
 			at[s.Package] = i
 			p.Packages = append(p.Packages, PlannedPackage{Path: s.Package, Dir: s.Dir, Harness: true})
 		}
-		p.Packages[i].Suites = append(p.Packages[i].Suites, s)
+		p.Packages[i].Suites = append(p.Packages[i].Suites, *s)
 	}
 	p.index()
 	return &OverlayResult{SharedFixtures: fixtures, Plan: p}
@@ -665,6 +666,7 @@ type planMaps struct {
 	FuzzParamsByFunc               map[string]map[string][]string
 	FuzzDecodedByFunc              map[string]map[string]bool
 	DirsByPkg                      map[string]string
+	ModulesByPkg                   map[string]string
 	SkippedSuitesByPkg             map[string][]string
 	SuiteRequiredSharedFixtureKeys map[string]map[string][]string // package → test function → keys
 }
@@ -675,7 +677,7 @@ func mapsOf(results gotestgen.GenerateResults) planMaps {
 		StdlibTestsByPkg: map[string]int{}, SuitesByPkg: map[string][]string{}, ExclusiveSuitesByPkg: map[string]map[string]bool{},
 		GroupsByPkg: map[string]map[string]string{}, TestlessSuitesByPkg: map[string]map[string]bool{}, BenchesByPkg: map[string][]string{},
 		FuzzFuncsByPkg: map[string]map[string][]string{}, FuzzParamsByFunc: map[string]map[string][]string{}, FuzzDecodedByFunc: map[string]map[string]bool{},
-		DirsByPkg: map[string]string{}, SkippedSuitesByPkg: map[string][]string{}, SuiteRequiredSharedFixtureKeys: map[string]map[string][]string{},
+		DirsByPkg: map[string]string{}, ModulesByPkg: map[string]string{}, SkippedSuitesByPkg: map[string][]string{}, SuiteRequiredSharedFixtureKeys: map[string]map[string][]string{},
 	}
 	set := func(names []string) map[string]bool {
 		out := map[string]bool{}
@@ -695,6 +697,9 @@ func mapsOf(results gotestgen.GenerateResults) planMaps {
 		}
 		if r.AbsPath != "" {
 			m.DirsByPkg[r.PkgPath] = r.AbsPath
+		}
+		if r.ModulePath != "" {
+			m.ModulesByPkg[r.PkgPath] = r.ModulePath
 		}
 		if len(r.SkippedSuiteNames) > 0 {
 			m.SkippedSuitesByPkg[r.PkgPath] = r.SkippedSuiteNames
@@ -751,6 +756,7 @@ func (m planMaps) plan() *RunPlan { //nolint:gocritic // hugeParam: test helper
 		suite := func(name string, tests bool) PlannedSuite {
 			s := PlannedSuite{
 				Package:    path,
+				Module:     m.ModulesByPkg[path],
 				Dir:        m.DirsByPkg[path],
 				Name:       name,
 				Tests:      tests,

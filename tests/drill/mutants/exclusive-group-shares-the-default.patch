@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lifecycle .* / runs its default group's Exclusive suite without waiting \(
+Clause: when a run reaches group e2e while another run of the module runs that group → runs its default group's Exclusive suite without waiting
+--- a/internal/gotestrunner/exclusivelock.go
++++ b/internal/gotestrunner/exclusivelock.go
+@@ -301,7 +301,7 @@
+ 		}
+ 		var keys []scopeKey
+ 		for _, s := range suites {
+-			k := scopeKey{Module: s.Module, Group: sc.Group}
++			k := scopeKey{Module: s.Module}
+ 			if !slices.Contains(keys, k) {
+ 				keys = append(keys, k)
+ 			}

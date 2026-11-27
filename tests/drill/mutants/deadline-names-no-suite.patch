@@ -2,8 +2,8 @@ Expect: ^FAIL .*conformance/cli .* / names the suite in the run's FAIL line, on 
 Clause: when --timeout expires while a method waits for its context to end, and the method then returns → names the suite in the run's FAIL line, on stderr and in the stream
 --- a/internal/gotestrunner/pipeline.go
 +++ b/internal/gotestrunner/pipeline.go
-@@ -205,11 +205,6 @@
- 		msg = fmt.Sprintf("global --timeout exceeded after %v", cfg.GlobalTimeout)
+@@ -227,11 +227,6 @@
+ 		msg += " while " + waiting + " waited for another gotest run"
  	}
  	if len(running) == 0 {
 -		// No method was left running: name the suites the deadline stopped.

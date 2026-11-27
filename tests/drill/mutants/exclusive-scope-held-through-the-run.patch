@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/lifecycle .* / holds no scope while it waits, so a third run's Exclusive suite runs at once \(
+Clause: when a run reaches group e2e while another run of the module runs that group → holds no scope while it waits, so a third run's Exclusive suite runs at once
+--- a/internal/gotestrunner/dispatch.go
++++ b/internal/gotestrunner/dispatch.go
+@@ -465,7 +465,6 @@
+ 			// slot, which needs none of what it frees.
+ 			r.done(&d.t)
+ 		}
+-		hold.done()
+ 	}
+ 	r.allIn()
+ }

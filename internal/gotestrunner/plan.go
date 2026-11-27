@@ -28,6 +28,7 @@ type PlannedPackage struct {
 // PlannedSuite is one suite a package declares.
 type PlannedSuite struct {
 	Package    string        // import path
+	Module     string        // path of the package's module, "" for none
 	Dir        string        // the package's source directory
 	Name       string        // suite type identifier, "FooTestSuite"
 	Tests      bool          // has a test run: test methods or fuzz seeds
@@ -78,6 +79,7 @@ func planRun(results gotestgen.GenerateResults) *RunPlan {
 		suite := func(name string, tests bool) PlannedSuite {
 			s := PlannedSuite{
 				Package:    r.PkgPath,
+				Module:     r.ModulePath,
 				Dir:        r.AbsPath,
 				Name:       name,
 				Tests:      tests,

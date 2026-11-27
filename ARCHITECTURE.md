@@ -654,6 +654,25 @@ runner starts the shared fixtures it needs that are not up yet, and a
 fixture no remaining planned suite needs is released (see Per-Suite
 Fixture Readiness).
 
+Exclusivity holds across runs too: two runs of one module on one machine,
+from one checkout or two worktrees, take turns at each exclusive scope,
+the default group's tail or a named group from its first suite, or its
+up-front fixtures, to its end ([Exclusive across runs](specs/lifecycle/spec.md#requirement-exclusive-across-runs)).
+A scope's lock is a file under `<cache>/exclusive/`, named by a hash of
+module and group and taken with the flock/LockFileEx helper the binary
+cache uses, so a holder that dies leaves no stale lock; the holder writes
+its pid, directory, arguments and start time beside it for a run that
+waits. A run holds one scope at a time and takes a scope's modules in
+sorted order, so two runs never wait for each other in a cycle. The wait
+comes before a suite's process starts, so no suite budget pays for it, and
+the stream's context ends it, at a stop or the run's `--timeout`. A suite
+process gets `GOTEST_EXCLUSIVE_HELD`, the lock files its run holds, and a
+gotest run it starts takes them as its own instead of waiting for its
+parent ([Runs that do not wait](specs/lifecycle/spec.md#requirement-runs-that-do-not-wait)).
+The CLI runs this repository's tests start get a private cache, so their
+locks never meet the run testing them; under the drill they share one
+cache and may take turns among themselves.
+
 Level 3 is sized from a budget of concurrent test methods, `--parallel`,
 2×GOMAXPROCS by default: at most GOMAXPROCS suite processes run at a time,
 and each gets the budget divided by the process count as its

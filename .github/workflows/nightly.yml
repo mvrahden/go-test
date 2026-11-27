@@ -21,7 +21,7 @@ concurrency:
 jobs:
   gate:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
@@ -75,7 +75,7 @@ jobs:
 
   gate-min:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/setup-go
@@ -101,7 +101,7 @@ jobs:
         shard: [cli, core]
         include:
           - os: windows-latest
-            timeout-scale: 2
+            timeout-scale: 3
           - os: macos-latest
             parallel: 6
             timeout-scale: 2

@@ -26,6 +26,7 @@ type GenerateResults []*GenerateResult
 type GenerateResult struct {
 	AbsPath                        string              // absolute directory path of the package
 	PkgPath                        string              // import path (e.g. "github.com/foo/bar")
+	ModulePath                     string              // path of the module the package belongs to, "" for none
 	PTest                          []byte              // generated internal test source
 	PXTest                         []byte              // generated external test source
 	SuiteNames                     []string            // suites with a test run: test methods or fuzz seeds (e.g. "FooTestSuite")
@@ -156,6 +157,16 @@ func (lr *LoadResult) InMainModule() bool {
 		}
 	}
 	return false
+}
+
+// ModulePath is the path of the module the package belongs to, "" for none.
+func (lr *LoadResult) ModulePath() string {
+	for _, p := range []*packages.Package{lr.Ptest, lr.Pxtest} {
+		if p != nil && p.Module != nil {
+			return p.Module.Path
+		}
+	}
+	return ""
 }
 
 // loadPackages is the shared core for all package-loading variants. Matched
@@ -723,6 +734,7 @@ func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateR
 		return &GenerateResult{
 			AbsPath:                        lr.PkgDir,
 			PkgPath:                        lr.PkgPath,
+			ModulePath:                     lr.ModulePath(),
 			PTest:                          ptestBuf,
 			PXTest:                         pxtestBuf,
 			SuiteNames:                     suiteNames,

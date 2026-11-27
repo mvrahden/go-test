@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lifecycle .* / exits 130, skipping its Exclusive suite with the reason run stopping \(
+Clause: when a run waiting for another run's exclusive scope is interrupted → exits 130, skipping its Exclusive suite with the reason run stopping
+--- a/internal/gotestrunner/exclusivelock.go
++++ b/internal/gotestrunner/exclusivelock.go
+@@ -215,7 +215,7 @@
+ 	select {
+ 	case g := <-ch:
+ 		return g.unlock, g.err
+-	case <-ctx.Done():
++	case <-make(chan struct{}):
+ 		go func() {
+ 			if g := <-ch; g.unlock != nil {
+ 				g.unlock()

@@ -518,7 +518,8 @@ func lookupSuiteMethod(overlay *gotestrunner.OverlayResult, pkg, funcName string
 	if p == nil {
 		return "", "", false
 	}
-	for _, s := range p.Suites {
+	for i := range p.Suites {
+		s := &p.Suites[i]
 		for _, f := range s.FuzzFuncs {
 			if f.Func != funcName {
 				continue

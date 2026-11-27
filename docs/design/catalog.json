@@ -26693,6 +26693,342 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "says once on stderr that it waits, naming the other run's pid, and nothing of it in the -json stream",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "crossrun_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 194,
+                      "name": "says_once_on_stderr_that_it_waits,_naming_the_other_run's_pid,_and_nothing_of_it_in_the_-json_stream",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "starts its Exclusive suite only once the other run's has ended",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "crossrun_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 200,
+                      "name": "starts_its_Exclusive_suite_only_once_the_other_run's_has_ended",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a run reaches its Exclusive suites while another run of the module runs its own",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "crossrun_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 193,
+                  "name": "a_run_reaches_its_Exclusive_suites_while_another_run_of_the_module_runs_its_own",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "TwoRunsOfOneModule",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "crossrun_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 182,
+              "name": "TestTwoRunsOfOneModule",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "runs its default group's Exclusive suite without waiting",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "crossrun_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 222,
+                      "name": "runs_its_default_group's_Exclusive_suite_without_waiting",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "holds no scope while it waits, so a third run's Exclusive suite runs at once",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "crossrun_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 226,
+                      "name": "holds_no_scope_while_it_waits,_so_a_third_run's_Exclusive_suite_runs_at_once",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "starts its e2e suite only once the other run's has ended",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "crossrun_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 231,
+                      "name": "starts_its_e2e_suite_only_once_the_other_run's_has_ended",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a run reaches group e2e while another run of the module runs that group",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "crossrun_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 221,
+                  "name": "a_run_reaches_group_e2e_while_another_run_of_the_module_runs_that_group",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ARunWaitingForAGroup",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "crossrun_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 208,
+              "name": "TestARunWaitingForAGroup",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "exits 130, skipping its Exclusive suite with the reason run stopping",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "crossrun_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 252,
+                      "name": "exits_130,_skipping_its_Exclusive_suite_with_the_reason_run_stopping",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a run waiting for another run's exclusive scope is interrupted",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "crossrun_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 251,
+                  "name": "a_run_waiting_for_another_run's_exclusive_scope_is_interrupted",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "StoppedWhileItWaits",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "crossrun_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 239,
+              "name": "TestStoppedWhileItWaits",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "fails, saying the timeout passed while its exclusive suites waited for another gotest run",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "crossrun_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 272,
+                      "name": "fails,_saying_the_timeout_passed_while_its_exclusive_suites_waited_for_another_gotest_run",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a run's --timeout passes while it waits for another run's exclusive scope",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "crossrun_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 271,
+                  "name": "a_run's_--timeout_passes_while_it_waits_for_another_run's_exclusive_scope",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ItsTimeoutPassesWhileItWaits",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "crossrun_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 262,
+              "name": "TestItsTimeoutPassesWhileItWaits",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "runs its Exclusive suite at once",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "crossrun_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 290,
+                      "name": "runs_its_Exclusive_suite_at_once",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a run with GOTEST_EXCLUSIVE_LOCK=0 reaches its Exclusive suites while another run of the module runs its own",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "crossrun_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 289,
+                  "name": "a_run_with_GOTEST_EXCLUSIVE_LOCK=0_reaches_its_Exclusive_suites_while_another_run_of_the_module_runs_its_own",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "TheLockTurnedOff",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "crossrun_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 280,
+              "name": "TestTheLockTurnedOff",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the nested run takes the scope its parent holds and passes without waiting",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "crossrun_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 307,
+                      "name": "the_nested_run_takes_the_scope_its_parent_holds_and_passes_without_waiting",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when an Exclusive suite runs gotest on an Exclusive suite of its module, under the same cache",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "crossrun_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 306,
+                  "name": "an_Exclusive_suite_runs_gotest_on_an_Exclusive_suite_of_its_module,_under_the_same_cache",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ARunAnExclusiveSuiteStarts",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "crossrun_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 299,
+              "name": "TestARunAnExclusiveSuiteStarts",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CrossRun",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "crossrun_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 23,
+          "name": "TestCrossRunTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "names only the hung test as running when the timeout expired",
                       "duration": 0,
                       "excluded": false,
@@ -41401,13 +41737,13 @@
     }
   ],
   "stats": {
-    "behaviors": 1205,
+    "behaviors": 1214,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 168,
+    "suites": 169,
     "tests": 0
   }
 }

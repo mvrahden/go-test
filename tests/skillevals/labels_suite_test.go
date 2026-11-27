@@ -109,6 +109,7 @@ var witnesses = []witness{
 	{file: "reference/assertions.md", quote: "a failing row goes on and so do the rows after it", label: "v1.42+", path: "pkg/gotest/utils.go", literal: "row.soft = true"},
 	{file: "SKILL.md", quote: "only what failed, then one closing line", label: "v1.42+", path: "internal/gotestrunner/agentoutput.go", literal: "func NewAgentOutput"},
 	{file: "reference/cli.md", quote: "A text run ends with one closing line", label: "v1.42+", path: "internal/gotestrunner/agentoutput.go", literal: "func (c Closing) String() string"},
+	{file: "reference/config.md", quote: "take turns at their exclusive scopes", label: "v1.42+", path: "internal/protocol/protocol.go", literal: "GOTEST_EXCLUSIVE_LOCK"},
 	{file: "reference/cli.md", quote: "fails a text run with exit 2", label: "v1.42+", path: "internal/gotestrunner/census.go", literal: "func reportsResult"},
 	{file: "reference/cli.md", quote: "there is no record or nothing to rerun", label: "v1.42+", path: "cmd/gotest/flags.go", literal: "--failed"},
 	{file: "SKILL.md", quote: "go tool gotest --changed ./...", label: "v1.42+", path: "cmd/gotest/flags.go", literal: "--changed"},

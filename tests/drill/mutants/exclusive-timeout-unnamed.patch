@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lifecycle .* / fails, saying the timeout passed while its exclusive suites waited for another gotest run \(
+Clause: when a run's --timeout passes while it waits for another run's exclusive scope → fails, saying the timeout passed while its exclusive suites waited for another gotest run
+--- a/internal/gotestrunner/pipeline.go
++++ b/internal/gotestrunner/pipeline.go
+@@ -224,7 +224,7 @@
+ 		msg = fmt.Sprintf("global --timeout exceeded after %v", cfg.GlobalTimeout)
+ 	}
+ 	if waiting != "" {
+-		msg += " while " + waiting + " waited for another gotest run"
++		_ = waiting
+ 	}
+ 	if len(running) == 0 {
+ 		// No method was left running: name the suites the deadline stopped.
