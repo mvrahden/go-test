@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditBaseLink / ALinkInTheBase / when audit --base names a commit whose go.work is a symbolic link to a file that does not exist, on Unix / writes no file where the link points and exits 0 \(
+Clause: when audit --base names a commit whose go.work is a symbolic link to a file that does not exist, on Unix → writes no file where the link points and exits 0
+--- a/cmd/gotest/auditbase.go
++++ b/cmd/gotest/auditbase.go
+@@ -308,7 +308,7 @@
+ func keepWorkspace(top, tree string) []string {
+ 	var copied []string
+ 	for _, name := range []string{"go.work", "go.work.sum"} {
+-		if _, err := os.Lstat(filepath.Join(tree, name)); err == nil {
++		if _, err := os.Stat(filepath.Join(tree, name)); err == nil {
+ 			continue
+ 		}
+ 		data, err := os.ReadFile(filepath.Join(top, name)) //nolint:gosec // G304: the checkout's own workspace file

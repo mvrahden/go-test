@@ -1263,6 +1263,7 @@ shards of one run do not add up to every mutant exactly once.
 | `audit-unproven-without-a-function` | a changed file without a function reads as without coverage data | audit conformance: the type-only It finds docs/doc.go listed |
 | `audit-base-ancestry-unsaid` | a base that is no ancestor of HEAD is not said | audit conformance: the ancestry It finds no note |
 | `audit-shallow-base-noted` | a shallow checkout is asked for ancestry | audit conformance: the shallow It finds a note |
+| `audit-base-follows-a-link` | a workspace link of the exported base is written through | audit conformance: the link It finds the file the link points at |
 | `mutate-boundary-never-written` | an ordering gets no boundary mutant, only its negation | audit conformance: the mutants It and the survivor It find no boundary mutant |
 | `mutate-schemata-written-into-the-module` | the mutants' source is also written beside each file of the module | audit conformance: the module It finds a file the audit added |
 | `mutate-tests-of-the-mutated-package-only` | only the mutated package's own tests judge its mutants | audit conformance: the suites It finds Grade's line judged by no suite |

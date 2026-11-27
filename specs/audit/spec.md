@@ -276,12 +276,16 @@ Text and Markdown SHALL mark each behavior and weakening with its verdict, a pas
 - **THEN** writes the evidence as a column of the behaviors table and the unproven lines as a table
 
 ### Requirement: Where a base is exported
-`--base` SHALL export the commit into a directory under gotest's cache fixed per checkout, never inside the checkout, under a lock one audit of the checkout holds at a time, exporting again only when the directory holds another commit; `gotest clean --cache` SHALL remove the directories no audit holds.
+`--base` SHALL export the commit into a directory under gotest's cache fixed per checkout, never inside the checkout, under a lock one audit of the checkout holds at a time, exporting again only when the directory holds another commit; `gotest clean --cache` SHALL remove the directories no audit holds. On Unix, a workspace file the commit holds as a symbolic link SHALL be left as the link it is, so that nothing is written outside the checkout and that directory.
 
 #### Scenario: Two audits of one commit
 - **WHEN** audit --base records one commit twice
 - **THEN** exports it once into one directory under gotest's cache, outside the checkout
 - **AND** gotest clean --cache removes that directory
+
+#### Scenario: A commit whose go.work is a dangling link
+- **WHEN** audit --base names a commit whose go.work is a symbolic link to a file that does not exist, on Unix
+- **THEN** writes no file where the link points and exits 0
 
 ### Requirement: What a tool reads from the document
 In the JSON document each finding and evidence row SHALL carry an `id` made from what it is about, never its order or lines; a finding SHALL carry each side's location where it has one, and its module; a finding, behavior or evidence row about a test SHALL name the go test name and `-run` pattern that select it; the document SHALL give each module's directory and each side's branch; an evidence row SHALL say whether it needs a decision, and its stream and commit.

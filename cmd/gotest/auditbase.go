@@ -303,11 +303,12 @@ func writeTarFile(r io.Reader, target string, perm os.FileMode) error {
 
 // keepWorkspace copies the checkout's go.work and go.work.sum into an
 // exported tree that has none, so its modules resolve as the checkout's do,
-// and returns the names it copied.
+// and returns the names it copied. A link the commit holds counts as there,
+// dangling or not, so nothing is written through it.
 func keepWorkspace(top, tree string) []string {
 	var copied []string
 	for _, name := range []string{"go.work", "go.work.sum"} {
-		if _, err := os.Stat(filepath.Join(tree, name)); err == nil {
+		if _, err := os.Lstat(filepath.Join(tree, name)); err == nil {
 			continue
 		}
 		data, err := os.ReadFile(filepath.Join(top, name)) //nolint:gosec // G304: the checkout's own workspace file
