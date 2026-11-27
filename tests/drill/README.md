@@ -706,6 +706,13 @@ shards of one run do not add up to every mutant exactly once.
 | `events-file-replaces-output` | the `--events-file` file takes the event stream instead of sharing it with the run's own output | cli conformance: the summary, annotations and step summary differ from a run without the flag |
 | `events-file-held-until-exit` | the `--events-file` file is buffered in memory and written only when the CLI exits | cli conformance: a CLI killed mid-run leaves the events of the suites that had ended out of the file |
 | `events-file-open-error-ignored` | a `--events-file` path that cannot be created is ignored and the run goes on | cli conformance: the run builds its packages instead of exiting 2 at once |
+| `live-relay-never-on` | `--live` is read but the collector never relays a suite's events before its process ends | cli conformance: neither suite's first pass is on stdout while both hold |
+| `live-variable-misread` | `GOTEST_LIVE` is looked up under `GOTEST_AGENT`'s name | cli conformance: a run under `GOTEST_LIVE=1` writes nothing before its suites end |
+| `live-flag-taken-by-a-text-run` | `--live` without `-json` is taken, and `--live=false` refused, instead of the other way round | cli conformance: the text run exits 0 instead of 2 |
+| `live-relay-writes-a-suite-twice` | a relayed suite's events are written again from its kept output when the process ends | cli conformance: each suite's events differ from a run without `--live` |
+| `live-relay-bypasses-the-events-file` | a relayed line goes straight to stdout, past the writer that opens packages and tees the `--events-file` | cli conformance: the events file differs from stdout |
+| `package-verdict-after-its-first-suite` | a package's verdict is written when its first suite ends, not its last | cli conformance: the verdict precedes the other suite's end |
+| `census-shared-by-live-suites` | every suite process's output is read by one census reading, as before suites could interleave | cli conformance: the method still hanging when the other suite ended is not named at the deadline |
 | `group-expr-accepted` | an `ExclusiveGroup` the generator cannot resolve is read as the default group | cli conformance: the suite runs instead of exit 2 naming the accepted forms |
 | `promote-refusal-unlocated` | a crasher file outside Go's corpus format is refused without its line | conformance: the fuzz promote It for a call in a crasher finds no `file:line` |
 | `promote-refusal-promotes-the-rest` | a refused crasher fails the run but the session's other crashers are still promoted | conformance: the fuzz promote It for a call in a crasher finds the valid crasher promoted |

@@ -245,7 +245,7 @@ func newStreamRun(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 		r.free(r.ledger.DoneExcept(overlay.BrokenPackages[i].PkgPath, nil))
 	}
 
-	c := NewOutputCollector(cfg.OutputMode, pf.Verbose, WithStdout(cfg.Stdout), WithEvents(cfg.Events), WithInputs(cfg.Inputs), WithManifest(cfg.Manifest))
+	c := NewOutputCollector(cfg.OutputMode, pf.Verbose, WithStdout(cfg.Stdout), WithEvents(cfg.Events), WithInputs(cfg.Inputs), WithManifest(cfg.Manifest), WithLive(cfg.Live))
 	r.collector = c
 	c.StdlibTestsByPkg = r.plan.StdlibTests()
 	c.holdToTests = cfg.OutputMode == RunBatchText && !mayRunNothing(cfg.GoTestArgs, r.pf.RunFlags) && cfg.Only == nil

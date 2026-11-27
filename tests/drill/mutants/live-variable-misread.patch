@@ -1,0 +1,11 @@
+Expect: ^FAIL .*conformance/cli .* / writes each suite's first pass on stdout before either suite ends \(
+Clause: when a -json run is made under GOTEST_LIVE=1 while its suites hold → writes each suite's first pass on stdout before either suite ends
+--- a/cmd/gotest/eventsfile.go
++++ b/cmd/gotest/eventsfile.go
+@@ -56,5 +56,5 @@
+ 		}
+ 		return on, nil
+ 	}
+-	return jsonMode && protocol.SwitchOn(getenv(protocol.EnvLive)), nil
++	return jsonMode && protocol.SwitchOn(getenv(protocol.EnvAgentOutput)), nil
+ }

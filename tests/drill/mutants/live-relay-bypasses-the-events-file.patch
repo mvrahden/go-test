@@ -1,0 +1,21 @@
+Expect: ^FAIL .*conformance/cli .* / writes the events file byte for byte as stdout \(
+Clause: when a -json run is given --live while each of its two suites holds after its first method → writes the events file byte for byte as stdout
+--- a/internal/gotestrunner/liverelay.go
++++ b/internal/gotestrunner/liverelay.go
+@@ -2,6 +2,7 @@
+ 
+ import (
+ 	"bytes"
++	"io"
+ 	"sync"
+ )
+ 
+@@ -56,7 +57,7 @@
+ func (l *liveSuite) relay(line []byte) {
+ 	l.c.mu.Lock()
+ 	defer l.c.mu.Unlock()
+-	filterPackageLevelEvents(l.c.jsonWriterTo(l.census), l.stamp.line(line))
++	filterPackageLevelEvents(io.MultiWriter(l.c.stdout, l.census, &l.c.assertions), l.stamp.line(line))
+ }
+ 
+ // redo takes the events a fresh converter wrote over the suite's whole

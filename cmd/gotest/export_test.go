@@ -330,6 +330,16 @@ func ExportAgentOutput(ownArgs []string, env map[string]string) (bool, string, e
 
 var ExportRerunCommand = rerunCommand
 
+// ExportLiveStream is liveStream over the own flags ownArgs, a -json run or
+// not, and env.
+func ExportLiveStream(ownArgs []string, jsonMode bool, env map[string]string) (bool, error) {
+	own, err := ownOf(ownArgs)
+	if err != nil {
+		return false, err
+	}
+	return liveStream(own, jsonMode, func(k string) string { return env[k] })
+}
+
 // ExportRunsEntryJSON is one run of the runs listing as JSON.
 func ExportRunsEntryJSON(k *gotestrunner.KeptRun) string {
 	data, _ := json.Marshal(entryOf(k, nil))

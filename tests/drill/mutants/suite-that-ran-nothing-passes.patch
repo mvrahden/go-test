@@ -2,8 +2,8 @@ Expect: ^FAIL .*conformance/cli .* / fails the package and exits 2, naming the s
 Clause: when a suite's binary runs none of its tests in a text run without a pattern → fails the package and exits 2, naming the suite as one that ran no tests
 --- a/internal/gotestrunner/dispatch.go
 +++ b/internal/gotestrunner/dispatch.go
-@@ -226,7 +226,6 @@
- 	c := NewOutputCollector(cfg.OutputMode, pf.Verbose, WithStdout(cfg.Stdout), WithEvents(cfg.Events), WithInputs(cfg.Inputs), WithManifest(cfg.Manifest))
+@@ -248,7 +248,6 @@
+ 	c := NewOutputCollector(cfg.OutputMode, pf.Verbose, WithStdout(cfg.Stdout), WithEvents(cfg.Events), WithInputs(cfg.Inputs), WithManifest(cfg.Manifest), WithLive(cfg.Live))
  	r.collector = c
  	c.StdlibTestsByPkg = r.plan.StdlibTests()
 -	c.holdToTests = cfg.OutputMode == RunBatchText && !mayRunNothing(cfg.GoTestArgs, r.pf.RunFlags) && cfg.Only == nil

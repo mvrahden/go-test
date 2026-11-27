@@ -14,9 +14,9 @@ Clause: when a -json run with --events-file is killed while a suite holds → ke
  	"fmt"
  	"io"
  	"os"
-@@ -227,6 +228,11 @@ func runText(inv Invocation, own OwnFlags, goTestArgs []string, jsonMode bool, a
- 	}
+@@ -238,6 +239,11 @@
  	cfg.JSON = jsonMode
+ 	cfg.Live = live
  	cfg.Events = eventsWriter(events)
 +	if events != nil {
 +		bw := bufio.NewWriterSize(events, 1<<24)

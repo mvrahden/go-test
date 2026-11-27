@@ -11703,6 +11703,250 @@
                 {
                   "children": [
                     {
+                      "children": [],
+                      "display": "writes each suite's first pass on stdout before either suite ends",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "live_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 171,
+                      "name": "writes_each_suite's_first_pass_on_stdout_before_either_suite_ends",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "writes the package's verdict only after both suites ended",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "live_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 176,
+                      "name": "writes_the_package's_verdict_only_after_both_suites_ended",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "writes each suite's events once each, in the order the suite wrote them, every line one whole event",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "live_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 183,
+                      "name": "writes_each_suite's_events_once_each,_in_the_order_the_suite_wrote_them,_every_line_one_whole_event",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "writes the events file byte for byte as stdout",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "live_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 192,
+                      "name": "writes_the_events_file_byte_for_byte_as_stdout",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a -json run is given --live while each of its two suites holds after its first method",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "live_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 170,
+                  "name": "a_-json_run_is_given_--live_while_each_of_its_two_suites_holds_after_its_first_method",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "TwoSuitesThatHold",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "live_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 154,
+              "name": "TestTwoSuitesThatHold",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "writes each suite's first pass on stdout before either suite ends",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "live_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 205,
+                      "name": "writes_each_suite's_first_pass_on_stdout_before_either_suite_ends",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a -json run is made under GOTEST_LIVE=1 while its suites hold",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "live_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 204,
+                  "name": "a_-json_run_is_made_under_GOTEST_LIVE=1_while_its_suites_hold",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "TheVariable",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "live_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 198,
+              "name": "TestTheVariable",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "refuses it with exit 2, naming -json",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "live_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 218,
+                      "name": "refuses_it_with_exit_2,_naming_-json",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when --live is given without -json",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "live_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 217,
+                  "name": "--live_is_given_without_-json",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ATextRun",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "live_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 213,
+              "name": "TestATextRun",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "names the hanging method in the stream with the line that names the deadline",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "live_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 237,
+                      "name": "names_the_hanging_method_in_the_stream_with_the_line_that_names_the_deadline",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when --timeout expires in a --live run while one suite's method hangs after the other suite ended",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "live_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 236,
+                  "name": "--timeout_expires_in_a_--live_run_while_one_suite's_method_hangs_after_the_other_suite_ended",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AMethodThatHangsPastTheTimeout",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "live_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 226,
+              "name": "TestAMethodThatHangsPastTheTimeout",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLILive",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "live_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 23,
+          "name": "TestCLILiveTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
                       "children": [
                         {
                           "children": [],
@@ -41737,13 +41981,13 @@
     }
   ],
   "stats": {
-    "behaviors": 1214,
+    "behaviors": 1221,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 169,
+    "suites": 170,
     "tests": 0
   }
 }

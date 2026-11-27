@@ -266,7 +266,7 @@ func MarkerOrderOf(got []string, markers ...string) bool {
 }
 
 // childEnv is the CLI's environment: the caller's, minus the GitHub Actions
-// variables, the CI switches, the agent's variables and the snapshot update switch, plus the marker
+// variables, the CI switches, the agent's variables, the live stream switch and the snapshot update switch, plus the marker
 // directory, so a run under test sees only the flags it was given. Its gotest
 // cache uses the drill's private worker root when supplied, otherwise the
 // marker directory; neither fills the user's cache.
@@ -284,6 +284,7 @@ func childEnv(markerDir string) []string {
 			strings.HasPrefix(kv, agentenv.EnvAgent+"="),
 			strings.HasPrefix(kv, "CLAUDECODE="),
 			strings.HasPrefix(kv, protocol.EnvAgentOutput+"="),
+			strings.HasPrefix(kv, protocol.EnvLive+"="),
 			strings.HasPrefix(kv, protocol.EnvCacheDir+"="):
 			continue
 		}

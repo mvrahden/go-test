@@ -636,7 +636,7 @@ gotest clean --cache SHALL remove every cached binary no run is linking or copyi
 - **AND** refuses a package beside the flag with exit 2
 
 ### Requirement: Saving the event stream
-A run given --events-file SHALL write to that file byte for byte the go test -json stream it prints, and SHALL change none of its other output, coverage or exit code. Each event SHALL reach the file when it reaches stdout, a suite's events when its process ends, so a run stopped or killed leaves every event written before, each line whole. summary --input SHALL render the file as the run's summary and exit code, a --min limit excepted: the live run judges it.
+A run given --events-file SHALL write to that file byte for byte the go test -json stream it prints, and SHALL change none of its other output, coverage or exit code. Each event SHALL reach the file when it reaches stdout, a suite's events when its process ends or, under --live, as written, so a run stopped or killed leaves every event written before, each line whole. summary --input SHALL render the file as the run's summary and exit code, a --min limit excepted: the live run judges it.
 
 #### Scenario: A -json run with --events-file
 - **WHEN** a -json run is given --events-file
@@ -667,6 +667,28 @@ A run given --events-file SHALL write to that file byte for byte the go test -js
 #### Scenario: A killed run
 - **WHEN** a -json run with --events-file is killed while a suite holds
 - **THEN** keeps the events of the suites that ended before the kill, each line whole
+
+### Requirement: A live event stream
+A -json run given --live, or made under GOTEST_LIVE=1, SHALL write each event of a suite process when the process writes it, each line whole, not when the process ends. The events SHALL be those it writes without, each suite's in its own order; nothing SHALL order two suites' events, and a package's verdict SHALL come after its last suite ended. --live SHALL be refused with exit 2 without -json; the variable SHALL change no other run.
+
+#### Scenario: Two suites that hold
+- **WHEN** a -json run is given --live while each of its two suites holds after its first method
+- **THEN** writes each suite's first pass on stdout before either suite ends
+- **AND** writes the package's verdict only after both suites ended
+- **AND** writes each suite's events once each, in the order the suite wrote them, every line one whole event
+- **AND** writes the events file byte for byte as stdout
+
+#### Scenario: The variable
+- **WHEN** a -json run is made under GOTEST_LIVE=1 while its suites hold
+- **THEN** writes each suite's first pass on stdout before either suite ends
+
+#### Scenario: A text run
+- **WHEN** --live is given without -json
+- **THEN** refuses it with exit 2, naming -json
+
+#### Scenario: A method that hangs past --timeout
+- **WHEN** --timeout expires in a --live run while one suite's method hangs after the other suite ended
+- **THEN** names the hanging method in the stream with the line that names the deadline
 
 ### Requirement: What a run says it was
 A -json run, and the run spec or summary renders, SHALL open its go test -json stream with a start event of the package `gotest run`, marked RunLevel, whose `Manifest` holds `Version` (the CLI's), `GoVersion` (the go command's), `Args`, `Commit` and `Dirty` (the checkout's commit and whether it has uncommitted changes) and `Agent`: `AI_AGENT` when set, else `claude-code` under `CLAUDECODE=1`. A fact the run cannot learn SHALL be left out and SHALL NOT fail the run.

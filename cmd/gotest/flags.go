@@ -68,6 +68,7 @@ var gotestFlags = map[string]FlagKind{
 	"--agent":   BoolFlag,
 	"--failed":  BoolFlag,
 	"--changed": BoolFlag,
+	"--live":    BoolFlag,
 
 	"--check-fresh": BoolFlag,
 	"--import":      ValueFlag,
@@ -91,7 +92,7 @@ var testAllowed = flagSet(
 	"--debug", "--ci", "--spec", "--update-snapshots", "--no-cache",
 	"--min", "--setup-timeout", "--timeout", "--parallel", "--compile-parallel",
 	"--no-harvest", "--events-file", "--group", "--skip-group", "--control",
-	"--agent", "--failed", "--changed",
+	"--agent", "--failed", "--changed", "--live",
 )
 
 var specAllowed = flagSet(

@@ -2,14 +2,14 @@ Expect: ^FAIL .*conformance/lifecycle DeadlineNaming .* / names only the hung te
 Clause: when one suite's process crashed on its own and another suite hangs until --timeout → names only the hung test as running when the timeout expired
 --- a/internal/gotestrunner/census.go
 +++ b/internal/gotestrunner/census.go
-@@ -263,10 +263,6 @@
+@@ -294,10 +294,6 @@
  	}
- 	x.stoppedNow = nil
+ 	s.stoppedNow = nil
  	if !cutShort {
--		for _, k := range x.ranNow {
+-		for _, k := range s.ranNow {
 -			x.settle(k)
 -			delete(x.waiting, k)
 -		}
- 		for _, k := range x.cutNow {
+ 		for _, k := range s.cutNow {
  			delete(x.cut, k)
  		}

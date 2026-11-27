@@ -2,13 +2,13 @@ Expect: ^FAIL .*internal/gotestrunner .*DeadlineAttribution
 Judge: ./internal/gotestrunner DeadlineAttributionTestSuite/TestAMethodTheStopEnded
 --- a/internal/gotestrunner/census.go
 +++ b/internal/gotestrunner/census.go
-@@ -258,9 +258,6 @@
- // under counts as running or cut only when the run's context stopped it; a
- // binary that ended on its own was cut short by no deadline.
- func (x *verdictIndex) endSuite(cutShort bool) {
+@@ -289,9 +289,6 @@
+ // that ended on its own was cut short by no deadline.
+ func (s *suiteCensus) end(cutShort bool) {
+ 	x := s.x
 -	if cutShort {
--		x.stopped = append(x.stopped, x.stoppedNow...)
+-		x.stopped = append(x.stopped, s.stoppedNow...)
 -	}
- 	x.stoppedNow = nil
+ 	s.stoppedNow = nil
  	if !cutShort {
- 		for _, k := range x.ranNow {
+ 		for _, k := range s.ranNow {

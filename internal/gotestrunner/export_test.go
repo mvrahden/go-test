@@ -270,8 +270,8 @@ func ExportTrack(tree *proctree.Tree, root int, again func() error, done <-chan 
 // count once each start returns, and returns what restores the real start.
 func ExportCountSuiteStarts(after func(n int)) (restore func()) {
 	var n atomic.Int32
-	suiteStart = func(ctx context.Context, target SuiteTarget, env []string, test2json bool) (startedSuite, error) { //nolint:gocritic // hugeParam: as startSuite
-		s, err := startSuite(ctx, target, env, test2json)
+	suiteStart = func(ctx context.Context, target SuiteTarget, env []string, test2json bool, live *liveSuite) (startedSuite, error) { //nolint:gocritic // hugeParam: as startSuite
+		s, err := startSuite(ctx, target, env, test2json, live)
 		after(int(n.Add(1)))
 		return s, err
 	}
@@ -281,7 +281,7 @@ func ExportCountSuiteStarts(after func(n int)) (restore func()) {
 // ExportFailSuiteStarts makes every suite start fail with err, calling each
 // per start, and returns what restores the real start.
 func ExportFailSuiteStarts(err error, each func()) (restore func()) {
-	suiteStart = func(context.Context, SuiteTarget, []string, bool) (startedSuite, error) {
+	suiteStart = func(context.Context, SuiteTarget, []string, bool, *liveSuite) (startedSuite, error) {
 		each()
 		return startedSuite{}, err
 	}
@@ -412,14 +412,69 @@ var ExportCompileError = compileError
 func ExportBookDeadlineCut(stream string, cutShort bool) (running []CensusCase, booked string) {
 	var stdout, errw bytes.Buffer
 	c := NewOutputCollector(RunStreamJSON, false, WithWriters(&stdout, &errw))
-	_, _ = io.WriteString(c.jsonWriter(), stream)
-	c.verdicts.endSuite(cutShort)
+	census := c.verdicts.suite()
+	_, _ = io.WriteString(c.jsonWriterTo(census), stream)
+	census.end(cutShort)
 	before := stdout.Len()
 	running = c.bookDeadline(context.DeadlineExceeded)
 	return running, stdout.String()[before:]
 }
 
 var ExportMayRunNothing = mayRunNothing
+
+// ExportLiveRelay writes chunks through a live -json collector's relay of one
+// suite as its converter would, hands it redo when not empty as a converter
+// run again, and books the suite; burst is what a collector without the relay
+// writes for full, the suite's whole output. Both are stdout.
+func ExportLiveRelay(chunks []string, redo, full string) (live, burst string) {
+	record := func(c *OutputCollector, r SuiteResult) {
+		c.Register("example.com/pkg", 1)
+		c.RecordResult("example.com/pkg", 0, r)
+	}
+	var out, errw bytes.Buffer
+	c := NewOutputCollector(RunStreamJSON, false, WithWriters(&out, &errw), WithLive(true))
+	l := c.openLive(true)
+	for _, chunk := range chunks {
+		_, _ = io.WriteString(l, chunk)
+	}
+	if redo != "" {
+		l.redo([]byte(redo))
+	}
+	l.flush()
+	record(c, SuiteResult{Stdout: []byte(full), relayed: l.census})
+	var burstOut bytes.Buffer
+	record(NewOutputCollector(RunStreamJSON, false, WithWriters(&burstOut, &errw)), SuiteResult{Stdout: []byte(full)})
+	return out.String(), burstOut.String()
+}
+
+// ExportInterleavedDeadline writes steps through a -json collector, books the
+// deadline and returns the named units and the booked events. A step is
+// "<suite>:<line>", a line of that suite process's output, "end <suite>",
+// its process ending on its own, or "cut <suite>", the run's context ending
+// it; a suite is any name.
+func ExportInterleavedDeadline(steps ...string) (running []CensusCase, booked string) {
+	var stdout, errw bytes.Buffer
+	c := NewOutputCollector(RunStreamJSON, false, WithWriters(&stdout, &errw))
+	suites := map[string]*suiteCensus{}
+	census := func(name string) *suiteCensus {
+		if suites[name] == nil {
+			suites[name] = c.verdicts.suite()
+		}
+		return suites[name]
+	}
+	for _, step := range steps {
+		if name, ok := strings.CutPrefix(step, "end "); ok {
+			census(name).end(false)
+		} else if name, ok := strings.CutPrefix(step, "cut "); ok {
+			census(name).end(true)
+		} else if name, line, ok := strings.Cut(step, ":"); ok {
+			_, _ = io.WriteString(c.jsonWriterTo(census(name)), line+"\n")
+		}
+	}
+	before := stdout.Len()
+	running = c.bookDeadline(context.DeadlineExceeded)
+	return running, stdout.String()[before:]
+}
 
 func WithWriters(stdout, stderr io.Writer) OutputOption {
 	return func(c *OutputCollector) {

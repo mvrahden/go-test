@@ -2,17 +2,23 @@ Expect: ^FAIL .*conformance/cli CLIRerun / EveryRunExecutesItsTests / when a pac
 Clause: when a package is run twice with nothing changed in between → the second run executes its tests again and marks nothing cached
 --- a/internal/gotestrunner/abandon.go
 +++ b/internal/gotestrunner/abandon.go
-@@ -38,7 +38,13 @@
-
- // runRecorded runs a suite and records its result.
+@@ -39,6 +39,11 @@
+ // runRecorded runs a suite and records its result; a live run's events were
+ // written as they came.
  func runRecorded(ctx context.Context, c *OutputCollector, pkg string, idx int, t SuiteTarget, env []string, test2json bool) { //nolint:gocritic // hugeParam: as RunSingleSuite
 +	done := os.Getenv("GOTEST_CACHE_DIR") + string(os.PathSeparator) + "done-" + t.SuiteName
 +	if _, err := os.Stat(done); err == nil {
 +		c.RecordResult(pkg, idx, SuiteResult{})
 +		return
 +	}
- 	c.RecordResult(pkg, idx, RunSingleSuite(ctx, t, env, test2json))
+ 	live := c.openLive(test2json)
+ 	r := runSuiteProcess(ctx, t, env, test2json, live)
+ 	if live != nil {
+@@ -46,6 +51,7 @@
+ 		r.relayed = live.census
+ 	}
+ 	c.RecordResult(pkg, idx, r)
 +	_ = os.WriteFile(done, nil, 0o600)
  }
-
+ 
  // Abandon gives up on every process tree still running, for a CLI about to

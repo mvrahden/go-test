@@ -65,6 +65,9 @@ type SuiteResult struct {
 	// Counts holds the protocol.LeafCount lines a text run's process wrote;
 	// nil when none was asked for or none was written.
 	Counts []byte
+	// relayed is the census the process's events went through as they were
+	// written; nil for events that wait in Stdout.
+	relayed *suiteCensus
 }
 
 // RunMode controls how a run executes its suites and collects their output.
@@ -225,7 +228,9 @@ var attachChannel = (*control.ChildEnd).Attach
 // suiteStart starts a suite process; a variable so tests can count starts.
 var suiteStart = startSuite
 
-func startSuite(ctx context.Context, target SuiteTarget, env []string, test2json bool) (startedSuite, error) { //nolint:gocritic // hugeParam: a copy per start is nothing beside the process it starts
+// startSuite starts a suite process; live, when not nil, relays its events
+// as the converter writes them.
+func startSuite(ctx context.Context, target SuiteTarget, env []string, test2json bool, live *liveSuite) (startedSuite, error) { //nolint:gocritic // hugeParam: a copy per start is nothing beside the process it starts
 	cmd := buildSuiteCmd(ctx, target, env, test2json)
 	s := startedSuite{cmd: cmd, stdout: &bytes.Buffer{}, stderr: &bytes.Buffer{}, cutShort: &atomic.Bool{}}
 	link, child, err := control.New()
@@ -235,7 +240,7 @@ func startSuite(ctx context.Context, target SuiteTarget, env []string, test2json
 	attachChannel(child, cmd)
 	if test2json {
 		// One writer for both streams gets one pipe, which keeps their order.
-		s.relay = startRelay(target, s.stdout, s.stderr)
+		s.relay = startRelay(target, s.stdout, s.stderr, live)
 		cmd.Stdout, cmd.Stderr = s.relay, s.relay
 	} else {
 		cmd.Stdout, cmd.Stderr = s.stdout, s.stderr
@@ -292,10 +297,16 @@ func waitRetry(ctx context.Context, d time.Duration) error {
 // outside the group that keeps the pipes open holds the result for the drain
 // delay at most.
 func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2json bool) SuiteResult { //nolint:gocritic // hugeParam: stable API
+	return runSuiteProcess(ctx, target, env, test2json, nil)
+}
+
+// runSuiteProcess is RunSingleSuite, its events relayed through live as they
+// are written when live is not nil.
+func runSuiteProcess(ctx context.Context, target SuiteTarget, env []string, test2json bool, live *liveSuite) SuiteResult { //nolint:gocritic // hugeParam: as RunSingleSuite
 	counts, env := askCounts(target, env, test2json)
 	defer removeCounts(counts)
 	start := time.Now()
-	s, err := suiteStart(ctx, target, env, test2json)
+	s, err := suiteStart(ctx, target, env, test2json, live)
 	for retry := time.Duration(0); errors.Is(err, syscall.ETXTBSY) && retry < startRetryLimit; {
 		// Another process still has the executable open for writing: a go
 		// command writing a tool into the shared build cache in place.
@@ -307,7 +318,7 @@ func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2
 		if err = waitRetry(ctx, retry); err != nil {
 			break // a cancelled start, as exec reports one
 		}
-		s, err = suiteStart(ctx, target, env, test2json)
+		s, err = suiteStart(ctx, target, env, test2json, live)
 	}
 	if err != nil {
 		return SuiteResult{

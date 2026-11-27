@@ -90,6 +90,9 @@ type ExecConfig struct {
 	// Changed is --changed: only the packages whose verdict the record does
 	// not hold as current run. ChangedFailed is --failed beside it.
 	Changed, ChangedFailed bool
+	// Live writes a -json run's suite events as each suite process writes
+	// them, not when it ends.
+	Live bool
 	// Agent renders a text run for a coding agent; nil for go test's text.
 	Agent *gotestrunner.AgentOutput
 	// Manifest opens a -json or agent run's stream and goes into the run's

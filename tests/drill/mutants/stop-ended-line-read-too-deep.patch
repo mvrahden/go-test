@@ -2,12 +2,12 @@ Expect: ^FAIL .*conformance/lifecycle .* / the method is booked failed in -json,
 Clause: when a run's --timeout ends a method that honours its context → the method is booked failed in -json, and spec shows it failed
 --- a/internal/gotestrunner/census.go
 +++ b/internal/gotestrunner/census.go
-@@ -230,7 +230,7 @@
+@@ -245,7 +245,7 @@
  			}
  			x.resulted[key] = true
  		}
 -		if depth == 1 && strings.TrimSpace(ev.Output) == stopEndedLine {
 +		if depth == 2 && strings.TrimSpace(ev.Output) == stopEndedLine {
- 			x.stoppedNow = append(x.stoppedNow, key)
+ 			s.stoppedNow = append(s.stoppedNow, key)
  		}
  	case "pass", "fail", "skip":

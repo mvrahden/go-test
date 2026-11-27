@@ -200,6 +200,11 @@ func runText(inv Invocation, own OwnFlags, goTestArgs []string, jsonMode bool, a
 		fmt.Fprintln(os.Stderr, "FAIL: --events-file saves the go test -json event stream, which a text run does not produce; add -json, or use gotest summary")
 		return 2
 	}
+	live, err := liveStream(own, jsonMode, os.Getenv)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
 	events, err := openEventsFile(own)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
@@ -231,6 +236,7 @@ func runText(inv Invocation, own OwnFlags, goTestArgs []string, jsonMode bool, a
 		return 2
 	}
 	cfg.JSON = jsonMode
+	cfg.Live = live
 	cfg.Events = eventsWriter(events)
 	cfg.Agent = agent
 	// A text run's manifest is only recorded, so it is read beside the run.

@@ -2,12 +2,12 @@ Expect: ^FAIL .*conformance/lifecycle .* / skips the later group's suites with t
 Clause: when a run is stopped while a suite of the e2e group runs → skips the later group's suites with the reason run stopping
 --- a/internal/gotestrunner/output_collector.go
 +++ b/internal/gotestrunner/output_collector.go
-@@ -426,6 +426,10 @@ func (c *OutputCollector) RecordStopped(pkg string, idx int, suite string) {
- 	defer c.mu.Unlock()
+@@ -446,6 +446,10 @@
  	skip := "--- SKIP: " + suite + " (0.00s)\n"
  	r := SuiteResult{Target: SuiteTarget{SuiteSpec: SuiteSpec{Package: pkg, SuiteName: suite}}, ExitCode: 1}
+ 	var census *suiteCensus
 +	if true {
-+		c.recordResultLocked(pkg, idx, r)
++		c.recordResultLocked(pkg, idx, r, nil)
 +		return
 +	}
  	if c.mode == RunBatchText {

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / writes the package's verdict only after both suites ended \(
+Clause: when a -json run is given --live while each of its two suites holds after its first method → writes the package's verdict only after both suites ended
+--- a/internal/gotestrunner/output_collector.go
++++ b/internal/gotestrunner/output_collector.go
+@@ -270,7 +270,7 @@
+ 		if len(r.Stderr) > 0 {
+ 			_, _ = c.stderr.Write(r.Stderr)
+ 		}
+-		if s.completed == s.expected {
++		if s.completed == 1 {
+ 			c.emitJSONPackageSummary(c.jsonWriter(), pkg, s)
+ 		}
+ 	}

@@ -92,7 +92,9 @@ type streamEvent struct {
 // that reported a result, and the units still running. Deeper subtests are not
 // kept.
 type verdictIndex struct {
-	partial    []byte
+	// loose reads what no suite process wrote: package verdicts, build
+	// output, the runner's own bookings.
+	loose      suiteCensus
 	last       map[CensusCase]streamEvent
 	order      []CensusCase
 	benched    map[CensusCase]bool
@@ -111,13 +113,24 @@ type verdictIndex struct {
 	// waiting holds the parallel units paused for a slot and not yet
 	// continued: started, but not running.
 	waiting map[CensusCase]bool
-	// ranNow and cutNow hold the units started and cut in the suite output
-	// being indexed.
-	ranNow, cutNow []CensusCase
 	// stopped holds, in stream order, the methods of cut-short suites that
-	// printed stopEndedLine; stoppedNow those of the suite output being read.
-	stopped, stoppedNow []CensusCase
+	// printed stopEndedLine.
+	stopped []CensusCase
 }
+
+// suiteCensus is the census's reading of one suite process's output, kept
+// apart from every other suite's so their lines may interleave.
+type suiteCensus struct {
+	x       *verdictIndex
+	partial []byte
+	// ranNow and cutNow hold the units this output started and cut.
+	ranNow, cutNow []CensusCase
+	// stoppedNow holds its methods that printed stopEndedLine.
+	stoppedNow []CensusCase
+}
+
+// suite opens the reading of one suite process's output.
+func (x *verdictIndex) suite() *suiteCensus { return &suiteCensus{x: x} }
 
 // stopEndedLine is what the runtime prints on a method's output when the
 // method returned after the stop began: it did not finish. No released
@@ -125,14 +138,19 @@ type verdictIndex struct {
 const stopEndedLine = "run stopping: the stop came while this method ran"
 
 func (x *verdictIndex) Write(p []byte) (int, error) {
-	x.partial = append(x.partial, p...)
+	x.loose.x = x
+	return x.loose.Write(p)
+}
+
+func (s *suiteCensus) Write(p []byte) (int, error) {
+	s.partial = append(s.partial, p...)
 	for {
-		i := bytes.IndexByte(x.partial, '\n')
+		i := bytes.IndexByte(s.partial, '\n')
 		if i < 0 {
 			break
 		}
-		x.observe(x.partial[:i])
-		x.partial = x.partial[i+1:]
+		s.x.observe(s, s.partial[:i])
+		s.partial = s.partial[i+1:]
 	}
 	return len(p), nil
 }
@@ -168,7 +186,7 @@ func rawTestDepth(line []byte) int {
 	return bytes.Count(value, []byte("/"))
 }
 
-func (x *verdictIndex) observe(line []byte) {
+func (x *verdictIndex) observe(s *suiteCensus, line []byte) {
 	if !slices.ContainsFunc(verdictMarkers, func(m []byte) bool { return bytes.Contains(line, m) }) {
 		return
 	}
@@ -207,7 +225,7 @@ func (x *verdictIndex) observe(line []byte) {
 			if ev.Gotest != nil && ev.Gotest.Instance > 1 {
 				x.instance[key] = ev.Gotest.Instance
 			}
-			x.ranNow = append(x.ranNow, key)
+			s.ranNow = append(s.ranNow, key)
 			delete(x.resulted, key)
 			delete(x.waiting, key)
 		}
@@ -228,7 +246,7 @@ func (x *verdictIndex) observe(line []byte) {
 			x.resulted[key] = true
 		}
 		if depth == 1 && strings.TrimSpace(ev.Output) == stopEndedLine {
-			x.stoppedNow = append(x.stoppedNow, key)
+			s.stoppedNow = append(s.stoppedNow, key)
 		}
 	case "pass", "fail", "skip":
 		if x.last == nil {
@@ -243,7 +261,7 @@ func (x *verdictIndex) observe(line []byte) {
 				x.cut = map[CensusCase]bool{}
 			}
 			x.cut[key] = true
-			x.cutNow = append(x.cutNow, key)
+			s.cutNow = append(s.cutNow, key)
 		}
 		ev.Output = ""
 		x.last[key] = ev
@@ -266,29 +284,30 @@ func isResultLine(output, test string) bool {
 	return false
 }
 
-// endSuite closes the output of one suite process. What its binary ended
-// under counts as running or cut only when the run's context stopped it; a
-// binary that ended on its own was cut short by no deadline.
-func (x *verdictIndex) endSuite(cutShort bool) {
+// end closes the output of one suite process. What its binary ended under
+// counts as running or cut only when the run's context stopped it; a binary
+// that ended on its own was cut short by no deadline.
+func (s *suiteCensus) end(cutShort bool) {
+	x := s.x
 	if cutShort {
-		x.stopped = append(x.stopped, x.stoppedNow...)
+		x.stopped = append(x.stopped, s.stoppedNow...)
 	}
-	x.stoppedNow = nil
+	s.stoppedNow = nil
 	if !cutShort {
-		for _, k := range x.ranNow {
+		for _, k := range s.ranNow {
 			x.settle(k)
 			delete(x.waiting, k)
 		}
-		for _, k := range x.cutNow {
+		for _, k := range s.cutNow {
 			delete(x.cut, k)
 		}
 	}
 	// Result lines only tell a cut unit from a finished one while its
 	// suite's output is being read.
-	for _, k := range x.ranNow {
+	for _, k := range s.ranNow {
 		delete(x.resulted, k)
 	}
-	x.ranNow, x.cutNow = nil, nil
+	s.ranNow, s.cutNow = nil, nil
 }
 
 // creditBenchmark books a benchmark's verdict, once.
