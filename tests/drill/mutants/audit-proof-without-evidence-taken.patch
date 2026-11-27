@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditEvidence / ProofInThePolicy / when --fail-on names a proof class and no stream or profile is given / audit refuses it with exit 2, naming the flags that give it \(
+Clause: when --fail-on names a proof class and no stream or profile is given → audit refuses it with exit 2, naming the flags that give it
+--- a/cmd/gotest/audit.go
++++ b/cmd/gotest/audit.go
+@@ -194,7 +194,7 @@
+ 		switch {
+ 		case c == gotestaudit.ClassUnproven && !a.unproven():
+ 			return errors.New("--fail-on=unproven judges a coverage profile: give --coverage or --run, with --base or --diff")
+-		case gotestaudit.IsProof(c) && c != gotestaudit.ClassUnproven && len(a.evidence) == 0 && !a.run:
++		case gotestaudit.IsProof(c) && c != gotestaudit.ClassUnproven && len(a.evidence) == 0 && a.run:
+ 			return fmt.Errorf("--fail-on=%s judges runs: give --evidence=<stream> or --run", c)
+ 		}
+ 	}

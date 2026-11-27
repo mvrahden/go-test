@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditRun / WhereABaseIsExported / when audit --base records one commit twice / gotest clean --cache removes that directory \(
+Clause: when audit --base records one commit twice → gotest clean --cache removes that directory
+--- a/internal/gotestrunner/auditbase.go
++++ b/internal/gotestrunner/auditbase.go
+@@ -88,7 +88,7 @@
+ 			continue
+ 		}
+ 		if _, err := os.Stat(filepath.Join(root, key)); err == nil {
+-			_ = os.RemoveAll(filepath.Join(root, key))
++			_ = os.Remove(filepath.Join(root, key))
+ 			removed++
+ 		}
+ 		releaseEvicted(lock, unlock)

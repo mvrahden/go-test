@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditRun / LinesFromGit / when audit --base with --coverage runs in a checkout with uncommitted and untracked production files / takes the changed lines from the commit to the files on disk, every line of an untracked file included \(
+Clause: when audit --base with --coverage runs in a checkout with uncommitted and untracked production files → takes the changed lines from the commit to the files on disk, every line of an untracked file included
+--- a/cmd/gotest/auditbase.go
++++ b/cmd/gotest/auditbase.go
+@@ -310,7 +310,7 @@
+ 		return nil, err
+ 	}
+ 	for _, name := range strings.Split(untracked, "\x00") {
+-		if !strings.HasSuffix(name, ".go") {
++		if !strings.HasSuffix(name, ".go") || name != "" {
+ 			continue
+ 		}
+ 		data, err := os.ReadFile(filepath.Join(g.top, filepath.FromSlash(name))) //nolint:gosec // G304: a file of the checkout

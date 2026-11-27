@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditRun / WhereABaseIsExported / when audit --base records one commit twice / exports it once into one directory under gotest's cache, outside the checkout \(
+Clause: when audit --base records one commit twice → exports it once into one directory under gotest's cache, outside the checkout
+--- a/cmd/gotest/auditbase.go
++++ b/cmd/gotest/auditbase.go
+@@ -173,7 +173,7 @@
+ 		if err := exportCommit(ctx, g.top, g.commit, tree); err != nil {
+ 			return err
+ 		}
+-		if err := os.WriteFile(marker, []byte(g.commit+"\n"), 0o600); err != nil {
++		if err := os.WriteFile(marker, []byte(g.short+"\n"), 0o600); err != nil {
+ 			return err
+ 		}
+ 	}

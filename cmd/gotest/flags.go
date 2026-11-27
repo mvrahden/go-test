@@ -67,6 +67,17 @@ var gotestFlags = map[string]FlagKind{
 
 	"--agent":  BoolFlag,
 	"--failed": BoolFlag,
+
+	"--record":      BoolFlag,
+	"--base":        ValueFlag,
+	"--base-record": ValueFlag,
+	"--head-record": ValueFlag,
+	"--fail-on":     ValueFlag,
+
+	"--evidence":      ListFlag,
+	"--base-evidence": ListFlag,
+	"--run":           BoolFlag,
+	"--diff":          ValueFlag,
 }
 
 var testAllowed = flagSet(

@@ -1117,13 +1117,15 @@ gotest summary ./...           # failure-focused summary for CI
 gotest watch ./... -v          # watch mode with auto-rerun
 gotest scaffold ./pkg/user.Svc # generate suite skeleton from type
 gotest lint ./...              # static analysis for test suites
+gotest audit --base=origin/main  # what a change did to the suites, and what got weaker
+gotest audit --base=origin/main --run  # and what a run of what changed proved
 gotest refactor toggle-focus user_test.go UserTestSuite  # toggle an F_ prefix on a suite (or Suite.Method)
 gotest skill install           # install the agent skill matching this version
 gotest hook pre-shell          # answer a coding agent's hook event on stdin (the plugin wires it)
 gotest migrate ./...           # convert testify/suite to go-test
 gotest generate ./...          # run code generation only (no tests)
 gotest clean ./...             # remove orphaned generated files
-gotest clean --cache           # empty the test binary cache
+gotest clean --cache           # empty the test binary cache and the audit's base trees
 gotest discover ./...          # suite metadata as JSON (editor/AI surface)
 gotest prepare ./tests/e2e     # start shared fixtures for debugging
 gotest version                 # print version

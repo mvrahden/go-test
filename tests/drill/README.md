@@ -1086,6 +1086,55 @@ shards of one run do not add up to every mutant exactly once.
 | `text-run-panic-read-as-a-pass` | a leaf that reported its count and then panicked reads as a pass in a text run | runner suite: the panicked leaf is vacuous |
 | `counts-file-never-opened` | the runtime writes no count to the file a text run names | canary: the assertcount text run under --ci exits 0 |
 | `raw-subtest-parent-a-text-leaf` | a test that ran a subtest through `t.T().Run` writes its count as a leaf's | canary: the assertcount text run names the raw parent vacuous |
+| `audit-hash-counts-comments` | a body's hash counts its comments, so a body only commented anew hashes differently | audit conformance: the record It finds the reworded It's hashes apart |
+| `audit-assertions-counted-once` | a body's assertions count as one however many it writes | audit conformance: the record It counts 1 assertion where the It writes 2 |
+| `audit-nodeadline-read-as-default` | `NoDeadline` is recorded as the 30s default | audit conformance: the record It finds the Stock suite's SetupTimeout 30s, not none |
+| `audit-record-paths-absolute` | a record's files are absolute paths | audit conformance: the record holds the staged directory |
+| `audit-rename-base-is-the-head` | a reworded or moved behavior's base place is its head's | audit conformance: the behaviors It finds the head's path on the base side |
+| `audit-ambiguous-rename-guessed` | a rename two removed behaviors could explain pairs the first | audit conformance: the ambiguous It finds the first copy reworded |
+| `audit-guard-unfound` | a guard the head adds is no finding | audit conformance: the weakenings It misses the guard finding |
+| `audit-changed-counted-as-a-weakening` | a changed body is a weakening | audit conformance: the informational It finds no informational finding |
+| `audit-suppression-matched-by-line` | suppressions are matched by line too, so one that moved is added | audit conformance: the moved-suppression It finds the moved comment |
+| `audit-reworded-suppression-weakens` | a suppression that only changed its reason is a suppression added | audit conformance: the new-reason It finds no informational suppression |
+| `audit-evidence-null` | the document's evidence is null instead of an empty list | audit conformance: the JSON It finds no `"evidence":[]` |
+| `audit-text-behaviors-first` | the text format leaves the behaviors out | audit conformance: the text It finds no behaviors line |
+| `audit-markdown-weakenings-untabled` | the Markdown leaves the weakenings' table out | audit conformance: the Markdown It finds no weakenings table |
+| `audit-weakenings-fail-by-default` | a weakening fails the audit without a policy | audit conformance: the default-policy It sees exit 1 |
+| `audit-fail-on-ignored` | `--fail-on` never fails | audit conformance: the policy It sees exit 0 |
+| `audit-unknown-class-taken` | an unknown class is taken | audit conformance: the unknown-class It sees exit 0 |
+| `audit-base-recorded-from-the-worktree` | `--base` records the working tree as the base | audit conformance: the git It finds no finding where the records find 15 |
+| `audit-base-in-a-git-worktree` | `--base` checks the commit out as a git worktree of the checkout | audit conformance: the git It finds the worktree list changed |
+| `audit-unknown-ref-names-no-flags` | a ref the checkout lacks is refused without naming the record flags | audit conformance: the unknown-ref It finds the flags unnamed |
+| `audit-broken-package-unrecorded` | a package that does not compile is left out of the record | audit conformance: the broken-tree It finds no package |
+| `audit-broken-package-compared` | a package the head cannot read is compared, every behavior removed | audit conformance: the broken-tree It finds behaviors listed |
+| `audit-evidence-assertions-dropped` | a leaf's evidence leaves out the assertions its run reported | audit conformance: the evidence It finds no count on a passing leaf |
+| `audit-evidence-unreported-passes` | a behavior the stream does not report reads as passed | audit conformance: the not-run It finds the empty-stock When passed |
+| `audit-evidence-exit-code-dropped` | a stream's exit code is left out of its entry | audit conformance: the stream It finds no exit code |
+| `audit-dirty-stream-current` | a stream of a tree with uncommitted changes is current | audit conformance: the stale It finds the uncommitted stream current |
+| `audit-first-stream-wins` | the first stream given judges a behavior, stale or not | audit conformance: the two-streams It finds the stale pass |
+| `audit-runtime-base-is-the-head` | an assertions finding carries the head's run-time count for the base's | audit conformance: the run-time It finds 1 → 1 |
+| `audit-own-run-stale` | `--run`'s stream is read as a saved one, stale on an uncommitted head | audit conformance: the run It finds the stream stale |
+| `audit-own-run-uncovered` | `--run`'s profile is not read for the unproven lines | audit conformance: the run's unproven It finds no profile read |
+| `audit-unproven-every-block-ran` | a block that never ran counts as run | audit conformance: the unproven It finds no unexecuted line |
+| `audit-unproven-unspanned-counted` | a changed line no block spans counts as executable | audit conformance: the unspanned It counts 11 changed lines |
+| `audit-unproven-uncovered-dropped` | a file of a package no profile covers is left out | audit conformance: the no-coverage It finds no ledger entry |
+| `audit-git-untracked-ignored` | the changed lines leave out the files git does not track | audit conformance: the git-lines It finds no ledger entry |
+| `audit-failing-uncounted` | `--fail-on=failing` finds no failing behavior | audit conformance: the policy It sees exit 0 |
+| `audit-all-takes-proof` | `all` takes the proof classes too | audit conformance: the all It finds failing among the classes |
+| `audit-proof-without-evidence-taken` | a proof class without a stream is taken | audit conformance: the refusal It sees exit 0 |
+| `audit-text-marks-dropped` | the text rows carry no verdict | audit conformance: the text It finds no FAIL mark |
+| `audit-text-rows-unordered` | a weakened behavior is not put first | audit conformance: the order It finds the weakened change after the failing one |
+| `audit-text-rows-unfolded` | seven rows alike are not folded | audit conformance: the folding It finds seven rows |
+| `audit-markdown-unproven-untabled` | the Markdown leaves the unproven lines out | audit conformance: the Markdown It finds no unproven table |
+| `audit-base-exported-every-time` | the export's marker never matches, so every audit exports again | audit conformance: the export It finds a new file |
+| `audit-clean-leaves-base-trees` | `clean --cache` removes only an empty base tree | audit conformance: the clean It finds the tree left |
+| `audit-ids-from-lines` | a finding's id is made from its lines too | audit conformance: the id It finds other ids once the lines moved |
+| `audit-base-location-dropped` | a behavior's finding has no base location | audit conformance: the locations It finds no base file of a removed test |
+| `audit-run-pattern-unanchored` | the -run pattern is not anchored, so it selects siblings sharing a prefix | audit conformance: the selector It finds an unanchored pattern |
+| `audit-head-branch-dropped` | the head's provenance names no branch | audit conformance: the branch It finds none on the head |
+| `audit-needs-decision-only-on-failure` | only a failing row needs a decision | audit conformance: the decision It finds the vacuous row undecided |
+| `version-json-without-schema` | `version --json` names a schema the audit does not write | cli conformance: the version It finds schema 2 |
+| `audit-base-records-a-missing-directory` | a directory the commit lacks is recorded as a package that cannot be read | audit conformance: the missing-directory It sees exit 2 |
 
 ## Adding a mutant
 

@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/audit AuditCompare / TheAuditDocument / when audit compares two records with --format=json / prints one document opening with version and schema that holds base, head, summary, findings, behaviors and empty evidence and unproven lists \(
+Clause: when audit compares two records with --format=json → prints one document opening with version and schema that holds base, head, summary, findings, behaviors and empty evidence and unproven lists
+--- a/internal/gotestaudit/compare.go
++++ b/internal/gotestaudit/compare.go
+@@ -363,9 +363,6 @@
+ 	if d.Behaviors == nil {
+ 		d.Behaviors = []Change{}
+ 	}
+-	if d.Evidence == nil {
+-		d.Evidence = []Evidence{}
+-	}
+ 	if d.Unproven == nil {
+ 		d.Unproven = []Unproven{}
+ 	}

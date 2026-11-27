@@ -131,6 +131,7 @@ var (
 	ExportBenchAllowed   = benchAllowed
 	ExportMigrateAllowed = migrateAllowed
 	ExportControlAllowed = controlAllowed
+	ExportAuditAllowed   = auditAllowed
 )
 
 // focusguard.go

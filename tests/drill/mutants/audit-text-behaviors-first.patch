@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditCompare / TheAuditDocument / when audit compares two records in the text format / prints the weakenings before the behaviors and ends stdout with a closing line naming the verdict, the exit code and the counts, with nothing on stderr \(
+Clause: when audit compares two records in the text format → prints the weakenings before the behaviors and ends stdout with a closing line naming the verdict, the exit code and the counts, with nothing on stderr
+--- a/internal/gotestaudit/render.go
++++ b/internal/gotestaudit/render.go
+@@ -49,7 +49,7 @@
+ 		}
+ 		folded += writeRows(w, d, rows, 11, marks, v.Verbose)
+ 	}
+-	if len(d.Behaviors) > 0 {
++	if len(d.Behaviors) < 0 {
+ 		fmt.Fprintf(w, "\nbehaviors: %s\n", behaviorCounts(&d.Summary))
+ 		var rows []textRow
+ 		for _, i := range behaviorOrder(d, ev) {

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditEvidence / EvidenceInTheRenderings / when the text format lists five or more rows alike of one suite / folds them into one line that counts them, and -v lists each \(
+Clause: when the text format lists five or more rows alike of one suite → folds them into one line that counts them, and -v lists each
+--- a/internal/gotestaudit/render.go
++++ b/internal/gotestaudit/render.go
+@@ -24,7 +24,7 @@
+ 
+ // groupAt is how many rows of one class, package and suite the text format
+ // folds into one line.
+-const groupAt = 5
++const groupAt = 50
+ 
+ // RenderText writes the document for a terminal or an agent: the evidence
+ // read, the weakenings, the behaviors, the unproven lines, what was not

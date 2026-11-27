@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditCompare / ThePolicyExit / when audit finds weakenings and is given no --fail-on / exits 0 \(
+Clause: when audit finds weakenings and is given no --fail-on → exits 0
+--- a/internal/gotestaudit/policy.go
++++ b/internal/gotestaudit/policy.go
+@@ -55,7 +55,7 @@
+ // policy, else 2 when something could not be compared, else 0.
+ func ExitCode(d *Document, failOn []string) int {
+ 	switch {
+-	case Breaks(d, failOn):
++	case Breaks(d, failOn) || d.Summary.Weakenings > 0:
+ 		return 1
+ 	case len(d.Incomplete) > 0:
+ 		return 2

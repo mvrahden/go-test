@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditCompare / BehaviorsCompared / when audit compares a base record with a head record that adds, removes, rewords, moves and changes behaviors / lists each as added, removed, reworded, moved or changed with its base and head file and line \(
+Clause: when audit compares a base record with a head record that adds, removes, rewords, moves and changes behaviors → lists each as added, removed, reworded, moved or changed with its base and head file and line
+--- a/internal/gotestaudit/compare.go
++++ b/internal/gotestaudit/compare.go
+@@ -176,7 +176,7 @@
+ func (c *collector) pair(b, h *node) {
+ 	switch {
+ 	case b.how != "":
+-		c.doc.Behaviors = append(c.doc.Behaviors, Change{Change: b.how, Kind: h.kind, Package: h.pkg, Base: place(b), Head: place(h), Selector: selector(b, h)})
++		c.doc.Behaviors = append(c.doc.Behaviors, Change{Change: b.how, Kind: h.kind, Package: h.pkg, Base: place(h), Head: place(h), Selector: selector(b, h)})
+ 	case h.kind != KindSuite && (b.hash != h.hash || h.whole && b.tree != h.tree):
+ 		c.doc.Behaviors = append(c.doc.Behaviors, Change{Change: ChangeChanged, Kind: h.kind, Package: h.pkg, Base: place(b), Head: place(h), Selector: selector(b, h)})
+ 		c.find(ClassChanged, h.pkg, subject(h), b.hash, h.hash, h.loc)

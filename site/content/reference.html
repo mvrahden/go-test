@@ -680,6 +680,7 @@ percentage = covered / total</div>
           <tr><td><code>gotest bench ./...</code></td><td>Run <code>Benchmark*</code> suite methods serially; <code>--save</code>, <code>--against</code> and <code>--gate</code> keep and compare baselines.</td></tr>
           <tr><td><code>gotest fuzz ./...</code></td><td>Search for new failing inputs with <code>Fuzz*</code> suite methods for a time budget (<code>--for</code>); <code>fuzz triage</code> and <code>fuzz promote</code> handle what it finds.</td></tr>
           <tr><td><code>gotest lint ./...</code></td><td>Static analysis for test suites — see <a href="#linter">Linter</a>.</td></tr>
+          <tr><td><code>gotest audit --base=&lt;ref&gt;</code></td><td>Compare the suites a change declares with its base, read from source: behaviors added, removed, reworded, moved and changed, and every finding that the estate got weaker; <code>--record</code> writes a tree&#39;s record for a later comparison.</td></tr>
           <tr><td><code>gotest scaffold ./pkg/user.Svc</code></td><td>Generate a suite skeleton from any Go type.</td></tr>
           <tr><td><code>gotest migrate ./...</code></td><td>Convert testify/suite tests automatically.</td></tr>
           <tr><td><code>gotest generate ./...</code></td><td>Generate suite files without running tests.</td></tr>
@@ -719,7 +720,7 @@ percentage = covered / total</div>
           <tr><td><code>--events-file=&lt;path&gt;</code></td><td>With <code>-json</code>, or in <code>summary</code>, also write the run&#39;s <code>go test -json</code> event stream to the file as <code>-json</code> prints it (a suite&#39;s events when its process ends), making its directories and replacing a file there; <code>summary --input</code> reads it back; a text run refuses it, and an unwritable path exits 2 before anything is built.</td></tr>
           <tr><td><code>--control=stdin</code></td><td>Read <code>stop</code> and <code>force</code> lines on standard input, a first and a second interrupt, counted with the signals, the input&#39;s end a stop when none is under way; taken by every command that stops on an interrupt, and without it standard input is never read.</td></tr>
           <tr><td><code>--github</code></td><td>Emit GitHub annotations and step summary (auto-enabled in GitHub Actions).</td></tr>
-          <tr><td><code>--coverage=&lt;path&gt;</code></td><td>Coverage profile path for the <code>summary</code> subcommand.</td></tr>
+          <tr><td><code>--coverage=&lt;path&gt;</code></td><td>Coverage profile path for the <code>summary</code> subcommand; for <code>audit</code>, the profile the unproven lines are read from.</td></tr>
           <tr><td><code>--badge=&lt;path&gt;</code></td><td>Write a self-contained coverage badge SVG (<code>summary</code>); adds <code>-coverprofile</code> when neither the caller nor <code>--min</code> did.</td></tr>
           <tr><td><code>--render-only</code></td><td>With <code>--input</code>, exit 0 on a failing or incomplete stream: the code reports whether rendering succeeded, not whether the tests passed.</td></tr>
           <tr><td><code>--stamp</code></td><td>With <code>--input</code>, write the stream back with each test event placed as <code>gotest -json</code> places it, instead of rendering it (<code>spec</code>).</td></tr>
@@ -732,7 +733,7 @@ percentage = covered / total</div>
           <tr><td><code>--save=&lt;path&gt;</code></td><td>Save a benchmark run as a JSON baseline (<code>bench</code>; a bare <code>--save=</code> uses <code>bench.baseline</code> from <code>.gotest.yml</code>, and saving to the configured baseline promotes the run without comparing it).</td></tr>
           <tr><td><code>--against=&lt;path&gt;</code></td><td>Compare a benchmark run against a saved baseline and print the delta table (<code>bench</code>; defaults to <code>bench.baseline</code>); a baseline from another machine or Go version warns and still compares.</td></tr>
           <tr><td><code>--gate=&lt;pct&gt;</code></td><td>Fail (exit 1) if the worst significant benchmark regression exceeds the threshold (<code>bench</code>); needs <code>-count=4</code> or more.</td></tr>
-          <tr><td><code>--json</code></td><td>Emit one versioned JSON report to stdout instead of human output (<code>bench</code>; for tooling).</td></tr>
+          <tr><td><code>--json</code></td><td>Emit one versioned JSON report to stdout instead of human output (<code>bench</code>; for tooling); print the version as one JSON document (<code>version</code>).</td></tr>
           <tr><td><code>--for=&lt;dur&gt;</code></td><td>Approximate wall-clock fuzz budget for the session, split across targets (<code>fuzz</code>; default 1m or half of a shorter <code>--timeout</code>; <code>0</code> removes the budget).</td></tr>
           <tr><td><code>--target=&lt;name&gt;</code></td><td>Fuzz exactly one generated wrapper by name; an unmatched name lists the available ones (<code>fuzz</code>).</td></tr>
           <tr><td><code>--jobs=&lt;n&gt;</code></td><td>Max concurrent fuzz targets (<code>fuzz</code>; default: max(1, GOMAXPROCS/2)).</td></tr>
@@ -740,7 +741,16 @@ percentage = covered / total</div>
           <tr><td><code>--fuzz</code></td><td>Generate fuzz round-trip skeletons (<code>scaffold</code>).</td></tr>
           <tr><td><code>--dry-run</code></td><td>Print the unified diff of every edit instead of writing it (<code>migrate</code>).</td></tr>
           <tr><td><code>--dir=&lt;skills-dir&gt;</code></td><td>Skills directory to install into, default <code>.agents/skills</code> (<code>skill install</code>).</td></tr>
-          <tr><td><code>--cache</code></td><td>Remove every cached test binary no run is using (<code>clean</code>).</td></tr>
+          <tr><td><code>--cache</code></td><td>Remove every cached test binary no run is using, and every base tree no audit is using (<code>clean</code>).</td></tr>
+          <tr><td><code>--record</code></td><td>Write the record of the tree as JSON instead of comparing (<code>audit</code>).</td></tr>
+          <tr><td><code>--base=&lt;ref&gt;</code></td><td>Record the commit the ref names, exported by git outside the checkout, as the base (<code>audit</code>).</td></tr>
+          <tr><td><code>--base-record=&lt;file&gt;</code></td><td>The base of the comparison, a record <code>--record</code> wrote (<code>audit</code>).</td></tr>
+          <tr><td><code>--head-record=&lt;file&gt;</code></td><td>The head of the comparison, a record <code>--record</code> wrote; default the working tree (<code>audit</code>).</td></tr>
+          <tr><td><code>--fail-on=&lt;classes&gt;</code></td><td>Exit 1 when the audit lists a finding of one of the comma-separated classes, <code>all</code> for every weakening, <code>proof</code> for every proof class (<code>audit</code>).</td></tr>
+          <tr><td><code>--evidence=&lt;stream&gt;</code></td><td>A saved <code>-json</code> stream of a run of the head, repeatable: each changed behavior's verdict, current or stale (<code>audit</code>).</td></tr>
+          <tr><td><code>--base-evidence=&lt;stream&gt;</code></td><td>A saved <code>-json</code> stream of a run of the base, repeatable, for the run-time assertions of an assertions finding (<code>audit</code>).</td></tr>
+          <tr><td><code>--run</code></td><td>Run the packages of the changed behaviors, with coverage of the changed production packages, and take the run as current evidence (<code>audit</code>).</td></tr>
+          <tr><td><code>--diff=&lt;file|-&gt;</code></td><td>The changed lines the unproven ones are read from, as a unified diff, where <code>--base</code> does not give them (<code>audit</code>).</td></tr>
         </tbody>
       </table>
 

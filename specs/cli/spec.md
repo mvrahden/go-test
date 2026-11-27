@@ -364,6 +364,13 @@ The version subcommand SHALL exit 0 and print the version on stdout.
 - **WHEN** the version subcommand runs
 - **THEN** exits 0 and prints the version on stdout
 
+### Requirement: The version as JSON
+`gotest version --json` SHALL print one JSON document holding the version, the Go it was built with, the platform, every subcommand and, per document that carries a schema, its schema number, so a tool learns what the CLI can do without parsing the version line.
+
+#### Scenario: Asking for the version as JSON
+- **WHEN** the version subcommand runs with --json
+- **THEN** prints one JSON document naming the version, the subcommands and the audit's schema
+
 ### Requirement: The setup budget's default in the help
 Every help text that lists --setup-timeout SHALL give its default as the fixtures' declared budgets, 30s until the first reports. The cases are the table in `tests/conformance/cli/help_suite_test.go`.
 

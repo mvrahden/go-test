@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditEvidence / WhatAToolReads / when a tool reads the audit document as JSON / finds on each finding and evidence row an id that stays when the lines move \(
+Clause: when a tool reads the audit document as JSON → finds on each finding and evidence row an id that stays when the lines move
+--- a/internal/gotestaudit/compare.go
++++ b/internal/gotestaudit/compare.go
+@@ -391,7 +391,7 @@
+ 	})
+ 	for i := range d.Findings {
+ 		f := &d.Findings[i]
+-		f.ID = stableID(f.Class, f.Module, f.Package, f.Subject, f.Base, f.Head)
++		f.ID = stableID(f.Class, f.Module, f.Package, f.Subject, f.Base, f.Head, fmt.Sprint(f.HeadLocation))
+ 	}
+ 	d.Summary = Summary{Classes: map[string]int{}, Incomplete: len(d.Incomplete)}
+ 	for i := range d.Findings {

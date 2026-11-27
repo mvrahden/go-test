@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditCompare / ThePolicyExit / when --fail-on names an unknown class / audit refuses it with exit 2, naming the classes \(
+Clause: when --fail-on names an unknown class → audit refuses it with exit 2, naming the classes
+--- a/internal/gotestaudit/policy.go
++++ b/internal/gotestaudit/policy.go
+@@ -42,7 +42,7 @@
+ 		case slices.Contains(known, c):
+ 			want[c] = true
+ 		default:
+-			return nil, fmt.Errorf("unknown finding class %q; the classes are %s", c, names)
++			want[c] = true
+ 		}
+ 	}
+ 	if len(want) == 0 {

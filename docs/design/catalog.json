@@ -3608,6 +3608,1575 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "lists each as added, removed, reworded, moved or changed with its base and head file and line",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "compare_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 56,
+                      "name": "lists_each_as_added,_removed,_reworded,_moved_or_changed_with_its_base_and_head_file_and_line",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when audit compares a base record with a head record that adds, removes, rewords, moves and changes behaviors",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "compare_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 55,
+                  "name": "audit_compares_a_base_record_with_a_head_record_that_adds,_removes,_rewords,_moves_and_changes_behaviors",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lists both as removed and the new one as added",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "compare_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 85,
+                      "name": "lists_both_as_removed_and_the_new_one_as_added",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when two removed behaviors have the body of one added behavior",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "compare_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 84,
+                  "name": "two_removed_behaviors_have_the_body_of_one_added_behavior",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "BehaviorsCompared",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "compare_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 54,
+              "name": "TestBehaviorsCompared",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lists a finding of each class with its subject and its base and head values",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "compare_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 105,
+                      "name": "lists_a_finding_of_each_class_with_its_subject_and_its_base_and_head_values",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "lists each changed body as an informational finding, apart from the weakenings",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "compare_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 123,
+                      "name": "lists_each_changed_body_as_an_informational_finding,_apart_from_the_weakenings",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the head removes a test, excludes one, focuses one, adds a guard, raises a budget, sets NoDeadline, adds a suppression, rewrites and deletes a snapshot, drops an assertion and adds AssertsBy",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "compare_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 104,
+                  "name": "the_head_removes_a_test,_excludes_one,_focuses_one,_adds_a_guard,_raises_a_budget,_sets_NoDeadline,_adds_a_suppression,_rewrites_and_deletes_a_snapshot,_drops_an_assertion_and_adds_AssertsBy",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lists it as an informational suppression finding naming both comments",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "compare_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 138,
+                      "name": "lists_it_as_an_informational_suppression_finding_naming_both_comments",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a suppression keeps its file and rules and gives a new reason",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "compare_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 137,
+                  "name": "a_suppression_keeps_its_file_and_rules_and_gives_a_new_reason",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lists no suppression finding for it",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "compare_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 150,
+                      "name": "lists_no_suppression_finding_for_it",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a suppression moves to another line with its rules and reason",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "compare_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 149,
+                  "name": "a_suppression_moves_to_another_line_with_its_rules_and_reason",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "WhatGotWeaker",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "compare_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 102,
+              "name": "TestWhatGotWeaker",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "prints one document opening with version and schema that holds base, head, summary, findings, behaviors and empty evidence and unproven lists",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "compare_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 161,
+                      "name": "prints_one_document_opening_with_version_and_schema_that_holds_base,_head,_summary,_findings,_behaviors_and_empty_evidence_and_unproven_lists",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when audit compares two records with --format=json",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "compare_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 160,
+                  "name": "audit_compares_two_records_with_--format=json",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "prints the weakenings before the behaviors and ends stdout with a closing line naming the verdict, the exit code and the counts, with nothing on stderr",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "compare_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 171,
+                      "name": "prints_the_weakenings_before_the_behaviors_and_ends_stdout_with_a_closing_line_naming_the_verdict,_the_exit_code_and_the_counts,_with_nothing_on_stderr",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when audit compares two records in the text format",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "compare_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 170,
+                  "name": "audit_compares_two_records_in_the_text_format",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "writes a heading, a table of the weakenings and a table of the behaviors",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "compare_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 182,
+                      "name": "writes_a_heading,_a_table_of_the_weakenings_and_a_table_of_the_behaviors",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when audit compares two records with --format=md",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "compare_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 181,
+                  "name": "audit_compares_two_records_with_--format=md",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "TheAuditDocument",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "compare_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 159,
+              "name": "TestTheAuditDocument",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "exits 0",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "compare_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 193,
+                      "name": "exits_0",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when audit finds weakenings and is given no --fail-on",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "compare_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 192,
+                  "name": "audit_finds_weakenings_and_is_given_no_--fail-on",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "exits 1 and the closing line names FAIL and the classes",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "compare_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 199,
+                      "name": "exits_1_and_the_closing_line_names_FAIL_and_the_classes",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when --fail-on names a class the document lists",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "compare_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 198,
+                  "name": "--fail-on_names_a_class_the_document_lists",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "audit refuses it with exit 2, naming the classes",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "compare_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 207,
+                      "name": "audit_refuses_it_with_exit_2,_naming_the_classes",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when --fail-on names an unknown class",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "compare_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 206,
+                  "name": "--fail-on_names_an_unknown_class",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ThePolicyExit",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "compare_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 191,
+              "name": "TestThePolicyExit",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "AuditCompare",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "compare_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 16,
+          "name": "TestAuditCompareTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "states for each added, reworded, moved and changed behavior and each finding's behavior its verdict, its run-time assertions, whether it passed vacuous and its AssertsBy",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "evidence_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 167,
+                      "name": "states_for_each_added,_reworded,_moved_and_changed_behavior_and_each_finding's_behavior_its_verdict,_its_run-time_assertions,_whether_it_passed_vacuous_and_its_AssertsBy",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "names a behavior the stream did not report not run, one X_ excludes skipped, and one of a package no stream holds no evidence",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "evidence_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 198,
+                      "name": "names_a_behavior_the_stream_did_not_report_not_run,_one_X__excludes_skipped,_and_one_of_a_package_no_stream_holds_no_evidence",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "lists the stream with its manifest's CLI version, commit, dirty flag, agent and exit code",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "evidence_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 211,
+                      "name": "lists_the_stream_with_its_manifest's_CLI_version,_commit,_dirty_flag,_agent_and_exit_code",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when audit is given a stream of the head's run",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "evidence_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 166,
+                  "name": "audit_is_given_a_stream_of_the_head's_run",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "EvidenceFromRuns",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "evidence_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 165,
+              "name": "TestEvidenceFromRuns",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "marks each stale, naming another commit, uncommitted changes and no manifest",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "evidence_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 228,
+                      "name": "marks_each_stale,_naming_another_commit,_uncommitted_changes_and_no_manifest",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when audit is given streams of another commit, of a tree with uncommitted changes and without a manifest",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "evidence_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 227,
+                  "name": "audit_is_given_streams_of_another_commit,_of_a_tree_with_uncommitted_changes_and_without_a_manifest",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "states the current stream's verdict and names the stale one's among the others",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "evidence_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 247,
+                      "name": "states_the_current_stream's_verdict_and_names_the_stale_one's_among_the_others",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a current and a stale stream judge one behavior",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "evidence_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 246,
+                  "name": "a_current_and_a_stale_stream_judge_one_behavior",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "CurrentAndStaleEvidence",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "evidence_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 226,
+              "name": "TestCurrentAndStaleEvidence",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the assertions finding carries the base's and the head's run-time counts",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "evidence_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 270,
+                      "name": "the_assertions_finding_carries_the_base's_and_the_head's_run-time_counts",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when audit is given a stream of each side's run and the head drops an assertion",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "evidence_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 269,
+                  "name": "audit_is_given_a_stream_of_each_side's_run_and_the_head_drops_an_assertion",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AssertionsAtRunTime",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "evidence_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 268,
+              "name": "TestAssertionsAtRunTime",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lists per file the changed executable lines no test executed as ranges, and counts them in the summary",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "evidence_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 291,
+                      "name": "lists_per_file_the_changed_executable_lines_no_test_executed_as_ranges,_and_counts_them_in_the_summary",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "counts no changed line that no block of the profile spans",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "evidence_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 304,
+                      "name": "counts_no_changed_line_that_no_block_of_the_profile_spans",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "lists a changed file of a package the profile does not cover as without coverage data",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "evidence_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 311,
+                      "name": "lists_a_changed_file_of_a_package_the_profile_does_not_cover_as_without_coverage_data",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when audit is given a coverage profile and a diff that changes production lines",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "evidence_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 290,
+                  "name": "audit_is_given_a_coverage_profile_and_a_diff_that_changes_production_lines",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "UnprovenLines",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "evidence_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 289,
+              "name": "TestUnprovenLines",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "exits 1 and the closing line counts the evidence and names the class",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "evidence_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 325,
+                      "name": "exits_1_and_the_closing_line_counts_the_evidence_and_names_the_class",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "--fail-on=all names every weakening class and no proof class",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "evidence_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 331,
+                      "name": "--fail-on=all_names_every_weakening_class_and_no_proof_class",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when --fail-on names failing and a stream fails a behavior the comparison names",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "evidence_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 324,
+                  "name": "--fail-on_names_failing_and_a_stream_fails_a_behavior_the_comparison_names",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "audit refuses it with exit 2, naming the flags that give it",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "evidence_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 338,
+                      "name": "audit_refuses_it_with_exit_2,_naming_the_flags_that_give_it",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when --fail-on names a proof class and no stream or profile is given",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "evidence_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 337,
+                  "name": "--fail-on_names_a_proof_class_and_no_stream_or_profile_is_given",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ProofInThePolicy",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "evidence_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 323,
+              "name": "TestProofInThePolicy",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "marks each row with its verdict and names each stream read under the first line",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "evidence_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 354,
+                      "name": "marks_each_row_with_its_verdict_and_names_each_stream_read_under_the_first_line",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "lists the removed, weakened and failing behaviors before the others",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "evidence_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 371,
+                      "name": "lists_the_removed,_weakened_and_failing_behaviors_before_the_others",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when audit renders evidence in the text format",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "evidence_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 353,
+                  "name": "audit_renders_evidence_in_the_text_format",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "folds them into one line that counts them, and -v lists each",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "evidence_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 400,
+                      "name": "folds_them_into_one_line_that_counts_them,_and_-v_lists_each",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the text format lists five or more rows alike of one suite",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "evidence_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 399,
+                  "name": "the_text_format_lists_five_or_more_rows_alike_of_one_suite",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "writes the evidence as a column of the behaviors table and the unproven lines as a table",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "evidence_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 432,
+                      "name": "writes_the_evidence_as_a_column_of_the_behaviors_table_and_the_unproven_lines_as_a_table",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when audit renders evidence with --format=md",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "evidence_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 431,
+                  "name": "audit_renders_evidence_with_--format=md",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "EvidenceInTheRenderings",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "evidence_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 352,
+              "name": "TestEvidenceInTheRenderings",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "finds on each finding and evidence row an id that stays when the lines move",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "evidence_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 489,
+                      "name": "finds_on_each_finding_and_evidence_row_an_id_that_stays_when_the_lines_move",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "finds on a finding each side's location, and the module of one without a package",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "evidence_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 524,
+                      "name": "finds_on_a_finding_each_side's_location,_and_the_module_of_one_without_a_package",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "finds on a finding, behavior and evidence row about a test the go test name and -run pattern that select it",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "evidence_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 547,
+                      "name": "finds_on_a_finding,_behavior_and_evidence_row_about_a_test_the_go_test_name_and_-run_pattern_that_select_it",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "finds each module's directory relative to the audited one and each side's branch",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "evidence_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 582,
+                      "name": "finds_each_module's_directory_relative_to_the_audited_one_and_each_side's_branch",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "finds on each evidence row whether it needs a decision, the stream it was judged by and that stream's commit",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "evidence_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 591,
+                      "name": "finds_on_each_evidence_row_whether_it_needs_a_decision,_the_stream_it_was_judged_by_and_that_stream's_commit",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a tool reads the audit document as JSON",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "evidence_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 488,
+                  "name": "a_tool_reads_the_audit_document_as_JSON",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "WhatAToolReads",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "evidence_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 487,
+              "name": "TestWhatAToolReads",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "AuditEvidence",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "evidence_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 16,
+          "name": "TestAuditEvidenceTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "compares that commit's tree with the working tree's, as the records of both would",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "gitbase_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 94,
+                      "name": "compares_that_commit's_tree_with_the_working_tree's,_as_the_records_of_both_would",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "leaves the checkout's status, index and worktree list as they were",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "gitbase_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 111,
+                      "name": "leaves_the_checkout's_status,_index_and_worktree_list_as_they_were",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when audit --base names a commit of the checkout",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "gitbase_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 93,
+                  "name": "audit_--base_names_a_commit_of_the_checkout",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "exits 2 naming --base-record and --head-record",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "gitbase_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 117,
+                      "name": "exits_2_naming_--base-record_and_--head-record",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when audit --base names no commit of the checkout",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "gitbase_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 116,
+                  "name": "audit_--base_names_no_commit_of_the_checkout",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ABaseFromGit",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "gitbase_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 92,
+              "name": "TestABaseFromGit",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "AuditGitBase",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "gitbase_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 17,
+          "name": "TestAuditGitBaseTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "prints one document opening with version and schema that lists each suite, test, When, It and row with its display path, module-relative file and lines and body hash, and exits 0",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "record_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 43,
+                      "name": "prints_one_document_opening_with_version_and_schema_that_lists_each_suite,_test,_When,_It_and_row_with_its_display_path,_module-relative_file_and_lines_and_body_hash,_and_exits_0",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "counts the gotest assertions written in each body, and marks AssertsBy, F_ and X_",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "record_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 76,
+                      "name": "counts_the_gotest_assertions_written_in_each_body,_and_marks_AssertsBy,_F__and_X_",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "names each suite's budgets and guard, each suppression with its rules and reason, and each snapshot file with its hash",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "record_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 89,
+                      "name": "names_each_suite's_budgets_and_guard,_each_suppression_with_its_rules_and_reason,_and_each_snapshot_file_with_its_hash",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when audit --record runs over a module",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "record_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 42,
+                  "name": "audit_--record_runs_over_a_module",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the two records are byte for byte equal and hold no absolute path",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "record_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 125,
+                      "name": "the_two_records_are_byte_for_byte_equal_and_hold_no_absolute_path",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the same tree is recorded twice",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "record_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 124,
+                  "name": "the_same_tree_is_recorded_twice",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "TheTreeRecord",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "record_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 41,
+              "name": "TestTheTreeRecord",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "audit --record lists the package with its errors and no suites and exits 2",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "record_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 154,
+                      "name": "audit_--record_lists_the_package_with_its_errors_and_no_suites_and_exits_2",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "audit compares none of its behaviors, names it as not compared and exits 2",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "record_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 164,
+                      "name": "audit_compares_none_of_its_behaviors,_names_it_as_not_compared_and_exits_2",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the head tree holds a package that does not compile",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "record_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 153,
+                  "name": "the_head_tree_holds_a_package_that_does_not_compile",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ATreeThatDoesNotCompile",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "record_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 142,
+              "name": "TestATreeThatDoesNotCompile",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "AuditRecord",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "record_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 15,
+          "name": "TestAuditRecordTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "runs the packages of the changed behaviors and states their verdicts as current evidence of that run",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "run_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 111,
+                      "name": "runs_the_packages_of_the_changed_behaviors_and_states_their_verdicts_as_current_evidence_of_that_run",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "lists the changed production lines that run did not execute",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "run_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 130,
+                      "name": "lists_the_changed_production_lines_that_run_did_not_execute",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when audit --run compares the working tree with a base",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "run_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 110,
+                  "name": "audit_--run_compares_the_working_tree_with_a_base",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "TheAuditsOwnRun",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "run_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 109,
+              "name": "TestTheAuditsOwnRun",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "takes the changed lines from the commit to the files on disk, every line of an untracked file included",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "run_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 156,
+                      "name": "takes_the_changed_lines_from_the_commit_to_the_files_on_disk,_every_line_of_an_untracked_file_included",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when audit --base with --coverage runs in a checkout with uncommitted and untracked production files",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "run_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 155,
+                  "name": "audit_--base_with_--coverage_runs_in_a_checkout_with_uncommitted_and_untracked_production_files",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "LinesFromGit",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "run_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 154,
+              "name": "TestLinesFromGit",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "exports it once into one directory under gotest's cache, outside the checkout",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "run_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 179,
+                      "name": "exports_it_once_into_one_directory_under_gotest's_cache,_outside_the_checkout",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "gotest clean --cache removes that directory",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "run_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 190,
+                      "name": "gotest_clean_--cache_removes_that_directory",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when audit --base records one commit twice",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "run_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 178,
+                  "name": "audit_--base_records_one_commit_twice",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "WhereABaseIsExported",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "run_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 177,
+              "name": "TestWhereABaseIsExported",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "records no package of that directory for the base and compares the rest, exiting 0",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "run_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 200,
+                      "name": "records_no_package_of_that_directory_for_the_base_and_compares_the_rest,_exiting_0",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when audit --base names a commit that lacks a directory one of the packages names",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "run_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 199,
+                  "name": "audit_--base_names_a_commit_that_lacks_a_directory_one_of_the_packages_names",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ABaseWithoutADirectory",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "run_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 198,
+              "name": "TestABaseWithoutADirectory",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "AuditRun",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "run_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 19,
+          "name": "TestAuditRunTestSuite",
+          "output": [],
+          "status": "none"
+        }
+      ],
+      "output": [],
+      "path": "github.com/mvrahden/go-test/tests/conformance/audit",
+      "status": "none"
+    },
+    {
+      "duration": 0,
+      "nodes": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "names the benchmark as running when the timeout expired",
                       "duration": 0,
                       "excluded": false,
@@ -14109,7 +15678,7 @@
                       "file": "version_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 21,
+                      "line": 23,
                       "name": "exits_0_and_prints_the_version_on_stdout",
                       "output": [],
                       "status": "none",
@@ -14123,7 +15692,7 @@
                   "file": "version_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 20,
+                  "line": 22,
                   "name": "the_version_subcommand_runs",
                   "output": [],
                   "status": "none",
@@ -14137,8 +15706,54 @@
               "file": "version_suite_test.go",
               "focused": false,
               "kind": "method",
-              "line": 17,
+              "line": 19,
               "name": "TestVersion",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "prints one JSON document naming the version, the subcommands and the audit's schema",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "version_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 33,
+                      "name": "prints_one_JSON_document_naming_the_version,_the_subcommands_and_the_audit's_schema",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the version subcommand runs with --json",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "version_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 32,
+                  "name": "the_version_subcommand_runs_with_--json",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "VersionAsJSON",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "version_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 31,
+              "name": "TestVersionAsJSON",
               "output": [],
               "status": "none"
             }
@@ -14150,7 +15765,7 @@
           "file": "version_suite_test.go",
           "focused": false,
           "kind": "suite",
-          "line": 11,
+          "line": 13,
           "name": "TestCLIVersionTestSuite",
           "output": [],
           "status": "none"
@@ -36762,13 +38377,13 @@
     }
   ],
   "stats": {
-    "behaviors": 1067,
+    "behaviors": 1116,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 152,
+    "suites": 157,
     "tests": 0
   }
 }

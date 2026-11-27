@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditEvidence / AssertionsAtRunTime / when audit is given a stream of each side's run and the head drops an assertion / the assertions finding carries the base's and the head's run-time counts \(
+Clause: when audit is given a stream of each side's run and the head drops an assertion → the assertions finding carries the base's and the head's run-time counts
+--- a/internal/gotestaudit/evidence.go
++++ b/internal/gotestaudit/evidence.go
+@@ -525,7 +525,7 @@
+ 				js[k] = bases[k].judge(f.Package, t)
+ 			}
+ 			if pick := best(bases, js); pick >= 0 {
+-				rt.Base = js[pick].assertions
++				rt.Base = rt.Head
+ 			}
+ 		}
+ 		if rt.Base != nil || rt.Head != nil {

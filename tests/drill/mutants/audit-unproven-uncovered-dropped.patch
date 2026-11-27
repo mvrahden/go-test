@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditEvidence / UnprovenLines / when audit is given a coverage profile and a diff that changes production lines / lists a changed file of a package the profile does not cover as without coverage data \(
+Clause: when audit is given a coverage profile and a diff that changes production lines → lists a changed file of a package the profile does not cover as without coverage data
+--- a/internal/gotestaudit/unproven.go
++++ b/internal/gotestaudit/unproven.go
+@@ -147,8 +147,6 @@
+ 		f := &files[i]
+ 		u := Unproven{Module: f.Module, File: f.File, Package: f.Package, Ranges: []LineRange{}}
+ 		if !profiled[f.Package] {
+-			d.Unproven = append(d.Unproven, u)
+-			s.NoCoverage++
+ 			continue
+ 		}
+ 		covered[f.Package] = true

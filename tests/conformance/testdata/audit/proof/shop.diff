@@ -1,0 +1,36 @@
+diff --git a/shop/shop.go b/shop/shop.go
+index 3c1b8e1..9d2f0a4 100644
+--- a/shop/shop.go
++++ b/shop/shop.go
+@@ -5,0 +6,11 @@ func Add(a, b int) int { return a + b }
++
++// Clamp keeps n within 0 and limit.
++func Clamp(n, limit int) int {
++	if n < 0 {
++		return 0
++	}
++	if n > limit {
++		return limit
++	}
++	return n
++}
+diff --git a/shop/cart_suite_test.go b/shop/cart_suite_test.go
+index 1111111..2222222 100644
+--- a/shop/cart_suite_test.go
++++ b/shop/cart_suite_test.go
+@@ -12 +12 @@ func (s *CartTestSuite) SuiteConfig() gotest.SuiteConfig {
+-	return gotest.SuiteConfig{Parallel: true, Timeout: 10 * time.Second}
++	return gotest.SuiteConfig{Parallel: true, Timeout: time.Minute}
+diff --git a/shop/ledger/ledger.go b/shop/ledger/ledger.go
+new file mode 100644
+index 0000000..5e6f7a8
+--- /dev/null
++++ b/shop/ledger/ledger.go
+@@ -0,0 +1,7 @@
++// Package ledger has no test of its own.
++package ledger
++
++// Balance is what is left of a sum after a cost.
++func Balance(sum, cost int) int {
++	return sum - cost
++}

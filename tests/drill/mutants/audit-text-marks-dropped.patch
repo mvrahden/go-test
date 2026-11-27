@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditEvidence / EvidenceInTheRenderings / when audit renders evidence in the text format / marks each row with its verdict and names each stream read under the first line \(
+Clause: when audit renders evidence in the text format → marks each row with its verdict and names each stream read under the first line
+--- a/internal/gotestaudit/render.go
++++ b/internal/gotestaudit/render.go
+@@ -34,7 +34,7 @@
+ 	fmt.Fprintf(w, "gotest audit: base %s → head %s\n", sideText(&d.Base), sideText(&d.Head))
+ 	writeStreams(w, d)
+ 	ev := evidenceIndex(d)
+-	marks := len(ev) > 0
++	marks := false
+ 	folded := 0
+ 	if len(d.Findings) > d.Summary.Informational {
+ 		fmt.Fprintf(w, "\nweakenings: %d\n", d.Summary.Weakenings)

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditRecord / TheTreeRecord / when the same tree is recorded twice / the two records are byte for byte equal and hold no absolute path \(
+Clause: when the same tree is recorded twice → the two records are byte for byte equal and hold no absolute path
+--- a/internal/gotestaudit/read.go
++++ b/internal/gotestaudit/read.go
+@@ -138,7 +138,7 @@
+ // rel is path relative to the module root, slash-separated; path itself
+ // where the root does not hold it.
+ func (m module) rel(path string) string {
+-	if m.dir != "" {
++	if m.dir == "-" {
+ 		if r, err := filepath.Rel(m.dir, path); err == nil && r != ".." && !strings.HasPrefix(r, ".."+string(filepath.Separator)) {
+ 			return filepath.ToSlash(r)
+ 		}

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditRun / ABaseWithoutADirectory / when audit --base names a commit that lacks a directory one of the packages names / records no package of that directory for the base and compares the rest, exiting 0 \(
+Clause: when audit --base names a commit that lacks a directory one of the packages names → records no package of that directory for the base and compares the rest, exiting 0
+--- a/cmd/gotest/auditbase.go
++++ b/cmd/gotest/auditbase.go
+@@ -143,7 +143,7 @@
+ func presentPatterns(dir string, patterns []string) []string {
+ 	var out []string
+ 	for _, p := range patterns {
+-		if !strings.HasPrefix(p, ".") {
++		if !strings.HasPrefix(p, ".") || p != "" {
+ 			out = append(out, p)
+ 			continue
+ 		}

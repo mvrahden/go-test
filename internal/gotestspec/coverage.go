@@ -161,3 +161,57 @@ func coveragePackage(file string) string {
 	}
 	return file[:idx]
 }
+
+// CoverageBlock is one block of a coverage profile: its file as the
+// profile names it (import path and file name), the lines it spans, its
+// statements and how often it ran.
+type CoverageBlock struct {
+	File               string
+	StartLine, EndLine int
+	Stmts, Count       int
+}
+
+// ReadCoverageBlocks reads a profile's blocks in order, a block a merged
+// profile repeats once with its largest count.
+func ReadCoverageBlocks(r io.Reader) ([]CoverageBlock, error) {
+	var out []CoverageBlock
+	at := map[string]int{}
+	scanner := bufio.NewScanner(r)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "mode:") {
+			continue
+		}
+		file, block, stmts, count, err := parseCoverageLine(line)
+		if err != nil {
+			continue
+		}
+		if i, ok := at[file+":"+block]; ok {
+			out[i].Count = max(out[i].Count, count)
+			continue
+		}
+		start, end, ok := blockLines(block)
+		if !ok {
+			continue
+		}
+		at[file+":"+block] = len(out)
+		out = append(out, CoverageBlock{File: file, StartLine: start, EndLine: end, Stmts: stmts, Count: count})
+	}
+	return out, scanner.Err()
+}
+
+// blockLines reads the lines of a block "startLine.startCol,endLine.endCol".
+func blockLines(block string) (start, end int, ok bool) {
+	from, to, found := strings.Cut(block, ",")
+	if !found {
+		return 0, 0, false
+	}
+	sl, _, _ := strings.Cut(from, ".")
+	el, _, _ := strings.Cut(to, ".")
+	s, err1 := strconv.Atoi(sl)
+	e, err2 := strconv.Atoi(el)
+	if err1 != nil || err2 != nil || e < s {
+		return 0, 0, false
+	}
+	return s, e, true
+}

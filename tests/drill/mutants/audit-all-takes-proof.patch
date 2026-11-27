@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/audit AuditEvidence / ProofInThePolicy / when --fail-on names failing and a stream fails a behavior the comparison names / --fail-on=all names every weakening class and no proof class \(
+Clause: when --fail-on names failing and a stream fails a behavior the comparison names → --fail-on=all names every weakening class and no proof class
+--- a/internal/gotestaudit/policy.go
++++ b/internal/gotestaudit/policy.go
+@@ -30,8 +30,8 @@
+ 		switch {
+ 		case c == "":
+ 		case c == ClassAll:
+-			for _, k := range Classes {
+-				if Weakens(k) {
++			for _, k := range policyClasses() {
++				if k != ClassChanged {
+ 					want[k] = true
+ 				}
+ 			}

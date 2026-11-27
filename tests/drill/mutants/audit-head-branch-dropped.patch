@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditEvidence / WhatAToolReads / when a tool reads the audit document as JSON / finds each module's directory relative to the audited one and each side's branch \(
+Clause: when a tool reads the audit document as JSON → finds each module's directory relative to the audited one and each side's branch
+--- a/cmd/gotest/audit.go
++++ b/cmd/gotest/audit.go
+@@ -255,7 +255,7 @@
+ 			dirty := p.Dirty
+ 			prov = gotestaudit.Provenance{Commit: p.Commit, Dirty: &dirty}
+ 			if p.Branch != "HEAD" {
+-				prov.Branch = p.Branch
++				_ = p.Branch
+ 			}
+ 		}
+ 	}

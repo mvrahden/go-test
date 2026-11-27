@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditRecord / TheTreeRecord / when audit --record runs over a module / names each suite's budgets and guard, each suppression with its rules and reason, and each snapshot file with its hash \(
+Clause: when audit --record runs over a module → names each suite's budgets and guard, each suppression with its rules and reason, and each snapshot file with its hash
+--- a/internal/gotestaudit/budget.go
++++ b/internal/gotestaudit/budget.go
+@@ -105,7 +105,7 @@
+ func budgetString(d time.Duration) string {
+ 	switch {
+ 	case d < 0:
+-		return BudgetNone
++		return defaultBudget.String()
+ 	case d == 0:
+ 		return defaultBudget.String()
+ 	default:

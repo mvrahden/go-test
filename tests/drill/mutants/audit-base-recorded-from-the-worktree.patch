@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditGitBase / ABaseFromGit / when audit --base names a commit of the checkout / compares that commit's tree with the working tree's, as the records of both would \(
+Clause: when audit --base names a commit of the checkout → compares that commit's tree with the working tree's, as the records of both would
+--- a/cmd/gotest/auditbase.go
++++ b/cmd/gotest/auditbase.go
+@@ -101,7 +101,7 @@
+ 		return nil, fmt.Errorf("exporting %s: %w", g.ref, err)
+ 	}
+ 
+-	dir := filepath.Join(tree, filepath.FromSlash(g.prefix))
++	dir := filepath.Join(g.top, filepath.FromSlash(g.prefix))
+ 	present := presentPatterns(dir, patterns)
+ 	clean := false
+ 	prov := gotestaudit.Provenance{Ref: g.ref, Branch: g.branch, Commit: g.short, Dirty: &clean}

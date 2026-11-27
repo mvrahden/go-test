@@ -96,6 +96,8 @@ var witnesses = []witness{
 	{file: "reference/fixtures.md", quote: "refuses (v1.38+) an embedded", label: "v1.38+", path: "internal/gotestast/transfer.go", literal: "an interface the state cannot carry"},
 	{file: "reference/cli.md", quote: "incl. every subtest name", label: "v1.42+", path: "internal/protocol/manifest.go", literal: "RunPackage"},
 	{file: "SKILL.md", quote: "Write the reason", label: "v1.42+", path: "internal/lint/lint.go", literal: "nolint-reason"},
+	{file: "SKILL.md", quote: "audit it against its base", label: "v1.42+", path: "cmd/gotest/audit.go", literal: "func runAudit"},
+	{file: "reference/cli.md", quote: "go tool gotest audit --base=<ref>", label: "v1.42+", path: "cmd/gotest/audit.go", literal: "--head-record"},
 	{file: "reference/cli.md", quote: "its reason, as JSON", label: "v1.42+", path: "cmd/gotest/lint.go", literal: "suppressions"},
 	{file: "reference/api.md", quote: "except on an `Each` row's `T`", label: "v1.42+", path: "pkg/gotest/utils.go", literal: "row.soft = true"},
 	{file: "reference/assertions.md", quote: "An `Each` row's `t` is the exception", label: "v1.42+", path: "pkg/gotest/utils.go", literal: "row.soft = true"},

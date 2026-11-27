@@ -2,9 +2,9 @@ Expect: ^FAIL .*conformance/cli .* / refuses a package beside the flag with exit
 Clause: when gotest clean --cache runs → refuses a package beside the flag with exit 2
 --- a/cmd/gotest/clean.go
 +++ b/cmd/gotest/clean.go
-@@ -77,10 +77,6 @@
- // clearCache removes every cached test binary no run is using; args may
- // hold go test flags, never a package.
+@@ -79,10 +79,6 @@
+ // base tree no audit is using; args may hold go test flags, never a
+ // package.
  func clearCache(args []string) int {
 -	if len(gotestrunner.PatternIndices(args, ownFlag)) > 0 {
 -		fmt.Fprintln(os.Stderr, "FAIL: --cache clears the test binary cache and takes no packages; run gotest clean <packages> for generated files")

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditCompare / TheAuditDocument / when audit compares two records with --format=md / writes a heading, a table of the weakenings and a table of the behaviors \(
+Clause: when audit compares two records with --format=md → writes a heading, a table of the weakenings and a table of the behaviors
+--- a/internal/gotestaudit/render.go
++++ b/internal/gotestaudit/render.go
+@@ -522,7 +522,7 @@
+ 		fmt.Fprintf(w, "\nEvidence: %s\n", gotestspec.EscapeLabel(streamsText(d)))
+ 	}
+ 	ev := evidenceIndex(d)
+-	if d.Summary.Weakenings > 0 {
++	if d.Summary.Weakenings < 0 {
+ 		if len(ev) > 0 {
+ 			fmt.Fprint(w, "\n#### Weakenings\n\n| Class | Evidence | Package | Subject | Base | Head | Where |\n|---|---|---|---|---|---|---|\n")
+ 		} else {

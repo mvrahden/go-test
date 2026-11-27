@@ -67,6 +67,16 @@ last run in this directory failed, with `-json`, `spec` and `summary` too,
 and exits 2 when nothing is recorded to rerun. `--agent=false` or
 `GOTEST_AGENT=0` gives you go test's text instead.
 
+Before you report a change done, audit it against its base (v1.42+):
+`go tool gotest audit --base=$(git merge-base origin/main HEAD)` reads both
+trees' suites from source and lists every weakening before the behaviors
+added, removed, reworded, moved and changed: a test removed, an `X_` or
+`F_` added, a guard, a raised budget or `NoDeadline`, a new suppression, a
+rewritten snapshot, fewer assertions, a new `AssertsBy`. Each one is what
+the change meant, said in your report, or a mistake to undo. Add `--run` to
+run what changed: each behavior then shows its verdict, and the changed
+production lines no test executed are listed.
+
 ## The write loop
 
 Write → lint → both runners → fix:

@@ -108,6 +108,7 @@ var knownSubcommands = map[string]bool{
 	"watch":    true,
 	"clean":    true,
 	"lint":     true,
+	"audit":    true,
 	"refactor": true,
 	"skill":    true,
 	"hook":     true,
