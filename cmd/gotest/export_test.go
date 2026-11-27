@@ -490,3 +490,9 @@ func ExportMutate(files []gotestaudit.ProdFile, budget time.Duration, suite stri
 
 // ExportNarrowedTo is the Changed of a run that runs pkgs.
 var ExportNarrowedTo = narrowedTo
+
+// ExportHeldCurrent is whether --changed holds a recorded verdict as current.
+var ExportHeldCurrent = heldCurrent
+
+// ExportStampRecord stamps a run's record with its mode and narrowing.
+var ExportStampRecord = stampRecord

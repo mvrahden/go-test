@@ -861,7 +861,7 @@ spec and summary given --input and --check-fresh SHALL hash the stream's package
 - **THEN** refuses with exit 2, naming --input
 
 ### Requirement: Running what changed
---changed SHALL run, of the packages given, those whose verdict the working directory's record does not hold as current: their input hash differs, or the record holds no verdict of them, a failed one or one narrowed by -run, -skip, --group or --failed. Without a record it SHALL run every package and say so on stderr. Beside --failed a package chosen only for its failure SHALL rerun only what failed. It SHALL work in a text or -json run, spec and summary.
+--changed SHALL run, of the packages given, those whose verdict the working directory's record does not hold as current: their input hash differs, or the record holds no verdict of them, a failed one, one of a part of their tests, or one taken under a mode that does not cover this run's. Without a record it SHALL run every package and say so on stderr. Beside --failed a package chosen only for its failure SHALL rerun only what failed. It SHALL work in a text or -json run, spec and summary.
 
 #### Scenario: A run after a change
 - **WHEN** --changed follows a run, after a file two of its packages read changed
@@ -892,7 +892,7 @@ A --changed run SHALL say how far it was narrowed: its manifest's `Changed` coun
 - **AND** closes the stream with 0 units not run
 
 ### Requirement: The packages of a record
-A run's record SHALL list each package it judged with its verdict, its InputHash, its time and whether -run, -skip, --group or --failed narrowed it. A --changed run SHALL keep from the record before it the packages it did not run and their failed units, so the record holds the last verdict of every package. Writers SHALL take the checkout's lock, so runs side by side lose no package.
+A run's record SHALL list each package it judged with its verdict, its InputHash, its time, the mode the verdict was taken under and whether the verdict is of a part of the package's tests. A --changed run SHALL keep from the record before it the packages it did not run and their failed units, so the record holds the last verdict of every package. Writers SHALL take the checkout's lock, so runs side by side lose no package.
 
 #### Scenario: The packages of a narrowed run
 - **WHEN** a -run narrowed run of a package ends
@@ -901,6 +901,32 @@ A run's record SHALL list each package it judged with its verdict, its InputHash
 #### Scenario: The record after a --changed run
 - **WHEN** a --changed run leaves out packages the record before it held
 - **THEN** the record keeps their verdicts and hashes beside those of the packages it ran
+
+#### Scenario: The mode in a record
+- **WHEN** a --ci -short run of a package ends
+- **THEN** its record lists the package with a Mode whose Policy and Short are on
+- **AND** the record of a plain run lists it with both off
+
+### Requirement: The mode a verdict was taken under
+A run's record SHALL stamp each package's verdict with its mode, `Mode`: `Policy`, whether CI mode's gates judged it, by --ci or the environment, and `Short`, whether its tests ran under -short, or -test.short after -args. --changed SHALL hold a recorded verdict as current only when its mode covers the run's: the same `Short`, and `Policy` on or the run's off, since a verdict CI mode took stands for a plain run and never the reverse.
+
+#### Scenario: After a -short run
+- **WHEN** --changed follows a -short run of a package unchanged since
+- **THEN** a plain --changed run runs the package again, saying on stderr that the record does not hold its verdict under this run's -short and --ci
+- **AND** a -short --changed run leaves it out
+
+#### Scenario: CI mode and a plain run
+- **WHEN** --changed follows a run of a package unchanged since, one of the two under --ci
+- **THEN** after a plain run, --ci --changed runs the package again and fails on its test that passed without an assertion
+- **AND** after a --ci run, a plain --changed run leaves the package out
+
+### Requirement: A verdict without a mode
+A verdict without a mode, as a record written before modes were stamped holds, SHALL cover no run. When packages unchanged since their verdict run again for their mode alone, --changed SHALL say so on stderr with their number.
+
+#### Scenario: A record without modes
+- **WHEN** --changed reads a record whose packages carry no mode
+- **THEN** runs every package given once, saying so on stderr
+- **AND** leaves them out on the next --changed run
 
 ### Requirement: Run records kept
 Each run that records itself SHALL also keep its record alone, with the path of its --events-file, as a file of its own in the checkout's history under the gotest cache, written by a rename; each write SHALL remove all but the newest 50 and those kept over 30 days. gotest clean --cache SHALL remove the records of every checkout no run is writing.

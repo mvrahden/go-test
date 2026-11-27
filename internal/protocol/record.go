@@ -33,9 +33,28 @@ type PackageVerdict struct {
 	InputHash string `json:"InputHash,omitempty"`
 	// Elapsed is the package's time in seconds.
 	Elapsed float64 `json:"Elapsed"`
-	// Narrowed marks a verdict of a part of the package's tests: under
-	// -run, -skip, --failed or --group.
+	// Narrowed marks a verdict that does not stand for all the package's
+	// tests: the run selected among them, did not count them, or failed
+	// outside any package.
 	Narrowed bool `json:"Narrowed,omitempty"`
+	// Mode is the mode the verdict was taken under; nil in a record
+	// written before modes, which covers no run.
+	Mode *VerdictMode `json:"Mode,omitempty"`
+}
+
+// VerdictMode is what a run's flags and environment make of a verdict
+// beyond the source it judged.
+type VerdictMode struct {
+	// Policy is CI mode: its gates judged the verdict.
+	Policy bool `json:"Policy"`
+	// Short is -short, or -test.short after -args.
+	Short bool `json:"Short"`
+}
+
+// Covers reports whether a verdict under m stands for a run under run:
+// the same Short, and Policy on or the run's off. A nil mode covers none.
+func (m *VerdictMode) Covers(run VerdictMode) bool {
+	return m != nil && m.Short == run.Short && (m.Policy || !run.Policy)
 }
 
 // FailedUnit is one unit a run failed, at the finest level the runner can

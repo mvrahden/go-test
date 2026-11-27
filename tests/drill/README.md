@@ -1273,6 +1273,8 @@ shards of one run do not add up to every mutant exactly once.
 | `mutate-ignore-without-a-reason-keeps` | a comment without a reason keeps its function | audit conformance: the reasonless It finds Half's mutant ignored |
 | `mutate-ignores-unrecorded` | a record lists no mutate-ignore comment | audit conformance: the record It finds none |
 | `mutate-ignores-not-compared` | mutate-ignore comments are left out of the comparison | audit conformance: the suppression It finds no finding |
+| `changed-ignores-the-mode` | `--changed` holds a verdict as current whatever mode it was taken under | cli conformance: the package judged under -short does not run again |
+| `record-forgets-the-mode` | a run's record stamps no package with its mode | cli conformance: the record's package has no Mode, and an unchanged package runs again |
 
 ## Adding a mutant
 

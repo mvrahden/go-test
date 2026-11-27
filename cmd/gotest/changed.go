@@ -70,6 +70,8 @@ type runPlan struct {
 	merge bool
 	// only is the selection of a --changed --failed run; nil for none.
 	only map[string]string
+	// mode is the mode the run's verdicts are taken under.
+	mode protocol.VerdictMode
 }
 
 // planRun hashes the loaded packages and, under --changed, keeps only
@@ -79,7 +81,7 @@ type runPlan struct {
 // the run cannot go on.
 func planRun(cfg *ExecConfig, pkgs *gotestgen.RunPackages) (*runPlan, bool) {
 	classified := gotestrunner.ClassifyGoTestArgs(cfg.GoTestArgs)
-	plan := &runPlan{inputs: startInputs(pkgs, classified.BuildFlags)}
+	plan := &runPlan{inputs: startInputs(pkgs, classified.BuildFlags), mode: runMode(cfg)}
 	if cfg.Manifest != nil {
 		cfg.Manifest.Build = plan.inputs.flags
 	}
@@ -111,15 +113,22 @@ func planRun(cfg *ExecConfig, pkgs *gotestgen.RunPackages) (*runPlan, bool) {
 	}
 	failedOnly := map[string]bool{}
 	keep := map[string]bool{}
+	otherMode := 0
 	for _, pkg := range pkgs.Order {
-		r, ok := recorded[pkg]
-		current := ok && r.InputHash != "" && r.InputHash == hashes[pkg] && !r.Narrowed
+		r := recorded[pkg]
+		current, other := heldCurrent(r, hashes[pkg], plan.mode)
+		if other {
+			otherMode++
+		}
 		switch {
 		case !current:
 			keep[pkg] = true
 		case r.Verdict == "fail":
 			keep[pkg], failedOnly[pkg] = true, true
 		}
+	}
+	if otherMode > 0 {
+		fmt.Fprintf(os.Stderr, "gotest: --changed: %d unchanged package(s) run again: the record does not hold their verdict under this run's -short and --ci\n", otherMode)
 	}
 	if cfg.ChangedFailed {
 		only := gotestrunner.RerunSelection(rec.Failed)
@@ -215,11 +224,11 @@ func saveRun(result *gotestrunner.PipelineResult, code int, manifest *protocol.M
 	res := *result.Judged
 	res.ExitCode = code
 	rec := protocol.RunRecord{Dir: dir, Manifest: *manifest, Result: res, Failed: result.Failed, Packages: slices.Clone(result.Packages), EventsFile: absPath(opts.eventsFile), Started: processStart.UTC()}
-	for i := range rec.Packages {
-		if opts.narrowed != nil && opts.narrowed(rec.Packages[i].Package) {
-			rec.Packages[i].Narrowed = true
-		}
+	var mode protocol.VerdictMode
+	if opts.plan != nil {
+		mode = opts.plan.mode
 	}
+	stampRecord(&rec, mode, opts.narrowed, false)
 	merge := opts.plan != nil && opts.plan.merge
 	if err := gotestrunner.SaveRun(rec, merge, time.Now()); err != nil {
 		fmt.Fprintf(os.Stderr, "gotest: the run is not recorded for --failed: %s\n", err)

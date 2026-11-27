@@ -2,7 +2,7 @@ Expect: ^FAIL .*conformance/cli CLIChanged .* / runs those two packages and the 
 Clause: when --changed follows a run, after a file two of its packages read changed → runs those two packages and the one that failed, and not the one unchanged
 --- a/cmd/gotest/changed.go
 +++ b/cmd/gotest/changed.go
-@@ -116,8 +116,6 @@
+@@ -123,8 +123,6 @@
  		switch {
  		case !current:
  			keep[pkg] = true
@@ -10,4 +10,4 @@ Clause: when --changed follows a run, after a file two of its packages read chan
 -			keep[pkg], failedOnly[pkg] = true, true
  		}
  	}
- 	if cfg.ChangedFailed {
+ 	if otherMode > 0 {
