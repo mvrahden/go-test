@@ -364,6 +364,9 @@ func refuseControl(own OwnFlags, input string) bool {
 }
 
 func parseExecFlags(own OwnFlags, goTestArgs []string, projCfg *config.ProjectConfig) (ExecConfig, error) {
+	if err := protocol.CheckSwitches(os.Getenv); err != nil {
+		return ExecConfig{}, err
+	}
 	control, err := parseControlFlag(own)
 	if err != nil {
 		return ExecConfig{}, err

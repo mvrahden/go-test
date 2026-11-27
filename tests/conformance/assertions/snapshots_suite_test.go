@@ -1,8 +1,11 @@
 package assertions_test
 
 import (
+	"bytes"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -92,6 +95,135 @@ func (s *SnapshotKeysTestSuite) TestSwitchSpellings(t *gotest.T) {
 	gotest.NoError(t, err)
 	after := readFile(t, baseline)
 	t.When("GOTEST_CI and GOTEST_UPDATE_SNAPSHOTS are spelled FALSE and f", func(w *gotest.T) {
+		w.It("both are off: a missing baseline is written and a stale one still fails", func(it *gotest.T) {
+			gotest.Equal(it, "pass", run.Verdict("TestSnapKeysTestSuite/TestRows/#1"), "stdout: %s", run.Stdout)
+			gotest.Contains(it, after, "=== SNAP TestRows/#1 ===\nrow one\n")
+			gotest.Equal(it, "fail", run.Verdict("TestSnapKeysTestSuite/TestStale"))
+			gotest.Contains(it, after, "=== SNAP TestStale ===\nold\n")
+		})
+	})
+}
+
+// switchHint ends the refusal of a switch value that is no boolean.
+const switchHint = " is neither on nor off: set it to 1 or true to switch it on, to 0 or false to switch it off, or unset it"
+
+// stageSnapKeys stages a copy of snapkeys as module, returning the module
+// directory, the baseline's path and its content.
+func stageSnapKeys(t *gotest.T, module string) (staged, baseline, before string) {
+	root, err := testkit.RepoRoot()
+	gotest.NoError(t, err)
+	staged = t.TempDir()
+	pkg, err := testkit.StagePackage(root, filepath.Join("..", "testdata", "snapkeys"), staged, module)
+	gotest.NoError(t, err)
+	baseline = filepath.Join(pkg, "testdata", "__snapshots__", "TestSnapKeysTestSuite_ext.snap")
+	return staged, baseline, readFile(t, baseline)
+}
+
+func (s *SnapshotKeysTestSuite) TestValuesThatAreNoSwitch(t *gotest.T) {
+	staged, baseline, before := stageSnapKeys(t, "snapnoswitchmod")
+	stagedPlain, baselinePlain, beforePlain := stageSnapKeys(t, "snapplainmod")
+	t.When("GOTEST_UPDATE_SNAPSHOTS or GOTEST_CI is set to a value that is no boolean", func(w *gotest.T) {
+		w.It("the run ends with exit 2 before any test runs, naming the variable and the value", func(it *gotest.T) {
+			for it, c := range gotest.Each(it, []struct {
+				Desc  string
+				env   []string
+				args  []string
+				names string
+			}{
+				{Desc: "GOTEST_UPDATE_SNAPSHOTS=off", env: []string{"GOTEST_UPDATE_SNAPSHOTS=off"}, args: []string{"-json", "./snapkeys/"}, names: `GOTEST_UPDATE_SNAPSHOTS="off"`},
+				{Desc: "GOTEST_UPDATE_SNAPSHOTS=no", env: []string{"GOTEST_UPDATE_SNAPSHOTS=no"}, args: []string{"-json", "./snapkeys/"}, names: `GOTEST_UPDATE_SNAPSHOTS="no"`},
+				{Desc: "GOTEST_UPDATE_SNAPSHOTS=2", env: []string{"GOTEST_UPDATE_SNAPSHOTS=2"}, args: []string{"-json", "./snapkeys/"}, names: `GOTEST_UPDATE_SNAPSHOTS="2"`},
+				{Desc: "GOTEST_UPDATE_SNAPSHOTS=yes", env: []string{"GOTEST_UPDATE_SNAPSHOTS=yes"}, args: []string{"-json", "./snapkeys/"}, names: `GOTEST_UPDATE_SNAPSHOTS="yes"`},
+				{Desc: "GOTEST_UPDATE_SNAPSHOTS is a space", env: []string{"GOTEST_UPDATE_SNAPSHOTS= "}, args: []string{"-json", "./snapkeys/"}, names: `GOTEST_UPDATE_SNAPSHOTS=" "`},
+				{Desc: "GOTEST_UPDATE_SNAPSHOTS is 1 after a space", env: []string{"GOTEST_UPDATE_SNAPSHOTS= 1"}, args: []string{"-json", "./snapkeys/"}, names: `GOTEST_UPDATE_SNAPSHOTS=" 1"`},
+				{Desc: "GOTEST_CI=off", env: []string{"GOTEST_CI=off"}, args: []string{"-json", "./snapkeys/"}, names: `GOTEST_CI="off"`},
+				{Desc: "GOTEST_CI=yes", env: []string{"GOTEST_CI=yes"}, args: []string{"-json", "./snapkeys/"}, names: `GOTEST_CI="yes"`},
+				{Desc: "both, GOTEST_CI named first", env: []string{"GOTEST_UPDATE_SNAPSHOTS=off", "GOTEST_CI=on"}, args: []string{"-json", "./snapkeys/"}, names: `GOTEST_CI="on"`},
+				{Desc: "GOTEST_UPDATE_SNAPSHOTS=off beside --ci", env: []string{"GOTEST_UPDATE_SNAPSHOTS=off"}, args: []string{"--ci", "-json", "./snapkeys/"}, names: `GOTEST_UPDATE_SNAPSHOTS="off"`},
+				{Desc: "GOTEST_CI=off beside --update-snapshots", env: []string{"GOTEST_CI=off"}, args: []string{"--update-snapshots", "-json", "./snapkeys/"}, names: `GOTEST_CI="off"`},
+				{Desc: "GOTEST_UPDATE_SNAPSHOTS=off under summary", env: []string{"GOTEST_UPDATE_SNAPSHOTS=off"}, args: []string{"summary", "./snapkeys/"}, names: `GOTEST_UPDATE_SNAPSHOTS="off"`},
+				{Desc: "GOTEST_UPDATE_SNAPSHOTS=off under spec", env: []string{"GOTEST_UPDATE_SNAPSHOTS=off"}, args: []string{"spec", "./snapkeys/"}, names: `GOTEST_UPDATE_SNAPSHOTS="off"`},
+			}) {
+				run, err := testkit.RunCLIWithEnv(it.Context(), staged, c.env, c.args...)
+				gotest.NoError(it, err)
+				gotest.Equal(it, 2, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+				gotest.Contains(it, run.Stderr, "FAIL: "+c.names+switchHint+"\n")
+				gotest.Empty(it, run.Stdout)
+				gotest.Equal(it, before, readFile(it, baseline), "the baseline was rewritten")
+			}
+		})
+		w.It("MatchSnapshot under plain go test fails naming the variable and the value, and leaves the baseline as it was", func(it *gotest.T) {
+			gen, err := testkit.RunCLI(it.Context(), stagedPlain, "generate", "./snapkeys/")
+			gotest.NoError(it, err)
+			gotest.Equal(it, 0, gen.Exit, "stderr: %s", gen.Stderr)
+			var stdout bytes.Buffer
+			cmd := exec.CommandContext(it.Context(), "go", "test", "-json", "-count=1", "./snapkeys/")
+			cmd.Dir = stagedPlain
+			cmd.Env = testkit.ChildEnv(it.TempDir(), "GOTEST_UPDATE_SNAPSHOTS=off")
+			cmd.Stdout = &stdout
+			_ = cmd.Run() // the failing tests exit 1; the events say which
+			verdicts := map[string]string{}
+			var output strings.Builder
+			for _, ev := range testkit.ParseEvents(stdout.Bytes()) {
+				output.WriteString(ev.Output)
+				switch ev.Action {
+				case "pass", "fail", "skip":
+					verdicts[ev.Test] = ev.Action
+				}
+			}
+			gotest.Equal(it, "fail", verdicts["TestSnapKeysTestSuite/TestStale"], "go test output:\n%s", output.String())
+			gotest.Empty(it, verdictsOf(verdicts, "pass"), "go test output:\n%s", output.String())
+			gotest.Contains(it, output.String(), `snapkeys_suite_test.go:26: MatchSnapshot: GOTEST_UPDATE_SNAPSHOTS="off"`+switchHint)
+			gotest.Equal(it, beforePlain, readFile(it, baselinePlain), "the baseline was rewritten")
+		})
+	})
+}
+
+// verdictsOf lists, sorted, the subtests whose verdict is want.
+func verdictsOf(verdicts map[string]string, want string) []string {
+	var names []string
+	for name, v := range verdicts {
+		if v == want && strings.Contains(name, "/") {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+	return names
+}
+
+func (s *SnapshotKeysTestSuite) TestTrueSpellings(t *gotest.T) {
+	staged, baseline, before := stageSnapKeys(t, "snaptruemod")
+	type spelled struct {
+		value string
+		run   testkit.Run
+		after string
+	}
+	var runs []spelled
+	for _, v := range []string{"true", "T"} {
+		gotest.NoError(t, os.WriteFile(baseline, []byte(before), 0o600))
+		run, err := testkit.RunCLIWithEnv(t.Context(), staged, []string{"GOTEST_UPDATE_SNAPSHOTS=" + v}, "-json", "./snapkeys/")
+		gotest.NoError(t, err)
+		runs = append(runs, spelled{value: v, run: run, after: readFile(t, baseline)})
+	}
+	t.When("GOTEST_UPDATE_SNAPSHOTS is spelled true or T", func(w *gotest.T) {
+		w.It("a stale baseline passes and is rewritten", func(it *gotest.T) {
+			for _, r := range runs {
+				gotest.Equal(it, 0, r.run.Exit, "%s: stdout: %s\nstderr: %s", r.value, r.run.Stdout, r.run.Stderr)
+				gotest.Equal(it, "pass", r.run.Verdict("TestSnapKeysTestSuite/TestStale"), r.value)
+				gotest.Contains(it, r.after, "=== SNAP TestStale ===\nnew\n", r.value)
+			}
+		})
+	})
+}
+
+func (s *SnapshotKeysTestSuite) TestEmptyValues(t *gotest.T) {
+	staged, baseline, _ := stageSnapKeys(t, "snapemptymod")
+	without := strings.Replace(readFile(t, baseline), "=== SNAP TestRows/#1 ===\nrow one\n", "", 1)
+	gotest.NoError(t, os.WriteFile(baseline, []byte(without), 0o600))
+	run, err := testkit.RunCLIWithEnv(t.Context(), staged, []string{"GOTEST_CI=", "GOTEST_UPDATE_SNAPSHOTS="}, "-json", "./snapkeys/")
+	gotest.NoError(t, err)
+	after := readFile(t, baseline)
+	t.When("GOTEST_CI and GOTEST_UPDATE_SNAPSHOTS are set to the empty string", func(w *gotest.T) {
 		w.It("both are off: a missing baseline is written and a stale one still fails", func(it *gotest.T) {
 			gotest.Equal(it, "pass", run.Verdict("TestSnapKeysTestSuite/TestRows/#1"), "stdout: %s", run.Stdout)
 			gotest.Contains(it, after, "=== SNAP TestRows/#1 ===\nrow one\n")

@@ -271,6 +271,35 @@ func (s *SnapshotInternalsTestSuite) TestMatchSnapshot_CIMode_FailsOnMissingBase
 	}
 }
 
+// A switch value that is no boolean fails the snapshot and touches no file.
+func (s *SnapshotInternalsTestSuite) TestMatchSnapshot_RefusesAValueThatIsNoSwitch(t *gotest.T) {
+	t.AssertsBy(rawCheck)
+	const hint = " is neither on nor off: set it to 1 or true to switch it on, to 0 or false to switch it off, or unset it"
+	for sub, tc := range gotest.Each(t, []struct {
+		Desc  string
+		name  string
+		value string
+	}{
+		{Desc: "GOTEST_UPDATE_SNAPSHOTS=off", name: "GOTEST_UPDATE_SNAPSHOTS", value: "off"},
+		{Desc: "GOTEST_UPDATE_SNAPSHOTS=2", name: "GOTEST_UPDATE_SNAPSHOTS", value: "2"},
+		{Desc: "GOTEST_UPDATE_SNAPSHOTS is a space", name: "GOTEST_UPDATE_SNAPSHOTS", value: " "},
+		{Desc: "GOTEST_CI=yes", name: "GOTEST_CI", value: "yes"},
+	}) {
+		sub.Setenv("GOTEST_CI", "0")
+		sub.Setenv("GOTEST_UPDATE_SNAPSHOTS", "")
+		sub.Setenv(tc.name, tc.value)
+		mock := &mockT{name: "TestRefused/" + tc.Desc}
+		gotest.MatchSnapshot(mock, "value")
+		want := fmt.Sprintf("MatchSnapshot: %s=%q%s", tc.name, tc.value, hint)
+		if !mock.failed || !strings.Contains(mock.msg, want) {
+			sub.Errorf("MatchSnapshot read a baseline under %s=%q: failed=%v, message %q, want it to hold %q", tc.name, tc.value, mock.failed, mock.msg, want)
+		}
+		if files, _ := filepath.Glob(filepath.Join(s.snapDir, "*.snap")); len(files) != 0 {
+			sub.Errorf("MatchSnapshot wrote %v under %s=%q", files, tc.name, tc.value)
+		}
+	}
+}
+
 func (s *SnapshotInternalsTestSuite) TestMatchSnapshot_CIMode_ComparesExistingBaseline(t *gotest.T) {
 	s.snap("TestSnapshotInternalsTestSuite_ext.snap")
 

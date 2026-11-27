@@ -439,7 +439,7 @@ When a section's exact key is missing, MatchSnapshot SHALL compare against the s
 - **THEN** the section is not reused for a second key
 
 ### Requirement: Snapshot updates switched off
-GOTEST_UPDATE_SNAPSHOTS and GOTEST_CI SHALL each be off when unset, empty or set to a false spelling of strconv.ParseBool (0, f, F, false, FALSE, False), and on for any other value, a mistyped one included. With GOTEST_UPDATE_SNAPSHOTS off, a stale snapshot SHALL fail and its baseline file SHALL stay unchanged.
+GOTEST_UPDATE_SNAPSHOTS and GOTEST_CI SHALL each be off when unset, empty or set to a false spelling of strconv.ParseBool (0, f, F, false, FALSE, False), and on when set to a true spelling (1, t, T, true, TRUE, True). With GOTEST_UPDATE_SNAPSHOTS off, a stale snapshot SHALL fail and its baseline file SHALL stay unchanged.
 
 #### Scenario: Updates disabled
 - **WHEN** GOTEST_UPDATE_SNAPSHOTS is 0
@@ -448,6 +448,22 @@ GOTEST_UPDATE_SNAPSHOTS and GOTEST_CI SHALL each be off when unset, empty or set
 #### Scenario: Other false spellings
 - **WHEN** GOTEST_CI and GOTEST_UPDATE_SNAPSHOTS are spelled FALSE and f
 - **THEN** both are off: a missing baseline is written and a stale one still fails
+
+#### Scenario: True spellings
+- **WHEN** GOTEST_UPDATE_SNAPSHOTS is spelled true or T
+- **THEN** a stale baseline passes and is rewritten
+
+#### Scenario: An empty value
+- **WHEN** GOTEST_CI and GOTEST_UPDATE_SNAPSHOTS are set to the empty string
+- **THEN** both are off: a missing baseline is written and a stale one still fails
+
+### Requirement: Switch values that are no boolean
+Any other value of GOTEST_UPDATE_SNAPSHOTS or GOTEST_CI, one with a space around a spelling included, SHALL be refused, naming the variable and the value: a run, and every other command that takes a run's flags, SHALL end with exit 2 before anything runs, whatever flags it is given, and MatchSnapshot in a test binary started without the CLI SHALL fail without reading or writing a baseline.
+
+#### Scenario: A value that is neither on nor off
+- **WHEN** GOTEST_UPDATE_SNAPSHOTS or GOTEST_CI is set to a value that is no boolean
+- **THEN** the run ends with exit 2 before any test runs, naming the variable and the value
+- **AND** MatchSnapshot under plain go test fails naming the variable and the value, and leaves the baseline as it was
 
 ### Requirement: Snapshot line endings
 MatchSnapshot SHALL read every carriage return before a newline, and those at the end of the value, as part of the line ending, so a baseline written for such a value matches it again.

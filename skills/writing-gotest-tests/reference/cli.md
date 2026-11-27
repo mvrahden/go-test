@@ -171,7 +171,7 @@ invocation runs tests — there is NO `test` subcommand:
 - Also: `prepare`, `generate`, `clean`, `version`, `help <cmd>`.
 
 Flags shared by run modes: `--ci` (or env `GOTEST_CI`/`CI`; `0`, `f`, `F`,
-`false`, `FALSE` and `False` are falsy, v1.34+; below, `0` and `false`) — enables the focus guard (committed `F_` prefixes fail
+`false`, `FALSE` and `False` are falsy, v1.34+; below, `0` and `false`; v1.42+ refuses any other `GOTEST_CI` or `GOTEST_UPDATE_SNAPSHOTS` value with exit 2) — enables the focus guard (committed `F_` prefixes fail
 the run) AND makes a missing `MatchSnapshot` baseline fail instead of
 being created. `--update-snapshots` rewrites baselines — in CI too, so
 never pass it there. `--spec` renders the spec view

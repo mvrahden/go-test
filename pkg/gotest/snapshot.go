@@ -408,8 +408,13 @@ func splitTestName(name string) (topLevel, rest string) {
 // calling file (<TestName>_ext.snap from an external test package). A
 // missing section is written as the baseline, except under GOTEST_CI;
 // GOTEST_UPDATE_SNAPSHOTS rewrites it. The optional name tells several
-// snapshots of one test apart.
+// snapshots of one test apart. A GOTEST_CI or GOTEST_UPDATE_SNAPSHOTS value
+// that is no boolean fails it.
 func MatchSnapshot(t testingT, value any, name ...string) {
 	countAssertion(t)
+	if err := protocol.CheckSwitches(os.Getenv); err != nil {
+		failf(t, "MatchSnapshot: %v", err)
+		return
+	}
 	matchSnapshot(t, 2, value, name...)
 }

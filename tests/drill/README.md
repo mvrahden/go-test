@@ -555,6 +555,10 @@ shards of one run do not add up to every mutant exactly once.
 | `snapshot-name-unchecked` | a snapshot name that spans lines is written as it is | canary: the failing fixture's bad name passes |
 | `snapshot-update-switch-any-value` | `GOTEST_UPDATE_SNAPSHOTS=0` rewrites baselines | canary: the stale baseline passes and the file changes |
 | `switch-false-spellings-on` | `FALSE` and `f` switch `GOTEST_CI` and `GOTEST_UPDATE_SNAPSHOTS` on | canary: a stale baseline is rewritten and a missing one refused |
+| `switch-unknown-value-runs` | a run given a `GOTEST_CI` or `GOTEST_UPDATE_SNAPSHOTS` value that is no boolean goes on | assertions conformance: the run exits 1 instead of 2 and its tests run |
+| `snapshot-unknown-switch-value-read` | `MatchSnapshot` reads and writes baselines under a switch value that is no boolean | ring-0 snapshot internals suite: the snapshot passes and a file is written |
+| `switch-true-spellings-refused` | `GOTEST_UPDATE_SNAPSHOTS` spelled `true` or `T` is refused | assertions conformance: the stale baseline is not rewritten |
+| `switch-empty-value-refused` | `GOTEST_UPDATE_SNAPSHOTS` set to the empty string is refused | assertions conformance: the missing baseline is not written |
 | `snapshot-legacy-ignored` | a baseline under the key the release before exact names used is not looked up | canary: the `snapshotlegacy` sections fail under `GOTEST_CI=1` |
 | `snapshot-legacy-renamed-under-ci` | an old-keyed section is renamed under `GOTEST_CI` | canary: the `snapshotlegacy` baseline changes in a CI run |
 | `snapshot-legacy-not-renamed` | an old-keyed section that matches keeps its old key | canary: the `snapshotlegacy` baseline is not migrated |
