@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -20,6 +21,9 @@ func (s *PlainTestSuite) TestSaysBye(t *gotest.T) {
 		return
 	}
 	bin := filepath.Join(t.TempDir(), "plain")
+	if runtime.GOOS == "windows" {
+		bin += ".exe" // Windows starts no file without an executable extension
+	}
 	out, err := exec.CommandContext(t.Context(), "go", "build", "-o", bin, "childcov/cmd/plain").CombinedOutput()
 	gotest.NoError(t, err, "%s", out)
 	out, err = exec.CommandContext(t.Context(), bin, "gotest").Output()
