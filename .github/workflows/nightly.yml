@@ -155,8 +155,6 @@ jobs:
           node-version: 22
       - name: OpenSpec validate
         run: make spec-validate
-      - name: Spec sync
-        run: make catalog && git diff --exit-code docs/design/catalog.json
       - name: Consumer fixture (skill evals)
         working-directory: tests/skillevals/writing-gotest-tests/consumer-fixture
         run: |

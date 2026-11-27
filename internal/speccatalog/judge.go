@@ -1,7 +1,6 @@
 package speccatalog
 
 import (
-	"encoding/json"
 	"fmt"
 	"go/ast"
 	"go/parser"
@@ -12,6 +11,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/mvrahden/go-test/internal/gotestscenarios"
 )
 
 // JudgeRun is one judge invocation for a drill mutant: the packages it tests
@@ -66,13 +67,14 @@ var testName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*TestSuite/Test[A-Za-z0
 // and every reason it cannot be judged.
 //
 // An Expect line anchored to a conformance package's FAIL line is judged by
-// that package, selecting the suites and methods holding the patch's Clause
-// lines of its capability, or all of them when it names none. Every other
-// Expect line is judged by the patch's Judge: lines, each one run of a
-// package directory and optionally the "<Suite>/<Method>" tests it selects.
+// that package, selecting the suites and methods holding the Its the
+// patch's Clause lines of its capability bind, or all of them when it names
+// none. Every other Expect line is judged by the patch's Judge: lines, each
+// one run of a package directory and optionally the "<Suite>/<Method>" tests
+// it selects.
 // An Expect line neither route reaches is refused, not run against a
 // default: only a run of the named check may catch the mutant.
-func JudgeRuns(specs []Spec, catalog []byte, patch []byte) ([]JudgeRun, []string) {
+func JudgeRuns(specs []Spec, r *Reading, patch []byte) ([]JudgeRun, []string) {
 	h := readHeader(patch)
 	var problems []string
 	known := map[string]bool{}
@@ -84,10 +86,7 @@ func JudgeRuns(specs []Spec, catalog []byte, patch []byte) ([]JudgeRun, []string
 			problems = append(problems, "Clause line names no clause of specs/: "+c)
 		}
 	}
-	tests, err := clauseTests(catalog)
-	if err != nil {
-		return nil, append(problems, err.Error())
-	}
+	tests := clauseTests(&r.Scenarios)
 
 	var caps []string
 	for _, e := range h.expects {
@@ -122,9 +121,9 @@ func JudgeRuns(specs []Spec, catalog []byte, patch []byte) ([]JudgeRun, []string
 		methods := []string{}
 		for _, test := range fields[1:] {
 			if strings.Count(test, "/") > 1 {
-				// Literal subtest names, as rendered in catalog.json, not regex.
-				if strings.HasPrefix(fields[0], "./"+ConformanceDir+"/") && !catalogTestPath(catalog, fields[0], test) {
-					problems = append(problems, "catalog declares no selected behavior: "+test)
+				// Literal subtest names, as spec --static lists them, not regex.
+				if strings.HasPrefix(fields[0], "./"+ConformanceDir+"/") && !declaresPath(r.Packages, fields[0], test) {
+					problems = append(problems, "the conformance suites declare no selected behavior: "+test)
 				}
 				runs = append(runs, JudgeRun{Packages: fields[:1], Tests: []string{test}})
 			} else {
@@ -195,38 +194,36 @@ func readHeader(patch []byte) header {
 }
 
 // clauseTests maps each capability's clauses, spelled as a Clause: line
-// spells them, to the "<Suite>/<Method>" tests that state them.
-func clauseTests(js []byte) (map[string]map[string][]string, error) {
-	var doc struct {
-		Packages []struct {
-			Path  string `json:"path"`
-			Nodes []node `json:"nodes"`
-		} `json:"packages"`
-	}
-	if err := json.Unmarshal(js, &doc); err != nil {
-		return nil, fmt.Errorf("catalog json: %w", err)
-	}
+// spells them, to the "<Suite>/<Method>" tests holding the Its they bind in
+// the capability's own conformance package.
+func clauseTests(doc *gotestscenarios.Document) map[string]map[string][]string {
 	out := map[string]map[string][]string{}
-	for _, p := range doc.Packages {
-		_, capability, _ := strings.Cut(p.Path, "/"+ConformanceDir+"/")
-		if out[capability] == nil {
-			out[capability] = map[string][]string{}
-		}
-		for _, suite := range p.Nodes {
-			if suite.Excluded {
-				continue
+	for i := range doc.Scenarios {
+		sc := &doc.Scenarios[i]
+		var whens []string
+		for _, c := range sc.Conditions {
+			if c.Keyword == gotestscenarios.When {
+				whens = append(whens, c.Text)
 			}
-			for i := range suite.Children {
-				method := &suite.Children[i]
-				test := strings.TrimPrefix(suite.Name, "Test") + "/" + method.Name
-				walk(method, nil, func(when, it *node) {
-					c := clauseWhen(whenLabel(when.Display, when.Name)) + Arrow + strings.TrimSpace(it.Display)
-					out[capability][c] = appendNew(out[capability][c], test)
-				})
+		}
+		if len(whens) != 1 {
+			continue
+		}
+		if out[sc.Capability] == nil {
+			out[sc.Capability] = map[string][]string{}
+		}
+		for _, c := range sc.Clauses {
+			key := clauseWhen(whens[0]) + Arrow + c.Text
+			for _, p := range c.Its {
+				if len(p.Path) < 2 || !strings.HasSuffix(p.Package, "/"+ConformanceDir+"/"+sc.Capability) {
+					continue
+				}
+				test := strings.TrimPrefix(p.Path[0], "Test") + "/" + p.Path[1]
+				out[sc.Capability][key] = appendNew(out[sc.Capability][key], test)
 			}
 		}
 	}
-	return out, nil
+	return out
 }
 
 // Suites indexes the suites declared in a package's test files.
@@ -352,18 +349,9 @@ func (r JudgeRun) Alone(root string) (bool, []string, error) {
 	return alone, problems, nil
 }
 
-// catalogTestPath validates an explicitly selected nested behavior against the
-// pristine catalog, so a typo cannot silently select no row.
-func catalogTestPath(data []byte, pkg, test string) bool {
-	var doc struct {
-		Packages []struct {
-			Path  string `json:"path"`
-			Nodes []node `json:"nodes"`
-		} `json:"packages"`
-	}
-	if json.Unmarshal(data, &doc) != nil {
-		return false
-	}
+// declaresPath reports whether the conformance tree declares an explicitly
+// selected nested behavior, so a typo cannot silently select no row.
+func declaresPath(pkgs []Package, pkg, test string) bool {
 	// A node's name is a whole level, slashes included: the path is matched
 	// name by name, never split.
 	var contains func([]node, string) bool
@@ -381,7 +369,7 @@ func catalogTestPath(data []byte, pkg, test string) bool {
 		}
 		return false
 	}
-	for _, p := range doc.Packages {
+	for _, p := range pkgs {
 		if strings.HasSuffix(p.Path, strings.TrimPrefix(pkg, ".")) && contains(p.Nodes, "Test"+test) {
 			return true
 		}

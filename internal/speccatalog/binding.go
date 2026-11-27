@@ -1,45 +1,160 @@
 package speccatalog
 
 import (
-	"encoding/json"
+	"bytes"
 	"fmt"
-	"sort"
+	"path"
 	"strings"
+
+	"github.com/mvrahden/go-test/internal/gotestscenarios"
 )
 
 // ConformanceDir holds one conformance package per capability.
 const ConformanceDir = "tests/conformance"
 
-// Clause is an It label directly under a When label, both as written in the
-// source, in the conformance package of its capability.
-type Clause struct {
-	Capability string
-	When       string
-	It         string
-}
-
-// ClausesOf lists the catalog's clauses as label pairs, in catalog order.
-// The capability is the package's directory under tests/conformance.
-func ClausesOf(js []byte) ([]Clause, error) {
-	var doc struct {
-		Packages []struct {
-			Path  string `json:"path"`
-			Nodes []node `json:"nodes"`
-		} `json:"packages"`
-	}
-	if err := json.Unmarshal(js, &doc); err != nil {
-		return nil, fmt.Errorf("catalog json: %w", err)
-	}
-	var out []Clause
-	for _, p := range doc.Packages {
-		_, capability, _ := strings.Cut(p.Path, "/"+ConformanceDir+"/")
-		for _, n := range p.Nodes {
-			walk(&n, nil, func(when, it *node) {
-				out = append(out, Clause{Capability: capability, When: whenLabel(when.Display, when.Name), It: strings.TrimSpace(it.Display)})
-			})
+// NotBound names each scenario the product does not call bound, as its text
+// report lists it.
+func NotBound(doc *gotestscenarios.Document) []string {
+	var out []string
+	for i := range doc.Scenarios {
+		sc := &doc.Scenarios[i]
+		if sc.Status != gotestscenarios.StatusBound {
+			out = append(out, fmt.Sprintf("%s %s:%d %s / %s", sc.Status, sc.File, sc.Line, sc.Requirement, sc.Title))
 		}
 	}
-	return out, nil
+	return out
+}
+
+// Report is the product's text report of doc, every class at fault.
+func Report(doc *gotestscenarios.Document) string {
+	var b bytes.Buffer
+	gotestscenarios.RenderText(&b, doc, gotestscenarios.Verdict{ExitCode: 1, FailOn: gotestscenarios.Classes})
+	return b.String()
+}
+
+// OutsideCapability names each It a scenario binds outside the conformance
+// package of its capability: specs/<capability>/spec.md is verified by
+// tests/conformance/<capability> alone.
+func OutsideCapability(doc *gotestscenarios.Document) []string {
+	var out []string
+	for i := range doc.Scenarios {
+		sc := &doc.Scenarios[i]
+		want := ConformanceDir + "/" + sc.Capability
+		for _, c := range sc.Clauses {
+			for _, p := range c.Its {
+				if !strings.HasSuffix(p.Package, "/"+want) {
+					out = append(out, fmt.Sprintf("%s:%d: scenario %q: %s %q binds the It at %s:%d, outside %s", sc.File, sc.Line, sc.Title, c.Keyword, c.Text, p.File, p.Line, want))
+				}
+			}
+		}
+	}
+	return out
+}
+
+// Inexact names each bound clause whose It, or whose When, is not labeled
+// with the scenario's text exactly as written: the product binds labels
+// that differ in case, backticks or a trailing period, this repository
+// keeps one spelling.
+func Inexact(doc *gotestscenarios.Document) []string {
+	var out []string
+	for i := range doc.Scenarios {
+		sc := &doc.Scenarios[i]
+		when := ""
+		for _, c := range sc.Conditions {
+			if c.Keyword == gotestscenarios.When {
+				when = c.Text
+			}
+		}
+		for _, c := range sc.Clauses {
+			for _, p := range c.Its {
+				at := fmt.Sprintf("%s:%d: scenario %q", sc.File, sc.Line, sc.Title)
+				if n := len(p.Path); n >= 2 && p.Path[n-2] != when {
+					out = append(out, fmt.Sprintf("%s: WHEN %q is labeled %q at %s:%d", at, when, p.Path[n-2], p.File, p.Line))
+				}
+				if n := len(p.Path); n >= 1 && p.Path[n-1] != c.Text {
+					out = append(out, fmt.Sprintf("%s: %s %q is labeled %q at %s:%d", at, c.Keyword, c.Text, p.Path[n-1], p.File, p.Line))
+				}
+			}
+		}
+	}
+	return out
+}
+
+// UnboundWhens names each conformance When holding an It directly that no
+// scenario's WHEN binds, with those Its: a behavior no spec states. The
+// product's unstated list covers the Its under a When a scenario binds.
+// Excluded nodes are skipped.
+func UnboundWhens(r *Reading) []string {
+	bound := map[string]bool{}
+	for i := range r.Scenarios.Scenarios {
+		for _, w := range r.Scenarios.Scenarios[i].Whens {
+			bound[placeKey(w.Package, path.Base(w.File), w.Line)] = true
+		}
+	}
+	specs := map[string]bool{}
+	for _, f := range r.Scenarios.Specs {
+		specs[f] = true
+	}
+	var out []string
+	for i := range r.Packages {
+		p := &r.Packages[i]
+		capability := p.capability()
+		pkg := ConformanceDir + "/" + capability
+		file := specFile(capability)
+		missing := ""
+		if !specs[file] {
+			missing = ", which does not exist"
+		}
+		visitWhens(p, func(suite, method, when *node, its []*node) {
+			if bound[placeKey(p.Path, when.File, when.Line)] {
+				return
+			}
+			for _, it := range its {
+				out = append(out, fmt.Sprintf("%s: %s.%s: When %q → It %q (%s:%d) is in no scenario of %s%s",
+					pkg, suite.Display, method.Display, whenLabel(when.Display, when.Name), strings.TrimSpace(it.Display), when.File, it.Line, file, missing))
+			}
+		})
+	}
+	return out
+}
+
+func placeKey(pkg, file string, line int) string {
+	return fmt.Sprintf("%s\x00%s:%d", pkg, file, line)
+}
+
+// visitWhens calls fn for every When with an It directly under it, with
+// those Its. Nothing under an excluded node is visited.
+func visitWhens(p *Package, fn func(suite, method, when *node, its []*node)) {
+	for s := range p.Nodes {
+		suite := &p.Nodes[s]
+		if suite.Excluded {
+			continue
+		}
+		for m := range suite.Children {
+			method := &suite.Children[m]
+			var visit func(n *node)
+			visit = func(n *node) {
+				if n.Excluded {
+					return
+				}
+				if n.Vocab == "when" {
+					var its []*node
+					for k := range n.Children {
+						if c := &n.Children[k]; c.Vocab == "it" && !c.Excluded {
+							its = append(its, c)
+						}
+					}
+					if len(its) > 0 {
+						fn(suite, method, n, its)
+					}
+				}
+				for k := range n.Children {
+					visit(&n.Children[k])
+				}
+			}
+			visit(method)
+		}
+	}
 }
 
 // whenLabel undoes the renderer's "when " connective. The subtest name keeps
@@ -52,131 +167,25 @@ func whenLabel(display, name string) string {
 	return strings.TrimSpace(label)
 }
 
-// Binding names what fails to bind. Unverified holds scenario text no clause
-// states; Unspecified holds clauses no scenario states.
-type Binding struct {
-	Unverified  []string
-	Unspecified []string
-}
-
-// Bind joins the specs with the clauses per capability: each scenario's
-// WHEN and THEN/AND bullets must equal the When label and It labels of a
-// clause, and each clause must be in a scenario.
-func Bind(specs []Spec, clauses []Clause) Binding {
-	its := map[string]map[string]map[string]bool{}
-	for _, c := range clauses {
-		if its[c.Capability] == nil {
-			its[c.Capability] = map[string]map[string]bool{}
-		}
-		if its[c.Capability][c.When] == nil {
-			its[c.Capability][c.When] = map[string]bool{}
-		}
-		its[c.Capability][c.When][c.It] = true
-	}
-
-	var b Binding
-	stated := map[Clause]bool{}
-	hasSpec := map[string]string{}
-	for _, s := range specs {
-		hasSpec[s.Capability] = s.File
-		pkg := ConformanceDir + "/" + s.Capability
-		whens, ok := its[s.Capability]
-		if !ok {
-			b.Unverified = append(b.Unverified, fmt.Sprintf("%s: %s declares no clauses", s.File, pkg))
-			continue
-		}
-		seen := map[string]int{}
-		for _, r := range s.Requirements {
-			for _, sc := range r.Scenarios {
-				if len(sc.Whens) != 1 {
-					continue
-				}
-				when := sc.Whens[0]
-				at := fmt.Sprintf("%s:%d: scenario %q", s.File, sc.Line, sc.Title)
-				if first, dup := seen[when]; dup {
-					b.Unverified = append(b.Unverified, fmt.Sprintf("%s: WHEN %q is already the WHEN of the scenario at line %d", at, when, first))
-					continue
-				}
-				seen[when] = sc.Line
-				known, ok := whens[when]
-				if !ok {
-					b.Unverified = append(b.Unverified, fmt.Sprintf("%s: WHEN %q is no When label in %s", at, when, pkg))
-					continue
-				}
-				for _, then := range sc.Thens {
-					if !known[then] {
-						b.Unverified = append(b.Unverified, fmt.Sprintf("%s: THEN %q is no It under When %q in %s", at, then, when, pkg))
-						continue
-					}
-					stated[Clause{Capability: s.Capability, When: when, It: then}] = true
-				}
-			}
-		}
-	}
-
-	reported := map[Clause]bool{}
-	for _, c := range sortedClauses(clauses) {
-		if stated[c] || reported[c] {
-			continue
-		}
-		reported[c] = true
-		pkg := ConformanceDir + "/" + c.Capability
-		if file, ok := hasSpec[c.Capability]; ok {
-			b.Unspecified = append(b.Unspecified, fmt.Sprintf("%s: When %q → It %q is in no scenario of %s", pkg, c.When, c.It, file))
-		} else {
-			b.Unspecified = append(b.Unspecified, fmt.Sprintf("%s: When %q → It %q: %s does not exist", pkg, c.When, c.It, specFile(c.Capability)))
-		}
-	}
-	return b
-}
-
-// sortedClauses orders clauses by capability, keeping catalog order within one.
-func sortedClauses(clauses []Clause) []Clause {
-	out := append([]Clause(nil), clauses...)
-	sort.SliceStable(out, func(i, j int) bool { return out[i].Capability < out[j].Capability })
-	return out
-}
-
-// node is the part of a catalog node ClausesOf reads.
+// node is the part of a spec --static node the checks read.
 type node struct {
 	Display  string `json:"display"`
 	Name     string `json:"name"`
 	Vocab    string `json:"vocab"`
 	Excluded bool   `json:"excluded"`
+	File     string `json:"file"`
+	Line     int    `json:"line"`
 	Children []node `json:"children"`
-}
-
-// walk calls fn for every It that is a direct child of a When. Nothing under
-// an excluded node is visited.
-func walk(n, parent *node, fn func(when, it *node)) {
-	if n.Excluded {
-		return
-	}
-	if n.Vocab == "it" && parent != nil && parent.Vocab == "when" {
-		fn(parent, n)
-	}
-	for i := range n.Children {
-		walk(&n.Children[i], n, fn)
-	}
 }
 
 // MisplacedIts names each labeled It that is not a direct child of a When:
 // under Each rows, under another It, or with no When above it. None of them
 // is a clause. Excluded nodes are skipped.
-func MisplacedIts(js []byte) ([]string, error) {
-	var doc struct {
-		Packages []struct {
-			Path  string `json:"path"`
-			Nodes []node `json:"nodes"`
-		} `json:"packages"`
-	}
-	if err := json.Unmarshal(js, &doc); err != nil {
-		return nil, fmt.Errorf("catalog json: %w", err)
-	}
+func MisplacedIts(r *Reading) []string {
 	var out []string
-	for _, p := range doc.Packages {
-		_, capability, _ := strings.Cut(p.Path, "/"+ConformanceDir+"/")
-		pkg := ConformanceDir + "/" + capability
+	for i := range r.Packages {
+		p := &r.Packages[i]
+		pkg := ConformanceDir + "/" + p.capability()
 		for _, suite := range p.Nodes {
 			if suite.Excluded {
 				continue
@@ -211,25 +220,16 @@ func MisplacedIts(js []byte) ([]string, error) {
 			}
 		}
 	}
-	return out, nil
+	return out
 }
 
 // UnstatedTables names each When whose children include Each rows but no It:
 // its table is a behavior no clause states. Excluded nodes are skipped.
-func UnstatedTables(js []byte) ([]string, error) {
-	var doc struct {
-		Packages []struct {
-			Path  string `json:"path"`
-			Nodes []node `json:"nodes"`
-		} `json:"packages"`
-	}
-	if err := json.Unmarshal(js, &doc); err != nil {
-		return nil, fmt.Errorf("catalog json: %w", err)
-	}
+func UnstatedTables(r *Reading) []string {
 	var out []string
-	for _, p := range doc.Packages {
-		_, capability, _ := strings.Cut(p.Path, "/"+ConformanceDir+"/")
-		pkg := ConformanceDir + "/" + capability
+	for i := range r.Packages {
+		p := &r.Packages[i]
+		pkg := ConformanceDir + "/" + p.capability()
 		for _, suite := range p.Nodes {
 			if suite.Excluded {
 				continue
@@ -251,7 +251,7 @@ func UnstatedTables(js []byte) ([]string, error) {
 			}
 		}
 	}
-	return out, nil
+	return out
 }
 
 // holdsTableOnly reports whether n has Each children and no It child.

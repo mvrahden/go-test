@@ -267,7 +267,8 @@ func (d *drillRun) judge() (err error) {
 	if err != nil {
 		return err
 	}
-	command := []string{clauses, "--judge-runs"}
+	// The planner reads the unmodified conformance suites with the judge.
+	command := []string{clauses, "--judge-runs", "--gotest=" + judge}
 	for _, n := range d.names {
 		command = append(command, patchOf(n))
 	}

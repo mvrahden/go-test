@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/mvrahden/go-test/internal/gotestscenarios"
 	"github.com/mvrahden/go-test/internal/speccatalog"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
@@ -13,7 +14,7 @@ const benchSpec = "# Bench Specification\n\n## Purpose\nHow bench compares runs.
 	"### Requirement: Gate\nA zero gate SHALL compare without a gate.\n\n" +
 	"#### Scenario: A zero gate\n- **WHEN** --gate=0 is given\n- **THEN** compares without a gate\n"
 
-const judgeCatalog = `{"packages":[
+const judgeTree = `{"packages":[
  {"path":"github.com/mvrahden/go-test/tests/conformance/cli","nodes":[{"kind":"suite","name":"TestCLIVersionTestSuite","children":[
   {"kind":"method","name":"TestVersion","children":[
    {"kind":"block","vocab":"when","display":"when the version subcommand runs","name":"the_version_subcommand_runs","children":[
@@ -22,6 +23,30 @@ const judgeCatalog = `{"packages":[
   {"kind":"method","name":"TestZeroGate","children":[
    {"kind":"block","vocab":"when","display":"when --gate=0 is given","name":"--gate=0_is_given","children":[
     {"kind":"block","vocab":"it","display":"compares without a gate","children":[]}]}]}]}]}]}`
+
+// judgeScenario is a scenario of capability whose THEN binds one It of pkg
+// in the suite and method given.
+func judgeScenario(capability, pkg, when, then, suite, method string) gotestscenarios.Scenario {
+	return gotestscenarios.Scenario{
+		Capability: capability, Status: gotestscenarios.StatusBound,
+		Conditions: []gotestscenarios.Clause{{Keyword: gotestscenarios.When, Text: when}},
+		Clauses: []gotestscenarios.Clause{{Keyword: gotestscenarios.Then, Text: then, Its: []gotestscenarios.Place{
+			{Package: pkg, Path: []string{suite, method, when, then}},
+		}}},
+	}
+}
+
+// judgeReading binds the cli and bench scenarios to the tree's suites, and
+// a cli scenario to an It of the bench package, which no cli run selects.
+func judgeReading(tree string) (*speccatalog.Reading, error) {
+	r, err := speccatalog.Decode([]byte("{}"), []byte(tree))
+	r.Scenarios.Scenarios = []gotestscenarios.Scenario{
+		judgeScenario("cli", "github.com/mvrahden/go-test/tests/conformance/cli", "the version subcommand runs", "exits 0 and prints the version on stdout", "TestCLIVersionTestSuite", "TestVersion"),
+		judgeScenario("cli", "github.com/mvrahden/go-test/tests/conformance/bench", "the version subcommand runs", "exits 0 and prints the version on stdout", "TestBenchGateTestSuite", "TestZeroGate"),
+		judgeScenario("bench", "github.com/mvrahden/go-test/tests/conformance/bench", "--gate=0 is given", "compares without a gate", "TestBenchGateTestSuite", "TestZeroGate"),
+	}
+	return &r, err
+}
 
 const (
 	versionClause = "Clause: when the version subcommand runs → exits 0 and prints the version on stdout\n"
@@ -44,7 +69,11 @@ func judgeRuns(patch string) ([]speccatalog.JudgeRun, []string) {
 		speccatalog.ParseSpec("cli", "specs/cli/spec.md", []byte(sampleSpec)),
 		speccatalog.ParseSpec("bench", "specs/bench/spec.md", []byte(benchSpec)),
 	}
-	return speccatalog.JudgeRuns(specs, []byte(judgeCatalog), []byte(patch))
+	r, err := judgeReading(judgeTree)
+	if err != nil {
+		return nil, []string{err.Error()}
+	}
+	return speccatalog.JudgeRuns(specs, r, []byte(patch))
 }
 
 func (s *MutantsTestSuite) TestJudgeRuns(t *gotest.T) {
@@ -183,9 +212,11 @@ func (s *MutantsTestSuite) TestAnExplicitBehaviorReplacesTheBroadConformanceRun(
 }
 
 func (s *MutantsTestSuite) TestANestedBehaviorWithASlashInItsLabelIsFound(t *gotest.T) {
-	catalog := strings.Replace(judgeCatalog, `"name":"the_version_subcommand_runs"`, `"name":"the_version/subcommand_runs"`, 1)
+	tree := strings.Replace(judgeTree, `"name":"the_version_subcommand_runs"`, `"name":"the_version/subcommand_runs"`, 1)
 	specs := []speccatalog.Spec{speccatalog.ParseSpec("cli", "specs/cli/spec.md", []byte(sampleSpec))}
-	_, problems := speccatalog.JudgeRuns(specs, []byte(catalog), []byte("Expect: ^FAIL .*conformance/cli .* / exits 0\n"+versionClause+
+	r, err := judgeReading(tree)
+	gotest.NoError(t, err)
+	_, problems := speccatalog.JudgeRuns(specs, r, []byte("Expect: ^FAIL .*conformance/cli .* / exits 0\n"+versionClause+
 		"Judge: ./tests/conformance/cli CLIVersionTestSuite/TestVersion/the_version/subcommand_runs\n"+cliDiff))
 	gotest.Empty(t, problems)
 }
@@ -193,7 +224,7 @@ func (s *MutantsTestSuite) TestANestedBehaviorWithASlashInItsLabelIsFound(t *got
 func (s *MutantsTestSuite) TestAnUnknownNestedBehaviorIsRejected(t *gotest.T) {
 	_, problems := judgeRuns("Expect: ^FAIL .*conformance/cli .* / exits 0\n" + versionClause +
 		"Judge: ./tests/conformance/cli CLIVersionTestSuite/TestVersion/missing\n" + cliDiff)
-	gotest.Equal(t, []string{"catalog declares no selected behavior: CLIVersionTestSuite/TestVersion/missing"}, problems)
+	gotest.Equal(t, []string{"the conformance suites declare no selected behavior: CLIVersionTestSuite/TestVersion/missing"}, problems)
 }
 
 func (s *MutantsTestSuite) TestNestedNamesAreLiteralAndNeverCrossCombined(t *gotest.T) {

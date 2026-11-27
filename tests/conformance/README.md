@@ -3,10 +3,13 @@
 These suites verify [`specs/`](../../specs/README.md), where gotest's behavior
 is stated. A `When` label and an `It` label directly under it are the key that
 binds a test to a scenario: they equal the scenario's WHEN and one of its THEN
-or AND texts. `gotest spec --static` reads the labels from source and `make
-catalog` indexes them in `docs/design/catalog.json`. A CI step fails when the committed index differs
-from a fresh render, and a conventions suite fails when any behavior is marked
-incomplete, so the index is always the whole, current list.
+or AND texts. `gotest scenarios` binds them from source, the same way it binds
+any module's specs, so nothing is generated or committed. The binding suite
+in `tests/conventions` (`make scenarios`) runs it over `specs/` and
+`./tests/conformance/...` and adds this repository's rules: a scenario binds
+in its own capability's package only, the labels equal the spec's text as
+written, every `When` holding an `It` is some scenario's WHEN, and no behavior
+is one the static reading could not list.
 
 ## Naming
 
@@ -40,8 +43,11 @@ this order:
 2. **Then the clause.** Write the conformance `When`/`It` whose labels equal
    the scenario's WHEN text and each of its THEN and AND texts. A clause is an
    `It` directly under a `When`; the rows of an `Each` table are not clauses,
-   and nothing under a suite the `X_` prefix disables is one.
-3. **Then the behavior.** Make the clause pass.
+   and nothing under a suite the `X_` prefix disables is one. `make scenarios`
+   goes green; `go run ./cmd/gotest scenarios --unstated ./tests/conformance/...`
+   lists what is still unbound, with the clause at fault.
+3. **Then the behavior.** Make the clause pass, and give the clause a drill
+   mutant with a `Clause:` line (`tests/drill/README.md`).
 
 Guides (`README.md`, `AGENTS.md`, `docs/`, the agent skill) link the
 requirement, for example

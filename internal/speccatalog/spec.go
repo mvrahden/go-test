@@ -174,7 +174,7 @@ func (s *Spec) Problems() []string {
 	if len(s.Requirements) == 0 {
 		add(0, "has no requirement")
 	}
-	names := map[string]int{}
+	names, whens := map[string]int{}, map[string]int{}
 	for _, r := range s.Requirements {
 		if first, ok := names[r.Name]; ok {
 			add(r.Line, "requirement %q: name is already used at line %d", r.Name, first)
@@ -195,6 +195,11 @@ func (s *Spec) Problems() []string {
 			case 0:
 				add(sc.Line, "scenario %q: has no WHEN bullet", sc.Title)
 			case 1:
+				if first, ok := whens[sc.Whens[0]]; ok {
+					add(sc.Line, "scenario %q: WHEN %q is already the WHEN of the scenario at line %d", sc.Title, sc.Whens[0], first)
+				} else {
+					whens[sc.Whens[0]] = sc.Line
+				}
 			default:
 				add(sc.Line, "scenario %q: has %d WHEN bullets, needs one", sc.Title, len(sc.Whens))
 			}

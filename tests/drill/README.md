@@ -157,16 +157,18 @@ worst it turns one into a failure of the drill.
 
 - An `Expect:` line anchored to a conformance package's `FAIL` line is
   judged by that package, under a `-run` selecting the suites and methods
-  that state the patch's `Clause:` lines of that capability, read from
-  `docs/design/catalog.json`; with no such `Clause:` line the whole package
-  runs.
+  holding the `It`s the patch's `Clause:` lines of that capability bind; the
+  planner reads them with the judge before any mutant runs, `gotest
+  scenarios` binding `specs/` to the unmodified conformance suites. With no
+  such `Clause:` line the whole package runs.
 - Every other `Expect:` line is judged by the patch's `Judge:` lines, each
   selecting `Judge: <package dir> [<Suite>/<Method>[/<subtest>...] ...]`, the tests named by
   their declarations (`Judge: ./tests/canary CanaryTestSuite/TestLifecycleRunsInOrder`),
   with no test names selecting the whole package. Nested paths use literal subtest names
-  from `catalog.json`, including underscores, and run separately to avoid regex
-  cross-products. An explicit `Judge:` for a conformance package replaces that
-  package's automatic method selection; unknown catalog paths are rejected.
+  as `gotest spec --static --format=json ./tests/conformance/...` lists them, including
+  underscores, and run separately to avoid regex cross-products. An explicit `Judge:`
+  for a conformance package replaces that package's automatic method selection; a
+  nested path the conformance suites do not declare is rejected.
 - No check runs by default. The plan refuses an `Expect:` line that names a
   conformance package without starting `^FAIL .*conformance/<capability> `,
   and one that names another check while the patch has no `Judge:` line.
@@ -236,10 +238,13 @@ A failure before any mutant runs prints one line and exits 1:
   patch header cannot be judged as it stands. `plan.tsv` holds a
   `bad<TAB><name><TAB><reason>` line for each problem, such as
   `Clause line names no clause of specs/: <clause>` (a `Clause:` line quotes
-  a sentence no scenario states), `./<dir> declares no <Suite>/<Method>` (a
+  a sentence no scenario states), `the conformance suites declare no selected
+  behavior: <path>` (a nested `Judge:` path names no subtest), `./<dir> declares no <Suite>/<Method>` (a
   `Judge:` line names a test that is not there; a renamed check needs its
   `Judge:` lines renamed with it), `Alone: line gives no reason` or
-  `no Expect: line, name the check that must catch it`.
+  `no Expect: line, name the check that must catch it`. With no such line,
+  the planner could not read the conformance suites: `bootstrap.log` names
+  the `gotest scenarios` or `gotest spec --static` run that failed.
 - `DRILL  another drill is running on <checkout> as shard <i>/<n> (lock <file>); wait for it or stop it`
   — a drill on the same checkout and shard, or a process a killed one left,
   holds the scratch directory.

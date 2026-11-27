@@ -4,10 +4,13 @@
 // drill mutant names on a Clause: line, by the same reading the conventions
 // suite holds the budget to. With --judge-runs <patch>... it prints, for each
 // patch, the judge runs speccatalog.JudgeRuns reads off its header, and exits
-// 1 when a patch cannot be judged as its header stands.
+// 1 when a patch cannot be judged as its header stands; it reads the
+// conformance suites with the gotest --gotest=<binary> names, or with one
+// built from the tree.
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -49,19 +52,26 @@ func main() {
 //	run	<name>	<-run pattern>	<package>...
 //
 // A patch that cannot be judged gets "bad	<name>	<reason>" lines instead.
-func judgeRuns(root string, specs []speccatalog.Spec, patches []string) {
-	catalog, err := os.ReadFile(filepath.Join(root, speccatalog.JSONPath))
+func judgeRuns(root string, specs []speccatalog.Spec, args []string) {
+	var reading speccatalog.Reading
+	var err error
+	if binary, ok := strings.CutPrefix(args[0], "--gotest="); ok {
+		reading, err = speccatalog.ReadWith(context.Background(), binary, root)
+		args = args[1:]
+	} else {
+		reading, err = speccatalog.Read(context.Background(), root)
+	}
 	if err != nil {
 		fail(err)
 	}
 	bad := false
-	for _, path := range patches {
+	for _, path := range args {
 		name := strings.TrimSuffix(filepath.Base(path), ".patch")
 		patch, err := os.ReadFile(path) //nolint:gosec // G304: a drill mutant named on the command line
 		if err != nil {
 			fail(err)
 		}
-		runs, problems := speccatalog.JudgeRuns(specs, catalog, patch)
+		runs, problems := speccatalog.JudgeRuns(specs, &reading, patch)
 		alone := speccatalog.AskedAlone(patch)
 		for _, r := range runs {
 			a, p, err := r.Alone(root)
