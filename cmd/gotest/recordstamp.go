@@ -10,15 +10,33 @@ func runMode(cfg *ExecConfig) protocol.VerdictMode {
 	return protocol.VerdictMode{Policy: cfg.CI, Short: gotestrunner.ShortMode(cfg.GoTestArgs)}
 }
 
-// stampRecord gives each package of rec the run's mode and marks those
-// narrowed reports.
+// stampRecord gives each package of rec the run's mode, fails those a
+// failure of the run names and marks those narrowed reports. A failure no
+// package explains, unattributed or an exit code without a failed package,
+// marks every pass: none of them is a verdict of the whole run.
 func stampRecord(rec *protocol.RunRecord, mode protocol.VerdictMode, narrowed func(string) bool, unattributed bool) {
+	failed := map[string]bool{}
+	for _, u := range rec.Failed {
+		failed[u.Package] = true
+	}
+	explained := len(rec.Failed) > 0
 	for i := range rec.Packages {
 		p := &rec.Packages[i]
+		if failed[p.Package] {
+			p.Verdict = "fail"
+		}
+		explained = explained || p.Verdict == "fail"
 		m := mode
 		p.Mode = &m
 		if narrowed != nil && narrowed(p.Package) {
 			p.Narrowed = true
+		}
+	}
+	if unattributed || rec.Result.ExitCode != 0 && !explained {
+		for i := range rec.Packages {
+			if rec.Packages[i].Verdict == "pass" {
+				rec.Packages[i].Narrowed = true
+			}
 		}
 	}
 }

@@ -123,7 +123,7 @@ func (c *OutputCollector) packageVerdicts() []protocol.PackageVerdict {
 		if c.starts == nil || c.starts.run == nil {
 			return nil
 		}
-		return c.starts.run.verdicts(c.runLevel)
+		return c.narrowUncounted(c.starts.run.verdicts(c.runLevel))
 	}
 	missed := map[string]bool{}
 	for _, m := range c.missing {
@@ -155,7 +155,40 @@ func (c *OutputCollector) packageVerdicts() []protocol.PackageVerdict {
 		}
 		out = append(out, v)
 	}
-	return out
+	return c.narrowUncounted(out)
+}
+
+// noteUncounted keeps, for a test run the census does not judge because it
+// failed, the packages holding a declared test without a verdict.
+func (c *OutputCollector) noteUncounted(cfg PipelineConfig, declared DeclaredUnits, code int, dispatchErr error) { //nolint:gocritic // hugeParam: once per run
+	if code == 0 && dispatchErr == nil || cfg.Bench {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	executedTests, executedFuzz := c.verdicts.executedTests(), c.verdicts.executedFuzz()
+	if c.mode == RunBatchText {
+		executedTests, executedFuzz = c.ran, c.ran
+	}
+	if cfg.Only != nil {
+		declared = DeclaredUnits{Tests: rerunUnits(declared.Tests, cfg.Only), Fuzz: rerunUnits(declared.Fuzz, cfg.Only)}
+	}
+	for _, m := range append(missingUnits(declared.Tests, executedTests), missingUnits(declared.Fuzz, executedFuzz)...) {
+		if c.uncounted == nil {
+			c.uncounted = map[string]bool{}
+		}
+		c.uncounted[m.Pkg] = true
+	}
+}
+
+// narrowUncounted marks the verdicts of the packages noteUncounted kept.
+func (c *OutputCollector) narrowUncounted(vs []protocol.PackageVerdict) []protocol.PackageVerdict {
+	for i := range vs {
+		if c.uncounted[vs[i].Package] {
+			vs[i].Narrowed = true
+		}
+	}
+	return vs
 }
 
 // vacuousUnits are the units of the passes without an assertion that failed

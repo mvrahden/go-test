@@ -2,10 +2,10 @@ Expect: ^FAIL .*conformance/cli CLIChanged .* / the record keeps their verdicts 
 Clause: when a --changed run leaves out packages the record before it held → the record keeps their verdicts and hashes beside those of the packages it ran
 --- a/cmd/gotest/changed.go
 +++ b/cmd/gotest/changed.go
-@@ -229,7 +229,7 @@
+@@ -235,7 +235,7 @@
  		mode = opts.plan.mode
  	}
- 	stampRecord(&rec, mode, opts.narrowed, false)
+ 	stampRecord(&rec, mode, opts.narrowed, result.Unattributed)
 -	merge := opts.plan != nil && opts.plan.merge
 +	merge := false
  	if err := gotestrunner.SaveRun(rec, merge, time.Now()); err != nil {

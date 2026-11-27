@@ -148,6 +148,8 @@ type PipelineResult struct {
 	Failed []protocol.FailedUnit
 	// Packages are the verdicts of the packages the run judged.
 	Packages []protocol.PackageVerdict
+	// Unattributed marks a failure no package carries: a shared fixture's teardown.
+	Unattributed bool
 }
 
 // sharedFixturesPkg names the synthetic package a shared fixture failure is
@@ -193,6 +195,7 @@ func teardownVerdict(teardownErr error, reports []string) error {
 // run that would otherwise have passed fail instead. Resources the fixtures
 // hold outlive the test process, so leaving them behind must not report ok.
 func applyTeardownFailure(c *OutputCollector, result *PipelineResult, err error) {
+	result.Unattributed = result.Unattributed || err != nil
 	applyFixtureFailure(c, result, err)
 }
 

@@ -951,6 +951,41 @@ A verdict of a part of a package's tests SHALL never be held as current. A packa
 - **WHEN** --changed follows a run of a package whose methods are all excluded, one holding only benchmarks, one without test files and one that passed
 - **THEN** leaves all four out as unchanged
 
+### Requirement: What a failed run leaves in its record
+A record SHALL list as failed each package a failure of the run names, a test that passed without an assertion and failed a --ci run and a declared test the census found without a verdict among them. A run that failed without a failed package, as on a shared fixture's teardown or the coverage minimum, and a run in which a shared fixture's teardown failed beside other failures SHALL mark every passing verdict it records as of a part: no pass of that run is held as current.
+
+#### Scenario: A pass without an assertion that failed a --ci run
+- **WHEN** --ci --changed follows a --ci run that failed only on a test that passed without an assertion
+- **THEN** the first run's record lists that test's package as failed
+- **AND** --changed runs that package again, leaves the other out and exits 1
+
+#### Scenario: A teardown failure alone
+- **WHEN** --changed follows a run that only a shared fixture's teardown failed
+- **THEN** runs both packages of that run again and exits 1
+
+#### Scenario: A teardown failure beside a failed test
+- **WHEN** --changed follows a run that a shared fixture's teardown and a test failed, the test fixed since
+- **THEN** runs all three packages of that run again and exits 1 on the teardown
+
+#### Scenario: A coverage minimum that failed
+- **WHEN** --min --changed follows a run that only its coverage minimum failed
+- **THEN** runs the package again and exits 1 on the minimum
+
+### Requirement: Packages a failed run did not count
+A run the census did not judge, as one that failed, SHALL mark as of a part each package holding a declared test without a verdict.
+
+#### Scenario: A package a failed run did not count
+- **WHEN** --changed follows a run that a test failed, beside a package whose binary ran none of its tests, the failing test fixed since
+- **THEN** runs both again, leaves out the third that passed, and exits 2, naming the test that never ran
+- **AND** a further --changed run runs that package alone and exits 2
+
+### Requirement: What a --changed run that ran nothing leaves
+A --changed run that ran no package SHALL leave the record as it found it, and keep its own record in the history.
+
+#### Scenario: A --changed run that ran nothing
+- **WHEN** a --changed run given only an unchanged package follows a run that failed another package
+- **THEN** the record keeps the failed run's exit code, arguments and failures, and the history holds both runs
+
 ### Requirement: Run records kept
 Each run that records itself SHALL also keep its record alone, with the path of its --events-file, as a file of its own in the checkout's history under the gotest cache, written by a rename; each write SHALL remove all but the newest 50 and those kept over 30 days. gotest clean --cache SHALL remove the records of every checkout no run is writing.
 

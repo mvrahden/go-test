@@ -55,3 +55,19 @@ func (s *RunSelectTestSuite) TestFlagsThatSelectTests(t *gotest.T) {
 		gotest.Equal(sub, r.want, gotestrunner.SelectsTests(r.args))
 	}
 }
+
+func (s *RunSelectTestSuite) TestPackagesAFailedRunDidNotCount(t *gotest.T) {
+	const stream = `{"Action":"run","Package":"m/a","Test":"TestATestSuite"}
+{"Action":"run","Package":"m/a","Test":"TestATestSuite/TestOne"}
+{"Action":"pass","Package":"m/a","Test":"TestATestSuite/TestOne"}
+{"Action":"pass","Package":"m/a","Test":"TestATestSuite"}
+{"Action":"pass","Package":"m/a"}
+`
+	declared := gotestrunner.DeclaredUnits{Tests: []gotestrunner.CensusCase{{Pkg: "m/a", Path: "TestATestSuite/TestOne"}, {Pkg: "m/b", Path: "TestBTestSuite/TestOne"}}}
+	t.It("names, of a failed run, the package holding a declared test without a verdict", func(it *gotest.T) {
+		gotest.Equal(it, []string{"m/b"}, gotestrunner.ExportUncounted(stream, declared, 1))
+	})
+	t.It("names none of a run that passed", func(it *gotest.T) {
+		gotest.Empty(it, gotestrunner.ExportUncounted(stream, declared, 0))
+	})
+}

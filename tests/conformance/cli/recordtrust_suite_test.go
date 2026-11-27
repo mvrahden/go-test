@@ -279,3 +279,104 @@ func (s *CLIRecordTrustTestSuite) TestPackagesThatRunNothingByTheirOwnSource(t *
 		})
 	})
 }
+
+func (s *CLIRecordTrustTestSuite) TestAPassWithoutAnAssertionThatFailedACIRun(t *gotest.T) {
+	tr := stageRecords(t)
+	gotest.Equal(t, 1, tr.run(t, "--ci", "./idle/", "./good/").Exit)
+	rec := tr.record(t)
+	changed := tr.run(t, "--ci", "--changed", "./idle/", "./good/")
+
+	t.When("--ci --changed follows a --ci run that failed only on a test that passed without an assertion", func(w *gotest.T) {
+		w.It("the first run's record lists that test's package as failed", func(it *gotest.T) {
+			gotest.Equal(it, "fail", rec.of("records/idle").Verdict)
+			gotest.Equal(it, "pass", rec.of("records/good").Verdict)
+		})
+		w.It("--changed runs that package again, leaves the other out and exits 1", func(it *gotest.T) {
+			gotest.Equal(it, 1, changed.Exit, "stderr: %s", changed.Stderr)
+			gotest.Equal(it, "gotest: FAIL exit 1 | tests: 1 vacuous | packages: 1 passed, 0 failed, 0 skipped | changed only: 1 ran, 1 unchanged", lastLine(changed.Stderr))
+		})
+	})
+}
+
+func (s *CLIRecordTrustTestSuite) TestAPackageAFailedRunDidNotCount(t *gotest.T) {
+	tr := stageRecords(t)
+	pkgs := []string{"./nomrun/", "./bad/", "./good/"}
+	gotest.Equal(t, 1, tr.run(t, pkgs...).Exit)
+	fixBad(t, tr)
+	first := tr.run(t, append([]string{"--changed"}, pkgs...)...)
+	second := tr.run(t, append([]string{"--changed"}, pkgs...)...)
+
+	t.When("--changed follows a run that a test failed, beside a package whose binary ran none of its tests, the failing test fixed since", func(w *gotest.T) {
+		w.It("runs both again, leaves out the third that passed, and exits 2, naming the test that never ran", func(it *gotest.T) {
+			gotest.Equal(it, 2, first.Exit, "stderr: %s", first.Stderr)
+			gotest.Contains(it, first.Stderr, "FAIL: census: 1 declared test(s) never ran\n  records/nomrun TestNoMRunTestSuite/TestNeverRuns\n")
+			gotest.Equal(it, "gotest: FAIL exit 2 | tests: 1 not run | packages: 1 passed, 1 failed, 0 skipped | changed only: 2 ran, 1 unchanged", lastLine(first.Stderr))
+		})
+		w.It("a further --changed run runs that package alone and exits 2", func(it *gotest.T) {
+			gotest.Equal(it, 2, second.Exit, "stderr: %s", second.Stderr)
+			gotest.Equal(it, "gotest: FAIL exit 2 | tests: 1 not run | packages: 0 passed, 1 failed, 0 skipped | changed only: 1 ran, 2 unchanged", lastLine(second.Stderr))
+		})
+	})
+}
+
+func (s *CLIRecordTrustTestSuite) TestATeardownFailureAlone(t *gotest.T) {
+	tr := stageRecords(t)
+	gotest.Equal(t, 1, tr.run(t, "./leak/", "./good/").Exit)
+	changed := tr.run(t, "--changed", "./leak/", "./good/")
+
+	t.When("--changed follows a run that only a shared fixture's teardown failed", func(w *gotest.T) {
+		w.It("runs both packages of that run again and exits 1", func(it *gotest.T) {
+			gotest.Equal(it, 1, changed.Exit, "stderr: %s", changed.Stderr)
+			gotest.Contains(it, changed.Stderr, "shared fixture teardown")
+			gotest.Equal(it, "gotest: FAIL exit 1 | packages: 2 passed, 0 failed, 0 skipped | changed only: 2 ran, 0 unchanged", lastLine(changed.Stderr))
+		})
+	})
+}
+
+func (s *CLIRecordTrustTestSuite) TestATeardownFailureBesideAFailedTest(t *gotest.T) {
+	tr := stageRecords(t)
+	pkgs := []string{"./leak/", "./good/", "./bad/"}
+	gotest.Equal(t, 1, tr.run(t, pkgs...).Exit)
+	fixBad(t, tr)
+	changed := tr.run(t, append([]string{"--changed"}, pkgs...)...)
+
+	t.When("--changed follows a run that a shared fixture's teardown and a test failed, the test fixed since", func(w *gotest.T) {
+		w.It("runs all three packages of that run again and exits 1 on the teardown", func(it *gotest.T) {
+			gotest.Equal(it, 1, changed.Exit, "stderr: %s", changed.Stderr)
+			gotest.Contains(it, changed.Stderr, "shared fixture teardown")
+			gotest.Equal(it, "gotest: FAIL exit 1 | packages: 3 passed, 0 failed, 0 skipped | changed only: 3 ran, 0 unchanged", lastLine(changed.Stderr))
+		})
+	})
+}
+
+func (s *CLIRecordTrustTestSuite) TestACoverageMinimumThatFailed(t *gotest.T) {
+	tr := stageRecords(t)
+	gotest.Equal(t, 1, tr.run(t, "--min", "90", "./half/").Exit)
+	changed := tr.run(t, "--min", "90", "--changed", "./half/")
+
+	t.When("--min --changed follows a run that only its coverage minimum failed", func(w *gotest.T) {
+		w.It("runs the package again and exits 1 on the minimum", func(it *gotest.T) {
+			gotest.Equal(it, 1, changed.Exit, "stderr: %s", changed.Stderr)
+			gotest.Contains(it, changed.Stderr, "FAIL: 50.0% coverage (minimum 90%)\n")
+			gotest.Equal(it, "gotest: FAIL exit 1 | packages: 1 passed, 0 failed, 0 skipped | changed only: 1 ran, 0 unchanged", lastLine(changed.Stderr))
+		})
+	})
+}
+
+func (s *CLIRecordTrustTestSuite) TestAChangedRunThatRanNothing(t *gotest.T) {
+	tr := stageRecords(t)
+	gotest.Equal(t, 1, tr.run(t, "./bad/", "./good/").Exit)
+	before := tr.record(t)
+	gotest.Equal(t, 0, tr.run(t, "--changed", "./good/").Exit)
+	after := tr.record(t)
+
+	t.When("a --changed run given only an unchanged package follows a run that failed another package", func(w *gotest.T) {
+		w.It("the record keeps the failed run's exit code, arguments and failures, and the history holds both runs", func(it *gotest.T) {
+			gotest.Equal(it, 1, after.Result.ExitCode)
+			gotest.Equal(it, []string{"./bad/", "./good/"}, after.Manifest.Args)
+			gotest.NotEmpty(it, after.Failed)
+			gotest.Equal(it, before.Failed, after.Failed)
+			gotest.Len(it, tr.history(it), 2)
+		})
+	})
+}

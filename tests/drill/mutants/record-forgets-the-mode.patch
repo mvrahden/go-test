@@ -12,10 +12,10 @@ Expect: ^FAIL .*conformance/cli CLIRecordTrust .* / leaves all four out as uncha
 Clause: when --changed follows a run of a package whose methods are all excluded, one holding only benchmarks, one without test files and one that passed → leaves all four out as unchanged
 --- a/cmd/gotest/recordstamp.go
 +++ b/cmd/gotest/recordstamp.go
-@@ -15,8 +15,6 @@
- func stampRecord(rec *protocol.RunRecord, mode protocol.VerdictMode, narrowed func(string) bool, unattributed bool) {
- 	for i := range rec.Packages {
- 		p := &rec.Packages[i]
+@@ -26,8 +26,6 @@
+ 			p.Verdict = "fail"
+ 		}
+ 		explained = explained || p.Verdict == "fail"
 -		m := mode
 -		p.Mode = &m
  		if narrowed != nil && narrowed(p.Package) {

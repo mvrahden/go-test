@@ -234,7 +234,7 @@ func saveRun(result *gotestrunner.PipelineResult, code int, manifest *protocol.M
 	if opts.plan != nil {
 		mode = opts.plan.mode
 	}
-	stampRecord(&rec, mode, opts.narrowed, false)
+	stampRecord(&rec, mode, opts.narrowed, result.Unattributed)
 	merge := opts.plan != nil && opts.plan.merge
 	if err := gotestrunner.SaveRun(rec, merge, time.Now()); err != nil {
 		fmt.Fprintf(os.Stderr, "gotest: the run is not recorded for --failed: %s\n", err)

@@ -1277,6 +1277,12 @@ shards of one run do not add up to every mutant exactly once.
 | `record-forgets-the-mode` | a run's record stamps no package with its mode | cli conformance: the record's package has no Mode, and an unchanged package runs again |
 | `focus-leaves-the-record-whole` | a run narrowed by `F_` records its packages as whole | cli conformance: the package the focus kept from running is left out |
 | `failed-refreshes-packages-it-skipped` | `--failed` records as whole a package given that it ran nothing of | cli conformance: the package broken since is left out |
+| `changed-keeps-a-policy-failure` | a package whose test failed a `--ci` run for passing without an assertion is recorded as passed | cli conformance: the record lists the package as pass, and --changed leaves it out |
+| `uncounted-package-refreshed-as-a-pass` | a failed run records as a whole pass a package whose binary ran none of its tests | cli conformance: --changed leaves that package out and exits 0 |
+| `unattributed-failure-refreshes-passes` | a run that failed outside its packages records their passes as whole | cli conformance: --changed after the teardown failure runs nothing |
+| `teardown-failure-kept-from-the-record` | a teardown failure beside a failed test is not told to the record | cli conformance: --changed runs only the package that had failed |
+| `unexplained-exit-refreshes-passes` | a run that exits non-zero with no failed package records its passes as whole | cli conformance: --changed under the minimum runs nothing |
+| `empty-changed-run-replaces-the-record` | a `--changed` run that ran no package overwrites the record's run | cli conformance: the record holds exit code 0 and the --changed arguments |
 
 ## Adding a mutant
 

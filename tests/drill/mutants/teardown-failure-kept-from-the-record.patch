@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/cli CLIRecordTrust .* / runs all three packages of that run again and exits 1 on the teardown \(
+Clause: when --changed follows a run that a shared fixture's teardown and a test failed, the test fixed since → runs all three packages of that run again and exits 1 on the teardown
+--- a/internal/gotestrunner/pipeline.go
++++ b/internal/gotestrunner/pipeline.go
+@@ -195,7 +195,6 @@
+ // run that would otherwise have passed fail instead. Resources the fixtures
+ // hold outlive the test process, so leaving them behind must not report ok.
+ func applyTeardownFailure(c *OutputCollector, result *PipelineResult, err error) {
+-	result.Unattributed = result.Unattributed || err != nil
+ 	applyFixtureFailure(c, result, err)
+ }
+ 

@@ -1,0 +1,16 @@
+Expect: ^FAIL .*conformance/cli CLIRecordTrust .* / the first run's record lists that test's package as failed \(
+Clause: when --ci --changed follows a --ci run that failed only on a test that passed without an assertion → the first run's record lists that test's package as failed
+Expect: ^FAIL .*conformance/cli CLIRecordTrust .* / --changed runs that package again, leaves the other out and exits 1 \(
+Clause: when --ci --changed follows a --ci run that failed only on a test that passed without an assertion → --changed runs that package again, leaves the other out and exits 1
+--- a/cmd/gotest/recordstamp.go
++++ b/cmd/gotest/recordstamp.go
+@@ -22,9 +22,6 @@
+ 	explained := len(rec.Failed) > 0
+ 	for i := range rec.Packages {
+ 		p := &rec.Packages[i]
+-		if failed[p.Package] {
+-			p.Verdict = "fail"
+-		}
+ 		explained = explained || p.Verdict == "fail"
+ 		m := mode
+ 		p.Mode = &m

@@ -524,6 +524,7 @@ func (r *streamRun) finish() PipelineResult {
 		if r.fixtures.failedSetup() && exitCode == 0 {
 			exitCode = 1
 		}
+		c.noteUncounted(r.cfg, r.overlay.Declared, exitCode, dispatchErr)
 		exitCode = c.takeCensus(r.cfg, r.overlay.Declared, exitCode, dispatchErr)
 		exitCode = c.judgeVacuous(r.cfg.CI, exitCode)
 		running := c.bookDeadline(dispatchErr)
