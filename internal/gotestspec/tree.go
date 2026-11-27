@@ -345,7 +345,7 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 			pkg.InputHash = cmp.Or(ev.InputHash, pkg.InputHash)
 			switch ev.Action {
 			case ActionPass, ActionFail:
-				pkg.Status = statusFrom(ev.Action)
+				pkg.Status = verdictOver(pkg.Status, statusFrom(ev.Action))
 				pkg.Duration = elapsed(ev.Elapsed)
 				if ev.FailedBuild != "" {
 					failedBuild[ev.Package] = ev.FailedBuild
@@ -384,7 +384,7 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 				node.Status = StatusPass
 			}
 		case ActionPass, ActionFail, ActionSkip:
-			node.Status = statusFrom(ev.Action)
+			node.Status = verdictOver(node.Status, statusFrom(ev.Action))
 			node.Duration = elapsed(ev.Elapsed)
 			node.End = ev.Time
 		case ActionAttr:
@@ -728,6 +728,16 @@ func declare(nodes []*Node, levels []string, lookup func([]string) Declaration) 
 		n.Vocab, n.SourceLabel = d.Vocab, d.Label
 		declare(n.Children, own, lookup)
 	}
+}
+
+// verdictOver is the status held once next is reported over had: a fail
+// stands, whichever came last, so runs appended into one stream read as
+// their failed one.
+func verdictOver(had, next Status) Status {
+	if had == StatusFail {
+		return had
+	}
+	return next
 }
 
 // FailBranches fails every node a failure beneath it reached, and the package

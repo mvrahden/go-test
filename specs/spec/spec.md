@@ -142,6 +142,22 @@ A node SHALL be failed when a node beneath it failed, and a package SHALL be fai
 - **THEN** renders the suite and its package as failed in the terminal, Markdown and JSON formats, as when their own lines say fail
 - **AND** counts one failure and exits 1, or 0 with --render-only
 
+### Requirement: A failed verdict among several
+A test or a package for which a stream holds more than one verdict under one run of its suite, as the files of several runs appended into one do, SHALL read failed when any of them is a fail, whichever came last, with the failure's output, so the stream renders, counts and exits as its failed run did. A suite run again under -count is another run of it and keeps its own verdicts ([A suite run more than once](#requirement-a-suite-run-more-than-once)).
+
+#### Scenario: A failed run followed by a passed one
+- **WHEN** a stream holds a package's failed run and, after it, a run in which the same tests passed
+- **THEN** renders the failed method, its suite and its package as failed, with the failure's message, in the terminal, Markdown and JSON formats
+- **AND** counts one failure and exits 1, or 0 with --render-only
+
+#### Scenario: A passed run followed by a failed one
+- **WHEN** a stream holds a package's passed run and, after it, a run in which one of the same tests failed
+- **THEN** renders the failed method as failed and counts one failure
+
+#### Scenario: A package that failed on its own, then passed
+- **WHEN** a stream holds a run in which a package failed with every test passing and, after it, a run in which the package passed
+- **THEN** renders the package as failed, with its output, counts one failed package and exits 1
+
 ### Requirement: The declared specification under a run's verdicts
 `spec --declared [packages]` SHALL render the specification the source declares under the run's verdicts, or a saved stream's with --input, as --static reads it: a reported node carries its verdict, duration and output, an unreported one neither, or skipped under a skipped node; what only the stream holds stays under its declared parent. A behavior with no verdict, unreported or only started, SHALL count as not run, with no duration, sparing the exit code, so the counts add up to the behaviors.
 

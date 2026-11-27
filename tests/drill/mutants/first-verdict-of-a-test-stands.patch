@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec .* / renders the failed method as failed and counts one failure \(
+Clause: when a stream holds a package's passed run and, after it, a run in which one of the same tests failed → renders the failed method as failed and counts one failure
+--- a/internal/gotestspec/tree.go
++++ b/internal/gotestspec/tree.go
+@@ -734,7 +734,7 @@
+ // stands, whichever came last, so runs appended into one stream read as
+ // their failed one.
+ func verdictOver(had, next Status) Status {
+-	if had == StatusFail {
++	if had != StatusNone {
+ 		return had
+ 	}
+ 	return next

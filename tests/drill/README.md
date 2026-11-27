@@ -346,6 +346,9 @@ shards of one run do not add up to every mutant exactly once.
 | `tree-fail-is-pass` | `BuildTree` classifies `fail` events as `pass` | ring-0 tree suite (the canary reads raw events, not the tree) |
 | `branch-keeps-a-pass-over-a-failure` | a suite whose own line says pass stays passed above a failed method | spec conformance: the composed stream's suite renders unlike the one go test failed |
 | `failed-branch-counted-as-its-own` | a branch failed by a failure beneath it counts as a failure of its own | spec conformance: the composed stream counts two failures |
+| `first-verdict-of-a-test-stands` | a test keeps the first verdict a stream holds for it | spec conformance: the method that failed in the later run reads passed |
+| `package-keeps-only-its-later-verdict` | a package that failed on its own reads passed once a later run of it passed | spec conformance: the crashed package's stream counts no failed package |
+| `replay-keeps-only-the-later-run` | a test that failed reads passed once a later run of it passed | spec conformance: the failed run's method, suite and package read passed |
 | `declared-node-shown-as-passed` | `--declared` gives a declared node the stream did not report a pass | spec conformance: the left-out method's rows carry a verdict |
 | `not-run-uncounted` | the behaviors without a verdict are not counted as not run | spec conformance: the declared package counts 0 not run, and a behavior that started without a verdict counts nowhere |
 | `no-verdict-row-timed` | the terminal spec times a behavior that started and reported no verdict | spec conformance: the row reads `○ DeleteUser` instead of NOT RUN |
