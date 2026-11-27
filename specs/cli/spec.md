@@ -468,6 +468,13 @@ gotest summary --github SHALL annotate a failed test at its file in its package'
 - **WHEN** summary writes the test-result predicate of a stream without a run manifest
 - **THEN** exits 2 naming --events-file on stderr, with nothing on stdout
 
+### Requirement: The predicate of a failed run exits 0
+`gotest summary --format=intoto-test-result` SHALL exit 0 for a run that failed: the result is the document's.
+
+#### Scenario: The predicate of a run that failed only on its policy
+- **WHEN** summary writes the test-result predicate of a stream whose run failed only on tests that passed without an assertion
+- **THEN** exits 0 and prints result FAILED with those tests in warnedTests
+
 ### Requirement: Hooks that call t.T() where it is nil
 gotest SHALL refuse with exit 2 a suite whose hook calls t.T() where its wrapper makes it nil: every hook under a benchmark method, BeforeAll and AfterAll under a fuzz method. One error names every such hook in source order, at the first. It reads the hook's own body, closures and aliases of t included, not the helpers it calls, and accepts a call whose result is checked for nil. The cases are the table in `tests/conformance/cli/rejections_suite_test.go`.
 
@@ -636,7 +643,7 @@ gotest clean --cache SHALL remove every cached binary no run is linking or copyi
 - **AND** refuses a package beside the flag with exit 2
 
 ### Requirement: Saving the event stream
-A run given --events-file SHALL write to that file byte for byte the go test -json stream it prints, and SHALL change none of its other output, coverage or exit code. Each event SHALL reach the file when it reaches stdout, a suite's events when its process ends or, under --live, as written, so a run stopped or killed leaves every event written before, each line whole. summary --input SHALL render the file as the run's summary and exit code, a --min limit excepted: the live run judges it.
+A run given --events-file SHALL write to that file byte for byte the go test -json stream it prints, and SHALL change none of its other output, coverage or exit code. Each event SHALL reach the file when it reaches stdout, a suite's events when its process ends or, under --live, as written, so a run stopped or killed leaves every event written before, each line whole. summary --input SHALL render the file as the run's summary and exit as the run did.
 
 #### Scenario: A -json run with --events-file
 - **WHEN** a -json run is given --events-file
@@ -738,6 +745,34 @@ spec and summary --format=json SHALL name the run they render in `run`, right af
 #### Scenario: A document of go test's own stream
 - **WHEN** spec --format=json renders a stream go test wrote
 - **THEN** holds no run
+
+### Requirement: A replayed stream's exit code
+spec and summary given --input SHALL exit as the run the stream records ended: with the `ExitCode` of the `Result` that closes it when that is not 0, the greatest of them when the stream holds several closed runs, and --format=json SHALL name that code as the run's `exitCode`. --render-only SHALL exit 0 whatever the run did.
+
+#### Scenario: A run that failed only on its policy
+- **WHEN** the saved stream of a --ci run that failed only on tests that passed without an assertion is replayed
+- **THEN** summary --input and spec --input exit 1, as the run did, and 0 with --render-only
+
+#### Scenario: A run that ended with another code
+- **WHEN** the saved stream of a run that ended with exit code 2 or 130 is replayed
+- **THEN** summary --input and spec --input exit with that code
+
+#### Scenario: A stream of several closed runs
+- **WHEN** a stream holds a run that failed only on its policy and a later run that passed
+- **THEN** summary --input and spec --input exit 1
+- **AND** summary --format=json names exit code 1 as the run's
+- **AND** the test-result predicate of the stream says FAILED
+
+### Requirement: A replayed stream without a closing result
+When no closed run ended with another code than 0, or the stream holds no closing Result, as one an older gotest or go test wrote and one filtered of its RunLevel events do, spec and summary given --input SHALL exit by the verdicts the stream holds: 2 when a package failed to build or the stream holds no verdict to report (no test events, or a package it opened never reported), 1 when a test or a package failed, else 0.
+
+#### Scenario: A stream without a closing result
+- **WHEN** a stream that go test wrote, or gotest wrote and a filter stripped of its RunLevel events, is replayed
+- **THEN** exits 1 when it holds a failed test and 0 when it holds none
+
+#### Scenario: A run that did not close its stream
+- **WHEN** the saved stream of a run that never closed it is replayed
+- **THEN** exits 2, naming gotest run as the package without a verdict
 
 ### Requirement: A suite cut short by --timeout
 A suite process an expired --timeout stopped SHALL fail its package on the text, -json and spec pipelines, whatever its tests reported: a method that returned when its context ended did not finish. The FAIL line of the run SHALL name the suite when no method was still running. An interrupt SHALL keep the tests' own verdicts, as the lifecycle spec states. A method running when the stop came SHALL be booked failed in the stream with the line that names the deadline.

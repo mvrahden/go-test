@@ -20,8 +20,9 @@ func isRunEvent(ev *TestEvent) bool {
 	return ev.RunLevel && ev.Package == protocol.RunPackage
 }
 
-// RunOf is the run events record: its manifest and, when the run closed the
-// stream, its exit code. ok is false for a stream with no manifest.
+// RunOf is the run events record: its manifest and, when a run closed the
+// stream, its exit code, the greatest when several runs closed it. ok is
+// false for a stream with no manifest.
 func RunOf(events []TestEvent) (r RunInfo, ok bool) {
 	for i := range events {
 		ev := &events[i]
@@ -31,7 +32,7 @@ func RunOf(events []TestEvent) (r RunInfo, ok bool) {
 		if ev.Manifest != nil && !ok {
 			r.Manifest, ok = *ev.Manifest, true
 		}
-		if ev.Result != nil {
+		if ev.Result != nil && (r.ExitCode == nil || ev.Result.ExitCode > *r.ExitCode) {
 			code := ev.Result.ExitCode
 			r.ExitCode = &code
 		}
@@ -40,6 +41,14 @@ func RunOf(events []TestEvent) (r RunInfo, ok bool) {
 		return RunInfo{}, false
 	}
 	return r, true
+}
+
+// failed reports the exit code of a run that closed with another than 0.
+func (r *RunInfo) failed() (code int, ok bool) {
+	if r == nil || r.ExitCode == nil || *r.ExitCode == 0 {
+		return 0, false
+	}
+	return *r.ExitCode, true
 }
 
 func (r *RunInfo) json() *jsonRun {

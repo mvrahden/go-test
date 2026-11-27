@@ -221,3 +221,43 @@ func (s *ReplayVerdictTestSuite) TestGotestStreamsThatRanNothing(t *gotest.T) {
 		}
 	}
 }
+
+// A run's own opening and closing events around a stream.
+const opened = `{"Action":"start","Package":"gotest run","RunLevel":true,"Manifest":{"Version":"v1.2.3","Args":["-json","./..."]}}
+`
+
+// closed is the event that closes a run with code.
+func closed(code int) string {
+	action := "fail"
+	if code == 0 {
+		action = "pass"
+	}
+	return `{"Action":"` + action + `","Package":"gotest run","RunLevel":true,"Result":{"ExitCode":` + strconv.Itoa(code) + `,"Packages":{"Passed":1,"Failed":0,"Skipped":0},"Tests":{"Passed":1,"Failed":0,"Skipped":0}}}
+`
+}
+
+// TestStreamsARunClosed replays streams a run closed: each exits as the run
+// did, the worst of several runs, and 0 when only rendered.
+func (s *ReplayVerdictTestSuite) TestStreamsARunClosed(t *gotest.T) {
+	for sub, r := range gotest.Each(t, []struct {
+		Desc   string
+		stream string
+		args   []string
+		exit   int
+		stderr string
+	}{
+		{Desc: "closed with 0", stream: opened + wholeRunStream + closed(0), exit: 0},
+		{Desc: "closed with 1", stream: opened + wholeRunStream + closed(1), exit: 1},
+		{Desc: "closed with 2", stream: opened + wholeRunStream + closed(2), exit: 2},
+		{Desc: "closed with 130", stream: opened + wholeRunStream + closed(130), exit: 130},
+		{Desc: "a failed run, then a passed one", stream: opened + wholeRunStream + closed(1) + opened + wholeRunStream + closed(0), exit: 1},
+		{Desc: "closed with 1, rendered only", stream: opened + wholeRunStream + closed(1), args: []string{"--render-only"}, exit: 0},
+		{Desc: "never closed", stream: opened + wholeRunStream, exit: 2, stderr: "FAIL: input ends before these packages reported a verdict (stream cut short?):\n  gotest run\n"},
+	}) {
+		for _, cmd := range []string{"spec", "summary"} {
+			_, stderr, code := s.replay(sub, r.stream, append([]string{cmd, "--input=-"}, r.args...)...)
+			gotest.Equal(sub, r.exit, code, "%s: %s", cmd, stderr)
+			gotest.Equal(sub, r.stderr, stderr, cmd)
+		}
+	}
+}

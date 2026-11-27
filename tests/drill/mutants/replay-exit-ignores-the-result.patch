@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/cli .* / summary --input and spec --input exit 1, as the run did, and 0 with --render-only \(
+Expect: ^FAIL .*conformance/cli .* / summary --input and spec --input exit with that code / a stopped run, exit code 130 \(
+Clause: when the saved stream of a --ci run that failed only on tests that passed without an assertion is replayed → summary --input and spec --input exit 1, as the run did, and 0 with --render-only
+Clause: when the saved stream of a run that ended with exit code 2 or 130 is replayed → summary --input and spec --input exit with that code
+--- a/cmd/gotest/spec.go
++++ b/cmd/gotest/spec.go
+@@ -384,7 +384,7 @@
+ 		code = 1
+ 	}
+ 	if run := runInfo(events, nil); run != nil && run.ExitCode != nil {
+-		code = max(code, *run.ExitCode)
++		code = max(code, 0)
+ 	}
+ 	return code
+ }

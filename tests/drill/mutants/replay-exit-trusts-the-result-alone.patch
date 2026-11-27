@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / exits 1 when it holds a failed test and 0 when it holds none \(
+Clause: when a stream that go test wrote, or gotest wrote and a filter stripped of its RunLevel events, is replayed → exits 1 when it holds a failed test and 0 when it holds none
+--- a/cmd/gotest/spec.go
++++ b/cmd/gotest/spec.go
+@@ -381,7 +381,7 @@
+ 	case buildFailed:
+ 		code = 2
+ 	case gotestspec.HasFailures(tree):
+-		code = 1
++		code = 0
+ 	}
+ 	if run := runInfo(events, nil); run != nil && run.ExitCode != nil {
+ 		code = max(code, *run.ExitCode)

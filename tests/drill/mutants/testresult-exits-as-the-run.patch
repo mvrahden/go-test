@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / exits 0 and prints result FAILED with those tests in warnedTests \(
+Clause: when summary writes the test-result predicate of a stream whose run failed only on tests that passed without an assertion → exits 0 and prints result FAILED with those tests in warnedTests
+--- a/cmd/gotest/attest.go
++++ b/cmd/gotest/attest.go
+@@ -76,7 +76,7 @@
+ 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+ 		return 2
+ 	}
+-	return 0
++	return replayExitCode(events, nil, false)
+ }
+ 
+ // verdictKey is a test of a package, "" for the package itself.

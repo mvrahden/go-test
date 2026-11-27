@@ -302,10 +302,10 @@ that match no package exit 2 as well: a run of nothing is not green.
 Flags:
   --format=<fmt>          Output format: terminal (default), md, json
   --output=<file>         Write to file instead of stdout
-  --input=<file>          Render from saved JSON ("-" for stdin); exits 2 if
-                          it holds no test events, a package or failed build
-                          never reported its verdict (a stream cut short), or
-                          a package failed to build (as the live run does)
+  --input=<file>          Render from saved JSON ("-" for stdin); exits as the
+                          run it records ended, else by its verdicts; 2 if it
+                          holds no test events or a package or failed build
+                          never reported its verdict (a stream cut short)
   --render-only           With --input, exit 0 on a failing or incomplete
                           stream: report whether rendering succeeded, not the
                           test verdict
@@ -408,10 +408,10 @@ Flags:
   --output=<file>         Write to file instead of stdout
   --events-file=<file>    Also write the run's go test -json event stream to
                           file as it happens; summary --input reads it back
-  --input=<file>          Read from saved JSON ("-" for stdin); exits 2 if
-                          it holds no test events, a package or failed build
-                          never reported its verdict (a stream cut short), or
-                          a package failed to build (as the live run does)
+  --input=<file>          Read from saved JSON ("-" for stdin); exits as the
+                          run it records ended, else by its verdicts; 2 if it
+                          holds no test events or a package or failed build
+                          never reported its verdict (a stream cut short)
   --render-only           With --input, exit 0 on a failing or incomplete
                           stream: report whether rendering succeeded, not the
                           test verdict

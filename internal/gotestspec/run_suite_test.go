@@ -89,3 +89,37 @@ func (s *RunEventsTestSuite) TestRunOfAStreamTheRunDidNotClose(t *gotest.T) {
 		t.Errorf("exit code = %d, want none", *run.ExitCode)
 	}
 }
+
+// greenRun is runStream's shape for a run that passed and closed with 0.
+const greenRun = `{"Action":"start","Package":"gotest run","RunLevel":true,"Manifest":{"Version":"v1.2.3","GoVersion":"go1.26.0","Args":["-json","./..."],"Commit":"abc1234","Dirty":true,"Agent":"claude-code"}}
+{"Action":"start","Package":"example.com/p"}
+{"Action":"run","Package":"example.com/p","Test":"TestS"}
+{"Action":"pass","Package":"example.com/p","Test":"TestS"}
+{"Action":"pass","Package":"example.com/p"}
+{"Action":"pass","Package":"gotest run","RunLevel":true,"Elapsed":1,"Result":{"ExitCode":0,"Packages":{"Passed":1,"Failed":0,"Skipped":0},"Tests":{"Passed":1,"Failed":0,"Skipped":0}}}
+`
+
+func (s *RunEventsTestSuite) TestRunOfSeveralClosedRunsEndsAsTheWorst(t *gotest.T) {
+	for _, c := range []struct {
+		name, stream string
+		want         int
+	}{
+		{"a failed run, then a passed one", runStream + greenRun, 1},
+		{"a passed run, then a failed one", greenRun + runStream, 1},
+		{"two passed runs", greenRun + greenRun, 0},
+	} {
+		events, err := gotestspec.ParseEvents(strings.NewReader(c.stream))
+		if err != nil {
+			fatalf(t, "%s: ParseEvents: %v", c.name, err)
+		}
+		run, ok := gotestspec.RunOf(events)
+		if !ok {
+			fatalf(t, "%s: RunOf found no run", c.name)
+		}
+		mustEq(t, c.name+": version", run.Manifest.Version, "v1.2.3")
+		if run.ExitCode == nil {
+			fatalf(t, "%s: no exit code", c.name)
+		}
+		mustEq(t, c.name+": exit code", *run.ExitCode, c.want)
+	}
+}
