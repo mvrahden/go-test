@@ -2,9 +2,9 @@ Expect: ^FAIL .*conformance/audit AuditMutate / AMutantsVerdict / when a mutant'
 Clause: when a mutant's first run outruns its limit and its second run ends in time → judges the mutant by its second run, run alone after the other mutants
 --- a/internal/mutate/schedule.go
 +++ b/internal/mutate/schedule.go
-@@ -167,7 +167,7 @@
- 	// A timeout is a second run's: each runs once more, alone, so a run a
- 	// busy machine slowed is not taken for one that never ends.
+@@ -174,7 +174,7 @@
+ 		again = run
+ 	}
  	for i := range out {
 -		if out[i].Verdict != Timeout {
 +		if out[i].Verdict != "" {

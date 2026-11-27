@@ -181,15 +181,21 @@ func (s *PlanTestSuite) TestATimeoutRunTwice(t *gotest.T) {
 		}
 	}
 	t.When("a mutant's run times out", func(w *gotest.T) {
-		w.It("runs it once more, alone after the others, and judges it by that run", func(it *gotest.T) {
+		w.It("runs it once more through Again, alone after the others, and judges it by that run", func(it *gotest.T) {
 			var log []string
 			var mu sync.Mutex
 			busy := 0
-			sched := mutate.Scheduler{Jobs: 3, Budget: time.Hour}
-			out, _ := sched.Run(it.Context(), list, judge(&log, &mu, &busy))
+			run := judge(&log, &mu, &busy)
+			var again []int
+			sched := mutate.Scheduler{Jobs: 3, Budget: time.Hour, Again: func(ctx context.Context, m *mutate.Mutant) mutate.Outcome {
+				again = append(again, m.Line)
+				return run(ctx, m)
+			}}
+			out, _ := sched.Run(it.Context(), list, run)
 			gotest.Equal(it, []mutate.Outcome{{Verdict: mutate.Killed, By: "TestX"}, {Verdict: mutate.Timeout}, {Verdict: mutate.Survived}}, out)
 			gotest.Len(it, log, 5)
 			gotest.Equal(it, []string{"1#2 with 1", "2#2 with 1"}, log[3:])
+			gotest.Equal(it, []int{1, 2}, again, "the second runs go through Again")
 		})
 	})
 	t.When("the budget is spent before the second run", func(w *gotest.T) {

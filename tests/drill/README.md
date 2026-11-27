@@ -1258,6 +1258,7 @@ shards of one run do not add up to every mutant exactly once.
 | `mutate-survivor-suites-dropped` | a line names its last suite by name alone | audit conformance: the survivor It finds the suite without its package |
 | `mutate-timeout-read-as-killed` | a run past its limit counts as killed | audit conformance: the timeout It finds the i-- mutant killed |
 | `mutate-timeout-of-one-run` | a mutant whose one run passed its limit is a timeout, never run again | audit conformance: the second-run It finds Grade's stalled mutant a timeout |
+| `mutate-second-run-given-the-first-limit` | a mutant's second run gets no more time than its first | cmd/gotest: the limit It finds the second limit equal to the first |
 | `mutate-judged-on-a-failing-run` | mutants are classified as judged although the coverage run failed | audit conformance: the failing-suite It counts mutants not covered |
 | `mutate-budget-never-spent` | the scheduler is given an hour more than the budget | audit conformance: the budget It finds mutants killed under a budget of 1ns |
 | `mutate-spent-read-as-the-budget` | the time spent is written as the budget | audit conformance: the budget It reads 1ns spent |
