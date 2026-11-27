@@ -248,19 +248,29 @@ func (s *AuditMutateTestSuite) TestAMutantsVerdict(t *gotest.T) {
 	})
 	t.When("a mutant's first run outruns its limit and its second run ends in time", func(w *gotest.T) {
 		w.It("judges the mutant by its second run, run alone after the other mutants", func(it *gotest.T) {
+			data, err := os.ReadFile(filepath.Join(s.stall, "runs"))
+			gotest.NoError(it, err)
+			stalled, err := os.ReadFile(filepath.Join(s.stall, "stalled"))
+			gotest.NoError(it, err)
+			log := strings.Split(strings.TrimSpace(string(data)), "\n")
 			doc := readMutation(it, s.json)
 			gotest.Equal(it, []string{
 				"early-return if score >= 50 { return \"pass\" } → return \"\" killed mutmod/report TestReportTestSuite/TestGrades",
 				"boundary score >= 50 → score > 50 killed mutmod/report TestReportTestSuite/TestGrades",
 				"negate-compare score >= 50 → score < 50 killed mutmod/report TestReportTestSuite/TestGrades",
-			}, verdicts(doc.line(it, 6)))
-			data, err := os.ReadFile(filepath.Join(s.stall, "runs"))
-			gotest.NoError(it, err)
-			runs := strings.Fields(string(data))
-			gotest.Len(it, runs, 4)
-			stalled, err := os.ReadFile(filepath.Join(s.stall, "stalled"))
-			gotest.NoError(it, err)
-			gotest.Equal(it, string(stalled), runs[3], "the stalled mutant runs again after report's others: %v", runs)
+			}, verdicts(doc.line(it, 6)), "report's runs: %q", log)
+			var runs []string
+			for _, l := range log {
+				if id, ok := strings.CutPrefix(l, "run "); ok {
+					runs = append(runs, id)
+				}
+			}
+			gotest.Len(it, runs, 4, "report's runs: %q", log)
+			last := ""
+			if len(runs) > 0 {
+				last = runs[len(runs)-1]
+			}
+			gotest.Equal(it, string(stalled), last, "the stalled mutant runs again after report's others: %q", log)
 		})
 	})
 	t.When("a suite that judges a mutant fails before any mutant is switched on", func(w *gotest.T) {

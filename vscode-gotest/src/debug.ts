@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { sessions } from "./sessions.js";
 import { ManagedChild } from "./managedChild.js";
 import type { PrepareOutput } from "./types.js";
 import {
@@ -11,6 +12,7 @@ import { killProcessTree } from "./runnerUtils.js";
 
 export class DebugLauncher implements vscode.Disposable {
   private readonly prepareProcesses = new Map<string, ManagedChild>();
+  private readonly prepareSessions = new Map<string, vscode.Disposable>();
   private sessionListener: vscode.Disposable | undefined;
 
   constructor(private readonly outputChannel: vscode.LogOutputChannel) {}
@@ -93,6 +95,15 @@ export class DebugLauncher implements vscode.Disposable {
     const prepareKey = `gotest-prepare:${pkgDir}`;
     this.killPrepareProcess(prepareKey);
     this.prepareProcesses.set(prepareKey, managed);
+    this.prepareSessions.set(
+      prepareKey,
+      sessions.add({
+        kind: "prepare",
+        folder: workspaceFolder.uri.fsPath,
+        target: pkgDir,
+        stop: () => this.killPrepareProcess(prepareKey),
+      }),
+    );
 
     const extraBuildFlags = scopedConfig(workspaceFolder.uri.fsPath).get<
       string[]
@@ -235,6 +246,8 @@ export class DebugLauncher implements vscode.Disposable {
   }
 
   private killPrepareProcess(sessionName: string): void {
+    this.prepareSessions.get(sessionName)?.dispose();
+    this.prepareSessions.delete(sessionName);
     const managed = this.prepareProcesses.get(sessionName);
     if (managed) {
       this.prepareProcesses.delete(sessionName);

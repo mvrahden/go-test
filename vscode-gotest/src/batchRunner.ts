@@ -8,21 +8,28 @@ import { type TestEvent } from "./outputParser.js";
 import { buildCliCommand, clearBinaryCache, formatCliCommand } from "./cli.js";
 import { readModulePath } from "./gomod.js";
 import {
-  applyEvent,
   OnceLog,
-  TestItemRouter,
+  StreamApplier,
+  enqueueDescendants,
+  startAncestors,
   getPackageItem,
   skipUnresolved,
   spawnTestProcess,
   resolveRunPatterns,
   readWorkspacePatterns,
   type AppliedResult,
-  BuildOutputs,
   erroredItem,
   itemTestPath,
   markFailedRun,
 } from "./runnerUtils.js";
 import { coverOf, type RunPiece } from "./specStore.js";
+import {
+  coverFileFor,
+  nextEventsFile,
+  pruneEventsFiles,
+} from "./eventsFiles.js";
+import { liveResults } from "./config.js";
+import type { RunProgress } from "./liveProgress.js";
 import {
   runGoToolCoverFunc,
   splitCoverByPackage,
@@ -44,6 +51,9 @@ export interface BatchConfig {
   outputChannel: vscode.LogOutputChannel;
   label: string;
   env?: Record<string, string>;
+  // Run with --changed: packages the CLI leaves out are neither skipped
+  // nor errored; they keep what they have.
+  changed?: boolean;
   coverage?: {
     store: CoverageStore;
     testOnly?: boolean;
@@ -53,11 +63,23 @@ export interface BatchConfig {
   // selection would let its focus skip the selected suites. Without it the
   // patterns widen unchecked.
   knownPackages?: { importPath: string; dir: string }[];
+  // The run this invocation belongs to, told of each event as it applies.
+  progress?: RunProgress;
+}
+
+// liveEnv is the environment of a run child: GOTEST_LIVE=1 unless the
+// folder turned live results off. The CLI reads it only for a -json run.
+export function liveEnv(
+  workspaceDir: string,
+  env: Record<string, string> | undefined,
+): Record<string, string> | undefined {
+  if (!liveResults(workspaceDir)) return env;
+  return { ...env, GOTEST_LIVE: "1" };
 }
 
 export interface BatchResult {
   stdout: string;
-  // The run as the Spec View keeps it.
+  // The run as the panel keeps it.
   piece: RunPiece;
 }
 
@@ -80,7 +102,53 @@ export function runPiece(
   return piece;
 }
 
+// How a --changed run narrowed itself, as its manifest says.
+export interface Narrowed {
+  ran: number;
+  unchanged: number;
+  noRecord: boolean;
+}
+
+// changedOf reads the run's manifest from its -json stream.
+export function changedOf(stdout: string): Narrowed | undefined {
+  for (const line of stdout.split("\n")) {
+    if (!line.includes('"Manifest"')) continue;
+    try {
+      const ev = JSON.parse(line) as {
+        RunLevel?: boolean;
+        Manifest?: {
+          Changed?: { Ran?: number; Unchanged?: number; NoRecord?: boolean };
+        };
+      };
+      const c = ev.RunLevel ? ev.Manifest?.Changed : undefined;
+      if (!c) continue;
+      return {
+        ran: c.Ran ?? 0,
+        unchanged: c.Unchanged ?? 0,
+        noRecord: !!c.NoRecord,
+      };
+    } catch {
+      // not an event
+    }
+  }
+  return undefined;
+}
+
+// narrowedLine says, in the run's output, that it was not a full run.
+export function narrowedLine(n: Narrowed): string {
+  const pkgs = (k: number) => `${k} package${k === 1 ? "" : "s"}`;
+  if (n.noRecord)
+    return `[gotest] --changed found no run record, so it ran everything: ${pkgs(n.ran)}.`;
+  return `[gotest] narrowed by --changed: ran ${pkgs(n.ran)}, left out ${pkgs(n.unchanged)} whose inputs did not change; their verdicts are the last record's, not this run's.`;
+}
+
 export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
+  const result = await runBatch(config);
+  config.progress?.finished(result.piece);
+  return result;
+}
+
+async function runBatch(config: BatchConfig): Promise<BatchResult> {
   const {
     pkgInfos,
     filter,
@@ -95,6 +163,8 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
     coverage,
     onResults,
     knownPackages,
+    changed,
+    progress,
   } = config;
 
   const importPaths = pkgInfos.map((p) => p.importPath);
@@ -113,14 +183,24 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
     cliPkgArgs = wildcards ?? importPaths;
   }
   let coverFile: string | undefined;
+  // A profile kept beside the run's stream outlives the run; one in a
+  // temporary directory goes with it.
+  let coverKept = false;
 
   try {
-    if (coverage) {
+    // The stream on disk too, so the run's record names a file to open.
+    const eventsFile = nextEventsFile();
+    if (coverage && eventsFile) {
+      coverFile = coverFileFor(eventsFile);
+      coverKept = true;
+    } else if (coverage) {
       const tmpDir = await mkdtemp(path.join(tmpdir(), "gotest-cov-"));
       coverFile = path.join(tmpDir, "cover.out");
     }
 
     const gotestArgs: string[] = [];
+    if (eventsFile) gotestArgs.push(`--events-file=${eventsFile}`);
+    if (changed) gotestArgs.push("--changed");
     const goTestArgs: string[] = ["-json", "-count=1", ...cliPkgArgs];
     if (coverFile) {
       goTestArgs.push("-covermode=atomic", `-coverprofile=${coverFile}`);
@@ -143,17 +223,45 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
     const cmd = await buildCliCommand(cliArgs, workspaceDir, outputChannel);
     outputChannel.info(`[${label}] ${formatCliCommand(cmd)}`);
 
-    const streamedPkgs = new Set<string>();
-    // Whether the stream carried a verdict the tree can show as red.
-    let streamedFailure = false;
-    const pkgOutputMaps = new Map<string, Map<string, string>>();
     const pkgDirMap = new Map(pkgInfos.map((p) => [p.importPath, p.dir]));
-    const builds = new BuildOutputs();
-    // One router per package, sharing one log for the run.
-    const routers = new Map<string, TestItemRouter>();
-    const unrouted = new OnceLog((m) => outputChannel.warn(m));
+    // A package's output is kept for the whole run, not dropped at its
+    // verdict: a --timeout writes the hung test's verdict after the
+    // package's, and under GOTEST_LIVE suites interleave.
+    const applier = new StreamApplier(
+      controller,
+      run,
+      (importPath) => pkgDirMap.get(importPath),
+      workspaceDir,
+      new OnceLog((m) => outputChannel.warn(m)),
+      undefined,
+      () => token.isCancellationRequested,
+    );
+    let streamed = "";
+    progress?.streaming(() => runPiece(streamed, config));
+
+    // A --changed run starts nothing up front; a package is marked running
+    // once the CLI says it runs it: in the run's manifest, or, from a CLI
+    // whose manifest lists none, at the package's own start event.
+    const infoByPath = new Map(pkgInfos.map((p) => [p.importPath, p]));
+    const marked = new Set<string>();
+    const markRunning = (paths: readonly string[]) => {
+      const started: vscode.TestItem[] = [];
+      for (const importPath of paths) {
+        const info = infoByPath.get(importPath);
+        if (!info || marked.has(importPath)) continue;
+        marked.add(importPath);
+        for (const item of info.items) {
+          controller.clearResults(item);
+          run.started(item);
+          enqueueDescendants(run, item);
+          started.push(item);
+        }
+      }
+      if (started.length > 0) startAncestors(run, started);
+    };
 
     const handleStdoutLine = (line: string) => {
+      streamed += line + "\n";
       let event: TestEvent;
       try {
         event = JSON.parse(line) as TestEvent;
@@ -161,60 +269,17 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
       } catch {
         return;
       }
-
-      if (builds.absorb(event)) return;
-      const dir = pkgDirMap.get(event.Package);
-      if (!dir) {
-        // The CLI books a run's own failure (shared fixtures, an interrupt,
-        // the global deadline) under a package of its own, marked RunLevel.
-        // No item holds it, so it is said in the run's output.
-        if (
-          event.RunLevel === true &&
-          event.Action === "output" &&
-          event.Output
-        ) {
-          run.appendOutput(
-            `[${event.Package}] ${event.Output.replace(/\n$/, "")}\r\n`,
-          );
+      if (changed && event.Action === "start") {
+        const listed = event.Manifest?.Changed?.Packages;
+        if (event.RunLevel) {
+          if (Array.isArray(listed)) markRunning(listed);
+        } else if (!event.Test) {
+          markRunning([event.Package]);
         }
-        return;
       }
-
-      let outputMap = pkgOutputMaps.get(event.Package);
-      if (!outputMap) {
-        outputMap = new Map();
-        pkgOutputMaps.set(event.Package, outputMap);
-      }
-      let router = routers.get(event.Package);
-      if (!router) {
-        router = new TestItemRouter(controller, event.Package, unrouted);
-        routers.set(event.Package, router);
-      }
-
-      const result = applyEvent(
-        controller,
-        run,
-        event,
-        outputMap,
-        event.Package,
-        dir,
-        { builds, buildDir: workspaceDir, router },
-      );
-      if (result) onResults?.([result]);
-
-      if (event.Action === "fail") {
-        streamedFailure = true;
-      }
-
-      const isTerminal =
-        !event.Test &&
-        (event.Action === "pass" ||
-          event.Action === "fail" ||
-          event.Action === "skip");
-      if (isTerminal) {
-        streamedPkgs.add(event.Package);
-        pkgOutputMaps.delete(event.Package);
-      }
+      const applied = applier.apply([event]);
+      if (applied.length > 0) onResults?.(applied);
+      if (pkgDirMap.has(event.Package)) progress?.note(event);
     };
 
     // What the CLI says on stderr — a note that a package was not run, a
@@ -230,14 +295,21 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
       token,
       outputChannel,
       label,
-      env,
+      liveEnv(workspaceDir, env),
       handleStdoutLine,
       handleStderrLine,
     );
 
-    if (token.isCancellationRequested) {
+    const narrowed = changed ? changedOf(result.stdout) : undefined;
+    if (narrowed) run.appendOutput(narrowedLine(narrowed) + "\r\n");
+
+    // A stop, ours or one the CLI was sent: what did not finish is skipped.
+    if (token.isCancellationRequested || applier.interrupted) {
+      // A narrowed run skips only what it said it would run.
       const skippedPkgs = pkgInfos.filter(
-        (i) => !streamedPkgs.has(i.importPath),
+        (i) =>
+          !applier.reported.has(i.importPath) &&
+          (!changed || marked.has(i.importPath)),
       );
       if (skippedPkgs.length > 0) {
         outputChannel.info(
@@ -262,7 +334,11 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
 
       let attributed = false;
       for (const info of pkgInfos) {
-        if (streamedPkgs.has(info.importPath)) {
+        // A narrowed run left the package out; it did not fail.
+        if (
+          applier.reported.has(info.importPath) ||
+          (changed && !marked.has(info.importPath))
+        ) {
           continue;
         }
 
@@ -291,15 +367,24 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
       // here — it is the whole run's output, not something to read on an item.
       markFailedRun(
         run,
-        pkgInfos.flatMap((info) => info.items.map(getPackageItem)),
+        pkgInfos
+          .filter((info) => !changed || applier.reported.has(info.importPath))
+          .flatMap((info) => info.items.map(getPackageItem)),
         {
           exitCode: result.exitCode,
           cancelled: false,
-          failed: attributed || streamedFailure,
+          failed: attributed || applier.failed,
           reason: stderrFiltered,
         },
         controller,
       );
+    }
+
+    // What a narrowed run marked and no event resolved, as a full run does.
+    for (const importPath of marked) {
+      for (const item of infoByPath.get(importPath)!.items) {
+        skipUnresolved(run, item, controller);
+      }
     }
 
     if (coverFile && coverage) {
@@ -358,7 +443,8 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
     }
     return { stdout: "", piece: runPiece("", config) };
   } finally {
-    if (coverFile) {
+    pruneEventsFiles();
+    if (coverFile && !coverKept) {
       rm(path.dirname(coverFile), { recursive: true, force: true }).catch(
         () => {},
       );

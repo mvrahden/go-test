@@ -6,7 +6,7 @@
 // extension's reading of it were each tested in isolation and never together.
 //
 // Two variants are recorded per stream: the gating form, whose exit code CI
-// depends on, and the --render-only form the Spec View sends. The `spec`
+// depends on, and the --render-only form the panel sends. The `spec`
 // runs replay a stream with --declared or --hide.
 
 import { describe, it, expect, vi } from "vitest";
@@ -52,13 +52,27 @@ vi.mock("vscode", () => {
   };
 });
 
-import { interpretSpecExit } from "./specView.js";
+import { interpretSpecExit } from "./panel/specData.js";
 import { parseTestEvents } from "./outputParser.js";
 import { DiscoveryCache, parseDiscoverOutput } from "./discovery.js";
 import { parseBenchReport } from "./benchReport.js";
 import { parseCoverProfile } from "./coverage.js";
 import { parsePromotedSeed } from "./fuzz.js";
 import { parseLintJson } from "./lintFindings.js";
+import {
+  AUDIT_SCHEMA,
+  buildChangeModel,
+  markOf,
+  parseAuditDocument,
+  runsOf,
+  targetsOf,
+} from "./auditModel.js";
+import { interpretAuditExit } from "./changeScope.js";
+import { parseCliCapabilities, RUNS_COMMAND } from "./cli.js";
+import { parseRunsDocument, type RunsDocument } from "./runsModel.js";
+import { cardsOf } from "./runsView.js";
+import { parseFreshness, CHECK_FRESH_ARGS } from "./freshness.js";
+import { changedOf } from "./batchRunner.js";
 
 interface Invocation {
   exitCode: number | null;
@@ -92,6 +106,30 @@ interface LiveRun {
   exitCode: number | null;
   stderr: string;
   events: LiveEvent[];
+}
+
+// Interleaved streams replayed beside their burst twins, and a --live run
+// recorded per suite: the order across suites is the scheduler's.
+interface StreamCases {
+  replays: Record<
+    string,
+    Record<
+      "gating" | "renderOnly",
+      { exitCode: number | null; stdoutMatchesBurst: boolean }
+    >
+  >;
+  run: {
+    args: string[];
+    exitCode: number | null;
+    stderr: string;
+    heldWhileBothSuitesRan: boolean;
+    packageStartsFirst: boolean;
+    packageVerdictAfterItsSuites: boolean;
+    eventsFileMatchesStdout: boolean;
+    renderMatchesBurst: boolean;
+    package: LiveEvent[];
+    suites: Record<string, LiveEvent[]>;
+  };
 }
 
 // A `gotest lint -json` run, its paths masked to "<fixtures>".
@@ -139,11 +177,19 @@ interface SpecDocument {
 // A `gotest spec --input=-` run over a stream under testdata/, with
 // --declared or --hide; the repository's directory is masked as "<repo>".
 interface SpecRun {
-  stream: string;
+  stream: string | null;
   args: string[];
   exitCode: number | null;
   stderr: string;
   document: SpecDocument;
+}
+
+interface AuditRun {
+  args: string[];
+  exitCode: number | null;
+  stderr: string;
+  stdout?: string;
+  document?: unknown;
 }
 
 interface ContractCase {
@@ -176,9 +222,22 @@ const golden = JSON.parse(
   cases: Record<string, ContractCase>;
   spec: Record<string, SpecRun>;
   live: Record<string, LiveRun>;
+  stream: StreamCases;
   outputs: Record<string, OutputRun>;
   lint: Record<string, LintRun>;
+  audit: Record<string, AuditRun>;
+  runs: Record<string, RunsCase>;
 };
+
+// A `gotest runs` invocation, or the freshness and --changed steps, masked.
+interface RunsCase {
+  args: string[];
+  exitCode: number | null;
+  stderr?: string;
+  document?: unknown;
+  manifestChanged?: unknown;
+  run?: { args: string[]; exitCode: number | null };
+}
 
 // nodesOf lists every node beneath pkg, keyed by its slash-joined path.
 function nodesOf(pkg: SpecPackage): Map<string, SpecNode> {
@@ -255,7 +314,7 @@ const EXPECTED: Record<
     packages: ["example.com/broken:fail"],
   },
   // A stream with no events holds no verdict: the gating form must not pass
-  // it as green. The Spec View renders it anyway, under --render-only.
+  // it as green. The panel renders it anyway, under --render-only.
   empty: {
     gatingExitCode: 2,
     gatingStderr:
@@ -273,7 +332,7 @@ const EXPECTED: Record<
     packages: ["example.com/checkout:fail"],
   },
   // The one stream naming a package of this repository. Every other case
-  // pins the name-only fallback; this one pins what the Spec View actually
+  // pins the name-only fallback; this one pins what the panel actually
   // gets in a workspace: the label the developer wrote, spoken in its
   // vocabulary, with `vocab` on the wire — and nothing on stderr while the
   // package loads.
@@ -303,7 +362,7 @@ const EXPECTED: Record<
     packages: ["example.com/excluded:pass", "example.com/plain:pass"],
   },
   // An It whose label holds a slash and one holding markup, beside an
-  // excluded suite: the Spec View renders this tree as the CLI built it.
+  // excluded suite: the panel renders this tree as the CLI built it.
   labels: {
     gatingExitCode: 0,
     goRunEpilogue: "",
@@ -385,7 +444,7 @@ describe("recorded CLI contract", () => {
 
       it("leaves go run with nothing to append under --render-only", () => {
         // With no non-zero exit there is no epilogue, so the hazard that broke
-        // the Spec View cannot arise on this path at all.
+        // the panel cannot arise on this path at all.
         expect(recorded.renderOnly.goRun.exitCode).toBe(0);
         expect(recorded.renderOnly.goRun.stderr).toBe("");
         expect(recorded.renderOnly.goRun.stdoutMatchesDirect).toBe(true);
@@ -461,7 +520,7 @@ describe("recorded CLI contract", () => {
       expect(reading.children[0].children).toEqual([]);
     });
 
-    it("sends labels raw, for the Spec View to escape once", () => {
+    it("sends labels raw, for the panel to escape once", () => {
       expect(reading.children[1].display).toBe('keeps <b>&" text');
     });
 
@@ -506,6 +565,7 @@ describe("recorded spec runs", () => {
   it("records exactly the stated runs", () => {
     expect(Object.keys(golden.spec).sort()).toEqual([
       "declared",
+      "declared-unrun",
       "hide-nothing",
       "hide-pass",
     ]);
@@ -792,6 +852,73 @@ function promotedSeeds(stdout: string) {
     .filter((v) => v !== undefined);
 }
 
+describe("recorded interleaved streams", () => {
+  it("replays every interleaved stream as its burst twin renders", () => {
+    expect(Object.keys(golden.stream.replays).sort()).toEqual([
+      "crash",
+      "packages",
+      "suites",
+      "timeout",
+    ]);
+    for (const [name, variants] of Object.entries(golden.stream.replays)) {
+      expect(variants.gating.stdoutMatchesBurst, name).toBe(true);
+      expect(variants.renderOnly.stdoutMatchesBurst, name).toBe(true);
+      expect(variants.renderOnly.exitCode, name).toBe(0);
+    }
+  });
+
+  describe("a --live run whose two suites hold", () => {
+    const run = golden.stream.run;
+
+    it("wrote both suites' first passes while both still ran", () => {
+      expect(run.args).toContain("--live");
+      expect(run.exitCode).toBe(0);
+      expect(run.stderr).toBe("");
+      expect(run.heldWhileBothSuitesRan).toBe(true);
+    });
+
+    it("opens the package with its start and judges it after its suites", () => {
+      expect(run.packageStartsFirst).toBe(true);
+      expect(run.packageVerdictAfterItsSuites).toBe(true);
+      expect(run.package.map((e) => e.Action)).toEqual([
+        "start",
+        "output",
+        "pass",
+      ]);
+    });
+
+    it("writes each test's run first and its verdict last, once", () => {
+      expect(Object.keys(run.suites)).toEqual([
+        "TestFirstTestSuite",
+        "TestSecondTestSuite",
+      ]);
+      for (const events of Object.values(run.suites)) {
+        const byTest = new Map<string, string[]>();
+        for (const e of events) {
+          byTest.set(e.Test!, [...(byTest.get(e.Test!) ?? []), e.Action]);
+        }
+        for (const [test, actions] of byTest) {
+          expect(actions[0], test).toBe("run");
+          expect(actions.at(-1), test).toBe("pass");
+          expect(
+            actions.filter((a) => a === "run"),
+            test,
+          ).toHaveLength(1);
+          expect(
+            actions.filter((a) => a === "pass"),
+            test,
+          ).toHaveLength(1);
+        }
+      }
+    });
+
+    it("saves the events file as stdout and renders as its burst would", () => {
+      expect(run.eventsFileMatchesStdout).toBe(true);
+      expect(run.renderMatchesBurst).toBe(true);
+    });
+  });
+});
+
 describe("recorded outputs", () => {
   it("records exactly the stated outputs", () => {
     expect(Object.keys(golden.outputs).sort()).toEqual([
@@ -801,6 +928,8 @@ describe("recorded outputs", () => {
       "promote-nothing",
       "promote-refused",
       "promote-staged",
+      "version",
+      "version-json",
     ]);
   });
 
@@ -1096,5 +1225,373 @@ describe("recorded lint runs", () => {
       );
       for (const f of findings) expect(ids).toContain(f.category);
     });
+  });
+});
+
+// A folder nothing ran in shows what its source declares: the --declared
+// overlay over an empty stream.
+describe("recorded declared tree of a folder nothing ran in", () => {
+  const recorded = golden.spec["declared-unrun"];
+
+  it("gives every declared row no verdict, each counted as not run", () => {
+    const statuses = new Set<string>();
+    for (const p of recorded.document.packages)
+      for (const n of nodesOf(p).values()) statuses.add(n.status);
+    expect(Array.from(statuses)).toEqual(["none"]);
+    const stats = recorded.document.stats as unknown as {
+      behaviors: number;
+      notRun: number;
+    };
+    expect(stats.behaviors).toBeGreaterThan(0);
+    expect(stats.notRun).toBe(stats.behaviors);
+  });
+});
+
+describe("recorded version", () => {
+  it("names the subcommands and the audit schema the Change scope asks for", () => {
+    const out = golden.outputs["version-json"];
+    expect(out.exitCode).toBe(0);
+    expect(out.stderr).toBe("");
+    const caps = parseCliCapabilities(JSON.stringify(out.document));
+    expect(caps?.json).toBe(true);
+    expect(caps?.commands).toContain("audit");
+    // The Runs scope, --changed and --check-fresh are asked by this word.
+    expect(caps?.commands).toContain(RUNS_COMMAND);
+    expect(caps?.schemas.audit).toBe(AUDIT_SCHEMA);
+    expect(Object.keys(out.document as object)).toEqual([
+      "version",
+      "goVersion",
+      "platform",
+      "commands",
+      "schemas",
+    ]);
+  });
+
+  it("still answers the plain version line without --json", () => {
+    const out = golden.outputs.version as unknown as { stdout: string };
+    expect(parseCliCapabilities(out.stdout)).toMatchObject({
+      json: false,
+      version: "dev",
+    });
+  });
+});
+
+describe("recorded audit", () => {
+  it("records exactly the stated runs", () => {
+    expect(Object.keys(golden.audit).sort()).toEqual([
+      "base-outside-git",
+      "compare",
+      "evidence",
+      "evidence-text",
+      "record-base",
+      "record-head",
+    ]);
+  });
+
+  it("records both trees with exit 0 and nothing on stderr", () => {
+    for (const side of ["record-base", "record-head"]) {
+      expect(golden.audit[side].exitCode).toBe(0);
+      expect(golden.audit[side].stderr).toBe("");
+    }
+  });
+
+  describe("two records compared", () => {
+    const recorded = golden.audit.compare;
+    const outcome = interpretAuditExit(
+      recorded.exitCode,
+      JSON.stringify(recorded.document),
+      recorded.stderr,
+    );
+    const doc = outcome.ok ? outcome.doc : undefined;
+
+    it("exits 0 without a policy and is read as one document", () => {
+      expect(recorded.exitCode).toBe(0);
+      expect(recorded.stderr).toBe("");
+      expect(doc?.schema).toBe(1);
+    });
+
+    it("holds the lists the Change scope reads, evidence and unproven empty", () => {
+      expect(doc?.findings.length).toBeGreaterThan(0);
+      expect(doc?.behaviors.length).toBeGreaterThan(0);
+      expect(doc?.evidence).toEqual([]);
+      expect(doc?.unproven).toEqual([]);
+      expect(doc?.modules).toEqual(["auditmod"]);
+    });
+
+    it("marks the weakenings, which the scope keeps as its decisions in order", () => {
+      const weak = doc!.findings.filter((f) => f.weakens);
+      expect(weak.length).toBeLessThan(doc!.findings.length);
+      const model = buildChangeModel(doc!);
+      expect(model.openCount).toBe(doc!.summary.weakenings);
+      expect(model.open.map((g) => g.tag)).toEqual(
+        Array.from(new Set(weak.map((f) => f.class))),
+      );
+    });
+
+    it("places every finding of a package and every behavior in a module file", () => {
+      for (const f of doc!.findings) {
+        if (!f.package) continue;
+        expect(f.location?.file).toMatch(/^shop\//);
+        expect(f.package.startsWith("auditmod")).toBe(true);
+      }
+      for (const c of doc!.behaviors) {
+        const place = c.head ?? c.base;
+        expect(place?.path.length).toBeGreaterThan(1);
+        expect(place?.line).toBeGreaterThan(0);
+      }
+    });
+
+    it("lists every change kind the scope groups", () => {
+      expect(new Set(doc!.behaviors.map((c) => c.change))).toEqual(
+        new Set(["added", "removed", "reworded", "moved", "changed"]),
+      );
+    });
+  });
+
+  describe("an audit with evidence", () => {
+    const recorded = golden.audit.evidence;
+    const outcome = interpretAuditExit(
+      recorded.exitCode,
+      JSON.stringify(recorded.document),
+      recorded.stderr,
+    );
+    const doc = outcome.ok ? outcome.doc : undefined;
+    const model = doc ? buildChangeModel(doc) : undefined;
+    const text = golden.audit["evidence-text"].stdout ?? "";
+
+    it("exits 0 without a policy and is read as one document", () => {
+      expect(recorded.exitCode).toBe(0);
+      expect(recorded.stderr).toBe("");
+      expect(doc?.schema).toBe(AUDIT_SCHEMA);
+    });
+
+    it("gives every finding and evidence row an id of its own", () => {
+      const ids = [
+        ...doc!.findings.map((f) => f.id),
+        ...doc!.evidence.map((e) => e.id),
+      ];
+      expect(ids.every((id) => typeof id === "string" && id.length > 0)).toBe(
+        true,
+      );
+      expect(new Set(ids).size).toBe(ids.length);
+    });
+
+    it("names the head's branch and where each module lies", () => {
+      expect(doc!.head.branch).toBe("trunk");
+      expect(model!.headBranch).toBe("trunk");
+      expect(doc!.moduleDirs).toEqual([{ path: "auditmod", dir: "." }]);
+      for (const f of doc!.findings) expect(f.module).toBe("auditmod");
+    });
+
+    it("names the streams under the evidence heading as the CLI's text does", () => {
+      const lines = text.split("\n");
+      const at = lines.indexOf(model!.streamsHead!);
+      expect(at).toBe(1);
+      expect(
+        lines
+          .slice(at + 1, at + 1 + model!.streams.length)
+          .map((l) => l.replace(/^ {2}(current|stale) {2,}/, "")),
+      ).toEqual(model!.streams.map((st) => st.text));
+      expect(model!.streams.map((st) => st.current)).toEqual(
+        lines
+          .slice(at + 1, at + 1 + model!.streams.length)
+          .map((l) => l.trimStart().startsWith("current")),
+      );
+    });
+
+    it("marks the weakenings and behaviors with the CLI text's marks", () => {
+      // The text's mark column: after a head of width 11 (weakenings) or 9
+      // (behaviors) and two spaces, twelve wide.
+      const column = (title: string, width: number) => {
+        const lines = text.split("\n");
+        const from = lines.findIndex((l) => l.startsWith(title));
+        const out: string[] = [];
+        for (const l of lines.slice(from + 1)) {
+          if (!l.startsWith("  ")) break;
+          out.push(l.slice(2 + width + 2, 2 + width + 2 + 12).trim());
+        }
+        return out;
+      };
+      const weakenings = model!.open
+        .flatMap((g) => g.rows)
+        .filter((r) => doc!.findings.some((f) => f.id === r.key))
+        .map((r) => r.mark?.text ?? "");
+      expect(weakenings).toEqual(column("weakenings:", 11));
+      const behaviors = model!.behaviors
+        .flatMap((p) => p.suites.flatMap((s) => s.rows))
+        .map((r) => r.mark?.text ?? "");
+      expect(behaviors.sort()).toEqual(column("behaviors:", 9).sort());
+      expect(new Set(doc!.evidence.map(markOf))).toEqual(
+        new Set([
+          "vacuous",
+          "not run",
+          "pass",
+          "pass 1",
+          "FAIL",
+          "skip",
+          "partly run",
+        ]),
+      );
+    });
+
+    it("asks a decision of the rows the document marks, after the weakenings", () => {
+      const rows = model!.open.flatMap((g) => g.rows);
+      const evidenceKeys = rows
+        .filter((r) => doc!.evidence.some((e) => e.id === r.key))
+        .map((r) => r.key);
+      // Grouped by their mark, so compared as a set.
+      expect(evidenceKeys.sort()).toEqual(
+        doc!.evidence
+          .filter((e) => e.needsDecision)
+          .map((e) => e.id)
+          .sort(),
+      );
+      const firstEvidence = rows.findIndex((r) => evidenceKeys.includes(r.key));
+      expect(firstEvidence).toBe(doc!.summary.weakenings);
+      expect(model!.openCount).toBe(
+        doc!.summary.weakenings + evidenceKeys.length,
+      );
+    });
+
+    it("runs the head's tests by their -run pattern, a removed one never", () => {
+      const runs = runsOf(model!);
+      for (const f of doc!.findings) {
+        if (!f.weakens) continue;
+        expect(runs.get(f.id)?.run).toBe(f.headLocation ? f.run : undefined);
+      }
+      expect(runs.size).toBeGreaterThan(0);
+      for (const r of runs.values()) expect(r.package).toBe("auditmod/shop");
+    });
+
+    it("opens each finding on the sides it has, a removed one on the base's", () => {
+      const targets = targetsOf(doc!, model!);
+      for (const f of doc!.findings.filter((f) => f.weakens)) {
+        const t = targets.get(f.id);
+        expect(t?.base).toEqual(f.baseLocation);
+        expect(t?.head).toEqual(f.headLocation);
+      }
+      const removed = doc!.findings.find((f) => f.class === "removed")!;
+      expect(targets.get(removed.id)?.head).toBeUndefined();
+    });
+
+    it("lists the unproven lines as the CLI's text does", () => {
+      const u = model!.unproven!;
+      expect(text).toContain(`unproven: ${u.head}`);
+      for (const f of u.files) {
+        const line = text
+          .split("\n")
+          .find((l) => l.trimStart().startsWith(f.file + " "));
+        const want = f.coverage
+          ? `${f.counts}: ${f.ranges.map((r) => r.text).join(", ")}`
+          : "no coverage data";
+        expect(line?.trim().slice(f.file.length).trim()).toBe(want);
+      }
+      const byLabel = Object.fromEntries(
+        model!.counters.map((c) => [c.label, c.value]),
+      );
+      expect(byLabel).toMatchObject({
+        evidence: doc!.summary.evidence,
+        failing: doc!.summary.failing,
+        unproven: `${doc!.summary.unproven} of ${doc!.summary.changedLines} lines`,
+      });
+    });
+  });
+
+  it("writes no document for a base outside git, and stderr says what to give instead", () => {
+    const recorded = golden.audit["base-outside-git"];
+    expect(recorded.exitCode).toBe(2);
+    expect(recorded.stdout).toBe("");
+    const outcome = interpretAuditExit(
+      recorded.exitCode,
+      recorded.stdout ?? "",
+      recorded.stderr,
+    );
+    expect(outcome.ok).toBe(false);
+    if (!outcome.ok) expect(outcome.message).toContain("--base-record");
+  });
+});
+
+describe("recorded run records", () => {
+  const r = golden.runs;
+  const rows = (name: string, exists: (f: string) => boolean = () => true) => {
+    const doc = parseRunsDocument(
+      JSON.stringify(r[name].document),
+    ) as RunsDocument;
+    return cardsOf(
+      {
+        state: { kind: "doc", doc },
+        busy: false,
+        folders: [],
+        now: new Date(),
+        exists,
+        chosen: () => false,
+      },
+      doc.runs,
+    ).map((c, i) => ({ ...c, eventsFile: doc.runs[i]?.eventsFile }));
+  };
+
+  it("records exactly the stated steps", () => {
+    expect(Object.keys(r).sort()).toEqual([
+      "changed",
+      "check-fresh",
+      "import-another-commit",
+      "import-current",
+      "import-no-manifest",
+      "import-uncommitted",
+      "list-after-changed",
+      "list-empty",
+      "list-imported",
+    ]);
+  });
+
+  it("lists no run of a checkout nothing ran in", () => {
+    expect(r["list-empty"].exitCode).toBe(0);
+    expect(rows("list-empty")).toEqual([]);
+  });
+
+  it("lists imported runs newest first, marked imported, with their events files", () => {
+    expect(r["import-current"].exitCode).toBe(0);
+    const list = rows("list-imported");
+    expect(list.map((x) => x.who)).toEqual([
+      "Imported from current.json, agent (<agent>)",
+      "Imported from uncommitted.json, agent (<agent>)",
+      "Imported from another-commit.json, agent (<agent>)",
+      "Imported from no-manifest.json",
+    ]);
+    expect(list[1].commit).toBe("HEAD_COMMIT dirty");
+    expect(list[3].command).toBe("gotest");
+    // Streams without input hashes judge nothing.
+    expect(list[0].fresh).toBe("1 package, freshness unknown");
+    expect(list.every((x) => x.eventsFile?.startsWith("<proof>/"))).toBe(true);
+  });
+
+  it("judges a run's stream stale once a file of its package changed", () => {
+    const c = r["check-fresh"];
+    expect(c.run?.exitCode).toBe(0);
+    expect(c.args).toEqual(CHECK_FRESH_ARGS);
+    expect(c.exitCode).toBe(0);
+    const judged = parseFreshness(JSON.stringify(c.document));
+    expect(Object.fromEntries(judged!)).toEqual({ "auditmod/shop": "stale" });
+  });
+
+  it("narrows a --changed run to the changed package and says so in its manifest", () => {
+    const ch = r.changed;
+    expect(ch.exitCode).toBe(0);
+    const line = JSON.stringify({
+      Action: "start",
+      Package: "gotest run",
+      RunLevel: true,
+      Manifest: { Changed: ch.manifestChanged },
+    });
+    expect(changedOf(line)).toEqual({ ran: 1, unchanged: 1, noRecord: false });
+    const list = rows("list-after-changed", (f) => f.startsWith("<stage>"));
+    expect(list[0].title).toBe(
+      "Run changed: ran 1 package, left out 1 unchanged",
+    );
+    expect(list[0].fresh).toBe("1 package, current");
+    // The run before it wrote its stream: openable, and stale for shop.
+    expect(list[1].canOpen).toBe(true);
+    expect(list[1].fresh).toBe("1 of 2 packages stale");
+    expect(list[1].freshTone).toBe("warn");
   });
 });

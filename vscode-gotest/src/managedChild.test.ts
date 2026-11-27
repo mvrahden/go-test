@@ -17,7 +17,7 @@ vi.mock("node:child_process", async () => {
   return { spawn: createScriptedSpawn(script, mockKill) };
 });
 
-import { ManagedChild, withControl } from "./managedChild.js";
+import { ManagedChild, finishedLine, withControl } from "./managedChild.js";
 import type { FakeChild } from "./scriptedSpawn.test-support.js";
 
 function written(mc: ManagedChild): string[] {
@@ -45,6 +45,44 @@ describe("ManagedChild", () => {
     const mc = drain(new ManagedChild("go", ["run", "."]));
     await expect(mc.exited).resolves.toMatchObject({ code: 0 });
     expect(mockKill).not.toHaveBeenCalled();
+  });
+
+  it("tells onFinished once how long the child ran and how it ended", async () => {
+    script.always = { neverExits: true, code: 3 };
+    const told: string[] = [];
+    const mc = drain(
+      new ManagedChild("go", ["run", "."], {
+        onFinished: (line) => told.push(line),
+      }),
+    );
+    await vi.advanceTimersByTimeAsync(250);
+    expect(told).toEqual([]);
+    const child = mc.child as unknown as FakeChild;
+    child.stdout.end();
+    child.stderr.end();
+    await mc.exited;
+    expect(told).toEqual(["finished in 250ms, exit 3"]);
+  });
+
+  it("settles even when onFinished throws", async () => {
+    script.always = { code: 0 };
+    const mc = drain(
+      new ManagedChild("go", ["run", "."], {
+        onFinished: () => {
+          throw new Error("Channel has been closed");
+        },
+      }),
+    );
+    await expect(mc.exited).resolves.toMatchObject({ code: 0 });
+  });
+
+  it("says a signal or a missing status where there is no exit code", () => {
+    expect(finishedLine(5, { code: null, signal: "SIGKILL" })).toBe(
+      "finished in 5ms, signal SIGKILL",
+    );
+    expect(finishedLine(5, { code: null, signal: null })).toBe(
+      "finished in 5ms, no exit status",
+    );
   });
 
   it("escalates to SIGKILL when the child ignores SIGTERM", async () => {

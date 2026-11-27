@@ -30,6 +30,19 @@ export interface TestEvent {
   // own level as reported, testing's #NN included; Repeat is that NN;
   // Instance (2 and up) the run of a top-level name the event belongs to.
   Gotest?: { Subtest?: string; Repeat?: number; Instance?: number };
+  // The run's closing event (RunLevel): how the CLI exited.
+  Result?: { ExitCode?: number };
+  // The run's opening event (RunLevel "start"). Changed is how a --changed
+  // run narrowed itself; Packages, the import paths it will run, is absent
+  // from older CLIs.
+  Manifest?: {
+    Changed?: {
+      Ran?: number;
+      Unchanged?: number;
+      NoRecord?: boolean;
+      Packages?: string[];
+    };
+  };
 }
 
 export interface TestMessage {

@@ -57,13 +57,24 @@ vi.mock("vscode", () => ({
   },
 }));
 
+// Every read of a collection, so a test can see how much of the tree a lookup
+// walked.
+const visits = { count: 0 };
+
 function createMockCollection() {
   const map = new Map<string, any>();
   return {
-    get: (id: string) => map.get(id),
+    get: (id: string) => {
+      visits.count++;
+      return map.get(id);
+    },
     add: (item: any) => map.set(item.id, item),
     delete: (id: string) => map.delete(id),
-    forEach: (fn: (item: any) => void) => map.forEach(fn),
+    forEach: (fn: (item: any) => void) =>
+      map.forEach((item) => {
+        visits.count++;
+        fn(item);
+      }),
     get size() {
       return map.size;
     },
@@ -865,5 +876,166 @@ describe("GoTestController.invalidateResults", () => {
   it("does nothing for a package the tree does not hold", () => {
     controller.invalidateResults("example.com/absent");
     expect(mock.invalidateTestResults).not.toHaveBeenCalled();
+  });
+});
+
+describe("GoTestController.findItem", () => {
+  beforeEach(() => {
+    mockWorkspaceFolders.length = 0;
+    mockWorkspaceFolders.push({ name: "ws", uri: { fsPath: "/ws" } });
+    mockGetWorkspaceFolder.mockReset();
+    mockGetWorkspaceFolder.mockReturnValue({
+      name: "ws",
+      uri: { fsPath: "/ws" },
+    });
+  });
+
+  type Pkg = Parameters<typeof createMockCache>[0][number];
+
+  // A cache whose packages a test can swap between rebuilds.
+  function swappableCache(initial: Pkg[]) {
+    let current = createMockCache(initial);
+    const cache = new Proxy({} as DiscoveryCache, {
+      get: (_target, key) => (current as any)[key],
+    });
+    return {
+      cache,
+      set: (pkgs: Pkg[]) => {
+        current = createMockCache(pkgs);
+      },
+    };
+  }
+
+  function packages(n: number): Pkg[] {
+    return Array.from({ length: n }, (_, i) => ({
+      importPath: `example.com/p${i}`,
+      dir: `/ws/p${i}`,
+      wsDir: "/ws",
+      suites: [makeSuite("ASuite"), makeSuite("BSuite")],
+    }));
+  }
+
+  // Every item in the tree, walked through the mock rather than the index.
+  function treeItems(controller: GoTestController): any[] {
+    const out: any[] = [];
+    const walk = (collection: any) =>
+      collection._map.forEach((item: any) => {
+        out.push(item);
+        walk(item.children);
+      });
+    walk(controller.testController.items);
+    return out;
+  }
+
+  function visitsOf(controller: GoTestController, id: string) {
+    visits.count = 0;
+    const found = controller.findItem(id);
+    return { found, visits: visits.count };
+  }
+
+  it("costs the same in a tree ten times larger", () => {
+    const small = createController(createMockCache(packages(4)));
+    small.rebuild();
+    const large = createController(createMockCache(packages(40)));
+    large.rebuild();
+
+    const deep = "example.com/p3/BSuite/TestOne";
+    const s = visitsOf(small, deep);
+    const l = visitsOf(large, deep);
+    expect(s.found?.id).toBe(deep);
+    expect(l.found?.id).toBe(deep);
+    expect(l.visits).toBe(s.visits);
+
+    // A miss is the worst case of a walk: it reads every node.
+    const missSmall = visitsOf(small, "example.com/absent");
+    const missLarge = visitsOf(large, "example.com/absent");
+    expect(missLarge.found).toBeUndefined();
+    expect(missLarge.visits).toBe(missSmall.visits);
+  });
+
+  it("answers with the very item the tree holds, for every item", () => {
+    const controller = createController(createMockCache(packages(3)));
+    controller.rebuild();
+    const items = treeItems(controller);
+    expect(items.length).toBeGreaterThan(10);
+    for (const item of items) {
+      expect(controller.findItem(item.id)).toBe(item);
+    }
+  });
+
+  it("forgets a package, a suite and a method once discovery drops them", () => {
+    const { cache, set } = swappableCache(packages(2));
+    const controller = createController(cache);
+    controller.rebuild();
+    expect(controller.findItem("example.com/p1/ASuite/TestOne")).toBeDefined();
+
+    const [first] = packages(1);
+    first.suites = [{ ...makeSuite("ASuite"), methods: [] }];
+    set([first]);
+    controller.rebuild();
+
+    expect(controller.findItem("example.com/p1")).toBeUndefined();
+    expect(controller.findItem("example.com/p1/ASuite")).toBeUndefined();
+    expect(
+      controller.findItem("example.com/p1/ASuite/TestOne"),
+    ).toBeUndefined();
+    expect(controller.findItem("example.com/p0/BSuite")).toBeUndefined();
+    expect(
+      controller.findItem("example.com/p0/ASuite/TestOne"),
+    ).toBeUndefined();
+    expect(controller.findItem("example.com/p0/ASuite")).toBeDefined();
+  });
+
+  it("answers with the replacement when a rebuild moves a package under a new parent", () => {
+    const { cache, set } = swappableCache([
+      {
+        importPath: "example.com/a",
+        dir: "/ws/a",
+        wsDir: "/ws",
+        suites: [makeSuite("S")],
+      },
+    ]);
+    const controller = createController(cache);
+    controller.rebuild();
+    const before = controller.findItem("example.com/a/S/TestOne");
+
+    set([
+      {
+        importPath: "example.com/a",
+        dir: "/ws/x/a",
+        wsDir: "/ws",
+        suites: [makeSuite("S")],
+      },
+      {
+        importPath: "example.com/b",
+        dir: "/ws/x/b",
+        wsDir: "/ws",
+        suites: [makeSuite("S")],
+      },
+    ]);
+    controller.rebuild();
+
+    const after = controller.findItem("example.com/a/S/TestOne");
+    expect(after).toBeDefined();
+    expect(after).not.toBe(before);
+    const held = treeItems(controller).filter(
+      (i) => i.id === "example.com/a/S/TestOne",
+    );
+    expect(held).toEqual([after]);
+  });
+
+  it("finds a subtest a run created, and forgets it when the run's children are cleared", () => {
+    const controller = createController(createMockCache(packages(1)));
+    controller.rebuild();
+    const method = controller.findItem("example.com/p0/ASuite/TestOne")!;
+    const sub = controller.createDynamicSubtest(method, "case_1", "case 1");
+
+    expect(controller.findItem("example.com/p0/ASuite/TestOne/case_1")).toBe(
+      sub,
+    );
+    controller.clearDynamicChildren(method);
+    expect(
+      controller.findItem("example.com/p0/ASuite/TestOne/case_1"),
+    ).toBeUndefined();
   });
 });

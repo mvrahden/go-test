@@ -1,9 +1,9 @@
 // The full pipeline, end to end.
 //
-// Every other test in this repo feeds the Spec View a stream someone wrote by
+// Every other test in this repo feeds the panel a stream someone wrote by
 // hand. This one runs a corpus of real Go suites — clean and adverse — through
 // the real CLI, captures stdout with the extension's own capture function, and
-// renders it through the real Spec View. Nothing about the stream is assumed;
+// renders it through the real panel. Nothing about the stream is assumed;
 // it is produced.
 //
 // The corpus lives in testdata/fixtures and deliberately contains suites that
@@ -26,7 +26,7 @@ const state = vi.hoisted(() => ({
   workspaceDir: "",
   cliPath: "",
   autoRefresh: true,
-  panels: [] as { webview: { html: string; cspSource: string } }[],
+  panels: [] as import("./vscodeStub.js").StubPanel[],
 }));
 
 vi.mock("vscode", async () => {
@@ -34,7 +34,8 @@ vi.mock("vscode", async () => {
   return buildVscodeStub(state as never);
 });
 
-import { SpecViewPanel } from "../../src/specView.js";
+import { PanelHost } from "../../src/panel/host.js";
+import { shownHtml } from "./shownPanel.js";
 import { spawnTestProcess } from "../../src/runnerUtils.js";
 import { createRecordingChannel } from "./vscodeStub.js";
 
@@ -257,21 +258,19 @@ beforeAll(async () => {
 
   const panelRecorder = createRecordingChannel();
   renderErrors = panelRecorder.errors;
-  const panel = new SpecViewPanel(panelRecorder.channel as never);
+  const panel = new PanelHost(panelRecorder.channel as never);
   await panel.show();
   await panel.refresh({ stream: capturedStdout, folder: repoRoot });
-  html = state.panels[state.panels.length - 1].webview.html;
-
-  spec = JSON.parse(
-    /const SPEC_STATE = (.*);\n/.exec(html)?.[1] ?? "null",
-  ) as typeof spec;
+  html = await shownHtml(state.panels[state.panels.length - 1].webview);
+  // The document the host keeps and serves the webview slices of.
+  spec = (panel as unknown as { lastSpecData: typeof spec }).lastSpecData;
 });
 
 afterAll(() => {
   if (tmp) rmSync(tmp, { recursive: true, force: true });
 });
 
-describe("the corpus reaches the spec view", () => {
+describe("the corpus reaches the panel", () => {
   it("produced a stream and rendered it without reporting a problem", () => {
     expect(capturedStdout.length).toBeGreaterThan(100_000);
     expect(renderErrors).toEqual([]);

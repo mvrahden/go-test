@@ -1,4 +1,6 @@
 import * as vscode from "vscode";
+import { sessions } from "./sessions.js";
+import { liveRuns, type RunProgress } from "./liveProgress.js";
 import * as path from "node:path";
 import type { GoTestController } from "./testController.js";
 import type { DiscoveryCache } from "./discovery.js";
@@ -293,6 +295,15 @@ export class CoverageRunner implements vscode.Disposable {
       packages: items.map((i) => i.id),
     }).id;
     this.activeRecordId = recordId;
+    const target = items.length === 1 ? items[0].id : `${items.length} items`;
+    const progress = liveRuns.start(`coverage: ${target}`);
+    const session = sessions.add({
+      kind: "coverage",
+      folder: this.cache.getWorkspaceDir(items[0].id) ?? "",
+      target,
+      stop: () => cts.cancel(),
+      progress,
+    });
 
     let resolveRun!: () => void;
     this.previousRunPromise = new Promise<void>((r) => {
@@ -400,6 +411,8 @@ export class CoverageRunner implements vscode.Disposable {
               testFlags,
               run,
               effectiveToken,
+              false,
+              progress,
             ),
           );
         }
@@ -414,6 +427,7 @@ export class CoverageRunner implements vscode.Disposable {
               run,
               effectiveToken,
               true,
+              progress,
             ),
           );
         }
@@ -434,6 +448,7 @@ export class CoverageRunner implements vscode.Disposable {
               run,
               effectiveToken,
               coverTestOnly && info.testOnly,
+              progress,
             ),
           );
         }
@@ -451,10 +466,14 @@ export class CoverageRunner implements vscode.Disposable {
       await this.store.flush();
       await this.controller.saveResults();
 
+      // Ended before the panel takes the finished run.
+      progress.end();
       if (pieces.some((p) => p.stream)) {
         this.onJsonOutput(pieces);
       }
     } finally {
+      progress.end();
+      session.dispose();
       const wasCancelled = effectiveToken.isCancellationRequested;
       if (this.activeRecordId === recordId) {
         if (wasCancelled) {
@@ -489,8 +508,10 @@ export class CoverageRunner implements vscode.Disposable {
     run: vscode.TestRun,
     token: vscode.CancellationToken,
     testOnly?: boolean,
+    progress?: RunProgress,
   ): Promise<RunPiece> {
     const result = await executeBatch({
+      progress,
       pkgInfos,
       filter,
       workspaceDir,

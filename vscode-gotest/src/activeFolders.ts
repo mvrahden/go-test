@@ -18,6 +18,11 @@ export class ActiveFolders {
     return this.active.size;
   }
 
+  // list names the folders that use gotest, in the order they activated.
+  list(): string[] {
+    return Array.from(this.active);
+  }
+
   // refresh re-reads the folder's go.work and go.mod files.
   async refresh(
     folder: string,

@@ -38,6 +38,20 @@ export interface ManagedChildOptions {
   // A gotest command that stops on a SIGINT: it is started with --control=stdin
   // and stopped through its stdin, the one graceful stop Windows has.
   control?: boolean;
+  // Told once, when the child has settled, how long it ran and how it ended:
+  // "finished in 120ms, exit 0". For a caller's log line; a throw is dropped.
+  onFinished?: (line: string) => void;
+}
+
+// finishedLine is what onFinished is told.
+export function finishedLine(ms: number, exit: Exit): string {
+  const how =
+    exit.code !== null
+      ? `exit ${exit.code}`
+      : exit.signal !== null
+        ? `signal ${exit.signal}`
+        : "no exit status";
+  return `finished in ${ms}ms, ${how}`;
 }
 
 // Observes every child this extension starts, so something outside can know
@@ -114,6 +128,7 @@ export class ManagedChild {
     if (opts.control) this.child.stdin?.on("error", () => {});
 
     this.registration = observer?.spawned(this.child.pid, opts.kind ?? "child");
+    const startedAt = Date.now();
 
     this.exited = new Promise<Exit>((resolve) => {
       this.settle = (exit: Exit) => {
@@ -122,6 +137,13 @@ export class ManagedChild {
         clearTimeout(this.escalation);
         observer?.exited(this.registration);
         this.registration = undefined;
+        if (opts.onFinished) {
+          try {
+            opts.onFinished(finishedLine(Date.now() - startedAt, exit));
+          } catch {
+            // A log line must not keep the exit from settling.
+          }
+        }
         resolve(exit);
       };
     });

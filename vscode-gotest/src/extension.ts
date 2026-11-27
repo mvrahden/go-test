@@ -1,4 +1,6 @@
 import * as vscode from "vscode";
+import * as path from "node:path";
+import { setEventsDir } from "./eventsFiles.js";
 import {
   DiscoveryCache,
   DiscoveryService,
@@ -27,7 +29,14 @@ import {
   TOGGLE_FOCUS_COMMAND,
 } from "./focusExclude.js";
 import { FocusDiagnostics } from "./diagnostics.js";
-import { SpecViewPanel, nearestItemId } from "./specView.js";
+import { PanelHost } from "./panel/host.js";
+import { nearestItemId } from "./panel/specData.js";
+import { ChangeScope } from "./changeScope.js";
+import { RunsScope } from "./runsScope.js";
+import { registerAuditTool } from "./auditTool.js";
+import { EvidenceSelection } from "./evidence.js";
+import { readFile } from "node:fs/promises";
+import { BASE_SCHEME, parseBaseQuery, showFile } from "./git.js";
 import { WatchManager } from "./watch.js";
 import {
   ScaffoldCodeActionProvider,
@@ -48,10 +57,15 @@ import {
   scopedConfig,
   cliPackagePath,
   clearBinaryCache,
+  hasRuns,
+  offerCliUpgrade,
+  pinnedBelow,
+  RUNS_CLI_VERSION,
 } from "./cli.js";
 import {
   buildRunFilter,
   getPackageDir,
+  getPackageItem,
   restoreStoredResults,
 } from "./runnerUtils.js";
 import { copyCoverageSummary, copyTestResults } from "./reporting.js";
@@ -67,13 +81,14 @@ import {
   moduleFileChanged,
   writeGitSettings,
 } from "./activeFolders.js";
+import { guardedLog } from "./guardedLog.js";
 
 let flushOnDeactivate: (() => Promise<void>) | undefined;
 
 export function activate(context: vscode.ExtensionContext): void {
-  const outputChannel = vscode.window.createOutputChannel("Go - Test Suites", {
-    log: true,
-  });
+  const outputChannel = guardedLog(
+    vscode.window.createOutputChannel("Go - Test Suites", { log: true }),
+  );
   outputChannel.info("[activate] extension activated");
 
   const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -97,6 +112,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const registryDir =
     context.storageUri?.fsPath ?? context.globalStorageUri.fsPath;
   const runRegistry = new RunRegistry(registryDir);
+  setEventsDir(path.join(registryDir, "events"));
   // Installed before anything can spawn, so no child escapes the table that
   // makes it reapable after a crash.
   const processRegistry = new ProcessRegistry(registryDir);
@@ -157,25 +173,108 @@ export function activate(context: vscode.ExtensionContext): void {
   );
   // The panel shows each folder's runs over the specification its source
   // declares, read from the packages the folder's discovery reads.
-  const specView = new SpecViewPanel(
+  const panelHost = new PanelHost(
     outputChannel,
     cache,
     context.storageUri?.fsPath,
     workspacePatterns,
+    () => active.list(),
   );
-  specView.setExtensionUri(context.extensionUri);
+  panelHost.setExtensionUri(context.extensionUri);
+  // The runs taken as the Change tab's evidence, chosen in the Runs tab.
+  const evidence = new EvidenceSelection(context.workspaceState);
+  // The panel's Runs tab lists each folder's records; the newest one that
+  // matches the tree is the Change tab's evidence when none is chosen.
+  let runsScope: RunsScope | undefined;
+  // The panel's Change tab: the audit of each folder against its base.
+  // Its rows run the test the document selects, in its package.
+  const changeScope = new ChangeScope({
+    log: outputChannel,
+    memento: context.workspaceState,
+    folders: () => active.list(),
+    patternsFor: workspacePatterns,
+    hasPackage: (pkg) => !!controller.findItem(pkg),
+    runTest: async (pkg, run) => {
+      const item = controller.findItem(pkg);
+      if (!item) return;
+      const cts = new vscode.CancellationTokenSource();
+      try {
+        await runner.run(new vscode.TestRunRequest([item]), cts.token, {
+          filter: run,
+        });
+      } finally {
+        cts.dispose();
+      }
+    },
+    evidence,
+    defaultEvidence: (folder) =>
+      runsScope?.newestCurrent(folder) ?? Promise.resolve(undefined),
+    changed: () => panelHost.changeChanged(),
+  });
+  panelHost.setChangeScope(changeScope);
+  runsScope = new RunsScope({
+    log: outputChannel,
+    folders: () => active.list(),
+    evidence,
+    openStream: async (id, label, folder, file) => {
+      const stream = await readFile(file, "utf-8");
+      await panelHost.openStream(id, label, { stream, folder }, "now");
+    },
+    runChanged: async (folder) => {
+      await vscode.commands.executeCommand("gotest.runChanged", folder);
+    },
+    changed: () => panelHost.runsChanged(),
+  });
+  panelHost.setRunsScope(runsScope);
+  // gotest_audit: the same audit for an agent in the editor.
+  const auditTool = registerAuditTool({
+    folder: () => {
+      const here = resolveActiveWorkspaceDir();
+      return here && active.has(here) ? here : changeScope.folder;
+    },
+    audit: (folder, input) => changeScope.auditMarkdown(folder, input),
+  });
+  if (auditTool) context.subscriptions.push(auditTool);
+  else
+    outputChannel.info(
+      "[activate] this editor has no language model tools API; gotest_audit is not offered",
+    );
+  // A file as the audit's base commit holds it, for the diff editor.
+  const baseContent = vscode.workspace.registerTextDocumentContentProvider(
+    BASE_SCHEME,
+    {
+      async provideTextDocumentContent(uri: vscode.Uri) {
+        const f = parseBaseQuery(uri.query);
+        if (!f || !f.commit) return "";
+        return (await showFile(f.toplevel, f.commit, f.path)) ?? "";
+      },
+    },
+  );
+  context.subscriptions.push(baseContent);
 
-  const specViewSerializer = vscode.window.registerWebviewPanelSerializer(
-    "gotestSpecView",
+  const panelSerializer = vscode.window.registerWebviewPanelSerializer(
+    "gotestPanel",
     {
       async deserializeWebviewPanel(
         panel: vscode.WebviewPanel,
         state: unknown,
       ) {
-        await specView.restorePanel(panel, state);
+        await panelHost.restorePanel(panel, state);
       },
     },
   );
+  // A panel saved under the type it had before its rename cannot restore
+  // into this one's state: it closes, and the panel opens in its place.
+  const formerPanel = vscode.window.registerWebviewPanelSerializer(
+    "gotestSpecView",
+    {
+      async deserializeWebviewPanel(panel: vscode.WebviewPanel) {
+        panel.dispose();
+        await panelHost.show();
+      },
+    },
+  );
+  context.subscriptions.push(formerPanel);
 
   coverageRunner = new CoverageRunner(
     controller,
@@ -183,7 +282,7 @@ export function activate(context: vscode.ExtensionContext): void {
     coverageStore,
     outputChannel,
     (pieces) => {
-      void specView.refresh(pieces);
+      void panelHost.refresh(pieces);
     },
     runRegistry,
   );
@@ -210,22 +309,20 @@ export function activate(context: vscode.ExtensionContext): void {
   );
   context.subscriptions.push(benchRunner, benchGateDiagnostics);
 
-  // The Spec View's buttons act on Test Explorer items; a node the tree does
+  // The panel's buttons act on Test Explorer items; a node the tree does
   // not hold runs as its nearest ancestor that it does.
   const toItem = (id: string) => {
     const nearest = nearestItemId(
       id,
       (i) => !!controller.findItem(i),
-      specView.ancestorsOf(id),
+      panelHost.ancestorsOf(id),
     );
     if (nearest && nearest !== id) {
-      outputChannel.info(
-        `[specView] ${id} is not in the tree; using ${nearest}`,
-      );
+      outputChannel.info(`[panel] ${id} is not in the tree; using ${nearest}`);
     }
     return nearest ? controller.findItem(nearest) : undefined;
   };
-  specView.setActions({
+  panelHost.setActions({
     run: async (ids) => {
       const items = Array.from(
         new Set(ids.map(toItem).filter((i) => i !== undefined)),
@@ -245,8 +342,58 @@ export function activate(context: vscode.ExtensionContext): void {
     },
   });
 
-  const specViewRefreshDisposable = runner.onDidComplete((pieces) => {
-    void specView.refresh(pieces);
+  // Run changed: --changed in each folder, through the runner. A CLI
+  // without run records cannot narrow a run, and is told so.
+  const runChanged = async (
+    folders: string[],
+    token?: vscode.CancellationToken,
+  ): Promise<void> => {
+    const ok: string[] = [];
+    for (const folder of folders) {
+      if (await hasRuns(folder, outputChannel)) {
+        ok.push(folder);
+        continue;
+      }
+      const upgrade = await pinnedBelow(
+        folder,
+        RUNS_CLI_VERSION,
+        outputChannel,
+      );
+      if (upgrade) offerCliUpgrade(upgrade);
+      else
+        void vscode.window.showInformationMessage(
+          `Run changed needs gotest ${RUNS_CLI_VERSION}, whose run records say what changed since the last run. Run: go get -tool ${cliPackagePath(folder)}@${RUNS_CLI_VERSION}`,
+        );
+    }
+    if (ok.length === 0) return;
+    const cts = new vscode.CancellationTokenSource();
+    const sub = token?.onCancellationRequested(() => cts.cancel());
+    try {
+      await runner.run(new vscode.TestRunRequest(), cts.token, {
+        changed: ok,
+      });
+    } finally {
+      sub?.dispose();
+      cts.dispose();
+    }
+  };
+  const changedProfile = controller.testController.createRunProfile(
+    "Run Changed",
+    vscode.TestRunProfileKind.Run,
+    (request, token) => {
+      const picked = (request.include ?? [])
+        .map((i) => cache.getWorkspaceDir(getPackageItem(i).id))
+        .filter((d): d is string => !!d);
+      const folders =
+        picked.length > 0 ? Array.from(new Set(picked)) : active.list();
+      return runChanged(folders, token);
+    },
+    false,
+  );
+  context.subscriptions.push(changedProfile);
+
+  const panelRefreshDisposable = runner.onDidComplete((pieces) => {
+    void panelHost.refresh(pieces);
   });
 
   const watchManager = new WatchManager(
@@ -254,7 +401,7 @@ export function activate(context: vscode.ExtensionContext): void {
     cache,
     outputChannel,
     (jsonOutput, _scope, cwd) => {
-      void specView.refresh({
+      void panelHost.refresh({
         stream: jsonOutput,
         folder: cwd,
         at: Date.now(),
@@ -290,7 +437,7 @@ export function activate(context: vscode.ExtensionContext): void {
     debugLauncher,
     discoveryService,
     diagnostics,
-    specView,
+    panelHost,
     watchManager,
     coverageStore,
     testResultStore,
@@ -298,6 +445,7 @@ export function activate(context: vscode.ExtensionContext): void {
     outputChannel,
     lint,
     active,
+    runChanged,
   });
   const watcherDisposables = setupFileWatchers(
     cache,
@@ -307,6 +455,7 @@ export function activate(context: vscode.ExtensionContext): void {
     outputChannel,
     active,
     controller,
+    (folder) => panelHost.sourceChanged(folder),
   );
 
   context.subscriptions.push(
@@ -315,6 +464,7 @@ export function activate(context: vscode.ExtensionContext): void {
         // The reaper's escalation timer, and the hook that would otherwise keep
         // recording into a registry nobody is reading any more.
         setChildObserver(undefined);
+        setEventsDir(undefined);
         setStoreErrorLogger(undefined);
         processRegistry.dispose();
       },
@@ -330,9 +480,9 @@ export function activate(context: vscode.ExtensionContext): void {
     coverageRunner,
     coverOnSave,
     coverageStore,
-    specView,
-    specViewSerializer,
-    specViewRefreshDisposable,
+    panelHost,
+    panelSerializer,
+    panelRefreshDisposable,
     watchManager,
     ...commandDisposables,
     ...watcherDisposables,
@@ -345,7 +495,7 @@ export function activate(context: vscode.ExtensionContext): void {
       testResultStore.flush(),
       snapshotStore.flush(),
       processRegistry.flush(),
-      specView.flush(),
+      panelHost.flush(),
     ]);
   };
 
@@ -361,7 +511,7 @@ export function activate(context: vscode.ExtensionContext): void {
     processRegistry,
     context,
     snapshotStore,
-    specView,
+    panelHost,
     active,
   }).catch((err) => {
     outputChannel.error(`[activate] async initialization failed: ${err}`);
@@ -440,7 +590,7 @@ export function registerCommands(deps: {
   debugLauncher: DebugLauncher;
   discoveryService: DiscoveryService;
   diagnostics: FocusDiagnostics;
-  specView: SpecViewPanel;
+  panelHost: PanelHost;
   watchManager: WatchManager;
   coverageStore: CoverageStore;
   testResultStore: TestResultStore;
@@ -448,6 +598,7 @@ export function registerCommands(deps: {
   outputChannel: vscode.LogOutputChannel;
   lint: LintService;
   active: ActiveFolders;
+  runChanged: (folders: string[]) => Promise<void>;
 }): vscode.Disposable[] {
   const {
     controller,
@@ -456,7 +607,7 @@ export function registerCommands(deps: {
     debugLauncher,
     discoveryService,
     diagnostics,
-    specView,
+    panelHost,
     watchManager,
     coverageStore,
     testResultStore,
@@ -464,6 +615,7 @@ export function registerCommands(deps: {
     outputChannel,
     lint,
     active,
+    runChanged,
   } = deps;
 
   // Promote edits user source (typed f.Add seeds), so the fuzz surfaces
@@ -706,13 +858,43 @@ export function registerCommands(deps: {
     }),
 
     vscode.commands.registerCommand("gotest.showSpecView", async () => {
-      await specView.show();
+      await panelHost.show();
     }),
+
+    vscode.commands.registerCommand("gotest.showChangeView", async () => {
+      await panelHost.showChange();
+    }),
+
+    vscode.commands.registerCommand("gotest.showRunsView", async () => {
+      await panelHost.showRuns();
+    }),
+
+    // A Test Explorer item's row, revealed in the Now tab.
+    vscode.commands.registerCommand(
+      "gotest.showInPanel",
+      async (item?: vscode.TestItem) => {
+        if (item?.id) await panelHost.reveal(item.id);
+      },
+    ),
+
+    vscode.commands.registerCommand(
+      "gotest.runChanged",
+      // The folder named, else the active editor's, else every one.
+      (folder?: string) => {
+        const here = resolveActiveWorkspaceDir();
+        const all = active.list();
+        if (typeof folder === "string") return runChanged([folder]);
+        return runChanged(here && all.includes(here) ? [here] : all);
+      },
+    ),
 
     vscode.commands.registerCommand(
       "gotest.openEventsFile",
       (target?: string | vscode.Uri) =>
-        openEventsFile({ controller, cache, specView, outputChannel }, target),
+        openEventsFile(
+          { controller, cache, panel: panelHost, outputChannel },
+          target,
+        ),
     ),
 
     vscode.commands.registerCommand("gotest.startWatch", async () => {
@@ -826,10 +1008,10 @@ export function registerCommands(deps: {
     // (tests.onDidChangeTestResults is still proposed). Everything this
     // extension persists would therefore come back on the next window reload.
     // This command clears the persisted state as well, so a clear survives a
-    // reload — results, coverage, and the spec view together.
+    // reload — results, coverage, and the panel together.
     vscode.commands.registerCommand("gotest.clearResults", async () => {
       testResultStore.clear();
-      specView.clear();
+      panelHost.clear();
       controller.testController.items.forEach((item) =>
         controller.clearResults(item),
       );
@@ -839,7 +1021,7 @@ export function registerCommands(deps: {
         outputChannel.error(`[coverage] clear failed: ${err}`);
       }
       await testResultStore.flush();
-      outputChannel.info("[results] cleared results, coverage and spec view");
+      outputChannel.info("[results] cleared results, coverage and the panel");
     }),
 
     vscode.commands.registerCommand(
@@ -914,7 +1096,13 @@ export function setupFileWatchers(
   outputChannel: vscode.LogOutputChannel,
   active: ActiveFolders,
   controller: GoTestController,
+  // A file a package's input hash covers changed in the folder.
+  inputsChanged?: (folder: string) => void,
 ): vscode.Disposable[] {
+  const noteInputs = (uri: vscode.Uri) => {
+    const folder = vscode.workspace.getWorkspaceFolder(uri);
+    if (folder) inputsChanged?.(folder.uri.fsPath);
+  };
   const coverOnSaveTimers = new Map<string, ReturnType<typeof setTimeout>>();
   const triggerCoverOnSave = (importPath: string, uri: vscode.Uri) => {
     const folder = vscode.workspace.getWorkspaceFolder(uri);
@@ -936,6 +1124,7 @@ export function setupFileWatchers(
   const testWatcher = vscode.workspace.createFileSystemWatcher("**/*_test.go");
   const onFileChange = (uri: vscode.Uri) => {
     staleOnChange(uri.fsPath, cache, controller);
+    noteInputs(uri);
     const folder = vscode.workspace.getWorkspaceFolder(uri);
     if (!folder) return;
     const wsDir = folder.uri.fsPath;
@@ -957,6 +1146,7 @@ export function setupFileWatchers(
   };
   const onFileDelete = (uri: vscode.Uri) => {
     staleOnChange(uri.fsPath, cache, controller);
+    noteInputs(uri);
     const discoverOnSave =
       vscode.workspace
         .getConfiguration("gotest")
@@ -974,6 +1164,7 @@ export function setupFileWatchers(
   const onSourceChange = (uri: vscode.Uri) => {
     if (uri.fsPath.endsWith("_test.go")) return;
     staleOnChange(uri.fsPath, cache, controller);
+    noteInputs(uri);
     const importPath = cache.resolveFileToPackage(uri.fsPath);
     if (!importPath) return;
 
@@ -992,6 +1183,7 @@ export function setupFileWatchers(
     "**/{go.mod,go.work}",
   );
   const onModuleFile = (uri: vscode.Uri) => {
+    noteInputs(uri);
     const folder = vscode.workspace.getWorkspaceFolder(uri);
     if (!folder) return;
     const dir = folder.uri.fsPath;
@@ -1019,7 +1211,15 @@ export function setupFileWatchers(
     );
   };
 
+  // Testdata is hashed too; it only asks the panel again.
+  const testdataWatcher =
+    vscode.workspace.createFileSystemWatcher("**/testdata/**");
+
   return [
+    testdataWatcher,
+    testdataWatcher.onDidChange(noteInputs),
+    testdataWatcher.onDidCreate(noteInputs),
+    testdataWatcher.onDidDelete(noteInputs),
     moduleWatcher,
     moduleWatcher.onDidChange(onModuleFile),
     moduleWatcher.onDidCreate(onModuleFile),
@@ -1053,7 +1253,7 @@ export async function initializeAsync(deps: {
   processRegistry: ProcessRegistry;
   context: vscode.ExtensionContext;
   snapshotStore: DiscoverySnapshotStore;
-  specView: SpecViewPanel;
+  panelHost: PanelHost;
   active: ActiveFolders;
 }): Promise<void> {
   const {
@@ -1068,7 +1268,7 @@ export async function initializeAsync(deps: {
     processRegistry,
     context,
     snapshotStore,
-    specView,
+    panelHost,
     active,
   } = deps;
 
@@ -1085,7 +1285,7 @@ export async function initializeAsync(deps: {
   }
 
   // Only a folder whose go.mod uses gotest gets the git settings and the
-  // Spec View button; the rest of the workspace is left alone.
+  // panel button; the rest of the workspace is left alone.
   for (const folder of workspaceFolders) {
     if ((await active.refresh(folder.uri.fsPath)) === "activated") {
       writeGitSettings(folder.uri.fsPath, outputChannel);
@@ -1168,7 +1368,7 @@ export async function initializeAsync(deps: {
   // restored tree exists precisely so runs can start during discovery.
   await coverageStore.load();
   await testResultStore.load();
-  await specView.load();
+  await panelHost.load();
 
   const restoreStored = async () => {
     await restoreCoverage();

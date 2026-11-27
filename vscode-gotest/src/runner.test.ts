@@ -71,6 +71,7 @@ vi.mock("./runnerUtils.js", async (importOriginal) => ({
   startAncestors: vi.fn(),
   skipUnresolved: vi.fn(),
   resolveAncestorItems: vi.fn(),
+  getPackageItem: (i: any) => ({ id: i.pkg }),
 }));
 
 vi.mock("./batchRunner.js", () => ({
@@ -80,11 +81,13 @@ vi.mock("./batchRunner.js", () => ({
 import * as vscode from "vscode";
 import { TestRunner } from "./runner.js";
 import { executeBatch } from "./batchRunner.js";
+import { enqueueDescendants, skipUnresolved } from "./runnerUtils.js";
 import type { RunPiece } from "./specStore.js";
+import { sessions } from "./sessions.js";
 
 const batch = vi.mocked(executeBatch);
 
-// result is a batch's outcome: its stdout and the piece the Spec View keeps.
+// result is a batch's outcome: its stdout and the piece the panel keeps.
 function result(stdout: string, folder = "/ws") {
   return { stdout, piece: { stream: stdout, folder } };
 }
@@ -182,6 +185,45 @@ describe("TestRunner", () => {
     );
   });
 
+  it("runs a folder's packages with --changed, clearing, starting and skipping none", async () => {
+    const { runner, runs, controller } = setup([A, B, C]);
+    await runner.run(
+      {
+        include: [item("m/a", "m/a"), item("m/b", "m/b"), item("m/c", "m/c")],
+      } as any,
+      token().token,
+      { changed: ["/ws"] },
+    );
+    expect(controller.createTestRun).toHaveBeenCalledWith(
+      expect.anything(),
+      "Go Test Run (changed packages only)",
+    );
+    expect(batch).toHaveBeenCalledTimes(1);
+    const cfg = batch.mock.calls[0][0];
+    expect(cfg.changed).toBe(true);
+    expect(cfg.filter).toBeUndefined();
+    expect(cfg.workspaceDir).toBe("/ws");
+    expect(cfg.pkgInfos.map((p) => p.importPath)).toEqual(["m/a", "m/b"]);
+    expect(controller.clearResults).not.toHaveBeenCalled();
+    expect(runs[0].started).not.toHaveBeenCalled();
+    expect(skipUnresolved).not.toHaveBeenCalled();
+  });
+
+  it("lists the run as a session while it runs; its stop cancels the run", async () => {
+    const { runner } = setup([A]);
+    let seen: string[] = [];
+    batch.mockImplementationOnce(async (cfg: any) => {
+      const mine = sessions.list().at(-1)!;
+      seen = [mine.kind, mine.target, mine.folder];
+      sessions.stop(mine.id);
+      expect(cfg.token.isCancellationRequested).toBe(true);
+      return result("");
+    });
+    await runner.run({ include: [item("m/a", "m/a")] } as any, token().token);
+    expect(seen).toEqual(["run", "m/a", "/ws"]);
+    expect(sessions.list()).toEqual([]);
+  });
+
   it("says nothing for a request with no items", async () => {
     const { runner } = setup([A]);
     await runner.run({ include: [] } as any, token().token);
@@ -263,6 +305,21 @@ describe("TestRunner", () => {
         env: undefined,
       },
     ]);
+  });
+
+  it("runs a given -run pattern in the item's package, clearing and skipping nothing", async () => {
+    const { runner, controller, runs } = setup([A]);
+    const pkg = item("m/a", "m/a", { filter: "^TestOther$" });
+    await runner.run({ include: [pkg] } as any, token().token, {
+      filter: "^TestCartTestSuite$/^TestRounds$",
+    });
+    expect(batch.mock.calls.map(([cfg]) => cfg.filter)).toEqual([
+      "^TestCartTestSuite$/^TestRounds$",
+    ]);
+    expect(runs[0].started).toHaveBeenCalledWith(pkg);
+    expect(controller.clearResults).not.toHaveBeenCalled();
+    expect(enqueueDescendants).not.toHaveBeenCalled();
+    expect(skipUnresolved).not.toHaveBeenCalled();
   });
 
   it("sets GOTEST_UPDATE_SNAPSHOTS when asked to update snapshots", async () => {

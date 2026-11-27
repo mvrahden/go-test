@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { sessions } from "./sessions.js";
 import type { ChildProcess } from "node:child_process";
 import type { GoTestController } from "./testController.js";
 import type { DiscoveryCache } from "./discovery.js";
@@ -323,6 +324,8 @@ export class WatchManager implements vscode.Disposable {
   private watchers = new Map<string, WatchProcess>();
   private activeCycles = new Map<string, WatchCycle>();
   private watchRecordIds = new Map<string, string>();
+  // Each watcher's row in the Sessions view.
+  private watchSessions = new Map<string, vscode.Disposable>();
   private readonly statusBar: vscode.StatusBarItem;
 
   constructor(
@@ -421,6 +424,7 @@ export class WatchManager implements vscode.Disposable {
 
         // Remove from map
         this.watchers.delete(pkgScope);
+        this.endSession(pkgScope);
         this.updateStatusBar();
       },
     );
@@ -431,7 +435,22 @@ export class WatchManager implements vscode.Disposable {
       packages: [pkgScope],
     }).id;
     this.watchRecordIds.set(pkgScope, recordId);
+    this.endSession(pkgScope);
+    this.watchSessions.set(
+      pkgScope,
+      sessions.add({
+        kind: "watch",
+        folder: cwd,
+        target: pkgScope,
+        stop: () => this.stop(pkgScope),
+      }),
+    );
     this.updateStatusBar();
+  }
+
+  private endSession(pkgScope: string): void {
+    this.watchSessions.get(pkgScope)?.dispose();
+    this.watchSessions.delete(pkgScope);
   }
 
   stop(pkgScope: string): void {
@@ -446,6 +465,7 @@ export class WatchManager implements vscode.Disposable {
       watcher.dispose();
       this.watchers.delete(pkgScope);
     }
+    this.endSession(pkgScope);
 
     const cycle = this.activeCycles.get(pkgScope);
     if (cycle) {
@@ -469,6 +489,8 @@ export class WatchManager implements vscode.Disposable {
       this.activeCycles.get(scope)?.run.end();
     }
     this.watchRecordIds.clear();
+    for (const s of this.watchSessions.values()) s.dispose();
+    this.watchSessions.clear();
     this.watchers.clear();
     this.activeCycles.clear();
     this.updateStatusBar();

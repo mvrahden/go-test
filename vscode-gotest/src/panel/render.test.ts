@@ -1,8 +1,8 @@
 // The spec render used to have no budget, no kill path and no cancellation: a
-// wedged CLI left the Spec View waiting forever with nothing able to end it.
+// wedged CLI left the panel waiting forever with nothing able to end it.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { SpawnScript } from "./scriptedSpawn.test-support.js";
+import type { SpawnScript } from "../scriptedSpawn.test-support.js";
 
 const { script, mockKill, buildCli } = vi.hoisted(() => ({
   script: { once: [], always: undefined, calls: [] } as SpawnScript,
@@ -46,24 +46,24 @@ vi.mock("vscode", () => ({
   },
 }));
 
-vi.mock("./cli.js", () => ({
+vi.mock("../cli.js", () => ({
   buildCliCommand: buildCli,
   offerCliUpgrade: () => false,
   stripGoRunExitEcho: (s: string) => s,
 }));
 
-vi.mock("./gomod.js", () => ({ readModulePath: async () => undefined }));
+vi.mock("../gomod.js", () => ({ readModulePath: async () => undefined }));
 
 vi.mock("node:child_process", async () => {
   const { createScriptedSpawn } =
-    await import("./scriptedSpawn.test-support.js");
+    await import("../scriptedSpawn.test-support.js");
   return { spawn: createScriptedSpawn(script, mockKill) };
 });
 
-import { SpecViewPanel } from "./specView.js";
+import { PanelHost } from "./host.js";
 
 // runSpec is private; the behaviour under test is its process handling.
-function render(panel: SpecViewPanel, input: string): Promise<string> {
+function render(panel: PanelHost, input: string): Promise<string> {
   return (
     panel as unknown as {
       runSpec(s: string, folder: undefined, format: string): Promise<string>;
@@ -91,7 +91,7 @@ describe("spec render process handling", () => {
 
   it("gives up on a CLI that never answers, and ends it", async () => {
     script.always = { neverExits: true };
-    const panel = new SpecViewPanel(channel, undefined as never);
+    const panel = new PanelHost(channel, undefined as never);
 
     const p = render(panel, "{}");
     const settled = expect(p).rejects.toThrow("spec render timed out");
@@ -102,7 +102,7 @@ describe("spec render process handling", () => {
 
   it("escalates to SIGKILL when the CLI ignores SIGTERM", async () => {
     script.always = { neverExits: true, ignoresSigterm: true };
-    const panel = new SpecViewPanel(channel, undefined as never);
+    const panel = new PanelHost(channel, undefined as never);
 
     const p = render(panel, "{}");
     const settled = expect(p).rejects.toThrow("spec render timed out");
@@ -114,7 +114,7 @@ describe("spec render process handling", () => {
 
   it("does not signal a render that answered in time", async () => {
     script.always = { stdout: ['{"tree":[]}'], code: 0 };
-    const panel = new SpecViewPanel(channel, undefined as never);
+    const panel = new PanelHost(channel, undefined as never);
 
     await expect(render(panel, "{}")).resolves.toContain("tree");
     await vi.advanceTimersByTimeAsync(200_000);
@@ -158,7 +158,7 @@ describe("which CLI renders a package", () => {
       { stdout: [doc("example.com/a", 2, 0)], code: 0 },
       { stdout: [doc("example.com/b", 1, 1)], code: 0 },
     ];
-    const panel = new SpecViewPanel(channel, undefined as never);
+    const panel = new PanelHost(channel, undefined as never);
     const internals = panel as unknown as {
       runs: { merge(p: { stream: string; folder: string }): void };
       renderRuns(): Promise<{
@@ -182,7 +182,7 @@ describe("which CLI renders a package", () => {
 });
 
 describe("the runs the panel keeps across a reload", () => {
-  const runs = (panel: SpecViewPanel) =>
+  const runs = (panel: PanelHost) =>
     (panel as unknown as { runs: { packages: string[] } }).runs.packages;
 
   it("come back from storage, and never over a run merged first", async () => {
@@ -192,15 +192,15 @@ describe("the runs the panel keeps across a reload", () => {
     const path = await import("node:path");
     const dir = mkdtempSync(path.join(tmpdir(), "gotest-specruns-"));
     try {
-      const before = new SpecViewPanel(channel, undefined as never, dir);
+      const before = new PanelHost(channel, undefined as never, dir);
       await before.refresh({ stream: runOf("example.com/a"), folder: "/ws" });
       await before.flush();
 
-      const after = new SpecViewPanel(channel, undefined as never, dir);
+      const after = new PanelHost(channel, undefined as never, dir);
       await after.load();
       expect(runs(after)).toEqual(["example.com/a"]);
 
-      const raced = new SpecViewPanel(channel, undefined as never, dir);
+      const raced = new PanelHost(channel, undefined as never, dir);
       await raced.refresh({ stream: runOf("example.com/b"), folder: "/ws" });
       await raced.load();
       expect(runs(raced)).toEqual(["example.com/b"]);
@@ -245,7 +245,7 @@ describe("a kept-runs file of the wrong shape", () => {
           path.join(dir, "specRuns.json"),
           JSON.stringify({ version: 1, data }),
         );
-        const panel = new SpecViewPanel(channel, undefined as never, dir);
+        const panel = new PanelHost(channel, undefined as never, dir);
         await expect(panel.load()).resolves.toBeUndefined();
         const runs = (panel as unknown as { runs: { packages: string[] } })
           .runs;
@@ -276,18 +276,33 @@ describe("what the panel asks the CLI for", () => {
     renderRuns(): Promise<unknown>;
     copy(): Promise<void>;
   };
-  // copies runs the panel's copy as the webview's message asks for it.
-  const copies = async (panel: SpecViewPanel, msg: unknown) => {
-    internalsOf(panel).handleMessage(msg);
-    await vi.waitFor(() => expect(notes.info.length).toBeGreaterThan(0));
+  // toasts are the lines the panel showed; copies runs a copy as the
+  // webview's message asks for it, until the panel says what it did.
+  const toasts: string[] = [];
+  const shown = (panel: PanelHost) => {
+    (panel as unknown as { panel: unknown }).panel = {
+      visible: true,
+      webview: {
+        postMessage: async (m: { type: string; text: string }) => {
+          if (m.type === "toast") toasts.push(m.text);
+          return true;
+        },
+      },
+    };
+    return panel;
   };
-  const internalsOf = (panel: SpecViewPanel) => panel as unknown as Internals;
+  const copies = async (panel: PanelHost, msg: unknown) => {
+    toasts.length = 0;
+    internalsOf(panel).handleMessage(msg);
+    await vi.waitFor(() => expect(toasts.length).toBeGreaterThan(0));
+  };
+  const internalsOf = (panel: PanelHost) => panel as unknown as Internals;
   const argsOfCall = (i: number) => buildCli.mock.calls[i][0];
 
-  it("lays the workspace's runs over what the folder's source declares, hiding what the toolbar hides", async () => {
+  it("lays the workspace's runs over what the folder's source declares, every status rendered whatever the chips", async () => {
     script.always = { stdout: [doc("example.com/a", 1, 0)], code: 0 };
     const patternsFor = vi.fn(async () => ["./...", "./examples/..."]);
-    const panel = new SpecViewPanel(
+    const panel = new PanelHost(
       channel,
       undefined as never,
       undefined,
@@ -295,10 +310,7 @@ describe("what the panel asks the CLI for", () => {
     );
     const internals = internalsOf(panel);
     internals.runs.merge({ stream: runOf("example.com/a"), folder: "/ws/a" });
-    internals.handleMessage({ type: "toggleHide", status: "pass" });
-    internals.handleMessage({ type: "toggleHide", status: "none" });
-    internals.handleMessage({ type: "toggleHide", status: "pass" });
-    internals.handleMessage({ type: "toggleHide", status: "skip" });
+    internals.handleMessage({ type: "filters", filters: ["fail"] });
 
     await internals.renderRuns();
 
@@ -308,7 +320,7 @@ describe("what the panel asks the CLI for", () => {
       "--input=-",
       "--format=json",
       "--render-only",
-      "--hide=none,skip",
+      "--hide=",
       "--declared",
       "./...",
       "./examples/...",
@@ -317,14 +329,14 @@ describe("what the panel asks the CLI for", () => {
 
   it("renders an imported stream as it is, without the source under it", async () => {
     script.always = { stdout: [doc("example.com/a", 1, 0)], code: 0 };
-    const panel = new SpecViewPanel(
+    const panel = new PanelHost(
       channel,
       undefined as never,
       undefined,
       async () => ["./..."],
     );
     const internals = internalsOf(panel);
-    const imported = new (await import("./specStore.js")).SpecStore();
+    const imported = new (await import("../specStore.js")).SpecStore();
     imported.merge({ stream: runOf("example.com/a"), folder: "/ws" });
     internals.imports.set("ci", { label: "ci.json", runs: imported });
     internals.selected = "ci";
@@ -340,9 +352,9 @@ describe("what the panel asks the CLI for", () => {
     ]);
   });
 
-  it("copies what it shows as the CLI's Markdown, with the same flags", async () => {
+  it("copies what it shows as the CLI's Markdown, hiding the statuses the chips leave out", async () => {
     script.always = { stdout: ["# Behavior Specification\n"], code: 0 };
-    const panel = new SpecViewPanel(
+    const panel = new PanelHost(
       channel,
       undefined as never,
       undefined,
@@ -350,9 +362,10 @@ describe("what the panel asks the CLI for", () => {
     );
     const internals = internalsOf(panel);
     internals.runs.merge({ stream: runOf("example.com/a"), folder: "/ws/a" });
-    internals.handleMessage({ type: "toggleHide", status: "pass" });
-    await vi.waitFor(() => expect(buildCli).toHaveBeenCalled());
-    buildCli.mockClear();
+    internals.handleMessage({
+      type: "filters",
+      filters: ["fail", "none", "skip", "vacuous"],
+    });
 
     await internals.copy();
 
@@ -368,11 +381,46 @@ describe("what the panel asks the CLI for", () => {
     expect(clipboard.text).toBe("# Behavior Specification\n");
   });
 
-  async function loaded(md: string): Promise<SpecViewPanel> {
-    notes.info = [];
-    notes.warn = [];
+  // A package's rows as the CLI writes them: two suites, the second with
+  // a method of two behaviors.
+  const node = (name: string, status: string, children: unknown[] = []) => ({
+    name,
+    display: name,
+    kind: "block",
+    status,
+    duration: 0,
+    focused: false,
+    excluded: false,
+    external: false,
+    output: [],
+    children,
+  });
+  const specOf = (pkg: string, nodes: unknown[]) =>
+    JSON.stringify({
+      packages: [{ path: pkg, status: "pass", duration: 0, nodes }],
+      stats: {
+        suites: 0,
+        behaviors: 0,
+        tests: 0,
+        passed: 0,
+        failed: 0,
+        skipped: 0,
+      },
+    });
+  const FULL = [
+    node("TestAATestSuite", "pass", [node("x", "pass")]),
+    node("TestBBTestSuite", "fail", [
+      node("TestM", "fail", [node("ok", "pass"), node("bad", "fail")]),
+    ]),
+  ];
+
+  async function loaded(md: string): Promise<PanelHost> {
     script.always = { stdout: [md], code: 0 };
-    const panel = new SpecViewPanel(channel, undefined as never);
+    const panel = shown(
+      new PanelHost(channel, undefined as never, undefined, async () => [
+        "./...",
+      ]),
+    );
     internalsOf(panel).runs.merge({
       stream: runOf("example.com/pkg"),
       folder: "/ws/a",
@@ -381,13 +429,17 @@ describe("what the panel asks the CLI for", () => {
       stream: runOf("example.com/other"),
       folder: "/ws/b",
     });
+    (panel as unknown as { lastSpecData: unknown }).lastSpecData = JSON.parse(
+      specOf("example.com/pkg", FULL),
+    );
     buildCli.mockClear();
     return panel;
   }
 
   it("copies what the search leaves, as the CLI's match", async () => {
     const panel = await loaded("# spec\n");
-    await copies(panel, { type: "copySpec", search: "  email " });
+    internalsOf(panel).handleMessage({ type: "search", text: "  email " });
+    await copies(panel, { type: "copySpec" });
     expect(buildCli.mock.calls.map((c) => c[0])).toEqual([
       expect.arrayContaining(["--format=md", "--match=email"]),
       expect.arrayContaining(["--format=md", "--match=email"]),
@@ -396,49 +448,171 @@ describe("what the panel asks the CLI for", () => {
 
   it("asks for no match when the search is empty", async () => {
     const panel = await loaded("# spec\n");
-    await copies(panel, { type: "copySpec", search: "" });
+    await copies(panel, { type: "copySpec" });
     expect(argsOfCall(0).some((a) => a.startsWith("--match"))).toBe(false);
   });
 
-  it("copies one node from the folder of the row's package", async () => {
-    const panel = await loaded("## node\n");
+  it("copies a directory's packages only: their stream, their source, each folder its own CLI", async () => {
+    const panel = await loaded("## pkgs\n");
+    script.once = [
+      { stdout: [specOf("example.com/pkg", FULL)], code: 0 },
+      { stdout: ["## pkg\n"], code: 0 },
+      {
+        stdout: [
+          specOf("example.com/other", [
+            node("TestCTestSuite", "pass", [node("y", "pass")]),
+          ]),
+        ],
+        code: 0,
+      },
+      { stdout: ["## other\n"], code: 0 },
+    ];
     await copies(panel, {
-      type: "copyNode",
+      type: "copy",
+      label: "a/",
+      pkgs: ["example.com/pkg", "example.com/other"],
+    });
+    expect(buildCli.mock.calls.map((c) => [c[0], c[1]])).toEqual([
+      [
+        [
+          "spec",
+          "--input=-",
+          "--format=json",
+          "--render-only",
+          "--hide=",
+          "--declared",
+          "example.com/pkg",
+        ],
+        "/ws/a",
+      ],
+      [
+        [
+          "spec",
+          "--input=-",
+          "--format=md",
+          "--render-only",
+          "--hide=",
+          "--declared",
+          "example.com/pkg",
+        ],
+        "/ws/a",
+      ],
+      [
+        [
+          "spec",
+          "--input=-",
+          "--format=json",
+          "--render-only",
+          "--hide=",
+          "--declared",
+          "example.com/other",
+        ],
+        "/ws/b",
+      ],
+      [
+        [
+          "spec",
+          "--input=-",
+          "--format=md",
+          "--render-only",
+          "--hide=",
+          "--declared",
+          "example.com/other",
+        ],
+        "/ws/b",
+      ],
+    ]);
+    // Each folder's stream holds the packages copied, nothing else of it.
+    expect(script.calls![0].args).toBeDefined();
+    expect(clipboard.text).toBe("## pkg\n\n## other\n");
+    expect(toasts).toEqual(["Copied a/ as Markdown: 4 behaviors."]);
+  });
+
+  it("copies one row from its package's folder, by its place there", async () => {
+    const panel = await loaded("## node\n");
+    script.once = [{ stdout: [specOf("example.com/pkg", FULL)], code: 0 }];
+    await copies(panel, {
+      type: "copy",
+      label: "M",
       pkg: "example.com/pkg",
-      position: [0, 1],
+      pos: "1.0",
+    });
+    expect(argsOfCall(1)).toEqual([
+      "spec",
+      "--input=-",
+      "--format=md",
+      "--render-only",
+      "--hide=",
+      "--only=example.com/pkg:1.0",
+      "--declared",
+      "example.com/pkg",
+    ]);
+    expect(buildCli.mock.calls[1][1]).toBe("/ws/a");
+    expect(clipboard.text).toBe("## node\n");
+    expect(toasts).toEqual(["Copied M as Markdown: 2 behaviors."]);
+  });
+
+  it("finds the row again under the chips and the search, whose rows the CLI counts in --only", async () => {
+    const panel = await loaded("## failed\n");
+    internalsOf(panel).handleMessage({ type: "filters", filters: ["fail"] });
+    internalsOf(panel).handleMessage({ type: "search", text: "bad" });
+    // With the passing first suite left out, the second is the first shown.
+    const narrowed = [
+      node("TestBBTestSuite", "fail", [
+        node("TestM", "fail", [node("bad", "fail")]),
+      ]),
+    ];
+    script.once = [{ stdout: [specOf("example.com/pkg", narrowed)], code: 0 }];
+    await copies(panel, {
+      type: "copy",
+      label: "M",
+      pkg: "example.com/pkg",
+      pos: "1.0",
+    });
+    expect(argsOfCall(0)).toEqual([
+      "spec",
+      "--input=-",
+      "--format=json",
+      "--render-only",
+      "--hide=none,pass,skip",
+      "--match=bad",
+      "--declared",
+      "example.com/pkg",
+    ]);
+    expect(argsOfCall(1)).toContain("--only=example.com/pkg:0.0");
+    expect(toasts).toEqual([
+      "Copied M as Markdown: 1 behavior. Filters apply.",
+    ]);
+  });
+
+  it("says there is nothing to copy when the filters leave none of the row", async () => {
+    const panel = await loaded("## none\n");
+    internalsOf(panel).handleMessage({ type: "search", text: "zzz" });
+    script.once = [{ stdout: [specOf("example.com/pkg", [])], code: 0 }];
+    clipboard.text = "before";
+    await copies(panel, {
+      type: "copy",
+      label: "M",
+      pkg: "example.com/pkg",
+      pos: "1.0",
     });
     expect(buildCli.mock.calls).toHaveLength(1);
-    expect(argsOfCall(0)).toEqual(
-      expect.arrayContaining(["--format=md", "--only=example.com/pkg:0.1"]),
-    );
-    expect(buildCli.mock.calls[0][1]).toBe("/ws/a");
-    expect(clipboard.text).toBe("## node\n");
+    expect(clipboard.text).toBe("before");
+    expect(toasts).toEqual([
+      "Nothing of M to copy: the filters leave none of it.",
+    ]);
   });
 
-  it("copies a whole package for an empty position", async () => {
-    const panel = await loaded("## pkg\n");
-    await copies(panel, {
-      type: "copyNode",
-      pkg: "example.com/other",
-      position: [],
-    });
-    expect(argsOfCall(0)).toContain("--only=example.com/other");
-    expect(buildCli.mock.calls[0][1]).toBe("/ws/b");
-  });
-
-  it("says how big the copy is", async () => {
-    const panel = await loaded("x".repeat(400));
-    await copies(panel, { type: "copySpec", search: "" });
-    expect(notes.info).toEqual(["Copied 801 characters (about 200 tokens)."]);
-    expect(notes.warn).toEqual([]);
-  });
-
-  it("warns when the copy is above GitHub's comment limit", async () => {
-    const panel = await loaded("x".repeat(35_000));
-    await copies(panel, { type: "copySpec", search: "" });
-    await vi.waitFor(() => expect(notes.warn).toHaveLength(1));
-    expect(notes.warn[0]).toContain(
-      "above GitHub's 65,536-character comment limit.",
+  it("says how big the whole list's copy is, and when it is above GitHub's comment limit", async () => {
+    let panel = await loaded("x".repeat(400));
+    await copies(panel, { type: "copySpec" });
+    expect(toasts).toEqual([
+      "Copied the whole list as Markdown: 801 characters (about 200 tokens).",
+    ]);
+    panel = await loaded("x".repeat(35_000));
+    await copies(panel, { type: "copySpec" });
+    expect(toasts[0]).toContain(
+      "It is above GitHub's 65,536-character comment limit.",
     );
   });
 });

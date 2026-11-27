@@ -11,14 +11,24 @@ import {
   buildRunFilter,
   resolveAncestorItems,
   erroredItem,
+  getPackageItem,
 } from "./runnerUtils.js";
 import type { CoverageStore } from "./coverageStore.js";
 import { executeBatch } from "./batchRunner.js";
 import type { RunRegistry } from "./runRegistry.js";
 import type { RunPiece } from "./specStore.js";
+import { sessions } from "./sessions.js";
+import { liveRuns, type RunProgress } from "./liveProgress.js";
 
 export interface RunOptions {
   updateSnapshots?: boolean;
+  // A -run pattern that decides what runs instead of the items: the items
+  // only start, and nothing they hold is cleared or skipped.
+  filter?: string;
+  // Run with --changed in these folders: only the packages whose inputs
+  // changed since the last record, and those that failed or never ran. The
+  // rest keep the verdicts they have.
+  changed?: string[];
 }
 
 export class TestRunner {
@@ -67,7 +77,11 @@ export class TestRunner {
     const effectiveToken = cts.token;
 
     this.outputChannel.info("[runner] run started");
-    const run = this.controller.createTestRun(request, "Go Test Run");
+    const narrow = options?.changed;
+    const run = this.controller.createTestRun(
+      request,
+      narrow ? "Go Test Run (changed packages only)" : "Go Test Run",
+    );
     this._lastJsonOutput = "";
     this._lastPieces = [];
     let anyCoverOnRun = false;
@@ -78,6 +92,8 @@ export class TestRunner {
     });
 
     let recordId: string | undefined;
+    let session: vscode.Disposable | undefined;
+    let progress: RunProgress | undefined;
 
     try {
       // Benchmarks never run as part of a normal test run: they answer with
@@ -85,7 +101,12 @@ export class TestRunner {
       // at the same time. The Bench profile (tag-scoped) is their only door.
       const collected = collectItems(this.controller, request);
       const items = collected.filter(
-        (i) => !i.tags.some((t) => t.id === "benchmark"),
+        (i) =>
+          !i.tags.some((t) => t.id === "benchmark") &&
+          (!narrow ||
+            narrow.includes(
+              this.cache.getWorkspaceDir(getPackageItem(i).id) ?? "",
+            )),
       );
       if (items.length === 0) {
         if (collected.length > 0) {
@@ -101,13 +122,39 @@ export class TestRunner {
         packages: items.map((i) => i.id),
       }).id;
       this.activeRecordId = recordId;
+      const folders = Array.from(
+        new Set(
+          items.map(
+            (i) => this.cache.getWorkspaceDir(getPackageItem(i).id) ?? "",
+          ),
+        ),
+      );
+      const kind = narrow ? "run --changed" : "run";
+      const target = narrow
+        ? "changed packages"
+        : items.length === 1
+          ? items[0].id
+          : `${items.length} items`;
+      progress = liveRuns.start(`${kind}: ${target}`);
+      session = sessions.add({
+        kind,
+        folder: folders[0] ?? "",
+        target,
+        stop: () => cts.cancel(),
+        progress,
+      });
 
-      for (const item of items) {
-        this.controller.clearResults(item);
-        run.started(item);
-        enqueueDescendants(run, item);
+      // A narrowed run starts nothing up front: a package it leaves out
+      // keeps its verdict, and the batch marks the ones the CLI runs.
+      if (!narrow) {
+        for (const item of items) {
+          const whole = options?.filter === undefined;
+          if (whole) this.controller.clearResults(item);
+          run.started(item);
+          if (whole) enqueueDescendants(run, item);
+        }
+        startAncestors(run, items);
       }
-      startAncestors(run, items);
 
       const groups = groupByPackage(items);
 
@@ -148,7 +195,9 @@ export class TestRunner {
           continue;
         }
 
-        const filter = buildRunFilter(groupItems);
+        const filter = narrow
+          ? undefined
+          : (options?.filter ?? buildRunFilter(groupItems));
         validPkgs.push({
           importPath,
           items: groupItems,
@@ -202,6 +251,8 @@ export class TestRunner {
             run,
             effectiveToken,
             extraEnv,
+            !!narrow,
+            progress,
           );
         }
 
@@ -221,13 +272,17 @@ export class TestRunner {
             run,
             effectiveToken,
             extraEnv,
+            false,
+            progress,
           );
         }
       }
 
       resolveAncestorItems(run, this.controller);
-      for (const item of items) {
-        skipUnresolved(run, item, this.controller);
+      if (options?.filter === undefined && !narrow) {
+        for (const item of items) {
+          skipUnresolved(run, item, this.controller);
+        }
       }
 
       if (anyCoverOnRun) {
@@ -250,7 +305,10 @@ export class TestRunner {
             if (choice !== "Update Snapshots") return;
             const cts2 = new vscode.CancellationTokenSource();
             try {
-              await this.run(request, cts2.token, { updateSnapshots: true });
+              await this.run(request, cts2.token, {
+                ...options,
+                updateSnapshots: true,
+              });
             } catch (err: unknown) {
               const msg = err instanceof Error ? err.message : String(err);
               this.outputChannel.error(
@@ -262,6 +320,7 @@ export class TestRunner {
           });
       }
     } finally {
+      session?.dispose();
       const wasCancelled = effectiveToken.isCancellationRequested;
       if (recordId !== undefined && this.activeRecordId === recordId) {
         if (wasCancelled) {
@@ -277,6 +336,8 @@ export class TestRunner {
         this.activeRun = undefined;
       }
       cts.dispose();
+      // Ended before the panel takes the finished run.
+      progress?.end();
       if (this._lastJsonOutput) {
         this._onDidComplete.fire(this._lastPieces);
       }
@@ -300,8 +361,12 @@ export class TestRunner {
     run: vscode.TestRun,
     token: vscode.CancellationToken,
     env?: Record<string, string>,
+    changed = false,
+    progress?: RunProgress,
   ): Promise<void> {
     const result = await executeBatch({
+      changed,
+      progress,
       pkgInfos,
       filter,
       workspaceDir,

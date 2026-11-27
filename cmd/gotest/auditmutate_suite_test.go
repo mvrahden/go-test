@@ -142,14 +142,17 @@ func (s *AuditMutateFlagsTestSuite) TestTheStreamOfAMutant(t *gotest.T) {
 
 func (s *AuditMutateFlagsTestSuite) TestALimit(t *gotest.T) {
 	took := map[string]time.Duration{"m/a TestS": 2 * time.Second, "m/b TestT": time.Second}
-	t.When("a mutant's suites took 3s with no mutant on and the runner 4s", func(w *gotest.T) {
-		w.It("gives the run three times their time, twice the runner's and a second", func(it *gotest.T) {
-			before, _ := ExportLimit(took, 4*time.Second, time.Hour, "m/a TestS", "m/b TestT")
-			gotest.Equal(it, 18*time.Second, before)
+	t.When("the run with no mutant on took 5s whole, its suites 3s of their own", func(w *gotest.T) {
+		w.It("gives a first run three times the whole run and a second, and a second run twice that", func(it *gotest.T) {
+			first, second := ExportLimit(took, 5*time.Second, "m/a TestS", "m/b TestT")
+			gotest.Equal(it, 16*time.Second, first)
+			gotest.Equal(it, 32*time.Second, second)
 		})
-		w.It("lowers the runner's share by a run that took less beyond its suites", func(it *gotest.T) {
-			_, after := ExportLimit(took, 4*time.Second, 4*time.Second, "m/a TestS", "m/b TestT")
-			gotest.Equal(it, 12*time.Second, after)
+	})
+	t.When("the suites' own time is longer than the whole run's", func(w *gotest.T) {
+		w.It("gives a first run three times the suites' time and a second", func(it *gotest.T) {
+			first, _ := ExportLimit(took, 2*time.Second, "m/a TestS", "m/b TestT")
+			gotest.Equal(it, 10*time.Second, first)
 		})
 	})
 }

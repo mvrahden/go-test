@@ -14,6 +14,7 @@ import {
   type TestEvent,
 } from "./outputParser.js";
 import { EXTERNAL_ID, externalInstance, withoutExternalId } from "./types.js";
+import { shownIn, type Shown } from "./runStates.js";
 
 export { killProcessTree };
 
@@ -400,6 +401,10 @@ export interface ApplyOptions {
   buildDir?: string;
   // The package's router for this run: it remembers where each test sat.
   router: TestItemRouter;
+  // The package's fail is an interrupt's, not a verdict: nothing is recorded.
+  cutOff?: boolean;
+  // Where the ids of tests marked cut short are told.
+  cutShortIds?: string[];
 }
 
 export function applyEvent(
@@ -444,13 +449,24 @@ export function applyEvent(
     ) {
       const duration =
         event.Elapsed !== undefined ? event.Elapsed * 1000 : undefined;
+      if (options.cutOff) {
+        const cut = controller.findItem(importPath);
+        if (cut) takeBackPackage(run, controller, cut, []);
+        return undefined;
+      }
       controller.recordResult(importPath, event.Action, duration);
 
       // Tests still running when the package failed were cut short: the
       // process died under them, so they carry no verdict of their own.
       const cutShort =
         event.Action === "fail" && !event.FailedBuild
-          ? markCutShort(run, controller, options.router, outputMap)
+          ? markCutShort(
+              run,
+              controller,
+              options.router,
+              outputMap,
+              options.cutShortIds,
+            )
           : [];
       const pkgItem = controller.findItem(importPath);
       if (pkgItem) {
@@ -480,6 +496,7 @@ export function applyEvent(
         } else {
           run.skipped(pkgItem);
         }
+        settleUnder(run, pkgItem);
         resolveAncestorsOf(run, pkgItem, controller);
       }
       return { itemId: importPath, status: event.Action, duration };
@@ -568,10 +585,12 @@ function markCutShort(
   controller: GoTestController,
   router: TestItemRouter,
   outputMap: Map<string, string>,
+  ids?: string[],
 ): string[] {
   const open = router.unfinished();
   const innermost: string[] = [];
   for (const t of open) {
+    ids?.push(t.item.id);
     const hasOpenChild = open.some(
       (other) =>
         other.instance === t.instance && other.test.startsWith(t.test + "/"),
@@ -593,6 +612,62 @@ function markCutShort(
     innermost.push(t.test);
   }
   return innermost;
+}
+
+// settleUnder resolves what a finished package's run still shows running
+// below it: a leaf no event reached is skipped, a container takes its
+// children's state (failed, else passed, else skipped). A suite that holds
+// only fuzz targets gets no event of its own and would stay queued.
+export function settleUnder(run: vscode.TestRun, item: vscode.TestItem): void {
+  item.children.forEach((child) => settleItem(run, child));
+}
+
+function settleItem(
+  run: vscode.TestRun,
+  item: vscode.TestItem,
+): Shown | undefined {
+  const kids: (Shown | undefined)[] = [];
+  item.children.forEach((child) => kids.push(settleItem(run, child)));
+  const shown = shownIn(run, item.id);
+  if (shown !== "running") return shown;
+  if (kids.includes("failed")) {
+    run.failed(item, []);
+    return "failed";
+  }
+  if (kids.includes("passed")) {
+    run.passed(item);
+    return "passed";
+  }
+  run.skipped(item);
+  return "skipped";
+}
+
+// takeBackPackage returns a package an interrupt cut off to no result: its
+// own verdict and the cut-short marks are forgotten and shown skipped, and the
+// folders above it derived again.
+function takeBackPackage(
+  run: vscode.TestRun,
+  controller: GoTestController,
+  pkgItem: vscode.TestItem,
+  cutShort: readonly vscode.TestItem[],
+): void {
+  controller.forgetResult(pkgItem.id);
+  run.skipped(pkgItem);
+  for (const item of cutShort) {
+    controller.forgetResult(item.id);
+    run.skipped(item);
+  }
+  settleUnder(run, pkgItem);
+  resolveAncestorsOf(run, pkgItem, controller);
+}
+
+// isInterruptEvent says the CLI's run was interrupted: its run-level
+// "interrupted" booking, or the run's close with the interrupt's exit code.
+function isInterruptEvent(event: TestEvent): boolean {
+  return (
+    event.RunLevel === true &&
+    (event.Package === "interrupted" || event.Result?.ExitCode === 130)
+  );
 }
 
 export function applyResults(
@@ -633,10 +708,16 @@ export class StreamApplier {
   readonly unknownPackages = new Set<string>();
   // Packages whose own verdict the events carried.
   readonly reported = new Set<string>();
-  // A fail event of a known package was applied.
-  failed = false;
   // What the CLI said about the run itself (RunLevel output), line by line.
   readonly runLevel: string[] = [];
+  // The stream said the run was interrupted.
+  interrupted = false;
+  // Packages a test of failed, in the stream: their fail is a verdict.
+  private readonly testFailed = new Set<string>();
+  private genuineFail = false;
+  // Package fails with no failing test or build behind them, and the tests
+  // marked cut short under them: an interrupt arriving later takes them back.
+  private readonly provisional = new Map<string, string[]>();
 
   constructor(
     private readonly controller: GoTestController,
@@ -647,7 +728,15 @@ export class StreamApplier {
     // Says once per run what could not be routed.
     private readonly log: OnceLog = new OnceLog(),
     private readonly unstamped = UNSTAMPED_LIVE,
+    // A stop was asked of the run: from then on a package's fail with no
+    // failing test is the stop's, not a verdict.
+    private readonly stopped: () => boolean = () => false,
   ) {}
+
+  // A fail event of a known package was applied that is a verdict.
+  get failed(): boolean {
+    return this.genuineFail || this.provisional.size > 0;
+  }
 
   apply(events: TestEvent[]): AppliedResult[] {
     const applied: AppliedResult[] = [];
@@ -661,6 +750,10 @@ export class StreamApplier {
           const line = event.Output.replace(/\n$/, "");
           this.runLevel.push(line);
           this.run.appendOutput(`[${event.Package}] ${line}\r\n`);
+        }
+        if (!this.interrupted && isInterruptEvent(event)) {
+          this.interrupted = true;
+          this.takeBack();
         }
         continue;
       }
@@ -684,6 +777,11 @@ export class StreamApplier {
         );
         this.routers.set(event.Package, router);
       }
+      const packageFail = !event.Test && event.Action === "fail";
+      const genuine = !!event.FailedBuild || this.testFailed.has(event.Package);
+      const cutOff =
+        packageFail && !genuine && (this.interrupted || this.stopped());
+      const cutShortIds: string[] = [];
       const result = applyEvent(
         this.controller,
         this.run,
@@ -691,10 +789,24 @@ export class StreamApplier {
         outputMap,
         event.Package,
         dir,
-        { builds: this.builds, buildDir: this.buildDir, router },
+        {
+          builds: this.builds,
+          buildDir: this.buildDir,
+          router,
+          cutOff,
+          cutShortIds,
+        },
       );
-      if (event.Action === "fail") this.failed = true;
+      if (event.Action === "fail" && event.Test) {
+        this.testFailed.add(event.Package);
+        this.genuineFail = true;
+      }
+      if (packageFail && !cutOff) {
+        if (genuine) this.genuineFail = true;
+        else this.provisional.set(event.Package, cutShortIds);
+      }
       if (
+        !cutOff &&
         !event.Test &&
         (event.Action === "pass" ||
           event.Action === "fail" ||
@@ -705,6 +817,20 @@ export class StreamApplier {
       if (result) applied.push(result);
     }
     return applied;
+  }
+
+  // takeBack undoes the package fails an interrupt turned out to cause.
+  private takeBack(): void {
+    for (const [importPath, cutShortIds] of this.provisional) {
+      const pkgItem = this.controller.findItem(importPath);
+      this.reported.delete(importPath);
+      if (!pkgItem) continue;
+      const cutShort = cutShortIds
+        .map((id) => this.controller.findItem(id))
+        .filter((i): i is vscode.TestItem => i !== undefined);
+      takeBackPackage(this.run, this.controller, pkgItem, cutShort);
+    }
+    this.provisional.clear();
   }
 }
 
@@ -756,22 +882,20 @@ export async function spawnTestProcess(
     }
   });
 
+  // Each stderr line is logged as it arrives, so a slow build's notice is
+  // stamped when the CLI said it. Fuzzing also reads crasher detail off it.
+  const stderrLine = (line: string) => {
+    const trimmed = line.trim();
+    if (!trimmed) return;
+    outputChannel.warn(`[${label}] stderr: ${line.trimEnd()}`);
+    onStderrLine?.(trimmed);
+  };
   mc.child.stderr?.on("data", (chunk: string) => {
     stderr += chunk;
-
-    // Fuzzing reads crasher detail off stderr as it arrives, so it needs the
-    // same line framing stdout gets rather than one blob at the end.
-    if (onStderrLine) {
-      stderrLineBuffer += chunk;
-      const lines = stderrLineBuffer.split("\n");
-      stderrLineBuffer = lines.pop() ?? "";
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (trimmed) {
-          onStderrLine(trimmed);
-        }
-      }
-    }
+    stderrLineBuffer += chunk;
+    const lines = stderrLineBuffer.split("\n");
+    stderrLineBuffer = lines.pop() ?? "";
+    for (const line of lines) stderrLine(line);
   });
 
   mc.child.on("error", (err: Error) => {
@@ -799,19 +923,7 @@ export async function spawnTestProcess(
         onStdoutLine(remaining);
       }
     }
-    if (onStderrLine) {
-      const remaining = stderrLineBuffer.trim();
-      if (remaining) {
-        onStderrLine(remaining);
-      }
-    }
-    if (stderr) {
-      for (const line of stderr.split("\n")) {
-        if (line.trim()) {
-          outputChannel.warn(`[${label}] stderr: ${line}`);
-        }
-      }
-    }
+    stderrLine(stderrLineBuffer);
     return { stdout, stderr, exitCode: code ?? 1 };
   } finally {
     cancelListener.dispose();
@@ -1123,6 +1235,18 @@ export function getPackageDir(
   return cache.getPackage(pkg.id)?.dir;
 }
 
+export function isStructuralId(id: string): boolean {
+  return (
+    id.startsWith("dir:") ||
+    id.startsWith("wsFolder:") ||
+    id.startsWith("module:")
+  );
+}
+
+// resolveAncestorsOf derives the folders above an item from what their
+// children show now: running while any is running in this run, else failed
+// if any failed, else passed if any passed. A folder's own stored result is
+// never read; a child the run did not touch counts by its stored verdict.
 export function resolveAncestorsOf(
   run: vscode.TestRun,
   item: vscode.TestItem,
@@ -1130,41 +1254,54 @@ export function resolveAncestorsOf(
 ): void {
   let current = item.parent;
   while (current) {
-    let anyFailed = false;
-    let allResolved = true;
-    current.children.forEach((child) => {
-      const result = controller.getResult(child.id);
-      if (result) {
-        if (result.status === "fail" || result.status === "errored") {
-          anyFailed = true;
-        }
-        return;
-      }
-      const isStructural =
-        child.id.startsWith("dir:") ||
-        child.id.startsWith("wsFolder:") ||
-        child.id.startsWith("module:");
-      if (isStructural) {
-        const r = resolveItemRecursive(run, child, controller);
-        if (r.anyResolved) {
-          if (r.anyFailed) anyFailed = true;
-        } else {
-          allResolved = false;
-        }
-      } else {
-        allResolved = false;
-      }
-    });
-    if (!allResolved) break;
+    const state = childrenState(run, controller, current);
+    if (state === "running") break;
     run.started(current);
-    if (anyFailed) {
-      run.failed(current, []);
-    } else {
-      run.passed(current);
-    }
-    controller.recordResult(current.id, anyFailed ? "fail" : "pass", undefined);
+    if (state === "failed") run.failed(current, []);
+    else if (state === "passed") run.passed(current);
+    else run.skipped(current);
     current = current.parent;
   }
+}
+
+function childrenState(
+  run: vscode.TestRun,
+  controller: GoTestController,
+  item: vscode.TestItem,
+): Shown | undefined {
+  let running = false;
+  let failed = false;
+  let passed = false;
+  item.children.forEach((child) => {
+    const s = currentState(run, controller, child);
+    // A folder below shows what it derives, as this one is about to.
+    if (isStructuralId(child.id) && s && s !== "running") {
+      run.started(child);
+      if (s === "failed") run.failed(child, []);
+      else run.passed(child);
+    }
+    if (s === "running") running = true;
+    else if (s === "failed") failed = true;
+    else if (s === "passed") passed = true;
+  });
+  if (running) return "running";
+  if (failed) return "failed";
+  if (passed) return "passed";
+  return undefined;
+}
+
+function currentState(
+  run: vscode.TestRun,
+  controller: GoTestController,
+  item: vscode.TestItem,
+): Shown | undefined {
+  if (isStructuralId(item.id)) return childrenState(run, controller, item);
+  const shown = shownIn(run, item.id);
+  if (shown) return shown === "skipped" ? undefined : shown;
+  const stored = controller.getResult(item.id)?.status;
+  if (stored === "fail" || stored === "errored") return "failed";
+  if (stored === "pass") return "passed";
+  return undefined;
 }
 
 // restoreStoredResults shows the stored verdicts as one run, so a reload
@@ -1180,9 +1317,19 @@ export function restoreStoredResults(
     "Restored Results",
   );
   let applied = 0;
+  const stale: string[] = [];
   store.forEach((result, itemId) => {
+    // A folder's state is derived from its children, never kept.
+    if (isStructuralId(itemId)) {
+      stale.push(itemId);
+      return;
+    }
     const item = controller.findItem(itemId);
     if (!item) return;
+    if (isCutOffPackage(item, result, store)) {
+      stale.push(itemId);
+      return;
+    }
     applied++;
     switch (result.status) {
       case "pass":
@@ -1206,9 +1353,33 @@ export function restoreStoredResults(
         break;
     }
   });
+  for (const id of stale) store.delete(id);
   resolveAncestorItems(run, controller);
   run.end();
   return applied;
+}
+
+// isCutOffPackage says a stored package fail is likely an interrupt's
+// rather than a verdict: it took no time and no test below it failed. An
+// interrupt fails every package that had not finished, at once. A package
+// that does not build fails in no time too; discovery marks it with an error.
+function isCutOffPackage(
+  item: vscode.TestItem,
+  result: { status: string; duration?: number },
+  store: TestResultStore,
+): boolean {
+  if (result.status !== "fail" || result.duration !== 0) return false;
+  if (!item.tags.some((t) => t.id === PACKAGE_TAG) || item.error) return false;
+  const anyFailed = (node: vscode.TestItem): boolean => {
+    let found = false;
+    node.children.forEach((child) => {
+      if (found) return;
+      const s = store.get(child.id)?.status;
+      found = s === "fail" || s === "errored" || anyFailed(child);
+    });
+    return found;
+  };
+  return !anyFailed(item);
 }
 
 export function resolveAncestorItems(
@@ -1225,12 +1396,9 @@ function resolveItemRecursive(
   item: vscode.TestItem,
   controller: GoTestController,
 ): { anyFailed: boolean; anyResolved: boolean } {
-  const directResult = controller.getResult(item.id);
+  const isStructural = isStructuralId(item.id);
+  const directResult = isStructural ? undefined : controller.getResult(item.id);
   const isPackage = item.tags.some((t) => t.id === "package");
-  const isStructural =
-    item.id.startsWith("dir:") ||
-    item.id.startsWith("wsFolder:") ||
-    item.id.startsWith("module:");
 
   if (directResult && !isPackage && !isStructural) {
     return {
@@ -1248,6 +1416,11 @@ function resolveItemRecursive(
     if (r.anyFailed) anyFailed = true;
   });
 
+  // A package an interrupt cut off has no result, whatever its tests showed.
+  if (isPackage && !directResult && shownIn(run, item.id) === "skipped") {
+    return { anyFailed: false, anyResolved: false };
+  }
+
   // A package the run failed or errored keeps that verdict: its passing
   // children do not make it green.
   if (
@@ -1263,9 +1436,6 @@ function resolveItemRecursive(
       run.failed(item, []);
     } else {
       run.passed(item);
-    }
-    if (isStructural) {
-      controller.recordResult(item.id, anyFailed ? "fail" : "pass", undefined);
     }
   }
 

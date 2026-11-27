@@ -1,4 +1,5 @@
 // The Test Explorer's Fuzz run profile: the opt-in counterpart of Bench. It
+import { linkedSession } from "./sessions.js";
 // is bound to the "fuzz" tag, so it is offered only when fuzz targets are in
 // the selection, and it never runs under plain Run — a search burns CPU on
 // request, not as a side effect of running tests.
@@ -227,7 +228,17 @@ export async function runFuzzProfile(
         for (const item of sessionItems) run.skipped(item);
         continue;
       }
-      const outcome = await runSession(session, token, deps, run);
+      const linked = linkedSession(token, {
+        kind: "fuzz",
+        folder: cache.getWorkspaceDir(session.importPath) ?? "",
+        target: `${session.importPath} ${session.wrappers.join(", ")}`,
+      });
+      let outcome;
+      try {
+        outcome = await runSession(session, linked.token, deps, run);
+      } finally {
+        linked.dispose();
+      }
       if (markFailedRun(run, sessionItems, sessionEnd(outcome))) continue;
       const verdicts = fuzzVerdicts(session.wrappers, outcome);
       for (const item of sessionItems) {

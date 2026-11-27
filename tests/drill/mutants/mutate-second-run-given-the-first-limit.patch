@@ -1,0 +1,13 @@
+Judge: ./cmd/gotest AuditMutateFlagsTestSuite/TestALimit
+Expect: ^FAIL .*cmd/gotest AuditMutateFlags .* / gives a first run three times the whole run and a second, and a second run twice that \(
+--- a/cmd/gotest/auditmutate_run.go
++++ b/cmd/gotest/auditmutate_run.go
+@@ -355,7 +355,7 @@
+ // the run with none switched on found it, still bounded for one that never
+ // ends.
+ func (j *mutantJudge) secondLimit(suites []*suiteRun) time.Duration {
+-	return 2 * j.limit(suites)
++	return j.limit(suites)
+ }
+ 
+ // judge runs mu within limit: killed at the first test that fails,

@@ -1,6 +1,6 @@
 // Opening a saved event stream — a CI run's --events-file — in the editor.
 // The stream is captured from the real CLI on the fixture corpus, then
-// replayed: into the Test Explorer as its own run, into the Spec View as a
+// replayed: into the Test Explorer as its own run, into the panel as a
 // source of its own, and never into the result store.
 
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
@@ -13,7 +13,7 @@ const state = vi.hoisted(() => ({
   workspaceDir: "",
   cliPath: "",
   autoRefresh: true,
-  panels: [] as { webview: { html: string; cspSource: string } }[],
+  panels: [] as import("./vscodeStub.js").StubPanel[],
   controllers: [] as unknown[],
   config: {} as Record<string, unknown>,
 }));
@@ -26,7 +26,8 @@ vi.mock("vscode", async () => {
 import { DiscoveryCache, DiscoveryService } from "../../src/discovery.js";
 import { GoTestController } from "../../src/testController.js";
 import { TestResultStore } from "../../src/testResultStore.js";
-import { SpecViewPanel } from "../../src/specView.js";
+import { PanelHost } from "../../src/panel/host.js";
+import { shownHtml } from "./shownPanel.js";
 import { openEventsFile } from "../../src/importEvents.js";
 import { createRecordingChannel } from "./vscodeStub.js";
 import type { FakeTestController } from "./vscodeTestApi.js";
@@ -115,12 +116,12 @@ afterAll(() => {
 describe("opening a saved event stream", () => {
   it("replays it as its own run in the Test Explorer, failures on their items", async () => {
     const recorder = createRecordingChannel();
-    const specView = new SpecViewPanel(recorder.channel as never, cache);
+    const panel = new PanelHost(recorder.channel as never, cache);
     const fake = state.controllers[0] as FakeTestController;
     const before = fake.runs.length;
 
     const outcome = await openEventsFile(
-      { controller, cache, specView, outputChannel: recorder.channel as never },
+      { controller, cache, panel, outputChannel: recorder.channel as never },
       eventsFile,
     );
 
@@ -161,12 +162,12 @@ describe("opening a saved event stream", () => {
     const file = path.join(tmp, "unstamped.jsonl");
     writeFileSync(file, bare, "utf-8");
     const recorder = createRecordingChannel();
-    const specView = new SpecViewPanel(recorder.channel as never, cache);
+    const panel = new PanelHost(recorder.channel as never, cache);
     const fake = state.controllers[0] as FakeTestController;
     const before = fake.runs.length;
 
     await openEventsFile(
-      { controller, cache, specView, outputChannel: recorder.channel as never },
+      { controller, cache, panel, outputChannel: recorder.channel as never },
       file,
     );
 
@@ -189,9 +190,9 @@ describe("opening a saved event stream", () => {
 
   it("keeps the replayed verdicts out of the result store", async () => {
     const recorder = createRecordingChannel();
-    const specView = new SpecViewPanel(recorder.channel as never, cache);
+    const panel = new PanelHost(recorder.channel as never, cache);
     await openEventsFile(
-      { controller, cache, specView, outputChannel: recorder.channel as never },
+      { controller, cache, panel, outputChannel: recorder.channel as never },
       eventsFile,
     );
 
@@ -207,25 +208,25 @@ describe("opening a saved event stream", () => {
     // the stream ends inside a line.
     writeFileSync(cut, whole.slice(0, whole.length - 70), "utf-8");
     const recorder = createRecordingChannel();
-    const specView = new SpecViewPanel(recorder.channel as never, cache);
+    const panel = new PanelHost(recorder.channel as never, cache);
 
     const outcome = await openEventsFile(
-      { controller, cache, specView, outputChannel: recorder.channel as never },
+      { controller, cache, panel, outputChannel: recorder.channel as never },
       cut,
     );
 
     expect(outcome).toBeDefined();
     expect(recorder.errors).toEqual([]);
-    expect(state.panels[state.panels.length - 1].webview.html).toContain(
-      "Imported: cut.jsonl",
-    );
+    expect(
+      await shownHtml(state.panels[state.panels.length - 1].webview),
+    ).toContain("Imported: cut.jsonl");
   }, 300_000);
 
-  it("shows it in the Spec View as its own source, every package included", async () => {
+  it("shows it in the panel as its own source, every package included", async () => {
     const recorder = createRecordingChannel();
-    const specView = new SpecViewPanel(recorder.channel as never, cache);
-    await specView.show();
-    await specView.refresh({
+    const panel = new PanelHost(recorder.channel as never, cache);
+    await panel.show();
+    await panel.refresh({
       stream: readFileSync(
         path.join(streamDir, "other-package-fail.jsonl"),
         "utf-8",
@@ -234,11 +235,11 @@ describe("opening a saved event stream", () => {
     });
 
     await openEventsFile(
-      { controller, cache, specView, outputChannel: recorder.channel as never },
+      { controller, cache, panel, outputChannel: recorder.channel as never },
       eventsFile,
     );
 
-    const html = state.panels[state.panels.length - 1].webview.html;
+    const html = await shownHtml(state.panels[state.panels.length - 1].webview);
     expect(recorder.errors).toEqual([]);
     expect(html).toMatch(
       /<option value="file:[^"]*events\.jsonl" selected>Imported: events\.jsonl<\/option>/,

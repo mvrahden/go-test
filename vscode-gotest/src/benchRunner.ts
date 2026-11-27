@@ -1,4 +1,5 @@
 // benchRunner drives `gotest bench --json` for the Bench run profile and the
+import { linkedSession } from "./sessions.js";
 // bench CodeLenses. Benchmarks are deliberate acts: nothing here hooks into
 // save events or watch mode, and invocations run strictly serially — timing
 // numbers taken in parallel are noise.
@@ -418,7 +419,31 @@ export class BenchRunner {
     }
   }
 
+  // execute lists the plan as one session; its stop is a cancel.
   private async execute(
+    plan: BenchTarget[],
+    token: vscode.CancellationToken,
+    hooks: Parameters<BenchRunner["executePlan"]>[2],
+  ): Promise<void> {
+    const first = plan[0];
+    const linked = linkedSession(token, {
+      kind: "bench",
+      folder: first ? (this.cache.getWorkspaceDir(first.importPath) ?? "") : "",
+      target:
+        plan.length === 1 && first
+          ? [first.importPath, first.suiteName, first.methodName]
+              .filter(Boolean)
+              .join(" ")
+          : `${plan.length} targets`,
+    });
+    try {
+      await this.executePlan(plan, linked.token, hooks);
+    } finally {
+      linked.dispose();
+    }
+  }
+
+  private async executePlan(
     plan: BenchTarget[],
     token: vscode.CancellationToken,
     hooks: {

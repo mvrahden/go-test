@@ -39,6 +39,13 @@
 // masked. Promote runs on a staged copy of cmd/gotest/testdata/fuzzcrash with
 // a session record written here, so no fuzzing happens and the bytes hold.
 //
+// The `audit` cases record the base and head modules the conformance suite
+// audits, each staged with its go.mod bound to this checkout, and compare the
+// two records as the Change scope reads them; one more asks a tree outside
+// git for a base. One more commits the head and gives it the conformance
+// suite's saved runs, diff and profile as evidence, as JSON and as text.
+// `version --json` is what the Change scope asks a CLI before it audits.
+//
 // The `lint` cases run `gotest lint -json` from the fixture module, through
 // a go.work that spans this checkout, on packages with known findings and on
 // one that does not compile, and print the rule registry. Paths are masked to
@@ -165,6 +172,9 @@ function maskDir(text, dir, token) {
 const bin = await buildBinary();
 const cases = {};
 
+// Every run here keeps its record in a cache of its own, never the user's.
+process.env.GOTEST_CACHE_DIR = tempDir("gotest-contract-cache-");
+
 for (const file of readdirSync(streamDir).sort()) {
   if (!file.endsWith(".jsonl")) continue;
   const name = file.replace(/\.jsonl$/, "");
@@ -209,11 +219,18 @@ const SPEC = {
     stream: "streams/mixed.jsonl",
     args: [...RENDER, "--hide="],
   },
+  // A folder nothing ran in: the declared tree over an empty stream.
+  "declared-unrun": {
+    stream: null,
+    args: [...RENDER, "--hide=", "--declared", "./examples/search"],
+  },
 };
 
 const spec = {};
 for (const [name, { stream, args }] of Object.entries(SPEC)) {
-  const input = readFileSync(path.join(testdataDir, stream), "utf-8");
+  const input = stream
+    ? readFileSync(path.join(testdataDir, stream), "utf-8")
+    : "";
   const result = await run(bin, args, input);
   const stdout = result.stdout.trim();
   // The document's directories are masked as paths, so Windows spells them
@@ -277,6 +294,155 @@ for (const [name, args] of Object.entries(LIVE)) {
     exitCode: result.exitCode,
     stderr: result.stderr,
     events: mask(result.stdout),
+  };
+}
+
+// The `stream` cases pin what an interleaved stream is to the CLI. Each
+// testdata/live stream holds the events of its burst twin, the suites
+// interleaved as a live run writes them, and must render as the twin does.
+// A real --live run of the conformance suite's clilive package, whose two
+// suites hold until the script releases them, is recorded per suite: the
+// order across suites is the scheduler's, each suite's own is the contract.
+const liveDir = path.join(testdataDir, "live");
+const stream = { replays: {}, run: null };
+for (const file of readdirSync(liveDir).sort()) {
+  if (!file.endsWith("-live.jsonl")) continue;
+  const name = file.replace(/-live\.jsonl$/, "");
+  const live = readFileSync(path.join(liveDir, file), "utf-8");
+  const burst = readFileSync(
+    path.join(liveDir, `${name}-burst.jsonl`),
+    "utf-8",
+  );
+  stream.replays[name] = {};
+  for (const [variant, args] of Object.entries(VARIANTS)) {
+    const a = await run(bin, args, live);
+    const b = await run(bin, args, burst);
+    stream.replays[name][variant] = {
+      exitCode: a.exitCode,
+      stdoutMatchesBurst: a.stdout === b.stdout && a.exitCode === b.exitCode,
+    };
+  }
+}
+
+// runHeld runs args with clilive's suites holding until both have passed
+// their first method, then releases them. held says both first passes were
+// on stdout while neither suite had ended.
+async function runHeld(args) {
+  const release = tempDir("gotest-contract-release-");
+  const events = path.join(release, "events.jsonl");
+  const child = spawn(bin, [`--events-file=${events}`, ...args], {
+    cwd: repoRoot,
+    env: {
+      ...outputEnv({ LIVE_RELEASE_DIR: release }),
+      GOTEST_LIVE: "",
+    },
+  });
+  current = child;
+  let stdout = "";
+  let stderr = "";
+  let held;
+  const firstPasses = (text) =>
+    ["TestFirstTestSuite", "TestSecondTestSuite"].every((s) =>
+      text.includes(
+        `"Action":"pass","Package":"${livePkg}","Test":"${s}/TestAPasses"`,
+      ),
+    );
+  const ended = (text) =>
+    /"Action":"(pass|fail)","Package":"[^"]*","Test":"Test[A-Za-z]+Suite"/.test(
+      text,
+    );
+  const free = () => {
+    for (const name of ["first", "second"])
+      writeFileSync(path.join(release, name), "");
+  };
+  // A run that never shows both passes is released anyway, and says so.
+  const giveUp = setTimeout(() => {
+    held ??= false;
+    free();
+  }, 120_000);
+  child.stdout.setEncoding("utf-8").on("data", (d) => {
+    stdout += d;
+    if (held === undefined && firstPasses(stdout)) {
+      held = !ended(stdout);
+      free();
+    }
+  });
+  child.stderr.setEncoding("utf-8").on("data", (d) => (stderr += d));
+  child.stdin.end();
+  const status = await new Promise((resolve, reject) => {
+    child.on("error", reject);
+    child.on("close", resolve);
+  });
+  clearTimeout(giveUp);
+  current = undefined;
+  return {
+    status,
+    stdout,
+    stderr,
+    held: held ?? false,
+    file: readFileSync(events, "utf-8"),
+  };
+}
+
+const livePkg =
+  "github.com/mvrahden/go-test/tests/conformance/testdata/clilive";
+const liveArgs = ["-json", "--live", "./tests/conformance/testdata/clilive/"];
+// Built and warmed first, so the held run compiles nothing while it waits.
+await run(bin, ["-json", "./tests/conformance/testdata/clilive/"], "", {
+  env: outputEnv(),
+});
+{
+  const r = await runHeld(liveArgs);
+  const events = mask(r.stdout);
+  const rootOf = (ev) => (ev.Test ?? "").split("/")[0];
+  const suites = {};
+  for (const ev of events) {
+    if (!ev.Test) continue;
+    (suites[rootOf(ev)] ??= []).push(ev);
+  }
+  const own = events.filter((ev) => !ev.Test && ev.Package === livePkg);
+  const lastSuite = Math.max(...events.map((ev, i) => (ev.Test ? i : -1)));
+  const verdict = events.findIndex(
+    (ev) =>
+      !ev.Test &&
+      ev.Package === livePkg &&
+      (ev.Action === "pass" || ev.Action === "fail"),
+  );
+  // The same events, each suite whole, as a run without --live writes them.
+  const lines = r.stdout.split("\n").filter((l) => l.trim() !== "");
+  const regrouped = [
+    ...lines.filter(
+      (l) => !JSON.parse(l).Test && JSON.parse(l).Action === "start",
+    ),
+    ...Object.keys(suites)
+      .sort()
+      .flatMap((s) => lines.filter((l) => rootOf(JSON.parse(l)) === s)),
+    ...lines.filter(
+      (l) => !JSON.parse(l).Test && JSON.parse(l).Action !== "start",
+    ),
+  ];
+  const render = (text) => run(bin, VARIANTS.renderOnly, text);
+  const asLive = await render(r.stdout);
+  const asBurst = await render(regrouped.join("\n") + "\n");
+  stream.run = {
+    args: liveArgs,
+    exitCode: r.status,
+    stderr: r.stderr,
+    heldWhileBothSuitesRan: r.held,
+    packageStartsFirst:
+      own[0]?.Action === "start" &&
+      events.findIndex((ev) => ev.Package === livePkg) ===
+        events.findIndex((ev) => ev === own[0]),
+    packageVerdictAfterItsSuites: verdict > lastSuite,
+    eventsFileMatchesStdout: r.file === r.stdout,
+    renderMatchesBurst:
+      asLive.exitCode === asBurst.exitCode && asLive.stdout === asBurst.stdout,
+    package: own,
+    suites: Object.fromEntries(
+      Object.keys(suites)
+        .sort()
+        .map((s) => [s, suites[s]]),
+    ),
   };
 }
 
@@ -675,23 +841,355 @@ for (const [name, args] of Object.entries(LINT)) {
   };
 }
 
+// Staged at fixed paths, so the build cache keys them the same each time.
+const auditRoot = path.join(tmpdir(), "gotest-contract-audit");
+const removeAudit = () => rmSync(auditRoot, { recursive: true, force: true });
+process.on("exit", removeAudit);
+removals.push(removeAudit);
+removeAudit();
+const auditSource = path.join(
+  repoRoot,
+  "tests",
+  "conformance",
+  "testdata",
+  "audit",
+);
+const audit = {};
+{
+  const env = outputEnv({ GOWORK: "off" });
+  const records = {};
+  for (const side of ["base", "head"]) {
+    const dir = path.join(auditRoot, side);
+    cpSync(path.join(auditSource, side), dir, { recursive: true });
+    const goMod = path.join(dir, "go.mod");
+    writeFileSync(
+      goMod,
+      readFileSync(goMod, "utf-8").replaceAll("REPO_ROOT", repoRoot),
+    );
+    const args = ["audit", "--record", "./..."];
+    const result = await run(bin, args, "", { cwd: dir, env });
+    records[side] = path.join(auditRoot, `${side}.json`);
+    writeFileSync(records[side], result.stdout);
+    audit[`record-${side}`] = {
+      args,
+      exitCode: result.exitCode,
+      stderr: result.stderr,
+    };
+  }
+  const shown = [
+    "audit",
+    "--base-record=<base>",
+    "--head-record=<head>",
+    "--format=json",
+  ];
+  const args = shown.map((a) =>
+    a.replace("<base>", records.base).replace("<head>", records.head),
+  );
+  const result = await run(bin, args, "", { env });
+  audit.compare = {
+    args: shown,
+    exitCode: result.exitCode,
+    stderr: result.stderr,
+    ...document(result.stdout, (d) => d),
+  };
+  // A tree outside git has no commit for --base to name.
+  const noGit = ["audit", "--base=HEAD", "--format=json", "./..."];
+  const outside = await run(bin, noGit, "", {
+    cwd: path.join(auditRoot, "head"),
+    env,
+  });
+  audit["base-outside-git"] = {
+    args: noGit,
+    exitCode: outside.exitCode,
+    stderr: maskDir(outside.stderr, auditRoot, "<stage>"),
+    stdout: outside.stdout,
+  };
+
+  // The head committed, with the conformance suite's saved runs, diff and
+  // profile as its proof; the streams name the head's commit where they ran
+  // it. The commit hashes the staged go.mod, so it is masked.
+  const proofHead = path.join(auditRoot, "proof-head");
+  cpSync(path.join(auditRoot, "head"), proofHead, { recursive: true });
+  const gitEnv = {
+    ...env,
+    GIT_AUTHOR_DATE: "2026-01-01T00:00:00Z",
+    GIT_COMMITTER_DATE: "2026-01-01T00:00:00Z",
+  };
+  const git = async (...args) => {
+    const r = await run(
+      "git",
+      [
+        "-c",
+        "user.name=gotest",
+        "-c",
+        "user.email=gotest@example.com",
+        "-c",
+        "commit.gpgsign=false",
+        "-c",
+        "init.defaultBranch=trunk",
+        ...args,
+      ],
+      "",
+      { cwd: proofHead, env: gitEnv },
+    );
+    if (r.exitCode !== 0) throw new Error(`git ${args.join(" ")}: ${r.stderr}`);
+    return r.stdout.trim();
+  };
+  await git("init", "-q");
+  await git("add", "-A");
+  await git("commit", "-q", "-m", "head");
+  const commit = await git("rev-parse", "--short", "HEAD");
+  const proofDir = path.join(auditRoot, "proof");
+  mkdirSync(proofDir, { recursive: true });
+  const proofSource = path.join(auditSource, "proof");
+  for (const file of readdirSync(proofSource)) {
+    writeFileSync(
+      path.join(proofDir, file),
+      readFileSync(path.join(proofSource, file), "utf-8").replaceAll(
+        "HEAD_COMMIT",
+        commit,
+      ),
+    );
+  }
+  const proofShown = [
+    "audit",
+    "--base-record=<base>",
+    "--evidence=<proof>/another-commit.json",
+    "--evidence=<proof>/current.json",
+    "--evidence=<proof>/uncommitted.json",
+    "--evidence=<proof>/no-manifest.json",
+    "--base-evidence=<proof>/base-run.json",
+    "--diff=<proof>/shop.diff",
+    "--coverage=<proof>/shop.cover",
+  ];
+  const proofArgs = proofShown.map((a) =>
+    a.replace("<base>", records.base).replace("<proof>", proofDir),
+  );
+  const unstage = (text) =>
+    maskDir(maskDir(text, proofDir, "<proof>"), auditRoot, "<stage>")
+      .split(commit)
+      .join("<commit>");
+  for (const [name, format] of [
+    ["evidence", ["--format=json"]],
+    ["evidence-text", []],
+  ]) {
+    const result = await run(bin, [...proofArgs, ...format], "", {
+      cwd: proofHead,
+      env,
+    });
+    const stdout = unstage(result.stdout);
+    audit[name] = {
+      args: [...proofShown, ...format],
+      exitCode: result.exitCode,
+      stderr: unstage(result.stderr),
+      ...(format.length > 0 ? document(stdout, (d) => d) : { stdout }),
+    };
+  }
+}
+removeAudit();
+
+{
+  const result = await run(bin, ["version"], "", { env: outputEnv() });
+  outputs.version = {
+    args: ["version"],
+    exitCode: result.exitCode,
+    stderr: result.stderr,
+    // The Go and the platform it was built on are the host's.
+    stdout: result.stdout.replace(/ go\S+ \S+\/\S+$/m, " <go> <platform>"),
+  };
+}
+
+{
+  const args = ["version", "--json"];
+  const result = await run(bin, args, "", { env: outputEnv() });
+  outputs["version-json"] = {
+    args,
+    exitCode: result.exitCode,
+    stderr: result.stderr,
+    // The Go and the platform it was built on are the host's.
+    ...document(result.stdout, (d) => ({
+      ...d,
+      goVersion: "<go>",
+      platform: "<platform>",
+    })),
+  };
+}
+
+// The run records: the conformance suite's saved runs imported into a
+// staged module's history, listed as the Runs scope reads them; then a run
+// of the module, one of its files changed, the run's stream judged against
+// the tree (--check-fresh), and a --changed run's manifest. Ids, times,
+// the stage, versions and hashes are masked.
+const runsRoot = path.join(tmpdir(), "gotest-contract-runs");
+const removeRuns = () => rmSync(runsRoot, { recursive: true, force: true });
+process.on("exit", removeRuns);
+removals.push(removeRuns);
+removeRuns();
+const runs = {};
+{
+  const mod = path.join(runsRoot, "mod");
+  cpSync(path.join(auditSource, "head"), mod, { recursive: true });
+  const goMod = path.join(mod, "go.mod");
+  writeFileSync(
+    goMod,
+    readFileSync(goMod, "utf-8").replaceAll("REPO_ROOT", repoRoot),
+  );
+  const env = outputEnv({
+    GOWORK: "off",
+    GOTEST_CACHE_DIR: path.join(runsRoot, "cache"),
+  });
+  const proofSource = path.join(auditSource, "proof");
+  // Paths below <proof> and <stage> are spelled as on Linux.
+  const unstage = (text) =>
+    slashed(
+      maskDir(maskDir(text, proofSource, "<proof>"), runsRoot, "<stage>"),
+    );
+  const maskRecord = (r) => ({
+    ...r,
+    id: "<id>",
+    recorded: "<time>",
+    // A live run's start is now; an imported one's is its stream's.
+    ...(r.started && !r.imported ? { started: "<time>" } : {}),
+    ...(r.eventsFile ? { eventsFile: unstage(r.eventsFile) } : {}),
+    // An input hash covers the Go version and the platform.
+    ...(r.ran
+      ? {
+          ran: r.ran.map((p) => ({
+            ...p,
+            ...(p.inputHash ? { inputHash: "<hash>" } : {}),
+          })),
+        }
+      : {}),
+    manifest: {
+      ...r.manifest,
+      ...(r.manifest.version ? { version: "<version>" } : {}),
+      ...(r.manifest.goVersion ? { goVersion: "<go>" } : {}),
+      ...(r.manifest.commit && r.manifest.commit !== "HEAD_COMMIT"
+        ? { commit: "<commit>" }
+        : {}),
+      ...(r.manifest.agent ? { agent: "<agent>" } : {}),
+      args: r.manifest.args.map(unstage),
+    },
+  });
+  const list = async (name) => {
+    const args = ["runs", "--format=json"];
+    const result = await run(bin, args, "", { cwd: mod, env });
+    runs[name] = {
+      args,
+      exitCode: result.exitCode,
+      stderr: unstage(result.stderr),
+      ...document(result.stdout, (d) => ({
+        ...d,
+        version: "<version>",
+        dir: unstage(d.dir),
+        runs: d.runs.map(maskRecord),
+      })),
+    };
+  };
+  await list("list-empty");
+  for (const name of [
+    "no-manifest",
+    "another-commit",
+    "uncommitted",
+    "current",
+  ]) {
+    const file = path.join(proofSource, `${name}.json`);
+    const args = ["runs", `--import=${file}`];
+    const result = await run(bin, args, "", { cwd: mod, env });
+    runs[`import-${name}`] = {
+      args: args.map(unstage),
+      exitCode: result.exitCode,
+      stderr: unstage(result.stderr),
+    };
+  }
+  await list("list-imported");
+
+  const events = path.join(runsRoot, "run.jsonl");
+  const runArgs = [
+    "--agent=false",
+    `--events-file=${events}`,
+    "--",
+    "-json",
+    "-count=1",
+    "./...",
+  ];
+  const first = await run(bin, runArgs, "", { cwd: mod, env });
+  writeFileSync(
+    path.join(mod, "shop", "shop.go"),
+    readFileSync(path.join(mod, "shop", "shop.go"), "utf-8") +
+      "\n// changed after the run\n",
+  );
+  const freshArgs = [
+    "spec",
+    "--input=-",
+    "--render-only",
+    "--check-fresh",
+    "--format=json",
+    "--hide=fail,none,pass,skip",
+  ];
+  const fresh = await run(bin, freshArgs, readFileSync(events, "utf-8"), {
+    cwd: mod,
+    env,
+  });
+  runs["check-fresh"] = {
+    run: { args: runArgs.map(unstage), exitCode: first.exitCode },
+    args: freshArgs,
+    exitCode: fresh.exitCode,
+    stderr: unstage(fresh.stderr),
+    ...document(fresh.stdout, (d) => ({
+      packages: d.packages.map((p) => ({
+        path: p.path,
+        freshness: p.freshness,
+        inputHash: p.inputHash ? "<hash>" : undefined,
+      })),
+      stale: d.stats.stale,
+    })),
+  };
+  const changedArgs = [
+    "--agent=false",
+    "--changed",
+    "--",
+    "-json",
+    "-count=1",
+    "./...",
+  ];
+  const changed = await run(bin, changedArgs, "", { cwd: mod, env });
+  const manifest = changed.stdout
+    .split("\n")
+    .filter((l) => l.includes('"Manifest"'))
+    .map((l) => JSON.parse(l).Manifest)[0];
+  runs.changed = {
+    args: changedArgs,
+    exitCode: changed.exitCode,
+    manifestChanged: manifest?.Changed ?? null,
+  };
+  await list("list-after-changed");
+}
+removeRuns();
+
 const golden = {
   note: [
     "Recorded contract of `gotest spec --input=- --format=json`, of its",
     "--declared and --hide forms (`spec`), of live `gotest -json` runs",
-    "(`live`), of the other documents the extension reads (`outputs`), and",
-    "of `gotest lint -json` and `gotest lint -rules -json` (`lint`).",
+    "(`live`), of interleaved streams and a --live run (`stream`), of the",
+    "other documents the extension reads (`outputs`), and",
+    "of `gotest lint -json` and `gotest lint -rules -json` (`lint`), and",
+    "of `gotest audit` over the conformance suite's base and head (`audit`),",
+    "and of `gotest runs`, --check-fresh and --changed over a staged module (`runs`).",
     "Generated by scripts/record-cli-contract.mjs — do not hand-edit.",
     "A diff here is a change to an interface the VS Code extension consumes.",
   ],
   cases,
   spec,
   live,
+  stream,
   outputs,
   lint,
+  audit,
+  runs,
 };
 
 writeFileSync(goldenPath, JSON.stringify(golden, null, 2) + "\n", "utf-8");
 console.log(
-  `recorded ${Object.keys(cases).length} cases, ${Object.keys(spec).length} spec runs, ${Object.keys(live).length} live runs, ${Object.keys(outputs).length} outputs and ${Object.keys(lint).length} lint runs -> ${path.relative(extensionDir, goldenPath)}`,
+  `recorded ${Object.keys(cases).length} cases, ${Object.keys(spec).length} spec runs, ${Object.keys(live).length} live runs, ${Object.keys(outputs).length} outputs, ${Object.keys(lint).length} lint runs, ${Object.keys(audit).length} audit runs and ${Object.keys(runs).length} runs cases -> ${path.relative(extensionDir, goldenPath)}`,
 );

@@ -1,7 +1,7 @@
 {
   "name": "gotest",
   "displayName": "Go - Test Suites",
-  "description": "Specification-driven test suites for Go — Spec View, Test Explorer, coverage, and debug integration",
+  "description": "Specification-driven test suites for Go — a panel of verdicts, changes and runs, Test Explorer, coverage, and debug integration",
   "version": "0.1.0",
   "publisher": "mvrahden",
   "license": "MIT",
@@ -95,11 +95,27 @@
       },
       {
         "command": "gotest.showSpecView",
-        "title": "Go Test: Show Spec View",
+        "title": "Go Test: Show Panel (Now)",
         "icon": {
           "light": "static/spec-icon.svg",
           "dark": "static/spec-icon.svg"
         }
+      },
+      {
+        "command": "gotest.showChangeView",
+        "title": "Go Test: Show Panel (Change)"
+      },
+      {
+        "command": "gotest.showRunsView",
+        "title": "Go Test: Show Panel (Runs)"
+      },
+      {
+        "command": "gotest.showInPanel",
+        "title": "Go Test: Show in Panel"
+      },
+      {
+        "command": "gotest.runChanged",
+        "title": "Go Test: Run Changed Packages"
       },
       {
         "command": "gotest.openEventsFile",
@@ -201,6 +217,10 @@
           "when": "false"
         },
         {
+          "command": "gotest.showInPanel",
+          "when": "false"
+        },
+        {
           "command": "gotest.toggleFocus",
           "when": "false"
         },
@@ -238,6 +258,11 @@
           "command": "gotest.copyTestResults",
           "when": "controllerId == gotest",
           "group": "inline"
+        },
+        {
+          "command": "gotest.showInPanel",
+          "when": "controllerId == gotest",
+          "group": "gotest@2"
         }
       ]
     },
@@ -316,6 +341,12 @@
           "scope": "resource",
           "description": "Collect coverage data alongside normal test runs"
         },
+        "gotest.liveResults": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Show each test's result as it happens: test runs, coverage runs and Run Changed have the CLI stream every suite's events live (GOTEST_LIVE=1) instead of when the suite's process ends"
+        },
         "gotest.coverTestOnlyPackages": {
           "type": "boolean",
           "default": false,
@@ -334,11 +365,11 @@
           "scope": "resource",
           "description": "Run gotest lint on the package of a saved _test.go file and show its findings as diagnostics. Rules are configured in .gotest.yml."
         },
-        "gotest.specView.autoRefresh": {
+        "gotest.panel.autoRefresh": {
           "type": "boolean",
           "default": true,
           "scope": "window",
-          "description": "Auto-refresh spec view panel after test runs"
+          "description": "Render the panel's Now tab again after each test run"
         },
         "gotest.watch.autoRestart": {
           "type": "boolean",
@@ -378,6 +409,32 @@
       {
         "path": "./skills/writing-gotest-tests/SKILL.md",
         "when": "gotest.active"
+      }
+    ],
+    "languageModelTools": [
+      {
+        "name": "gotest_audit",
+        "displayName": "gotest Audit",
+        "toolReferenceName": "gotestAudit",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(checklist)",
+        "userDescription": "The audit of the working tree's test change against a base, as gotest audit writes it in Markdown",
+        "modelDescription": "Audits what the working tree changed in the Go test suites of the active gotest workspace folder against a git base, with `gotest audit --format=md`, and returns that Markdown document: behaviors added, removed, reworded, moved and changed; findings that weaken the test estate (removed tests, focus, exclusions, guards, budgets, suppressions, snapshots, assertions); and, as evidence, the verdicts of runs chosen in the editor or of a run this audit makes. Use it to review a test change before committing or merging. With run=true it runs the tests of the changed behaviors with coverage and also lists changed production lines no test executed; that is slower and asks the user to confirm. Without base it audits against the base chosen in the editor's Change view, by default the merge-base with the remote default branch. It does not change any file.",
+        "when": "gotest.active",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "base": {
+              "type": "string",
+              "description": "A git ref to audit against, such as origin/main or a commit; omit for the folder's chosen base"
+            },
+            "run": {
+              "type": "boolean",
+              "description": "Run the tests of the changed behaviors as evidence; asks the user first",
+              "default": false
+            }
+          }
+        }
       }
     ]
   },

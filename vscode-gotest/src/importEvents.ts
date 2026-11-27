@@ -3,7 +3,7 @@ import * as path from "node:path";
 import { readFile } from "node:fs/promises";
 import type { GoTestController } from "./testController.js";
 import type { DiscoveryCache } from "./discovery.js";
-import type { SpecViewPanel } from "./specView.js";
+import type { PanelHost } from "./panel/host.js";
 import type { TestResult } from "./testResultStore.js";
 import { parseTestEvents, type TestEvent } from "./outputParser.js";
 import { buildCliCommand } from "./cli.js";
@@ -17,7 +17,7 @@ const UNSTAMPED_IMPORT =
 export interface ImportDeps {
   controller: GoTestController;
   cache: DiscoveryCache;
-  specView: SpecViewPanel;
+  panel: PanelHost;
   outputChannel: vscode.LogOutputChannel;
 }
 
@@ -59,12 +59,15 @@ class ImportedResults {
   getResult(itemId: string): TestResult | undefined {
     return this.results.get(itemId);
   }
+  forgetResult(itemId: string): void {
+    this.results.delete(itemId);
+  }
   noteStart(): void {}
   notePaused(): void {}
 }
 
 // openEventsFile opens a saved go test -json stream, such as a CI run's
-// --events-file: in the Spec View as a source of its own, and in the Test
+// --events-file: in the panel as a source of its own, and in the Test
 // Explorer as a run named after the file.
 export async function openEventsFile(
   deps: ImportDeps,
@@ -127,7 +130,7 @@ export async function openEventsFile(
     .sort();
   if (missing.length > 0) {
     run.appendOutput(
-      `[import] not in this workspace, shown in the Spec View only:\r\n${missing
+      `[import] not in this workspace, shown in the panel only:\r\n${missing
         .map((p) => `  ${p}`)
         .join("\r\n")}\r\n`,
     );
@@ -142,7 +145,7 @@ export async function openEventsFile(
     `[import] ${file}: ${events.length} event(s), ${missing.length} package(s) not in the workspace`,
   );
 
-  await deps.specView.openStream(`file:${file}`, label, {
+  await deps.panel.openStream(`file:${file}`, label, {
     stream: text,
     folder,
   });

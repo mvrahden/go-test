@@ -13,9 +13,15 @@ export interface StubPanel {
   webview: {
     html: string;
     cspSource: string;
-    onDidReceiveMessage: () => void;
+    onDidReceiveMessage: (handler: (msg: unknown) => void) => void;
+    // What the webview's script would post, delivered to the panel.
+    post?: (msg: unknown) => void;
     asWebviewUri: (u: unknown) => unknown;
+    // What the host posted to the webview, in order.
+    posted: unknown[];
+    postMessage: (msg: unknown) => Promise<boolean>;
   };
+  onDidChangeViewState: () => void;
   onDidDispose: () => void;
   reveal: () => void;
   dispose: () => void;
@@ -196,7 +202,7 @@ export function buildVscodeStub(state: StubState) {
         get: (key: string, fallback?: unknown) => {
           if (state.config && key in state.config) return state.config[key];
           if (key === "cliPath") return state.cliPath;
-          if (key === "specView.autoRefresh") return state.autoRefresh;
+          if (key === "panel.autoRefresh") return state.autoRefresh;
           if (key === "buildTags") return "";
           if (key === "modulePath") return undefined;
           return fallback;
@@ -223,9 +229,17 @@ export function buildVscodeStub(state: StubState) {
           webview: {
             html: "",
             cspSource: "vscode-resource:",
-            onDidReceiveMessage: () => {},
+            onDidReceiveMessage: (handler: (msg: unknown) => void) => {
+              panel.webview.post = handler;
+            },
             asWebviewUri: (u: unknown) => u,
+            posted: [],
+            postMessage: (msg: unknown) => {
+              panel.webview.posted.push(msg);
+              return Promise.resolve(true);
+            },
           },
+          onDidChangeViewState: () => {},
           onDidDispose: () => {},
           reveal: () => {},
           dispose: () => {},

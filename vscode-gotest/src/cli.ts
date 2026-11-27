@@ -5,6 +5,7 @@ import { execFile } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { promisify } from "node:util";
 import { resolveGoBinary, fileExists, clearGoBinaryCache } from "./goBinary.js";
+import { ManagedChild } from "./managedChild.js";
 import {
   goLine,
   hasReplaceDirective,
@@ -26,7 +27,7 @@ const DEFAULT_MODULE_PATH = "github.com/mvrahden/go-test/cmd/gotest";
 // v1.38.0 is the release whose runner stops a suite on its control channel,
 // which its runtime requires, so the CLI's runtime floor moved there and this
 // floor with it. From v1.37.0 on spec reads --declared and --hide and lint
-// prints -rules -json, which the Spec View and the lint diagnostics drive,
+// prints -rules -json, which the panel and the lint diagnostics drive,
 // and --control=stdin takes the stop and force lines a cancel writes.
 // From v1.31.0 on the stream carries
 // every verdict the tree shows, including a shared fixture that failed to
@@ -39,6 +40,16 @@ const DEFAULT_MODULE_PATH = "github.com/mvrahden/go-test/cmd/gotest";
 // gotestgen.MinRuntimeVersion (a Go test guards the order): a CLI the
 // extension accepts must enforce a runtime floor no newer than itself.
 export const MIN_CLI_VERSION = "v1.39.0";
+
+// The Change scope reads `gotest audit`, which v1.42.0 brings. Whether a
+// CLI has it is asked of the CLI (`version --json`); this is the version
+// the upgrade advice names. Below it the rest of the extension still works.
+export const AUDIT_CLI_VERSION = "v1.42.0";
+
+// Run records (`gotest runs`), --changed and spec's --check-fresh come with
+// the same release; a CLI that lists `runs` among its commands has all three.
+export const RUNS_CLI_VERSION = "v1.42.0";
+export const RUNS_COMMAND = "runs";
 
 export interface CliCommand {
   bin: string;
@@ -226,16 +237,18 @@ export class GotestNotRequiredError extends CliUnavailableError {
 // already tells the user, so callers show no toast of their own. The advice
 // names the floor, the smallest move that satisfies it: @latest could raise
 // the go line further than needed. The dialog picks the newest that fits.
+// floor is the version required: the extension's, or one feature's.
 export class CliBelowFloorError extends CliUnavailableError {
   constructor(
     readonly pin: string,
     readonly modulePath: string,
     readonly pinnedDirs: string[],
     readonly log?: vscode.LogOutputChannel,
+    readonly floor: string = MIN_CLI_VERSION,
   ) {
     super(
-      `go.mod pins gotest ${pin}, but >= ${MIN_CLI_VERSION} is required. ` +
-        `Run: go get -tool ${modulePath}@${MIN_CLI_VERSION}`,
+      `go.mod pins gotest ${pin}, but >= ${floor} is required. ` +
+        `Run: go get -tool ${modulePath}@${floor}`,
     );
     this.name = "CliBelowFloorError";
   }
@@ -249,6 +262,110 @@ export function offerCliUpgrade(err: unknown): boolean {
   if (!(err instanceof CliBelowFloorError)) return false;
   showUpgradeDialog(err);
   return true;
+}
+
+// What `gotest version --json` says a CLI can do. json is false for a CLI
+// that answered with its version line: one that predates --json.
+export interface CliCapabilities {
+  json: boolean;
+  version?: string;
+  commands: string[];
+  schemas: Record<string, number>;
+}
+
+// parseCliCapabilities reads what `gotest version --json` printed.
+export function parseCliCapabilities(
+  stdout: string,
+): CliCapabilities | undefined {
+  const text = stdout.trim();
+  if (text.startsWith("{")) {
+    try {
+      const v = JSON.parse(text.split("\n")[0]) as Record<string, unknown>;
+      const schemas: Record<string, number> = {};
+      if (v.schemas && typeof v.schemas === "object") {
+        for (const [k, n] of Object.entries(v.schemas)) {
+          if (typeof n === "number") schemas[k] = n;
+        }
+      }
+      return {
+        json: true,
+        version: typeof v.version === "string" ? v.version : undefined,
+        commands: Array.isArray(v.commands)
+          ? v.commands.filter((c): c is string => typeof c === "string")
+          : [],
+        schemas,
+      };
+    } catch {
+      // not the document; read it as the version line below
+    }
+  }
+  const version = /^gotest\s+(\S+)/m.exec(text)?.[1];
+  if (!version) return undefined;
+  return { json: false, version, commands: [], schemas: {} };
+}
+
+// queryCliCapabilities asks the folder's CLI what it is and can do:
+// `gotest version --json`, through the command the extension would run.
+// Undefined when it says nothing usable.
+export async function queryCliCapabilities(
+  workspaceDir: string,
+  log?: vscode.LogOutputChannel,
+  timeoutMs = 120_000,
+): Promise<CliCapabilities | undefined> {
+  const cmd = await buildCliCommand(["version", "--json"], workspaceDir, log);
+  // A managed child: through go run the CLI is a grandchild a budget must
+  // reach too.
+  const mc = new ManagedChild(cmd.bin, cmd.args, {
+    cwd: workspaceDir,
+    kind: "version",
+  });
+  let stdout = "";
+  mc.child.stdout?.on("data", (chunk: string) => (stdout += chunk));
+  mc.child.stderr?.on("data", () => {});
+  mc.child.on("error", (err: Error) =>
+    log?.debug(`[cli] version query failed: ${err.message}`),
+  );
+  mc.child.stdin?.on("error", () => {});
+  mc.child.stdin?.end();
+  const budget = setTimeout(() => void mc.terminate("prompt"), timeoutMs);
+  try {
+    const { code } = await mc.exited;
+    if (code !== 0) return undefined;
+    return parseCliCapabilities(stdout);
+  } finally {
+    clearTimeout(budget);
+    mc.dispose();
+  }
+}
+
+// pinnedBelow is the floor error for a folder whose go.mod pins the CLI below
+// floor, so the upgrade dialog can move it; undefined when nothing pins it
+// below, or a replace directive decides the version.
+export async function pinnedBelow(
+  workspaceDir: string,
+  floor: string,
+  log?: vscode.LogOutputChannel,
+): Promise<CliBelowFloorError | undefined> {
+  const modulePath = cliPackagePath(workspaceDir);
+  const roots = await readModuleRoots(workspaceDir);
+  if (roots.some((r) => hasReplaceDirective(r.goMod, modulePath))) {
+    return undefined;
+  }
+  const pinned = roots
+    .map((root) => ({ root, version: requireVersion(root.goMod, modulePath) }))
+    .filter((p): p is { root: ModuleRoot; version: string } => !!p.version);
+  const pin = pinned
+    .map((p) => p.version)
+    .sort(compareVersions)
+    .at(-1);
+  if (!pin || compareVersions(pin, floor) >= 0) return undefined;
+  return new CliBelowFloorError(
+    pin,
+    modulePath,
+    pinned.map((p) => p.root.dir),
+    log,
+    floor,
+  );
 }
 
 function meetsFloor(version: string): boolean {
@@ -310,7 +427,7 @@ function showUpgradeDialog(err: CliBelowFloorError): void {
   upgradeState = "asking";
   vscode.window
     .showWarningMessage(
-      `gotest: go.mod pins gotest ${err.pin}, but >= ${MIN_CLI_VERSION} is required.`,
+      `gotest: go.mod pins gotest ${err.pin}, but >= ${err.floor} is required.`,
       "Upgrade",
     )
     .then(async (choice) => {
@@ -349,7 +466,7 @@ async function upgradeCli(err: CliBelowFloorError): Promise<void> {
       .join(", ");
     log?.warn(`[cli] upgrade blocked: ${declared}`);
     vscode.window.showWarningMessage(
-      `gotest: ${MIN_CLI_VERSION} and newer need go ${plan.needs.goLine}, but ${declared}. ` +
+      `gotest: ${err.floor} and newer need go ${plan.needs.goLine}, but ${declared}. ` +
         `Raise the go line to upgrade: go get -tool ${modulePath}@${plan.needs.release} raises it.`,
     );
   }
@@ -391,7 +508,7 @@ async function upgradeCli(err: CliBelowFloorError): Promise<void> {
 // lookUpUpgrade plans the upgrade, or says why there is none: undefined
 // after a failed or cancelled lookup, which leaves go.mod unchanged.
 async function lookUpUpgrade(
-  { modulePath, pinnedDirs, log }: CliBelowFloorError,
+  { modulePath, pinnedDirs, log, floor }: CliBelowFloorError,
   token: vscode.CancellationToken,
 ): Promise<UpgradePlan | undefined> {
   const cancel = new AbortController();
@@ -414,7 +531,7 @@ async function lookUpUpgrade(
       planUpgrade(
         modules.map((m) => ({ dir: m.dir, goLine: goLine(m.goMod) })),
         module,
-        MIN_CLI_VERSION,
+        floor,
         goReleaseQuery(goBin, dir, cancel.signal, log),
       ),
     );
@@ -844,8 +961,42 @@ export function scopedConfig(
   return vscode.workspace.getConfiguration("gotest", scope);
 }
 
+// What each folder's CLI said it can do, asked once until the CLI is
+// resolved afresh.
+const capabilityMemo = new Map<string, Promise<CliCapabilities | undefined>>();
+
+// folderCapabilities is queryCliCapabilities asked once per folder. A query
+// that throws is forgotten, so the next call asks again.
+export function folderCapabilities(
+  workspaceDir: string,
+  log?: vscode.LogOutputChannel,
+): Promise<CliCapabilities | undefined> {
+  let p = capabilityMemo.get(workspaceDir);
+  if (!p) {
+    p = queryCliCapabilities(workspaceDir, log);
+    capabilityMemo.set(workspaceDir, p);
+    p.catch(() => capabilityMemo.delete(workspaceDir));
+  }
+  return p;
+}
+
+// hasRuns says whether a folder's CLI records runs, so --changed and
+// --check-fresh are there too.
+export async function hasRuns(
+  workspaceDir: string,
+  log?: vscode.LogOutputChannel,
+): Promise<boolean> {
+  try {
+    const caps = await folderCapabilities(workspaceDir, log);
+    return !!caps?.json && caps.commands.includes(RUNS_COMMAND);
+  } catch {
+    return false;
+  }
+}
+
 export function clearBinaryCache(): void {
   clearGoBinaryCache();
+  capabilityMemo.clear();
   versionWarningShown = false;
   suggestedRoots.clear();
 }

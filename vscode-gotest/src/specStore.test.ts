@@ -90,6 +90,21 @@ describe("SpecStore", () => {
     expect(pathsOf(composed, checkout)).toEqual(["TestCheckoutTestSuite"]);
   });
 
+  it("composes the packages named, when names are given, and no other", () => {
+    const store = new SpecStore();
+    store.merge({ stream: fullCart, folder: "/ws" });
+    store.merge({
+      stream: stream(
+        ...test(checkout, "TestCheckoutTestSuite", "pass"),
+        verdict(checkout, "pass"),
+      ),
+      folder: "/ws",
+    });
+    const only = store.compose("/ws", new Set([checkout]));
+    expect(pathsOf(only, cart)).toEqual([]);
+    expect(pathsOf(only, checkout)).toEqual(["TestCheckoutTestSuite"]);
+  });
+
   it("holds a package once however many producers reported it", () => {
     const store = new SpecStore();
     store.merge({ stream: fullCart, folder: "/ws" });

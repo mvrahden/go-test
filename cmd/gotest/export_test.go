@@ -418,18 +418,16 @@ func ExportReadStream(chunks []string, collect bool) (killedBy string, failed []
 	return w.killedBy, w.failed, w.took
 }
 
-// ExportLimit is a mutant's limit over suites, given their zero-run times
-// and the runner's overhead, before and after a run that took observed.
-func ExportLimit(took map[string]time.Duration, overhead, observed time.Duration, suites ...string) (before, after time.Duration) {
-	j := &mutantJudge{took: took, overhead: overhead}
+// ExportLimit is a mutant's first and second limit over suites, given
+// their times with none switched on and how long that whole run took.
+func ExportLimit(took map[string]time.Duration, whole time.Duration, suites ...string) (first, second time.Duration) {
+	j := &mutantJudge{took: took, whole: whole}
 	var runs []*suiteRun
 	for _, s := range suites {
 		pkg, name, _ := strings.Cut(s, " ")
 		runs = append(runs, &suiteRun{pkg: pkg, name: name})
 	}
-	before = j.limit(runs)
-	j.observe(observed, runs)
-	return before, j.limit(runs)
+	return j.limit(runs), j.secondLimit(runs)
 }
 
 // ExportBaseline is what readBaseline made of a coverage run.

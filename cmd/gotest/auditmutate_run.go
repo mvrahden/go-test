@@ -14,7 +14,6 @@ import (
 	"runtime"
 	"slices"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -24,8 +23,9 @@ import (
 	"github.com/mvrahden/go-test/internal/mutate"
 )
 
-// Each mutant's run may take timeoutFactor times its suites' baseline
-// time, plus twice the runner's own overhead and timeoutSlack.
+// Each mutant's first run may take timeoutFactor times the run of its
+// suites with none switched on, start-up included, or of the suites' own
+// time when that is longer, plus timeoutSlack; its second run twice that.
 const (
 	timeoutFactor = 3
 	timeoutSlack  = time.Second
@@ -158,7 +158,7 @@ func (a *auditArgs) judge(doc *gotestaudit.Document, m *mutation, b *baseline) {
 				first[doc.Behaviors[i].Package] = true
 			}
 			todo = mutate.Order(todo, func(pkg string) bool { return first[pkg] })
-			outcomes, spent := (&mutate.Scheduler{Jobs: jobs, Budget: a.mutateBudget}).Run(ctx, todo, j.run)
+			outcomes, spent := (&mutate.Scheduler{Jobs: jobs, Budget: a.mutateBudget, Again: j.again}).Run(ctx, todo, j.run)
 			run.Spent = spent
 			for i, o := range outcomes {
 				r := results[todo[i].ID]
@@ -290,11 +290,10 @@ type mutantJudge struct {
 	m        *mutation
 	per      int
 	covering map[int][]*suiteRun
-	mu       sync.Mutex
 	// took is each suite's time on the mutants' build with none switched
-	// on; overhead the least time a run took beyond its suites'.
-	took     map[string]time.Duration
-	overhead time.Duration
+	// on; whole how long that run took, start-up included.
+	took  map[string]time.Duration
+	whole time.Duration
 }
 
 // zeroRun is the run of the mutants' suites with none switched on.
@@ -319,7 +318,7 @@ func (j *mutantJudge) zero(ctx context.Context, todo []mutate.Mutant) zeroRun {
 	w := &streamWriter{collect: true, took: map[string]time.Duration{}}
 	start := time.Now()
 	code := j.runSuites(ctx, 0, suites, w, 0)
-	j.took, j.overhead = w.took, time.Since(start)
+	j.took, j.whole = w.took, time.Since(start)
 	z := zeroRun{suites: len(suites), failed: testsFirst(w.failed), passed: code == 0 && len(w.failed) == 0 && ctx.Err() == nil}
 	if !z.passed && len(z.failed) == 0 {
 		z.failed = []string{fmt.Sprintf("the run (exit %d)", code)}
@@ -327,12 +326,11 @@ func (j *mutantJudge) zero(ctx context.Context, todo []mutate.Mutant) zeroRun {
 	return z
 }
 
-// limit is how long a mutant's run may take before it counts as a timeout.
+// limit is how long a mutant's first run may take before it counts as a
+// timeout. The run with none switched on is timed whole: on a slow machine
+// its start-up dwarfs the suites' own time.
 func (j *mutantJudge) limit(suites []*suiteRun) time.Duration {
-	sum := j.sum(suites)
-	j.mu.Lock()
-	defer j.mu.Unlock()
-	return timeoutFactor*sum + 2*j.overhead + timeoutSlack
+	return timeoutFactor*max(j.whole, j.sum(suites)) + timeoutSlack
 }
 
 func (j *mutantJudge) sum(suites []*suiteRun) time.Duration {
@@ -343,23 +341,31 @@ func (j *mutantJudge) sum(suites []*suiteRun) time.Duration {
 	return sum
 }
 
-// observe lowers the overhead estimate by a run that took took.
-func (j *mutantJudge) observe(took time.Duration, suites []*suiteRun) {
-	took -= j.sum(suites)
-	j.mu.Lock()
-	defer j.mu.Unlock()
-	if took > 0 && took < j.overhead {
-		j.overhead = took
-	}
+// run judges mu by its first run.
+func (j *mutantJudge) run(ctx context.Context, mu *mutate.Mutant) mutate.Outcome {
+	return j.judge(ctx, mu, j.limit(j.covering[mu.ID]))
 }
 
-// run judges mu: killed at the first test that fails, survived when its
-// suites pass, a timeout past its limit; not judged when ctx ends first.
-func (j *mutantJudge) run(ctx context.Context, mu *mutate.Mutant) mutate.Outcome {
+// again judges mu by its second run, alone.
+func (j *mutantJudge) again(ctx context.Context, mu *mutate.Mutant) mutate.Outcome {
+	return j.judge(ctx, mu, j.secondLimit(j.covering[mu.ID]))
+}
+
+// secondLimit is twice the first's: room for a run on a machine slower than
+// the run with none switched on found it, still bounded for one that never
+// ends.
+func (j *mutantJudge) secondLimit(suites []*suiteRun) time.Duration {
+	return 2 * j.limit(suites)
+}
+
+// judge runs mu within limit: killed at the first test that fails,
+// survived when its suites pass, a timeout past limit; not judged when ctx
+// ends first.
+func (j *mutantJudge) judge(ctx context.Context, mu *mutate.Mutant, limit time.Duration) mutate.Outcome {
 	suites := j.covering[mu.ID]
 	w := &streamWriter{first: make(chan string, 1)}
 	start := time.Now()
-	code := j.runSuites(ctx, mu.ID, suites, w, j.limit(suites))
+	code := j.runSuites(ctx, mu.ID, suites, w, limit)
 	o := mutate.Outcome{Elapsed: time.Since(start)}
 	switch {
 	case w.timedOut:
@@ -372,7 +378,6 @@ func (j *mutantJudge) run(ctx context.Context, mu *mutate.Mutant) mutate.Outcome
 		o.Verdict, o.By = mutate.Killed, fmt.Sprintf("the run's exit %d", code)
 	default:
 		o.Verdict = mutate.Survived
-		j.observe(o.Elapsed, suites)
 	}
 	return o
 }

@@ -65,6 +65,7 @@ import {
   type RunEnd,
 } from "./runnerUtils.js";
 import { buildPathTrie, collapsePathTrie, type PathNode } from "./pathTrie.js";
+import { tracked } from "./runStates.js";
 
 interface MockTestItem {
   id: string;
@@ -1680,11 +1681,8 @@ describe("resolveAncestorItems", () => {
     expect(run.passed).not.toHaveBeenCalledWith(pkg);
     expect(run.failed).not.toHaveBeenCalledWith(pkg, []);
     expect(run.failed).toHaveBeenCalledWith(dir, []);
-    expect(controller.recordResult).toHaveBeenCalledWith(
-      "dir:internal",
-      "fail",
-      undefined,
-    );
+    // A folder's state is derived each time, never stored.
+    expect(controller.recordResult).not.toHaveBeenCalled();
   });
 
   it("leaves a package the run errored errored, and its folder failed", () => {
@@ -2037,11 +2035,7 @@ describe("resolveAncestorsOf", () => {
     resolveAncestorsOf(run as any, pkgB as any, controller as any);
 
     expect(run.passed).toHaveBeenCalledWith(dir);
-    expect(controller.recordResult).toHaveBeenCalledWith(
-      "dir:pkg",
-      "pass",
-      undefined,
-    );
+    expect(controller.recordResult).not.toHaveBeenCalled();
   });
 
   it("propagates failed when any sibling failed", () => {
@@ -2064,19 +2058,17 @@ describe("resolveAncestorsOf", () => {
     resolveAncestorsOf(run as any, pkgB as any, controller as any);
 
     expect(run.failed).toHaveBeenCalledWith(dir, []);
-    expect(controller.recordResult).toHaveBeenCalledWith(
-      "dir:pkg",
-      "fail",
-      undefined,
-    );
+    expect(controller.recordResult).not.toHaveBeenCalled();
   });
 
-  it("stops propagation when a sibling has no result", () => {
+  it("stops propagation while a sibling is still running in the run", () => {
     const dir = createItem("dir:pkg", "pkg", undefined);
     const pkgA = createItem("example.com/pkg/a", "a", dir, [{ id: "package" }]);
     const pkgB = createItem("example.com/pkg/b", "b", dir, [{ id: "package" }]);
 
-    const run = { started: vi.fn(), passed: vi.fn(), failed: vi.fn() };
+    const raw = { started: vi.fn(), passed: vi.fn(), failed: vi.fn() };
+    const run = tracked(raw as any);
+    run.started(pkgB as any);
     const controller = {
       getResult: vi.fn((id: string) => {
         if (id === "example.com/pkg/a")
@@ -2088,8 +2080,8 @@ describe("resolveAncestorsOf", () => {
 
     resolveAncestorsOf(run as any, pkgA as any, controller as any);
 
-    expect(run.passed).not.toHaveBeenCalled();
-    expect(run.failed).not.toHaveBeenCalled();
+    expect(raw.passed).not.toHaveBeenCalled();
+    expect(raw.failed).not.toHaveBeenCalled();
     expect(controller.recordResult).not.toHaveBeenCalled();
   });
 
@@ -2115,16 +2107,7 @@ describe("resolveAncestorsOf", () => {
 
     expect(run.passed).toHaveBeenCalledWith(dir);
     expect(run.passed).toHaveBeenCalledWith(root);
-    expect(controller.recordResult).toHaveBeenCalledWith(
-      "dir:internal",
-      "pass",
-      undefined,
-    );
-    expect(controller.recordResult).toHaveBeenCalledWith(
-      "wsFolder:myproject",
-      "pass",
-      undefined,
-    );
+    expect(controller.recordResult).not.toHaveBeenCalled();
   });
 
   it("resolves structural siblings from descendants when they have no stored result", () => {

@@ -61,3 +61,16 @@ export function discoveryTimeoutSeconds(workspaceDir?: string): number {
 export function specRenderTimeoutSeconds(workspaceDir?: string): number {
   return discoveryTimeoutSeconds(workspaceDir);
 }
+
+// `gotest audit --base` records the tree twice, the base exported from git
+// and the working tree, so it gets twice discovery's budget.
+export function auditTimeoutSeconds(workspaceDir?: string): number {
+  return 2 * discoveryTimeoutSeconds(workspaceDir);
+}
+
+// Whether the extension's -json runs have the CLI write each suite's events
+// as they happen (GOTEST_LIVE=1), not when the suite's process ends. A CLI
+// that predates the variable ignores it.
+export function liveResults(workspaceDir?: string): boolean {
+  return scoped(workspaceDir).get<boolean>("liveResults") ?? true;
+}

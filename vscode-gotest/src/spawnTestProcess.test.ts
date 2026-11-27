@@ -1,7 +1,7 @@
 // A test run's output is the developer's own text, and it arrives in whatever
 // pieces the pipe delivers. Decoding each piece on its own would replace any
 // character a read boundary splits with U+FFFD — in the captured stdout the
-// spec view renders, and in the line events the Test Explorer maps to results.
+// panel renders, and in the line events the Test Explorer maps to results.
 
 import { describe, it, expect, vi } from "vitest";
 import type { SpawnScript, FakeChild } from "./scriptedSpawn.test-support.js";
@@ -79,6 +79,53 @@ describe("spawnTestProcess", () => {
 
     expect(result.exitCode).toBe(2);
     expect(result.stderr).toBe("build failed");
+  });
+
+  it("logs each stderr line as it arrives, not when the run ends", async () => {
+    script.once.push({ neverExits: true });
+    const logged: string[] = [];
+    const lines: string[] = [];
+    const logging = { ...channel, warn: (m: string) => logged.push(m) };
+    const done = spawnTestProcess(
+      "go",
+      ["test"],
+      "/ws",
+      token as never,
+      logging as never,
+      "runner",
+      undefined,
+      undefined,
+      (l) => lines.push(l),
+    );
+    await Promise.resolve();
+    const child = children[children.length - 1];
+    const flushed = () => new Promise((r) => setImmediate(r));
+
+    child.stderr.write("slow build: still compiling\nhalf a ");
+    await flushed();
+    expect(logged).toEqual(["[runner] stderr: slow build: still compiling"]);
+
+    child.stderr.write("line\n\n");
+    await flushed();
+    expect(logged).toEqual([
+      "[runner] stderr: slow build: still compiling",
+      "[runner] stderr: half a line",
+    ]);
+
+    child.stderr.write("no newline at the end");
+    child.stdout.end();
+    child.stderr.end();
+    const result = await done;
+    expect(logged).toHaveLength(3);
+    expect(logged[2]).toBe("[runner] stderr: no newline at the end");
+    expect(lines).toEqual([
+      "slow build: still compiling",
+      "half a line",
+      "no newline at the end",
+    ]);
+    expect(result.stderr).toBe(
+      "slow build: still compiling\nhalf a line\n\nno newline at the end",
+    );
   });
 
   // A run stops on Windows too only through its stdin: a signal there kills.
