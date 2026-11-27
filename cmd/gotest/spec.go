@@ -167,7 +167,7 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		return 2
 	}
 
-	code, coverageFailure := coverageVerdict(coverProfile, minCoverage, result.ExitCode)
+	code, coverageFailure := coverageVerdict(plan, coverProfile, minCoverage, result.ExitCode)
 	saveRun(&result, code, manifest, recordOptions{plan: plan, eventsFile: own.Value("--events-file"), narrowed: narrowedBy(&cfg, plan)})
 	events, err := gotestspec.ParseEvents(bytes.NewReader(result.CapturedJSON))
 	if err != nil {

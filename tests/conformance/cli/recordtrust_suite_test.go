@@ -420,3 +420,31 @@ func (s *CLIRecordTrustTestSuite) TestAFailureWhoseTestIsGone(t *gotest.T) {
 		})
 	})
 }
+
+func (s *CLIRecordTrustTestSuite) TestNothingRanUnderAMinimum(t *gotest.T) {
+	const skipped = "note: coverage minimum skipped under --changed: no package ran\n"
+	flag, file := stageRecords(t), stageRecords(t)
+	gotest.Equal(t, 0, flag.run(t, "--min", "10", "./half/").Exit)
+	byFlag := flag.run(t, "--min", "10", "--changed", "./half/")
+	spec := flag.run(t, "spec", "--min", "10", "--changed", "--no-color", "./half/")
+	summary := flag.run(t, "summary", "--min", "10", "--changed", "./half/")
+	gotest.NoError(t, os.WriteFile(filepath.Join(file.dir, ".gotest.yml"), []byte("min-coverage: 10\n"), 0o600))
+	gotest.Equal(t, 0, file.run(t, "./half/").Exit)
+	byFile := file.run(t, "--changed", "./half/")
+
+	t.When("--changed with a coverage minimum follows a passing run with the same minimum, nothing changed since", func(w *gotest.T) {
+		w.It("runs nothing and exits 0, noting on stderr that the coverage minimum was skipped, for --min and for min-coverage in the configuration", func(it *gotest.T) {
+			for _, run := range []testkit.Run{byFlag, byFile} {
+				gotest.Equal(it, 0, run.Exit, "stderr: %s", run.Stderr)
+				gotest.Contains(it, run.Stderr, skipped)
+				gotest.Equal(it, emptyOf1, lastLine(run.Stderr))
+			}
+		})
+		w.It("spec and summary note so too and exit 0", func(it *gotest.T) {
+			for _, run := range []testkit.Run{spec, summary} {
+				gotest.Equal(it, 0, run.Exit, "stderr: %s", run.Stderr)
+				gotest.Contains(it, run.Stderr, skipped)
+			}
+		})
+	})
+}

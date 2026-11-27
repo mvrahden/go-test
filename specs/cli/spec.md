@@ -994,6 +994,14 @@ A --changed run that ran no package SHALL leave the record as it found it, and k
 - **WHEN** a --changed run given only an unchanged package follows a run that failed another package
 - **THEN** the record keeps the failed run's exit code, arguments and failures, and the history holds both runs
 
+### Requirement: A coverage minimum when nothing ran
+A --changed run that ran no package SHALL not judge the coverage minimum, --min or the configuration's min-coverage, and SHALL say on stderr that it was skipped, in a text or -json run, spec and summary: no profile holds anything to measure.
+
+#### Scenario: Nothing ran under a minimum
+- **WHEN** --changed with a coverage minimum follows a passing run with the same minimum, nothing changed since
+- **THEN** runs nothing and exits 0, noting on stderr that the coverage minimum was skipped, for --min and for min-coverage in the configuration
+- **AND** spec and summary note so too and exit 0
+
 ### Requirement: Run records kept
 Each run that records itself SHALL also keep its record alone, with the path of its --events-file, as a file of its own in the checkout's history under the gotest cache, written by a rename; each write SHALL remove all but the newest 50 and those kept over 30 days. gotest clean --cache SHALL remove the records of every checkout no run is writing.
 
