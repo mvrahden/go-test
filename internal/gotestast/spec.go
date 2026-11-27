@@ -79,6 +79,17 @@ func (ts TestSuiteSpecSet) Focuses() bool {
 	return slices.ContainsFunc(ts, func(v *TestSuiteSpec) bool { return v.IsFocused() || v.focusesMethod() })
 }
 
+// IgnoreFocus makes every suite and method of ts read as unfocused: the F_
+// prefix stays in its name and narrows nothing.
+func (ts TestSuiteSpecSet) IgnoreFocus() {
+	for _, v := range ts {
+		v.focusIgnored = true
+		for _, m := range slices.Concat(v.th.TestCases, v.th.Benchmarks, v.th.Fuzzers) {
+			m.focusIgnored = true
+		}
+	}
+}
+
 // focusesMethod reports whether a suite that is not excluded has an F_ method.
 func (ts *TestSuiteSpec) focusesMethod() bool {
 	if ts.IsExcluded() {
@@ -215,6 +226,7 @@ type TestSuiteSpec struct {
 	th                 *TestSuiteHarness
 	fixture            *FixtureSpec
 	fixtureFieldName   string // field name used in the suite struct to hold the fixture pointer
+	focusIgnored       bool   // the F_ prefix narrows nothing
 }
 
 // Identifier returns the Types Name.
@@ -396,8 +408,10 @@ func (ts *TestSuiteSpec) IsGenericAlias() bool { return ts.underlyingTypeName !=
 
 func (ts *TestSuiteSpec) FileSet() *token.FileSet { return ts.pkg.Fset }
 func (ts *TestSuiteSpec) Pos() token.Pos          { return ts.ts.Name.Pos() }
-func (ts *TestSuiteSpec) IsFocused() bool         { return strings.HasPrefix(ts.ts.Name.Name, "F_") }
-func (ts *TestSuiteSpec) IsExcluded() bool        { return strings.HasPrefix(ts.ts.Name.Name, "X_") }
+func (ts *TestSuiteSpec) IsFocused() bool {
+	return !ts.focusIgnored && strings.HasPrefix(ts.ts.Name.Name, "F_")
+}
+func (ts *TestSuiteSpec) IsExcluded() bool { return strings.HasPrefix(ts.ts.Name.Name, "X_") }
 
 // TypeSpecEnd is where the suite's type declaration ends.
 func (ts *TestSuiteSpec) TypeSpecEnd() token.Pos { return ts.ts.End() }
@@ -457,6 +471,7 @@ type TestSuiteMethod struct {
 	usesStdlibT  bool
 	contextParam *types.Var // non-nil if method has a context parameter (2nd param)
 	returnType   types.Type // non-nil if method returns a value (BeforeEach only)
+	focusIgnored bool       // the F_ prefix narrows nothing
 }
 
 // UsesStdlibT returns true if the method's parameter is *testing.T instead of *gotest.T.
@@ -512,7 +527,9 @@ func (m *TestSuiteMethod) DeclaredAt(fset *token.FileSet) string {
 	return filepath.Base(p.Filename) + ":" + strconv.Itoa(p.Line)
 }
 
-func (m *TestSuiteMethod) IsFocused() bool  { return strings.HasPrefix(m.m.Name(), "F_") }
+func (m *TestSuiteMethod) IsFocused() bool {
+	return !m.focusIgnored && strings.HasPrefix(m.m.Name(), "F_")
+}
 func (m *TestSuiteMethod) IsExcluded() bool { return strings.HasPrefix(m.m.Name(), "X_") }
 
 // Identifier returns the test methods identifier.

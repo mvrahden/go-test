@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery GenerateUnderFocus .* / each package keeps a harness holding every method it declares, and go test on them runs the unfocused methods too \(
+Clause: when gotest generate is given two packages of which one holds a focused method → each package keeps a harness holding every method it declares, and go test on them runs the unfocused methods too
+--- a/cmd/gotest/generate.go
++++ b/cmd/gotest/generate.go
+@@ -42,7 +42,7 @@
+ 	if reportBrokenPackages(broken) {
+ 		return 2
+ 	}
+-	results, _, err := gotestgen.GenerateHarness(loaded)
++	results, _, err := gotestgen.GenerateFromLoaded(loaded)
+ 	if err != nil {
+ 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+ 		return 2

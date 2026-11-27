@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery GenerateUnderFocus .* / a run of the same packages still runs the focused method alone \(
+Clause: when gotest generate is given two packages of which one holds a focused method → a run of the same packages still runs the focused method alone
+--- a/internal/gotestrunner/overlay.go
++++ b/internal/gotestrunner/overlay.go
+@@ -47,7 +47,7 @@
+ }
+ 
+ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPackage, debug bool, noCache bool, harvestSeeds bool) (*OverlayResult, func(), error) {
+-	allResults, allSharedFixtures, err := gotestgen.GenerateFromLoadedOpts(loaded, harvestSeeds)
++	allResults, allSharedFixtures, err := gotestgen.GenerateHarness(loaded)
+ 	if err != nil {
+ 		return nil, nil, err
+ 	}

@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/discovery GenerateUnderFocus .* / generate notes on stderr that it ignores F_, naming the method where it is declared, and exits 0 \(
+Clause: when gotest generate is given two packages of which one holds a focused method → generate notes on stderr that it ignores F_, naming the method where it is declared, and exits 0
+--- a/cmd/gotest/focusguard.go
++++ b/cmd/gotest/focusguard.go
+@@ -114,6 +114,7 @@
+ // noteGenerateFocus says on w that generate ignored the F_ prefixes among
+ // loaded. A collection error is left to generation.
+ func noteGenerateFocus(w io.Writer, loaded []*gotestgen.LoadResult) {
++	return
+ 	suites, err := gotestgen.CollectFromLoaded(loaded)
+ 	if err != nil {
+ 		return
