@@ -36,6 +36,10 @@ func suiteHook(t *gotest.T, hook string) {
 		waitOn(t.Context(), hook)
 	case "goexit":
 		runtime.Goexit()
+	case "rowpanic":
+		for range gotest.Each(t, []int{0}) {
+			panic(hook + " panicked in a row")
+		}
 	default:
 		gotest.Fail(t, "%s failed", hook)
 	}

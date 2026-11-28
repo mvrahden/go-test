@@ -1,0 +1,15 @@
+Expect: eachfailpanic: the method after a row that panicked after it failed did not run
+Judge: ./tests/canary CanaryTestSuite/TestARowPanicAfterAFailureEndsItsMethod
+Clause: when a row of an Each table panics after an assertion on its T failed → runs AfterEach, the method after it and AfterAll
+Clause: when a row panics after it failed in a helper given its T, on NewTWithDeadline of it, in Eventually given it or in an It on it → the method ends there as failed and the method after it runs
+--- a/pkg/gotest/utils.go
++++ b/pkg/gotest/utils.go
+@@ -89,7 +89,7 @@
+ 		ended := rowPanicked(tt, captured, site)
+ 		close(done)
+ 		<-finished
+-		if ended {
++		if false && ended {
+ 			logAtUser(parent.t, rowPanicEnded(name, rest))
+ 			parent.t.FailNow()
+ 		}

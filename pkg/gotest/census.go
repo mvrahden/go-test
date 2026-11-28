@@ -18,6 +18,7 @@ import (
 type census struct {
 	n      atomic.Int64
 	nested atomic.Bool
+	void   atomic.Bool            // the test's body panicked: no count
 	by     atomic.Pointer[string] // the reason AssertsBy declared
 }
 
@@ -30,8 +31,8 @@ var (
 )
 
 // openCensus counts the assertions of tt until it ends, then reports them
-// as tt's attributes unless tt opened a subtest or was skipped. by is the
-// reason the test above declared, nil for none.
+// as tt's attributes unless tt opened a subtest, was skipped or was voided.
+// by is the reason the test above declared, nil for none.
 func openCensus(tt *testing.T, by *string) *census {
 	c := &census{}
 	c.by.Store(by)
@@ -40,7 +41,7 @@ func openCensus(tt *testing.T, by *string) *census {
 	tt.Cleanup(func() {
 		censuses.Delete(tt)
 		openCensuses.Add(-1)
-		if c.nested.Load() || tt.Skipped() {
+		if c.nested.Load() || c.void.Load() || tt.Skipped() {
 			return
 		}
 		by, n := c.by.Load(), c.n.Load()
@@ -103,6 +104,13 @@ func writeCount(tt *testing.T, n int64, by bool) {
 	countsMu.Lock()
 	defer countsMu.Unlock()
 	_, _ = countsFile.Write(append(line, '\n'))
+}
+
+// voidCount keeps tt, a test whose body panicked, from reporting a count.
+func voidCount(tt *testing.T) {
+	if c := censusOf(tt); c != nil {
+		c.void.Store(true)
+	}
 }
 
 // censusOf is the census of tb's test; nil when it has none.

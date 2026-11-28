@@ -1,0 +1,15 @@
+Expect: snapfailed updating: the baseline is
+Judge: ./tests/canary CanaryTestSuite/TestAFailedTestLeavesItsBaselineAlone
+Clause: when an Each row that has failed matches a snapshot with GOTEST_UPDATE_SNAPSHOTS on → leaves its section as it was and adds none, says so in the row's output, and still rewrites the section of a row that passed
+Clause: when a method that failed without stopping matches a snapshot → its section is not rewritten under an update, and none is written when it is missing
+--- a/pkg/gotest/snapshot.go
++++ b/pkg/gotest/snapshot.go
+@@ -209,7 +209,7 @@
+ 		claimed[sections[idx].Key] = true
+ 	}
+ 	claimed[sectionKey] = true
+-	if (updateSnapshots() || idx < 0 && !snapshotReadonly()) && baselineWithheld(t, sectionKey) {
++	if (idx < 0 && !snapshotReadonly()) && baselineWithheld(t, sectionKey) {
+ 		return
+ 	}
+ 

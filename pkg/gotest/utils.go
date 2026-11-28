@@ -5,6 +5,7 @@ import (
 	"iter"
 	"reflect"
 	"runtime"
+	"strconv"
 	"sync"
 	"testing"
 
@@ -16,8 +17,10 @@ import (
 // Each iterates over entries as sub-tests, yielding a fresh *T and the entry for each.
 // A failing assertion on the row's T fails the row and returns, so the row
 // goes on and the next row still runs. FailNow or Skipf on it ends the method
-// there, as Go cannot resume a range-over-func loop whose body left early. It
-// panics on a T with no *testing.T, as It and When do.
+// there, as Go cannot resume a range-over-func loop whose body left early.
+// A row that panics after it failed ends the method as failed; one that had
+// not failed panics on, as the method's body would. It panics on a T with no
+// *testing.T, as It and When do.
 func Each[E any](t *T, entries []E) iter.Seq2[*T, E] {
 	if t.t == nil {
 		panic("gotest: Each is unavailable in benchmark/fuzz lifecycle hooks")
@@ -25,7 +28,7 @@ func Each[E any](t *T, entries []E) iter.Seq2[*T, E] {
 	return func(yield func(*T, E) bool) {
 		for i, entry := range entries {
 			name := eachEntryName(reflect.ValueOf(entry), i)
-			if !eachRun(t, name, entry, yield) {
+			if !eachRun(t, name, entry, len(entries)-i-1, yield) {
 				break
 			}
 		}
@@ -35,7 +38,7 @@ func Each[E any](t *T, entries []E) iter.Seq2[*T, E] {
 // eachRun creates a named subtest and calls yield from the calling goroutine
 // (not the subtest goroutine). This satisfies Go's range-over-func contract
 // that yield must be called from the same goroutine as the iterator.
-func eachRun[E any](parent *T, name string, entry E, yield func(*T, E) bool) bool {
+func eachRun[E any](parent *T, name string, entry E, rest int, yield func(*T, E) bool) bool {
 	ready := make(chan *testing.T, 1)
 	done := make(chan struct{})
 	finished := make(chan struct{})
@@ -71,6 +74,7 @@ func eachRun[E any](parent *T, name string, entry E, yield func(*T, E) bool) boo
 	// in-flight panic instead of letting it propagate.
 	goexited := true
 	var captured *capturedPanic
+	var site string // the user's line the row panicked at
 	var result bool
 
 	// Deferred, so the subtest is released and awaited even when yield leaves
@@ -81,8 +85,14 @@ func eachRun[E any](parent *T, name string, entry E, yield func(*T, E) bool) boo
 	// instead of reaching the testing package as a bare Goexit, which it
 	// reports as a failure.
 	defer func() {
+		// Before the row's subtest is released: it can still be written to.
+		ended := rowPanicked(tt, captured, site)
 		close(done)
 		<-finished
+		if ended {
+			logAtUser(parent.t, rowPanicEnded(name, rest))
+			parent.t.FailNow()
+		}
 		if captured != nil {
 			panic(captured)
 		}
@@ -104,7 +114,13 @@ func eachRun[E any](parent *T, name string, entry E, yield func(*T, E) bool) boo
 	}()
 
 	func() {
-		defer func() { captured = capturedFrom(recover(), "Each entry") }()
+		defer func() {
+			v := recover()
+			if v != nil {
+				site = userLine()
+			}
+			captured = capturedFrom(v, "Each entry")
+		}()
 		row := parent.sub(tt)
 		row.soft = true
 		result = yield(row, entry)
@@ -113,23 +129,56 @@ func eachRun[E any](parent *T, name string, entry E, yield func(*T, E) bool) boo
 	return result
 }
 
-// logAtUser logs msg on tb at the innermost line of the user's on the stack:
-// while a Goexit unwinds, Logf would name a frame of the runtime's.
-func logAtUser(tb testing.TB, msg string) {
+// rowPanicked voids the count of a row whose body panicked and reports
+// whether the panic ends only its method: the row had failed. It then says
+// the panic on the row, which is still running.
+func rowPanicked(tt *testing.T, captured *capturedPanic, site string) bool {
+	if captured == nil {
+		return false
+	}
+	voidCount(tt)
+	if !tt.Failed() {
+		return false
+	}
+	fmt.Fprintln(tt.Output(), located(site, fmt.Sprintf("panic after the row failed: %v", captured.Unwrap())))
+	return true
+}
+
+// rowPanicEnded is the method's line for a row that panicked after it failed.
+func rowPanicEnded(name string, rest int) string {
+	msg := "ended at row " + name + ": it panicked after it failed"
+	if rest > 0 {
+		msg += "; rows after it not run: " + strconv.Itoa(rest)
+	}
+	return msg
+}
+
+// located prefixes msg with the line at, when there is one.
+func located(at, msg string) string {
+	if at == "" {
+		return msg
+	}
+	return at + ": " + msg
+}
+
+// userLine is the innermost line of the user's on the stack, "" for none.
+func userLine() string {
 	pcs := make([]uintptr, 64)
 	frames := runtime.CallersFrames(pcs[:runtime.Callers(2, pcs)])
 	for {
 		f, more := frames.Next()
 		if !assert.IsGotestSource(f.File) && !assert.IsGeneratedBridge(f.File) && !callsite.IsStd(f.Function, f.File) {
-			msg = callsite.Format(f.File, f.Line) + ": " + msg
-			break
+			return callsite.Format(f.File, f.Line)
 		}
 		if !more {
-			break
+			return ""
 		}
 	}
-	fmt.Fprintln(tb.Output(), msg)
 }
+
+// logAtUser logs msg on tb at the innermost line of the user's on the stack:
+// while a Goexit unwinds, Logf would name a frame of the runtime's.
+func logAtUser(tb testing.TB, msg string) { fmt.Fprintln(tb.Output(), located(userLine(), msg)) }
 
 func eachEntryName(v reflect.Value, index int) string {
 	if v.Kind() == reflect.Struct {

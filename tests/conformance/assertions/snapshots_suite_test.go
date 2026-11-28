@@ -101,6 +101,50 @@ func (s *SnapshotKeysTestSuite) TestSwitchSpellings(t *gotest.T) {
 	})
 }
 
+func (s *SnapshotKeysTestSuite) TestAFailedTest(t *gotest.T) {
+	root, err := testkit.RepoRoot()
+	gotest.NoError(t, err)
+	const before = "=== SNAP TestAMethod ===\nold\n=== SNAP TestRows/kept ===\nold\n=== SNAP TestRows/passing ===\nold\n"
+	// Each run gets a staged copy: a write lands there, never in the fixture.
+	staged := func(module string, env ...string) (testkit.Run, string) {
+		dir := t.TempDir()
+		pkg, err := testkit.StagePackage(root, filepath.Join("..", "testdata", "snapfailed"), dir, module)
+		gotest.NoError(t, err)
+		run, err := testkit.RunCLIWithEnv(t.Context(), dir, env, "-json", "./snapfailed/")
+		gotest.NoError(t, err)
+		return run, readFile(t, filepath.Join(pkg, "testdata", "__snapshots__", "TestSnapFailedTestSuite.snap"))
+	}
+	updating, afterUpdate := staged("snapfailedupmod", "SNAP_VALUE=new", "GOTEST_UPDATE_SNAPSHOTS=1")
+	comparing, afterCompare := staged("snapfailedcmpmod", "SNAP_VALUE=new")
+	const rows = "TestSnapFailedTestSuite/TestRows/"
+	t.When("an Each row that has failed matches a snapshot with GOTEST_UPDATE_SNAPSHOTS on", func(w *gotest.T) {
+		w.It("leaves its section as it was and adds none, says so in the row's output, and still rewrites the section of a row that passed", func(it *gotest.T) {
+			gotest.Equal(it, "=== SNAP TestAMethod ===\nold\n=== SNAP TestRows/kept ===\nold\n=== SNAP TestRows/passing ===\nnew\n", afterUpdate, "stdout: %s", updating.Stdout)
+			gotest.Equal(it, "pass", updating.Verdict(rows+"passing"))
+			gotest.Equal(it, "fail", updating.Verdict(rows+"kept"))
+			gotest.Contains(it, updating.Stdout, "snapfailed_suite_test.go:22: MatchSnapshot: snapshot [TestRows/kept] not updated: the test had already failed")
+			gotest.Contains(it, updating.Stdout, "snapfailed_suite_test.go:22: MatchSnapshot: snapshot [TestRows/fresh] not updated: the test had already failed")
+		})
+	})
+	t.When("an Each row that has failed matches a snapshot whose section is missing, updates off", func(w *gotest.T) {
+		w.It("writes no section and says so in the row's output, and a failed row whose section exists is still compared", func(it *gotest.T) {
+			gotest.Equal(it, before, afterCompare, "stdout: %s", comparing.Stdout)
+			gotest.Contains(it, comparing.Stdout, "snapfailed_suite_test.go:22: MatchSnapshot: snapshot [TestRows/fresh] not written: the test had already failed")
+			gotest.Contains(it, comparing.Stdout, "MatchSnapshot: snapshot mismatch [TestRows/kept]:")
+		})
+	})
+	t.When("a method that failed without stopping matches a snapshot", func(w *gotest.T) {
+		w.It("its section is not rewritten under an update, and none is written when it is missing", func(it *gotest.T) {
+			gotest.Contains(it, afterUpdate, "=== SNAP TestAMethod ===\nold\n")
+			gotest.NotContains(it, afterUpdate, "TestAFreshMethod")
+			gotest.NotContains(it, afterCompare, "TestAFreshMethod")
+			gotest.Contains(it, updating.Stdout, "MatchSnapshot: snapshot [TestAMethod] not updated: the test had already failed")
+			gotest.Contains(it, comparing.Stdout, "MatchSnapshot: snapshot [TestAFreshMethod] not written: the test had already failed")
+			gotest.Contains(it, comparing.Stdout, "MatchSnapshot: snapshot mismatch [TestAMethod]:")
+		})
+	})
+}
+
 func (s *SnapshotKeysTestSuite) TestNames(t *gotest.T) {
 	bad := []string{"two\nlines", "=== SNAP forged ==="}
 	results := make([]*gotest.R, len(bad))

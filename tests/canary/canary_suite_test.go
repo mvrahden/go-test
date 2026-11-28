@@ -336,6 +336,55 @@ func (s *CanaryTestSuite) TestEachRowsGoOnPastAFailure(t *gotest.T) {
 	}
 }
 
+// A row that panics after an assertion on its T failed ends its own method:
+// the row says the panic at its line, with no stack, the method says where
+// it ended, and AfterEach, the method after it and AfterAll run.
+func (s *CanaryTestSuite) TestARowPanicAfterAFailureEndsItsMethod(t *gotest.T) {
+	r := s.check(t, "eachfailpanic")
+	data, _ := os.ReadFile(filepath.Join(r.dir, testkit.MarkersFile))
+	got := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if !slices.Contains(got, "later method") {
+		t.Errorf("eachfailpanic: the method after a row that panicked after it failed did not run: %v", got)
+	}
+	want := []string{"row first", "row second", "after each TestEachFailPanicTestSuite/TestARowPanics", "later method", "after each TestEachFailPanicTestSuite/TestLater", "after all"}
+	if !slices.Equal(got, want) {
+		t.Errorf("eachfailpanic: markers %v, want %v", got, want)
+	}
+	if !strings.Contains(r.stream, "eachfailpanic_suite_test.go:37: panic after the row failed: runtime error: invalid memory address or nil pointer dereference") {
+		t.Errorf("eachfailpanic: the row does not say its panic")
+	}
+	if !strings.Contains(r.stream, "eachfailpanic_suite_test.go:34: ended at row second: it panicked after it failed; rows after it not run: 1") {
+		t.Errorf("eachfailpanic: the method does not say how many rows did not run")
+	}
+	if strings.Contains(r.stream, "goroutine ") || strings.Contains(r.stderr, "goroutine ") {
+		t.Errorf("eachfailpanic: the run printed a stack")
+	}
+}
+
+// A row that panics without having failed still ends the suite, and it
+// reports no count: under --ci nothing names it as a pass without an
+// assertion. The row before it keeps its count.
+func (s *CanaryTestSuite) TestAPanickingRowReportsNoCount(t *gotest.T) {
+	r := s.check(t, "eachpanic", "--ci")
+	counts := map[string]string{}
+	for _, line := range strings.Split(r.stream, "\n") {
+		var ev struct{ Action, Test, Key, Value string }
+		if json.Unmarshal([]byte(line), &ev) == nil && ev.Action == "attr" && ev.Key == protocol.AttrAssertions {
+			counts[ev.Test] = ev.Value
+		}
+	}
+	const rows = "TestEachPanicTestSuite/TestRows/"
+	if n, ok := counts[rows+"first"]; !ok || n != "1" {
+		t.Errorf("eachpanic: %sfirst gotest.assertions is %q (reported: %v), want \"1\"", rows, n, ok)
+	}
+	if _, ok := counts[rows+"second"]; ok {
+		t.Errorf("eachpanic: %ssecond gotest.assertions is reported, want none", rows)
+	}
+	if strings.Contains(r.stderr, "passed without an assertion") {
+		t.Errorf("eachpanic: stderr names a vacuous pass:\n%s", r.stderr)
+	}
+}
+
 // A failure inside a helper names the helper's line and the caller's, also
 // under -trimpath in a module whose path has no dot, which the standard
 // library's import paths resemble.
@@ -407,6 +456,39 @@ func (s *CanaryTestSuite) TestSnapshotsKeyOnTheExactName(t *gotest.T) {
 		}
 		if after, _ := os.ReadFile(baseline); !bytes.Equal(after, before) { //nolint:gosec // G304: as above
 			t.Errorf("snapshotting %s: the baseline was rewritten", c.how)
+		}
+	}
+}
+
+// A test that has already failed leaves its baseline as it was: nothing is
+// rewritten under an update and no missing section is written, while a row
+// that passed is still updated and a failed row is still compared.
+func (s *CanaryTestSuite) TestAFailedTestLeavesItsBaselineAlone(t *gotest.T) {
+	const kept = "=== SNAP TestAMethod ===\nold\n=== SNAP TestRows/kept ===\nold\n=== SNAP TestRows/passing ===\n"
+	for _, c := range []struct {
+		how  string
+		env  []string
+		file string
+		says []string
+	}{
+		{"updating", []string{"SNAP_VALUE=new", "GOTEST_UPDATE_SNAPSHOTS=1"}, kept + "new\n",
+			[]string{"snapshot [TestRows/kept] not updated: the test had already failed", "snapshot [TestAMethod] not updated: the test had already failed"}},
+		{"comparing", []string{"SNAP_VALUE=new"}, kept + "old\n",
+			[]string{"snapshot [TestRows/fresh] not written: the test had already failed", "snapshot [TestAFreshMethod] not written: the test had already failed", "snapshot mismatch [TestRows/kept]"}},
+	} {
+		dir := stage(t, "snapfailed")
+		r := s.runIn(t, dir, "./snapfailed/", "snapfailed", t.TempDir(), c.env)
+		if r.code != 1 {
+			t.Errorf("snapfailed %s: exit code %d, want 1", c.how, r.code)
+		}
+		after, _ := os.ReadFile(filepath.Join(dir, "snapfailed", "testdata", "__snapshots__", "TestSnapFailedTestSuite.snap")) //nolint:gosec // G304: the staged copy of the canary's own fixture
+		if string(after) != c.file {
+			t.Errorf("snapfailed %s: the baseline is\n%s\nwant\n%s", c.how, after, c.file)
+		}
+		for _, want := range c.says {
+			if !strings.Contains(r.stream, want) {
+				t.Errorf("snapfailed %s: no output says %q", c.how, want)
+			}
 		}
 	}
 }

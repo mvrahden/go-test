@@ -630,6 +630,7 @@ still ends the method — Go's range-over-func cannot resume a loop whose body l
 so a row that should merely be passed over uses `continue` ([Each rows](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-each-rows)).
 A row whose later lines need an earlier check to hold guards them itself:
 `if t.T().Failed() { continue }`, or puts them in a `t.It`, whose `t` is fatal.
+A row that panics after it failed is reported as that row's failure and ends its method ([A row that panics](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-a-row-that-panics)); a failed test's snapshot is left as it was ([Snapshots of a failed test](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-snapshots-of-a-failed-test)).
 
 ## Utilities
 

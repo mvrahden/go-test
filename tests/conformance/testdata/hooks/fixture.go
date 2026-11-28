@@ -3,7 +3,8 @@
 // error (a fixture hook returns one), assert (a suite hook fails an
 // assertion), panic, overrun (the hook sleeps a second, past the suite's
 // 300ms Timeout), wait (the hook waits on its context, and marks that it
-// saw it end) or goexit (the hook leaves through runtime.Goexit).
+// saw it end), goexit (the hook leaves through runtime.Goexit) or rowpanic
+// (the body panics in a row of an Each table, before the row failed).
 package hooks
 
 import (

@@ -15,6 +15,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"testing"
 
 	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/internal/runstate"
@@ -208,6 +209,9 @@ func matchSnapshot(t testingT, callerSkip int, value any, name ...string) {
 		claimed[sections[idx].Key] = true
 	}
 	claimed[sectionKey] = true
+	if (updateSnapshots() || idx < 0 && !snapshotReadonly()) && baselineWithheld(t, sectionKey) {
+		return
+	}
 
 	if updateSnapshots() {
 		if idx >= 0 {
@@ -251,6 +255,30 @@ func matchSnapshot(t testingT, callerSkip int, value any, name ...string) {
 			failf(t, "MatchSnapshot: snapshot mismatch [%s]:\n  expected: %s\n  actual:   %s\nRun with GOTEST_UPDATE_SNAPSHOTS=1 to update", sectionKey, want, got)
 		}
 	}
+}
+
+// baselineWithheld reports whether t's test has already failed, so its
+// baseline is not written; it says so at the user's line. A poll's recorder
+// has no output and withholds silently.
+func baselineWithheld(t testingT, sectionKey string) bool {
+	var tb testing.TB
+	switch v := t.(type) {
+	case *T:
+		tb = v.testingTB()
+	case testing.TB:
+		tb = v
+	case interface{ Failed() bool }:
+		return v.Failed()
+	}
+	if tb == nil || !tb.Failed() {
+		return false
+	}
+	verb := "written"
+	if updateSnapshots() {
+		verb = "updated"
+	}
+	logAtUser(tb, fmt.Sprintf("MatchSnapshot: snapshot [%s] not %s: the test had already failed", sectionKey, verb))
+	return true
 }
 
 // snapshotDirFor is where the snapshots of a caller file live. Tests of
@@ -407,8 +435,9 @@ func splitTestName(name string) (topLevel, rest string) {
 // test's baseline in testdata/__snapshots__/<TestName>.snap beside the
 // calling file (<TestName>_ext.snap from an external test package). A
 // missing section is written as the baseline, except under GOTEST_CI;
-// GOTEST_UPDATE_SNAPSHOTS rewrites it. The optional name tells several
-// snapshots of one test apart.
+// GOTEST_UPDATE_SNAPSHOTS rewrites it. For a test that has already failed
+// nothing is written. The optional name tells several snapshots of one test
+// apart.
 func MatchSnapshot(t testingT, value any, name ...string) {
 	countAssertion(t)
 	matchSnapshot(t, 2, value, name...)

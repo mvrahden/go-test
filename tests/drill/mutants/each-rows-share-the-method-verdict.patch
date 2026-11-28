@@ -5,10 +5,10 @@ Clause: when one row of an Each table fails → fails that row and the method, a
 Clause: when one row of an Each table skips → skips that row and the method from there, and the rows after it never run
 --- a/pkg/gotest/utils.go
 +++ b/pkg/gotest/utils.go
-@@ -102,9 +102,7 @@
- 
- 	func() {
- 		defer func() { captured = capturedFrom(recover(), "Each entry") }()
+@@ -121,9 +121,7 @@
+ 			}
+ 			captured = capturedFrom(v, "Each entry")
+ 		}()
 -		row := parent.sub(tt)
 -		row.soft = true
 -		result = yield(row, entry)

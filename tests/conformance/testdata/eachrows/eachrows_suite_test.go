@@ -115,3 +115,59 @@ func (s *EachRowsTestSuite) TestEventuallyInARow(t *gotest.T) {
 		mark("after Eventually")
 	}
 }
+
+// The methods below panic in a row that had already failed; each ends its
+// own method, and the hooks and the method after them still run.
+
+func (s *EachRowsTestSuite) AfterEach(t *gotest.T) { mark("after each " + t.Name()) }
+func (s *EachRowsTestSuite) AfterAll(t *gotest.T)  { mark("after all") }
+
+type valued struct {
+	Desc string
+	v    *int
+}
+
+func (s *EachRowsTestSuite) TestARowPanicsAfterFailing(t *gotest.T) {
+	one := 1
+	for it, r := range gotest.Each(t, []valued{{"first", &one}, {"second", nil}, {"third", &one}, {"fourth", &one}}) {
+		mark("panic " + r.Desc)
+		gotest.NotZero(it, r.v, "the %s row has no value", r.Desc)
+		gotest.Equal(it, 1, *r.v)
+	}
+	mark("after the panic")
+}
+
+func (s *EachRowsTestSuite) TestPanicAfterAHelper(t *gotest.T) {
+	for it, r := range gotest.Each(t, []row{{"first", false}}) {
+		expectOK(it, r.ok)
+		panic("after the helper")
+	}
+}
+
+func (s *EachRowsTestSuite) TestPanicAfterADeadline(t *gotest.T) {
+	for it, r := range gotest.Each(t, []row{{"first", false}}) {
+		gotest.True(gotest.NewTWithDeadline(it, time.Minute), r.ok)
+		panic("after the deadline T")
+	}
+}
+
+func (s *EachRowsTestSuite) TestPanicAfterEventually(t *gotest.T) {
+	for it, r := range gotest.Each(t, []row{{"first", false}}) {
+		gotest.Eventually(it, 50*time.Millisecond, 10*time.Millisecond, func(poll *gotest.R) {
+			gotest.True(poll, r.ok)
+		})
+		panic("after Eventually")
+	}
+}
+
+func (s *EachRowsTestSuite) TestPanicAfterAnIt(t *gotest.T) {
+	for it, r := range gotest.Each(t, []row{{"first", false}}) {
+		it.It("stops", func(it *gotest.T) { gotest.True(it, r.ok) })
+		panic("after the It")
+	}
+}
+
+func (s *EachRowsTestSuite) TestTheMethodAfterThePanics(t *gotest.T) {
+	mark("the method after the panics")
+	gotest.True(t, true)
+}
