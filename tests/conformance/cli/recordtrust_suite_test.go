@@ -448,3 +448,23 @@ func (s *CLIRecordTrustTestSuite) TestNothingRanUnderAMinimum(t *gotest.T) {
 		})
 	})
 }
+
+func (s *CLIRecordTrustTestSuite) TestAFocusedRunBesideAPackageThatDeclaresNoTest(t *gotest.T) {
+	tr := stageRecords(t)
+	pkgs := []string{"./good/", "./bad/", "./plain/"}
+	tr.replace(t, "good/good_suite_test.go", "TestHolds", "F_TestHolds")
+	gotest.Equal(t, 0, tr.run(t, pkgs...).Exit)
+	rec := tr.record(t)
+	tr.replace(t, "good/good_suite_test.go", "F_TestHolds", "TestHolds")
+	changed := tr.run(t, append([]string{"--changed"}, pkgs...)...)
+
+	t.When("a run is narrowed by a focus and one of its packages declares no test", func(w *gotest.T) {
+		w.It("that package's verdict stays current and a later --changed run leaves it out", func(it *gotest.T) {
+			gotest.Equal(it, "skip", rec.of("records/plain").Verdict)
+			gotest.False(it, rec.of("records/plain").Narrowed)
+			gotest.Equal(it, 1, changed.Exit, "stderr: %s", changed.Stderr)
+			gotest.Equal(it, []string{"records/good", "records/bad"}, ranOf(changed.Stdout, "records/good", "records/bad", "records/plain"), "stdout: %s", changed.Stdout)
+			gotest.Equal(it, "gotest: FAIL exit 1 | packages: 1 passed, 1 failed, 0 skipped | changed only: 2 ran, 1 unchanged", lastLine(changed.Stderr))
+		})
+	})
+}

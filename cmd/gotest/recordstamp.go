@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
 	"github.com/mvrahden/go-test/internal/protocol"
 )
@@ -39,6 +40,26 @@ func stampRecord(rec *protocol.RunRecord, mode protocol.VerdictMode, narrowed fu
 			}
 		}
 	}
+}
+
+// declaringPackages are the packages of loaded declaring a test method or
+// fuzz target an unfocused run runs, excluded ones aside; nil when the
+// suites cannot be read.
+func declaringPackages(loaded []*gotestgen.LoadResult) map[string]bool {
+	out := map[string]bool{}
+	for _, lr := range loaded {
+		suites, err := gotestgen.CollectFromLoaded([]*gotestgen.LoadResult{lr})
+		if err != nil {
+			return nil
+		}
+		effective, _, _ := suites.ReduceInRun(false)
+		for _, s := range effective {
+			if len(s.TestCases())+len(s.Fuzzers()) > 0 {
+				out[lr.PkgPath] = true
+			}
+		}
+	}
+	return out
 }
 
 // heldCurrent reports whether --changed holds r as current for a package

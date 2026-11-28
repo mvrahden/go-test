@@ -2,12 +2,12 @@ Expect: ^FAIL .*conformance/cli CLIRecordTrust .* / runs again the other package
 Clause: when --changed follows a run that a focused method in one package narrowed, the focus removed since → runs again the other package, whose failing test the focus kept from running, and exits 1
 --- a/cmd/gotest/changed.go
 +++ b/cmd/gotest/changed.go
-@@ -197,7 +197,7 @@
- // suite or method narrow all; --failed every package it does not rerun
- // whole.
+@@ -205,7 +205,7 @@
  func narrowedBy(cfg *ExecConfig, plan *runPlan) func(string) bool {
--	all := gotestrunner.SelectsTests(cfg.GoTestArgs) || len(cfg.Groups)+len(cfg.SkipGroups) > 0 || plan != nil && plan.focused
-+	all := gotestrunner.SelectsTests(cfg.GoTestArgs) || len(cfg.Groups)+len(cfg.SkipGroups) > 0
+ 	all := gotestrunner.SelectsTests(cfg.GoTestArgs) || len(cfg.Groups)+len(cfg.SkipGroups) > 0
+ 	focused := func(pkg string) bool {
+-		return plan != nil && plan.focused && (plan.declares == nil || plan.declares[pkg])
++		return false
+ 	}
  	only := cfg.Only
  	if plan != nil && plan.only != nil {
- 		only = plan.only

@@ -503,10 +503,11 @@ var ExportStampRecord = stampRecord
 // changed.go
 
 // ExportNarrowedBy is the narrowing of a run given its flags, groups,
-// --failed selection, --changed --failed selection and focus.
-func ExportNarrowedBy(args, groups []string, failedOnly, changedFailedOnly map[string]string, focused bool) func(string) bool {
+// --failed selection, --changed --failed selection, focus and the packages
+// declaring a test under it.
+func ExportNarrowedBy(args, groups []string, failedOnly, changedFailedOnly map[string]string, focused bool, declares map[string]bool) func(string) bool {
 	cfg := &ExecConfig{GoTestArgs: args, Groups: groups, Only: failedOnly}
-	return narrowedBy(cfg, &runPlan{only: changedFailedOnly, focused: focused})
+	return narrowedBy(cfg, &runPlan{only: changedFailedOnly, focused: focused, declares: declares})
 }
 
 // runs.go

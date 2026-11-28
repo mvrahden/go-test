@@ -2,10 +2,10 @@ Expect: ^FAIL .*conformance/cli CLIInputHash .* / the run's manifest names its -
 Clause: when a file the package's test reads outside its testdata trees changes after a run → the run's manifest names its -tags in Build
 --- a/cmd/gotest/changed.go
 +++ b/cmd/gotest/changed.go
-@@ -84,9 +84,6 @@
- func planRun(cfg *ExecConfig, pkgs *gotestgen.RunPackages) (*runPlan, bool) {
- 	classified := gotestrunner.ClassifyGoTestArgs(cfg.GoTestArgs)
- 	plan := &runPlan{inputs: startInputs(pkgs, classified.BuildFlags), mode: runMode(cfg), focused: cfg.Focused}
+@@ -90,9 +90,6 @@
+ 	if plan.focused {
+ 		plan.declares = declaringPackages(pkgs.Loaded)
+ 	}
 -	if cfg.Manifest != nil {
 -		cfg.Manifest.Build = plan.inputs.flags
 -	}

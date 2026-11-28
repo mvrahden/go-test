@@ -953,11 +953,15 @@ A record SHALL mark a package's verdict as of a part of its tests, `Narrowed`, w
 - **AND** --changed after the -count=0 run runs the package again and exits 1
 
 ### Requirement: A verdict of a part is never current
-A verdict of a part of a package's tests SHALL never be held as current. A package in which nothing ran for a reason in its own source, having no test files, every method excluded or benchmarks only, SHALL not be marked so: its input hash covers the reason.
+A verdict of a part of a package's tests SHALL never be held as current. A package in which nothing ran for a reason in its own source, having no test files, every method excluded or benchmarks only, SHALL not be marked so: its input hash covers the reason. A focus SHALL mark so only the packages declaring a test or fuzz target an unfocused run runs: from a package declaring none it takes nothing.
 
 #### Scenario: Packages that run nothing by their own source
 - **WHEN** --changed follows a run of a package whose methods are all excluded, one holding only benchmarks, one without test files and one that passed
 - **THEN** leaves all four out as unchanged
+
+#### Scenario: A focused run beside a package that declares no test
+- **WHEN** a run is narrowed by a focus and one of its packages declares no test
+- **THEN** that package's verdict stays current and a later --changed run leaves it out
 
 ### Requirement: What a failed run leaves in its record
 A record SHALL list as failed each package a failure of the run names, a test that passed without an assertion and failed a --ci run and a declared test the census found without a verdict among them. A run that failed without a failed package, as on a shared fixture's teardown or the coverage minimum, and a run in which a shared fixture's teardown failed beside other failures SHALL mark every passing verdict it records as of a part: no pass of that run is held as current.

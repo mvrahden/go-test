@@ -108,17 +108,19 @@ func (s *RecordStampTestSuite) TestWhatNarrowsARun(t *gotest.T) {
 		args, groups                  []string
 		failedOnly, changedFailedOnly map[string]string
 		focused                       bool
+		declares                      map[string]bool
 		a, b                          bool
 	}{
-		{"no flags", nil, nil, nil, nil, false, false, false},
-		{"-count=0", []string{"-count=0", "./..."}, nil, nil, nil, false, true, true},
-		{"a group", nil, []string{"fast"}, nil, nil, false, true, true},
-		{"a focus", nil, nil, nil, nil, true, true, true},
-		{"--failed naming a method", nil, nil, map[string]string{"m/a": "^TestS$/^TestX$"}, nil, false, true, true},
-		{"--failed rerunning a package whole", nil, nil, map[string]string{"m/a": ""}, nil, false, false, true},
-		{"--changed --failed", nil, nil, nil, map[string]string{"m/a": "", "m/b": "^TestS$/^TestX$"}, false, false, true},
+		{"no flags", nil, nil, nil, nil, false, nil, false, false},
+		{"-count=0", []string{"-count=0", "./..."}, nil, nil, nil, false, nil, true, true},
+		{"a group", nil, []string{"fast"}, nil, nil, false, nil, true, true},
+		{"a focus", nil, nil, nil, nil, true, nil, true, true},
+		{"a focus beside a package declaring no test", nil, nil, nil, nil, true, map[string]bool{"m/a": true}, true, false},
+		{"--failed naming a method", nil, nil, map[string]string{"m/a": "^TestS$/^TestX$"}, nil, false, nil, true, true},
+		{"--failed rerunning a package whole", nil, nil, map[string]string{"m/a": ""}, nil, false, nil, false, true},
+		{"--changed --failed", nil, nil, nil, map[string]string{"m/a": "", "m/b": "^TestS$/^TestX$"}, false, nil, false, true},
 	}) {
-		narrowed := main.ExportNarrowedBy(r.args, r.groups, r.failedOnly, r.changedFailedOnly, r.focused)
+		narrowed := main.ExportNarrowedBy(r.args, r.groups, r.failedOnly, r.changedFailedOnly, r.focused, r.declares)
 		gotest.Equal(sub, []bool{r.a, r.b}, []bool{narrowed("m/a"), narrowed("m/b")})
 	}
 }
