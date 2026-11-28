@@ -123,6 +123,9 @@ var witnesses = []witness{
 	{file: "reference/api.md", quote: "### A test asserts, or says how it checks", label: "v1.42+", path: "pkg/gotest/census.go", literal: "func (t *T) AssertsBy(reason string)"},
 	{file: "reference/api.md", quote: "the test checks by other means; never to silence the count", label: "v1.42+", path: "pkg/gotest/census.go", literal: "func (t *T) AssertsBy(reason string)"},
 	{file: "reference/ci.md", quote: "an assertion fails it (v1.42+", label: "v1.42+", path: "pkg/gotest/census.go", literal: "func (t *T) AssertsBy(reason string)"},
+	{file: "reference/api.md", quote: "and refused for any other value (v1.42+", label: "v1.42+", path: "internal/protocol/protocol.go", literal: "func CheckSwitches"},
+	{file: "reference/ci.md", quote: "v1.42+ refuses a `GOTEST_CI` that is neither", label: "v1.42+", path: "internal/protocol/protocol.go", literal: "func CheckSwitches"},
+	{file: "reference/cli.md", quote: "v1.42+ refuses any other `GOTEST_CI` or `GOTEST_UPDATE_SNAPSHOTS` value", label: "v1.42+", path: "cmd/gotest/cli.go", literal: "protocol.CheckSwitches(os.Getenv)"},
 }
 
 var (
