@@ -83,7 +83,7 @@ func (tr freshTree) record(t *gotest.T) trustRecord {
 }
 
 // of is pkg's entry; the zero value when absent.
-func (r trustRecord) of(pkg string) trustPackage {
+func (r *trustRecord) of(pkg string) trustPackage {
 	for _, p := range r.Packages {
 		if p.Package == pkg {
 			return p
@@ -119,7 +119,8 @@ func (s *CLIRecordTrustTestSuite) TestTheModeInARecord(t *gotest.T) {
 	strict, plain := stageRecords(t), stageRecords(t)
 	gotest.Equal(t, 0, strict.run(t, "--ci", "-short", "./good/").Exit)
 	gotest.Equal(t, 0, plain.run(t, "./good/").Exit)
-	on, off := strict.record(t).of("records/good").Mode, plain.record(t).of("records/good").Mode
+	strictRec, plainRec := strict.record(t), plain.record(t)
+	on, off := strictRec.of("records/good").Mode, plainRec.of("records/good").Mode
 
 	t.When("a --ci -short run of a package ends", func(w *gotest.T) {
 		w.It("its record lists the package with a Mode whose Policy and Short are on", func(it *gotest.T) {
@@ -248,7 +249,8 @@ func (s *CLIRecordTrustTestSuite) TestFlagsThatLeaveNothingToRun(t *gotest.T) {
 				tr := stageRecords(sub)
 				run := tr.run(sub, r.args...)
 				gotest.Equal(sub, 0, run.Exit, "stderr: %s", run.Stderr)
-				p := tr.record(sub).of("records/bad")
+				rec := tr.record(sub)
+				p := rec.of("records/bad")
 				gotest.Equal(sub, "pass", p.Verdict)
 				gotest.True(sub, p.Narrowed)
 			}

@@ -1,6 +1,8 @@
 package main_test
 
 import (
+	"strings"
+
 	main "github.com/mvrahden/go-test/cmd/gotest"
 	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -28,51 +30,36 @@ func (s *RecordStampTestSuite) TestStampingARecord(t *gotest.T) {
 		gotest.False(it, a.Narrowed)
 		gotest.True(it, b.Narrowed)
 	})
-	plain := &protocol.VerdictMode{}
-	pkg := func(name, verdict string, narrowed bool) protocol.PackageVerdict {
-		return protocol.PackageVerdict{Package: name, Verdict: verdict, Narrowed: narrowed, Mode: plain}
+	// verdicts reads "pkg:verdict" words, a third field "n" marking one narrowed.
+	verdicts := func(words string, mode *protocol.VerdictMode) []protocol.PackageVerdict {
+		var out []protocol.PackageVerdict
+		for _, w := range strings.Fields(words) {
+			f := strings.Split(w, ":")
+			out = append(out, protocol.PackageVerdict{Package: f[0], Verdict: f[1], Narrowed: len(f) > 2, Mode: mode})
+		}
+		return out
 	}
 	t.It("fails the packages a failure names and marks the passes of a failure no package explains", func(it *gotest.T) {
 		for sub, r := range gotest.Each(it, []struct {
 			Desc         string
-			record       protocol.RunRecord
+			exit         int
+			failed       string
+			packages     string
 			unattributed bool
-			want         []protocol.PackageVerdict
+			want         string
 		}{
-			{
-				"a failure names a package",
-				protocol.RunRecord{Result: protocol.RunResult{ExitCode: 1}, Failed: []protocol.FailedUnit{{Package: "m/a", Test: "TestS/TestX"}}, Packages: []protocol.PackageVerdict{{Package: "m/a", Verdict: "pass"}, {Package: "m/b", Verdict: "pass"}}},
-				false,
-				[]protocol.PackageVerdict{pkg("m/a", "fail", false), pkg("m/b", "pass", false)},
-			},
-			{
-				"exit 1 without a failure",
-				protocol.RunRecord{Result: protocol.RunResult{ExitCode: 1}, Packages: []protocol.PackageVerdict{{Package: "m/a", Verdict: "pass"}, {Package: "m/b", Verdict: "pass"}, {Package: "m/c", Verdict: "skip"}}},
-				false,
-				[]protocol.PackageVerdict{pkg("m/a", "pass", true), pkg("m/b", "pass", true), pkg("m/c", "skip", false)},
-			},
-			{
-				"exit 0 without a failure",
-				protocol.RunRecord{Packages: []protocol.PackageVerdict{{Package: "m/a", Verdict: "pass"}}},
-				false,
-				[]protocol.PackageVerdict{pkg("m/a", "pass", false)},
-			},
-			{
-				"an unattributed failure beside a failed package",
-				protocol.RunRecord{Result: protocol.RunResult{ExitCode: 1}, Failed: []protocol.FailedUnit{{Package: "m/a", Test: "TestS/TestX"}}, Packages: []protocol.PackageVerdict{{Package: "m/a", Verdict: "fail"}, {Package: "m/b", Verdict: "pass"}}},
-				true,
-				[]protocol.PackageVerdict{pkg("m/a", "fail", false), pkg("m/b", "pass", true)},
-			},
-			{
-				"exit 0 with a failure listed",
-				protocol.RunRecord{Failed: []protocol.FailedUnit{{Package: "m/a", Test: "TestS/TestX"}}, Packages: []protocol.PackageVerdict{{Package: "m/a", Verdict: "pass"}}},
-				false,
-				[]protocol.PackageVerdict{pkg("m/a", "fail", false)},
-			},
+			{"a failure names a package", 1, "m/a", "m/a:pass m/b:pass", false, "m/a:fail m/b:pass"},
+			{"exit 1 without a failure", 1, "", "m/a:pass m/b:pass m/c:skip", false, "m/a:pass:n m/b:pass:n m/c:skip"},
+			{"exit 0 without a failure", 0, "", "m/a:pass", false, "m/a:pass"},
+			{"an unattributed failure beside a failed package", 1, "m/a", "m/a:fail m/b:pass", true, "m/a:fail m/b:pass:n"},
+			{"exit 0 with a failure listed", 0, "m/a", "m/a:pass", false, "m/a:fail"},
 		}) {
-			rec := r.record
+			rec := protocol.RunRecord{Result: protocol.RunResult{ExitCode: r.exit}, Packages: verdicts(r.packages, nil)}
+			if r.failed != "" {
+				rec.Failed = []protocol.FailedUnit{{Package: r.failed, Test: "TestS/TestX"}}
+			}
 			main.ExportStampRecord(&rec, protocol.VerdictMode{}, nil, r.unattributed)
-			gotest.Equal(sub, r.want, rec.Packages)
+			gotest.Equal(sub, verdicts(r.want, &protocol.VerdictMode{}), rec.Packages)
 		}
 	})
 }
