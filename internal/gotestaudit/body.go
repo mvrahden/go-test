@@ -38,8 +38,8 @@ type bodyReader struct {
 }
 
 // body hashes parts as one normalized body, skips left out, and counts the
-// assertions and AssertsBy calls written in it.
-func (r *bodyReader) body(parts, skips []ast.Node) (hash string, assertions int, assertsBy bool) {
+// assertions, AssertsBy calls and calls that skip the test written in it.
+func (r *bodyReader) body(parts, skips []ast.Node) (hash string, assertions int, assertsBy bool, skipCalls int) {
 	h := sha256.New()
 	for _, part := range parts {
 		for _, tok := range r.tokens(part, skips) {
@@ -47,8 +47,9 @@ func (r *bodyReader) body(parts, skips []ast.Node) (hash string, assertions int,
 			h.Write([]byte{0})
 		}
 		assertions, assertsBy = r.count(part, skips, assertions, assertsBy)
+		skipCalls += r.skipCalls(part, skips)
 	}
-	return hex.EncodeToString(h.Sum(nil))[:16], assertions, assertsBy
+	return hex.EncodeToString(h.Sum(nil))[:16], assertions, assertsBy, skipCalls
 }
 
 // tokens are node's tokens, comments, layout, semicolons and the skipped
@@ -142,6 +143,44 @@ func (r *bodyReader) count(node ast.Node, skips []ast.Node, n int, by bool) (int
 		return true
 	})
 	return n, by
+}
+
+// skipCalls counts the calls node makes outside skips that skip the test:
+// Skip, Skipf and SkipNow of package testing's types, Skipf of gotest's.
+func (r *bodyReader) skipCalls(node ast.Node, skips []ast.Node) int {
+	skip := map[ast.Node]bool{}
+	for _, s := range skips {
+		skip[s] = true
+	}
+	n := 0
+	ast.Inspect(node, func(x ast.Node) bool {
+		if x == nil || skip[x] {
+			return false
+		}
+		call, ok := x.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		fn := r.callee(call.Fun)
+		if fn == nil || fn.Pkg() == nil {
+			return true
+		}
+		if sig, _ := fn.Type().(*types.Signature); sig == nil || sig.Recv() == nil {
+			return true
+		}
+		switch fn.Pkg().Path() {
+		case "testing":
+			if fn.Name() == "Skip" || fn.Name() == "Skipf" || fn.Name() == "SkipNow" {
+				n++
+			}
+		case gotestPath:
+			if fn.Name() == "Skipf" {
+				n++
+			}
+		}
+		return true
+	})
+	return n
 }
 
 // callee is the function a call's expression names, nil for any other.

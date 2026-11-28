@@ -33,10 +33,11 @@ const groupAt = 5
 func RenderText(w io.Writer, d *Document, v Verdict) {
 	fmt.Fprintf(w, "gotest audit: base %s → head %s\n", sideText(&d.Base), sideText(&d.Head))
 	writeStreams(w, d)
+	writeRun(w, d)
 	ev := evidenceIndex(d)
 	marks := len(ev) > 0
 	folded := 0
-	if len(d.Findings) > d.Summary.Informational {
+	if d.Summary.Weakenings > 0 {
 		fmt.Fprintf(w, "\nweakenings: %d\n", d.Summary.Weakenings)
 		var rows []textRow
 		for i := range d.Findings {
@@ -87,6 +88,15 @@ func RenderText(w io.Writer, d *Document, v Verdict) {
 	}
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, ClosingLine(d, v))
+}
+
+// writeRun names each run the audit made that failed.
+func writeRun(w io.Writer, d *Document) {
+	for i := range d.Findings {
+		if f := &d.Findings[i]; f.Class == ClassFailing {
+			fmt.Fprintf(w, "\nrun:\n  %s  %s\n", f.Class, findingText(d, f))
+		}
+	}
 }
 
 // textRow is one line of a text list before grouping.
@@ -397,7 +407,7 @@ func unprovenText(u *Unproven, verbose bool) string {
 func information(d *Document) []string {
 	var out []string
 	for i := range d.Findings {
-		if f := &d.Findings[i]; !f.Weakens && f.Class != ClassChanged {
+		if f := &d.Findings[i]; !f.Weakens && f.Class != ClassChanged && f.Class != ClassFailing {
 			out = append(out, fmt.Sprintf("%-11s  %s", f.Class, findingText(d, f)))
 		}
 	}
@@ -425,6 +435,11 @@ func ClosingLine(d *Document, v Verdict) string {
 	segments := []string{fmt.Sprintf("gotest audit: %s exit %d", verdict, v.ExitCode), weak, "behaviors: " + behaviorCounts(&d.Summary)}
 	if len(d.Streams) > 0 {
 		segments = append(segments, evidenceCounts(&d.Summary))
+	}
+	for i := range d.Findings {
+		if f := &d.Findings[i]; f.Class == ClassFailing {
+			segments = append(segments, "run: "+f.Head)
+		}
 	}
 	if d.Coverage != nil {
 		segments = append(segments, fmt.Sprintf("unproven: %d of %d lines", d.Summary.Unproven, d.Summary.ChangedLines)+noCoverage(&d.Summary))
@@ -579,6 +594,11 @@ func RenderMarkdown(w io.Writer, d *Document, v Verdict) {
 	fmt.Fprintf(w, "Base %s → head %s\n", gotestspec.EscapeLabel(sideText(&d.Base)), gotestspec.EscapeLabel(sideText(&d.Head)))
 	if len(d.Streams) > 0 {
 		fmt.Fprintf(w, "\nEvidence: %s\n", gotestspec.EscapeLabel(streamsText(d)))
+	}
+	for i := range d.Findings {
+		if f := &d.Findings[i]; f.Class == ClassFailing {
+			fmt.Fprintf(w, "\n#### Run\n\n- %s: %s\n", f.Class, gotestspec.EscapeLabel(findingText(d, f)))
+		}
 	}
 	ev := evidenceIndex(d)
 	if d.Summary.Weakenings > 0 {

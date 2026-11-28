@@ -24,10 +24,11 @@ func (a *auditArgs) prove(doc *gotestaudit.Document, base, head *gotestaudit.Rec
 		return nil
 	}
 	var files []gotestaudit.ProdFile
+	var tests []string
 	var lines string
 	if a.unproven() {
 		var err error
-		if files, lines, err = a.changedFiles(git); err != nil {
+		if files, tests, lines, err = a.changedFiles(git); err != nil {
 			return err
 		}
 	}
@@ -47,13 +48,14 @@ func (a *auditArgs) prove(doc *gotestaudit.Document, base, head *gotestaudit.Rec
 		}
 	}
 	var zero *baseline
+	ran := false
 	if a.run {
-		in, ranProfile, err := a.runChanged(doc, files, mut)
+		in, ranProfile, err := a.runChanged(doc, files, tests, mut)
 		if err != nil {
 			return err
 		}
 		if in != nil {
-			inputs = append(inputs, *in)
+			inputs, ran = append(inputs, *in), true
 		}
 		defer removeProfile(ranProfile)
 		if profile == "" {
@@ -86,7 +88,8 @@ func (a *auditArgs) prove(doc *gotestaudit.Document, base, head *gotestaudit.Rec
 	if len(inputs) > 0 {
 		gotestaudit.AddEvidence(doc, base, head, inputs)
 	}
-	if a.unproven() && profile != "" {
+	switch {
+	case a.unproven() && profile != "":
 		// The run's own profile may hold no block: then no file has data.
 		blocks, err := readProfile(profile, a.coverage == "")
 		if err != nil {
@@ -94,6 +97,11 @@ func (a *auditArgs) prove(doc *gotestaudit.Document, base, head *gotestaudit.Rec
 		}
 		shown := a.coverage
 		gotestaudit.AddUnproven(doc, files, blocks, gotestaudit.Coverage{Profile: shown, Lines: lines})
+	case a.unproven() && ran && !a.stopped:
+		// The run executed no test, so it wrote no profile.
+		if untested := gotestaudit.Executable(files); len(untested) > 0 {
+			gotestaudit.AddUnproven(doc, untested, nil, gotestaudit.Coverage{Lines: lines})
+		}
 	}
 	if mut != nil {
 		a.judge(doc, mut, zero)
@@ -181,8 +189,10 @@ func readProfile(path string, empty bool) ([]gotestspec.CoverageBlock, error) {
 }
 
 // changedFiles are the changed production files of the packages the
-// patterns match, with their changed lines, and where the lines came from.
-func (a *auditArgs) changedFiles(git *gitBase) ([]gotestaudit.ProdFile, string, error) {
+// patterns match, with their changed lines; the packages holding a changed
+// test file, whether or not lines were added to it; and where the lines
+// came from.
+func (a *auditArgs) changedFiles(git *gitBase) ([]gotestaudit.ProdFile, []string, string, error) {
 	var changes []gotestaudit.FileLines
 	var root, from string
 	switch {
@@ -191,27 +201,27 @@ func (a *auditArgs) changedFiles(git *gitBase) ([]gotestaudit.ProdFile, string, 
 		if a.diff != "-" {
 			f, err := os.Open(a.diff)
 			if err != nil {
-				return nil, "", fmt.Errorf("--diff: %w", err)
+				return nil, nil, "", fmt.Errorf("--diff: %w", err)
 			}
 			defer f.Close()
 			r = f
 		}
 		var err error
 		if changes, err = gotestaudit.ParseDiff(r); err != nil {
-			return nil, "", fmt.Errorf("--diff: %w", err)
+			return nil, nil, "", fmt.Errorf("--diff: %w", err)
 		}
 		from = "the diff " + a.diff
 	default:
 		var err error
 		if changes, err = changedLines(git); err != nil {
-			return nil, "", err
+			return nil, nil, "", err
 		}
 		root = git.top
 		from = "git diff " + git.short + " and the working tree, its untracked files included"
 	}
 	pkgs, _, err := gotestgen.ListPackageDirs("", a.patterns, a.loadFlags)
 	if err != nil {
-		return nil, "", err
+		return nil, nil, "", err
 	}
 	byDir := map[string]string{}
 	for _, p := range pkgs {
@@ -221,11 +231,13 @@ func (a *auditArgs) changedFiles(git *gitBase) ([]gotestaudit.ProdFile, string, 
 	}
 	cwd, err := os.Getwd()
 	if err != nil {
-		return nil, "", err
+		return nil, nil, "", err
 	}
 	var out []gotestaudit.ProdFile
+	var tests []string
 	for _, c := range changes {
-		if !strings.HasSuffix(c.Path, ".go") || strings.HasSuffix(c.Path, "_test.go") || len(c.Lines) == 0 {
+		test := strings.HasSuffix(c.Path, "_test.go")
+		if !strings.HasSuffix(c.Path, ".go") || !test && len(c.Lines) == 0 {
 			continue
 		}
 		abs := diffFile(root, cwd, c.Path)
@@ -236,6 +248,10 @@ func (a *auditArgs) changedFiles(git *gitBase) ([]gotestaudit.ProdFile, string, 
 		if !ok {
 			continue
 		}
+		if test {
+			tests = append(tests, pkg)
+			continue
+		}
 		modRoot, mod := moduleRootOf(filepath.Dir(abs))
 		rel, err := filepath.Rel(modRoot, abs)
 		if err != nil {
@@ -243,7 +259,8 @@ func (a *auditArgs) changedFiles(git *gitBase) ([]gotestaudit.ProdFile, string, 
 		}
 		out = append(out, gotestaudit.ProdFile{Module: mod, File: filepath.ToSlash(rel), Package: pkg, Lines: c.Lines, Abs: abs})
 	}
-	return out, from, nil
+	slices.Sort(tests)
+	return out, slices.Compact(tests), from, nil
 }
 
 // diffFile is the file a diff path names: under root when given, else under
@@ -281,12 +298,13 @@ func moduleRootOf(dir string) (root, path string) {
 
 // runChanged runs, through this CLI's runner, the packages holding the
 // behaviors the document names and, when the unproven lines are asked for,
-// the changed production packages, measuring their coverage. It returns
-// the run's stream, nil when there is nothing to run, and its profile.
-func (a *auditArgs) runChanged(doc *gotestaudit.Document, files []gotestaudit.ProdFile, mut *mutation) (*gotestaudit.StreamInput, string, error) {
-	run, cover := runSet(doc, files, mut)
+// the packages of the changed test files and the changed production
+// packages, measuring the latter's coverage. It returns the run's stream,
+// nil when there is nothing to run, and its profile.
+func (a *auditArgs) runChanged(doc *gotestaudit.Document, files []gotestaudit.ProdFile, tests []string, mut *mutation) (*gotestaudit.StreamInput, string, error) {
+	run, cover := runSet(doc, files, tests, mut)
 	if len(run) == 0 {
-		doc.Notes = append(doc.Notes, "--run: no package holds a changed behavior or a changed production file, so nothing ran")
+		doc.Notes = append(doc.Notes, "--run: no package holds a changed behavior, a changed test file or a changed production file, so nothing ran")
 		return nil, "", nil
 	}
 	dir, err := os.MkdirTemp(os.Getenv("GOTMPDIR"), "gotest-audit-run-")
@@ -375,7 +393,7 @@ func (a *auditArgs) runChanged(doc *gotestaudit.Document, files []gotestaudit.Pr
 	} else {
 		doc.Notes = append(doc.Notes, "--run: coverage is of the packages the run ran: "+strings.Join(run, " "))
 	}
-	return &gotestaudit.StreamInput{Side: gotestaudit.SideHead, Ran: true, Events: events}, profile, nil
+	return &gotestaudit.StreamInput{Side: gotestaudit.SideHead, Ran: true, Exit: exitCodeOf(runErr), Events: events}, profile, nil
 }
 
 // readMutationBaseline reads the run --mutate made with no mutant on as the
@@ -395,9 +413,10 @@ func (a *auditArgs) readMutationBaseline(doc *gotestaudit.Document, mut *mutatio
 }
 
 // runSet is what --run runs: the packages of the behaviors the document
-// names, the changed production packages and, under --mutate, every one
-// holding tests; and the packages it measures coverage of.
-func runSet(doc *gotestaudit.Document, files []gotestaudit.ProdFile, mut *mutation) (run, cover []string) {
+// names, those of the changed test files, the changed production packages
+// and, under --mutate, every one holding tests; and the packages it
+// measures coverage of.
+func runSet(doc *gotestaudit.Document, files []gotestaudit.ProdFile, tests []string, mut *mutation) (run, cover []string) {
 	for i := range doc.Behaviors {
 		if c := &doc.Behaviors[i]; c.Head != nil {
 			run = append(run, c.Package)
@@ -414,6 +433,7 @@ func runSet(doc *gotestaudit.Document, files []gotestaudit.ProdFile, mut *mutati
 	slices.Sort(cover)
 	cover = slices.Compact(cover)
 	run = append(run, cover...)
+	run = append(run, tests...)
 	if mut != nil {
 		run = append(run, mut.tests...)
 	}

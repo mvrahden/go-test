@@ -2,8 +2,8 @@ Expect: ^FAIL .*conformance/audit AuditCompare / TheAuditDocument / when audit c
 Clause: when audit compares two records with --format=md → writes a heading, a table of the weakenings and a table of the behaviors
 --- a/internal/gotestaudit/render.go
 +++ b/internal/gotestaudit/render.go
-@@ -522,7 +522,7 @@
- 		fmt.Fprintf(w, "\nEvidence: %s\n", gotestspec.EscapeLabel(streamsText(d)))
+@@ -601,7 +601,7 @@
+ 		}
  	}
  	ev := evidenceIndex(d)
 -	if d.Summary.Weakenings > 0 {

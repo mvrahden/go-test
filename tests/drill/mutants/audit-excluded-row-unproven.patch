@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditEvidence / ABehaviorXExcludes / when a stream's run left out a behavior X_ excludes / reads it as skip and does not count it as not run \(
+Clause: when a stream's run left out a behavior X_ excludes → reads it as skip and does not count it as not run
+--- a/internal/gotestaudit/evidence.go
++++ b/internal/gotestaudit/evidence.go
+@@ -631,7 +631,7 @@
+ // notProven reports an entry whose behavior, or a leaf beneath, did not
+ // run, or that the run skipped; one X_ excludes is judged by its finding.
+ func (e *Evidence) notProven() bool {
+-	skipped := e.Verdict == VerdictSkip && e.SkipReason != skipExcluded
++	skipped := e.Verdict == VerdictSkip
+ 	return skipped || e.Verdict == VerdictNotRun || e.Verdict == VerdictNone || e.Leaves != nil && e.Leaves.NotRun > 0
+ }
+ 

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditUntested / WhatTheRunTestedNothingOf / when audit --run compares a head that adds a package with a function and no test / lists the package's file as without coverage data and --fail-on=unproven exits 1 \(
+Clause: when audit --run compares a head that adds a package with a function and no test → lists the package's file as without coverage data and --fail-on=unproven exits 1
+--- a/cmd/gotest/auditproof.go
++++ b/cmd/gotest/auditproof.go
+@@ -97,7 +97,7 @@
+ 		}
+ 		shown := a.coverage
+ 		gotestaudit.AddUnproven(doc, files, blocks, gotestaudit.Coverage{Profile: shown, Lines: lines})
+-	case a.unproven() && ran && !a.stopped:
++	case a.unproven() && ran && !a.stopped && false:
+ 		// The run executed no test, so it wrote no profile.
+ 		if untested := gotestaudit.Executable(files); len(untested) > 0 {
+ 			gotestaudit.AddUnproven(doc, untested, nil, gotestaudit.Coverage{Lines: lines})

@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/scenarios ScenariosRun / ARunOfItsOwn / when --verify runs bound packages whose BeforeAll fails / exits 1 under the default policy, the closing line naming FAIL and evidence: run, exited 1 \(
+Expect: ^FAIL .*conformance/scenarios ScenariosRun / ARunOfItsOwn / when --verify runs bound packages whose BeforeAll fails / lists the run on a failing line of its own and marks it failed in the JSON document \(
+Clause: when --verify runs bound packages whose BeforeAll fails → exits 1 under the default policy, the closing line naming FAIL and evidence: run, exited 1
+Clause: when --verify runs bound packages whose BeforeAll fails → lists the run on a failing line of its own and marks it failed in the JSON document
+--- a/internal/gotestscenarios/document.go
++++ b/internal/gotestscenarios/document.go
+@@ -134,7 +134,7 @@
+ 	if opt.Run != nil {
+ 		doc.Run = runOf(opt.Run)
+ 		doc.Run.Packages = append([]string{}, opt.RunPackages...)
+-		doc.Run.Failed = opt.Evidence == EvidenceRun && opt.Run.ExitCode != nil && *opt.Run.ExitCode != 0
++		doc.Run.Failed = false
+ 	}
+ 	return doc
+ }

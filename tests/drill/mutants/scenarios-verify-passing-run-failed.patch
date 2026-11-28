@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/scenarios ScenariosRun / ARunOfItsOwn / when --verify runs bound packages that pass / exits 0, the closing line naming evidence: run, and marks no run failed \(
+Clause: when --verify runs bound packages that pass → exits 0, the closing line naming evidence: run, and marks no run failed
+--- a/internal/gotestscenarios/document.go
++++ b/internal/gotestscenarios/document.go
+@@ -134,7 +134,7 @@
+ 	if opt.Run != nil {
+ 		doc.Run = runOf(opt.Run)
+ 		doc.Run.Packages = append([]string{}, opt.RunPackages...)
+-		doc.Run.Failed = opt.Evidence == EvidenceRun && opt.Run.ExitCode != nil && *opt.Run.ExitCode != 0
++		doc.Run.Failed = opt.Evidence == EvidenceRun && opt.Run.ExitCode != nil && *opt.Run.ExitCode >= 0
+ 	}
+ 	return doc
+ }

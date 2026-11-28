@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditRunVerdict / ARunThatFails / when audit --run runs an added test whose suite's BeforeAll fails / names the run under run: in the text format and under a Run heading in Markdown \(
+Clause: when audit --run runs an added test whose suite's BeforeAll fails → names the run under run: in the text format and under a Run heading in Markdown
+--- a/internal/gotestaudit/render.go
++++ b/internal/gotestaudit/render.go
+@@ -33,7 +33,7 @@
+ func RenderText(w io.Writer, d *Document, v Verdict) {
+ 	fmt.Fprintf(w, "gotest audit: base %s → head %s\n", sideText(&d.Base), sideText(&d.Head))
+ 	writeStreams(w, d)
+-	writeRun(w, d)
++	_ = writeRun
+ 	ev := evidenceIndex(d)
+ 	marks := len(ev) > 0
+ 	folded := 0

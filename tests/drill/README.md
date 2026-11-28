@@ -1194,6 +1194,8 @@ shards of one run do not add up to every mutant exactly once.
 | `scenarios-unknown-status-taken` | an unknown status is taken | scenarios conformance: the It of its clause fails |
 | `scenarios-evidence-status-taken` | an evidence status is taken without evidence | scenarios conformance: the It of its clause fails |
 | `scenarios-broken-package-passes` | a package that does not compile leaves the exit at 0 | scenarios conformance: the It of its clause fails |
+| `scenarios-verify-exit-ignored` | the exit of the run --verify made is not judged | scenarios conformance: the It of its clause fails |
+| `scenarios-verify-passing-run-failed` | a run of --verify that passed is marked failed | scenarios conformance: the It of its clause fails |
 | `input-hash-on-test-events` | the input hash is stamped on test verdicts too, not only on a package's | cli conformance: a -json run's test events carry an InputHash |
 | `spec-json-drops-the-input-hash` | spec's JSON gives no package its `inputHash` | cli conformance: the document's hashes are not the stream's |
 | `input-hash-skips-dependencies` | a package's hash leaves out the packages it imports | cli conformance: a dependency's edit leaves its importer current |
@@ -1249,6 +1251,21 @@ shards of one run do not add up to every mutant exactly once.
 | `audit-run-child-note-dropped` | no note says how a binary a test starts counts | audit conformance: the note It finds no such note |
 | `audit-run-interrupt-kills-the-audit` | an interrupt ends the audit with its run unstopped | audit conformance: the interrupted-run It sees no exit 130 |
 | `audit-last-stream-wins` | of two current streams the last judges a behavior | audit conformance: the two-current-streams It finds the fresh/c rows judged by the second stream |
+| `audit-run-exit-ignored` | the code of the run `--run` made is not kept | audit conformance: the failed-run It finds no finding |
+| `audit-text-run-unnamed` | the text format names no failed run | audit conformance: the renderings It finds no run: block |
+| `audit-markdown-run-unnamed` | the Markdown names no failed run | audit conformance: the renderings It finds no Run heading |
+| `audit-test-file-package-unrun` | a changed test file's package is not run | audit conformance: the hook-only It finds no run |
+| `audit-nothing-ran-unsaid` | an empty run set is not said | audit conformance: the nothing-to-run It finds no note |
+| `audit-added-skip-unseen` | a skip call added to a body is not found | audit conformance: the skip It finds one finding of three |
+| `audit-kept-skip-flagged` | a body that keeps its skip count is found | audit conformance: the kept-skip It finds a finding |
+| `audit-skips-of-an-uncounted-record` | skip counts are compared where a record has none | audit conformance: the old-record It finds findings and no note |
+| `audit-skipped-row-proven` | a row the run skipped counts as proven | audit conformance: the guard It counts 0 not run |
+| `audit-excluded-row-unproven` | a row X_ excludes counts as not run | audit conformance: the X_ It counts 3 not run |
+| `audit-untested-package-proven` | a changed package the run tested nothing of lists no file | audit conformance: the untested It sees exit 0 |
+| `audit-unproven-without-a-function` | a changed file without a function reads as without coverage data | audit conformance: the type-only It finds docs/doc.go listed |
+| `audit-base-ancestry-unsaid` | a base that is no ancestor of HEAD is not said | audit conformance: the ancestry It finds no note |
+| `audit-shallow-base-noted` | a shallow checkout is asked for ancestry | audit conformance: the shallow It finds a note |
+| `audit-base-follows-a-link` | a workspace link of the exported base is written through | audit conformance: the link It finds the file the link points at |
 | `mutate-boundary-never-written` | an ordering gets no boundary mutant, only its negation | audit conformance: the mutants It and the survivor It find no boundary mutant |
 | `mutate-schemata-written-into-the-module` | the mutants' source is also written beside each file of the module | audit conformance: the module It finds a file the audit added |
 | `mutate-tests-of-the-mutated-package-only` | only the mutated package's own tests judge its mutants | audit conformance: the suites It finds Grade's line judged by no suite |

@@ -163,3 +163,81 @@ func findings(doc *auditDoc, weakens bool) []finding {
 	}
 	return out
 }
+
+// gatesCheckout stages gates/base under parent as name, commits it, and
+// lays each overlay tree of gates over it, uncommitted.
+func gatesCheckout(t *gotest.T, parent, name string, overlays ...string) string {
+	root, err := testkit.RepoRoot()
+	gotest.NoError(t, err)
+	dir := filepath.Join(parent, name)
+	gotest.NoError(t, testkit.StageModule(root, filepath.Join("..", "testdata", "audit", "gates", "base"), dir))
+	git(t, dir, "init", "-q")
+	git(t, dir, "add", "-A")
+	git(t, dir, "-c", "user.name=gotest", "-c", "user.email=gotest@example.com", "commit", "-q", "-m", "base")
+	for _, o := range overlays {
+		gotest.NoError(t, testkit.StageModule(root, filepath.Join("..", "testdata", "audit", "gates", o), dir))
+	}
+	return dir
+}
+
+// auditIn runs audit with args in dir, with cache as gotest's cache.
+func auditIn(t *gotest.T, dir, cache string, args ...string) testkit.Run {
+	run, err := testkit.RunCLIWithEnv(t.Context(), dir, append(outside(filepath.Dir(dir)), "GOTEST_CACHE_DIR="+cache), append([]string{"audit"}, args...)...)
+	gotest.NoError(t, err)
+	return run
+}
+
+// runDoc is the part of an audit document the run suites read.
+type runDoc struct {
+	Base struct {
+		Commit string `json:"commit"`
+	} `json:"base"`
+	Summary struct {
+		Weakenings int            `json:"weakenings"`
+		NotRun     int            `json:"notRun"`
+		Classes    map[string]int `json:"classes"`
+	} `json:"summary"`
+	Findings []struct {
+		Class   string `json:"class"`
+		Weakens bool   `json:"weakens"`
+		Subject string `json:"subject"`
+		Base    string `json:"base"`
+		Head    string `json:"head"`
+	} `json:"findings"`
+	Behaviors []change `json:"behaviors"`
+	Streams   []struct {
+		Ran bool `json:"ran"`
+		Run *struct {
+			Args     []string `json:"args"`
+			ExitCode *int     `json:"exitCode"`
+		} `json:"run"`
+	} `json:"streams"`
+	Evidence []struct {
+		Path          []string `json:"path"`
+		Verdict       string   `json:"verdict"`
+		SkipReason    string   `json:"skipReason"`
+		NeedsDecision bool     `json:"needsDecision"`
+	} `json:"evidence"`
+	Coverage *struct {
+		Packages []string `json:"packages"`
+	} `json:"coverage"`
+	Unproven []unproven `json:"unproven"`
+	Notes    []string   `json:"notes"`
+}
+
+func readRunDoc(t *gotest.T, stdout string) runDoc {
+	var doc runDoc
+	gotest.NoError(t, json.Unmarshal([]byte(stdout), &doc), "document: %s", stdout)
+	return doc
+}
+
+// findings are the document's findings that weaken, or that do not.
+func (d *runDoc) findings(weakens bool) []finding {
+	var out []finding
+	for _, f := range d.Findings {
+		if f.Weakens == weakens {
+			out = append(out, finding{f.Class, f.Subject, f.Base, f.Head})
+		}
+	}
+	return out
+}

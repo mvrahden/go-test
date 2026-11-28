@@ -60,6 +60,22 @@ func resolveBase(ref string) (*gitBase, error) {
 	return &gitBase{ref: ref, commit: commit, short: short, branch: branchOf(cwd, ref), top: topAsSpelled(cwd, prefix, top), prefix: prefix}, nil
 }
 
+// ancestryNote is the note for a base git knows to be no ancestor of HEAD;
+// "" for an ancestor and where git cannot tell, as in a shallow checkout.
+func ancestryNote(g *gitBase) string {
+	shallow, err := gitOutput(g.top, "rev-parse", "--is-shallow-repository")
+	if err != nil || shallow != "false" {
+		return ""
+	}
+	cmd := exec.Command("git", "merge-base", "--is-ancestor", g.commit, "HEAD") //nolint:gosec // G204: git with a verified commit
+	cmd.Dir = g.top
+	var exit *exec.ExitError
+	if err := cmd.Run(); !errors.As(err, &exit) || exit.ExitCode() != 1 {
+		return ""
+	}
+	return fmt.Sprintf("note: --base %s (%s) is not an ancestor of HEAD: what it holds and HEAD lacks reads as removed; for the merge base give --base=$(git merge-base %s HEAD)", g.ref, g.short, g.ref)
+}
+
 // topAsSpelled is the checkout's root spelled as the current directory is,
 // as go list names package directories: git resolves symlinks (macOS's /var)
 // and short names (Windows' RUNNER~1). It is git's top where the two differ.
@@ -126,7 +142,7 @@ func recordRef(g *gitBase, patterns, loadFlags []string) (*gotestaudit.Record, e
 	if len(present) == 0 {
 		// The commit has none of the directories: every package is new.
 		return &gotestaudit.Record{Version: about.ResolvedVersion(), Schema: gotestaudit.Schema, Provenance: prov, Patterns: patterns,
-			Notes: []string{gotestaudit.FloorNote}, Packages: []gotestaudit.Package{}, Suppressions: []gotestaudit.Suppression{}, Snapshots: []gotestaudit.Snapshot{}}, nil
+			Notes: []string{gotestaudit.FloorNote, gotestaudit.SkipNote}, Packages: []gotestaudit.Package{}, Suppressions: []gotestaudit.Suppression{}, Snapshots: []gotestaudit.Snapshot{}}, nil
 	}
 	out := filepath.Join(held.Dir, "base.json")
 	exe, err := os.Executable()
@@ -287,11 +303,12 @@ func writeTarFile(r io.Reader, target string, perm os.FileMode) error {
 
 // keepWorkspace copies the checkout's go.work and go.work.sum into an
 // exported tree that has none, so its modules resolve as the checkout's do,
-// and returns the names it copied.
+// and returns the names it copied. A link the commit holds counts as there,
+// dangling or not, so nothing is written through it.
 func keepWorkspace(top, tree string) []string {
 	var copied []string
 	for _, name := range []string{"go.work", "go.work.sum"} {
-		if _, err := os.Stat(filepath.Join(tree, name)); err == nil {
+		if _, err := os.Lstat(filepath.Join(tree, name)); err == nil {
 			continue
 		}
 		data, err := os.ReadFile(filepath.Join(top, name)) //nolint:gosec // G304: the checkout's own workspace file

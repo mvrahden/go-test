@@ -2,11 +2,11 @@ Expect: ^FAIL .*conformance/audit AuditEvidence / ProofInThePolicy / when --fail
 Clause: when --fail-on names failing and a stream fails a behavior the comparison names → exits 1 and the closing line counts the evidence and names the class
 --- a/internal/gotestaudit/evidence.go
 +++ b/internal/gotestaudit/evidence.go
-@@ -558,7 +558,7 @@
+@@ -649,7 +649,7 @@
  			s.Stale++
  		}
  	}
--	setClass(s, ClassFailing, s.Failing)
+-	setClass(s, ClassFailing, s.Failing+d.failedRuns())
 +	setClass(s, ClassFailing, 0)
  	setClass(s, ClassNotRun, s.NotRun)
  	setClass(s, ClassVacuous, s.Vacuous)

@@ -224,6 +224,17 @@ func (s *AuditEvidenceTestSuite) TestEvidenceFromRuns(t *gotest.T) {
 	})
 }
 
+func (s *AuditEvidenceTestSuite) TestABehaviorXExcludes(t *gotest.T) {
+	t.When("a stream's run left out a behavior X_ excludes", func(w *gotest.T) {
+		w.It("reads it as skip and does not count it as not run", func(it *gotest.T) {
+			doc := readProof(it, s.json)
+			empty := doc.evidenceOf("Cart / Empty")
+			gotest.Equal(it, []string{"skip", "excluded by X_"}, []string{empty.Verdict, empty.SkipReason})
+			gotest.Contains(it, s.text.Stdout, "| evidence: 11 (failing 2, not run 2, vacuous 2, stale 0) |")
+		})
+	})
+}
+
 func (s *AuditEvidenceTestSuite) TestCurrentAndStaleEvidence(t *gotest.T) {
 	t.When("audit is given streams of another commit, of a tree with uncommitted changes and without a manifest", func(w *gotest.T) {
 		w.It("marks each stale, naming another commit, uncommitted changes and no manifest", func(it *gotest.T) {
@@ -332,7 +343,7 @@ func (s *AuditEvidenceTestSuite) TestProofInThePolicy(t *gotest.T) {
 		w.It("--fail-on=all names every weakening class and no proof class", func(it *gotest.T) {
 			run := s.audit(it, "--fail-on=all")
 			gotest.Equal(it, 1, run.Exit, "stderr: %s", run.Stderr)
-			gotest.Regexp(it, `\| fail-on: removed,excluded,focus,guard,budget,suppression,snapshot,assertions,asserts-by\n$`, run.Stdout)
+			gotest.Regexp(it, `\| fail-on: removed,excluded,skip,focus,guard,budget,suppression,snapshot,assertions,asserts-by\n$`, run.Stdout)
 		})
 	})
 	t.When("--fail-on names a proof class and no stream or profile is given", func(w *gotest.T) {

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditRunVerdict / AChangedTestFile / when audit --run compares a head that changes no Go file / runs nothing and notes that no package holds a changed behavior, a changed test file or a changed production file \(
+Clause: when audit --run compares a head that changes no Go file → runs nothing and notes that no package holds a changed behavior, a changed test file or a changed production file
+--- a/cmd/gotest/auditproof.go
++++ b/cmd/gotest/auditproof.go
+@@ -297,7 +297,7 @@
+ func (a *auditArgs) runChanged(doc *gotestaudit.Document, files []gotestaudit.ProdFile, tests []string, mut *mutation) (*gotestaudit.StreamInput, string, error) {
+ 	run, cover := runSet(doc, files, tests, mut)
+ 	if len(run) == 0 {
+-		doc.Notes = append(doc.Notes, "--run: no package holds a changed behavior, a changed test file or a changed production file, so nothing ran")
++		_ = doc
+ 		return nil, "", nil
+ 	}
+ 	dir, err := os.MkdirTemp(os.Getenv("GOTMPDIR"), "gotest-audit-run-")

@@ -157,6 +157,7 @@ type Place struct {
 const (
 	ClassRemoved     = "removed"
 	ClassExcluded    = "excluded"
+	ClassSkip        = "skip"
 	ClassFocus       = "focus"
 	ClassGuard       = "guard"
 	ClassBudget      = "budget"
@@ -169,7 +170,7 @@ const (
 
 // Classes are the finding classes in order; all but changed weaken.
 var Classes = []string{
-	ClassRemoved, ClassExcluded, ClassFocus, ClassGuard, ClassBudget,
+	ClassRemoved, ClassExcluded, ClassSkip, ClassFocus, ClassGuard, ClassBudget,
 	ClassSuppression, ClassSnapshot, ClassAssertions, ClassAssertsBy, ClassChanged,
 }
 
@@ -310,7 +311,8 @@ type Evidence struct {
 	// Others are the other streams that hold a verdict on it.
 	Others []OtherVerdict `json:"others,omitempty"`
 	// NeedsDecision marks a row a reader must judge: failing, vacuous,
-	// not run, partly run, without evidence, or judged by a stale stream.
+	// not run, partly run, skipped by the run, without evidence, or judged
+	// by a stale stream.
 	NeedsDecision bool `json:"needsDecision"`
 	// Source is the judging stream's file, "--run" for the audit's run;
 	// Commit the commit that stream ran.

@@ -2,7 +2,7 @@ Expect: ^FAIL .*conformance/audit AuditEvidence / EvidenceFromRuns / when audit 
 Clause: when audit is given a stream of the head's run → names a behavior the stream did not report not run, one X_ excludes skipped, and one of a package no stream holds no evidence
 --- a/internal/gotestaudit/evidence.go
 +++ b/internal/gotestaudit/evidence.go
-@@ -221,7 +221,7 @@
+@@ -279,7 +279,7 @@
  	for _, r := range chain {
  		excluded = excluded || r.excluded
  	}
@@ -10,4 +10,4 @@ Clause: when audit is given a stream of the head's run → names a behavior the 
 +	j := judgment{verdict: VerdictPass}
  	switch {
  	case excluded:
- 		j.verdict, j.skipReason = VerdictSkip, "excluded by X_"
+ 		j.verdict, j.skipReason = VerdictSkip, skipExcluded

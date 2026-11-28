@@ -60,6 +60,9 @@ func runAudit(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 			return 2
 		}
+		if note := ancestryNote(git); note != "" {
+			fmt.Fprintln(os.Stderr, note)
+		}
 	}
 	base, err := args.baseRecord(head, git)
 	if err != nil {

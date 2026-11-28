@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditSkip / ASkipTheHeadAdds / when the base record was written without skip counts / lists no skip finding and notes that a skip the head adds is not listed \(
+Clause: when the base record was written without skip counts → lists no skip finding and notes that a skip the head adds is not listed
+--- a/internal/gotestaudit/compare.go
++++ b/internal/gotestaudit/compare.go
+@@ -28,7 +28,7 @@
+ 	m.moved(bRoots, hRoots)
+ 	doc.Notes = append(doc.Notes, m.notes...)
+ 
+-	c := &collector{doc: &doc, skips: slices.Contains(base.Notes, SkipNote) && slices.Contains(head.Notes, SkipNote)}
++	c := &collector{doc: &doc, skips: true}
+ 	if !c.skips {
+ 		doc.Notes = append(doc.Notes, NoSkipsNote)
+ 	}

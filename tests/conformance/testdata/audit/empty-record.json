@@ -1,1 +1,1 @@
-{"version":"v0.0.0","schema":1,"provenance":{},"patterns":["./..."],"notes":[],"packages":[],"suppressions":[],"snapshots":[]}
+{"version":"v0.0.0","schema":1,"provenance":{},"patterns":["./..."],"notes":["skips counts the Skip, Skipf and SkipNow calls written in a body; a helper's calls are not followed"],"packages":[],"suppressions":[],"snapshots":[]}

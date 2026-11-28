@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditBaseAncestry / ABaseBesideHead / when audit --base names a commit that is no ancestor of HEAD / prints one note on stderr naming the ref, its commit and the merge base, and compares the commit the ref names \(
+Clause: when audit --base names a commit that is no ancestor of HEAD → prints one note on stderr naming the ref, its commit and the merge base, and compares the commit the ref names
+--- a/cmd/gotest/auditbase.go
++++ b/cmd/gotest/auditbase.go
+@@ -70,7 +70,7 @@
+ 	cmd := exec.Command("git", "merge-base", "--is-ancestor", g.commit, "HEAD") //nolint:gosec // G204: git with a verified commit
+ 	cmd.Dir = g.top
+ 	var exit *exec.ExitError
+-	if err := cmd.Run(); !errors.As(err, &exit) || exit.ExitCode() != 1 {
++	if err := cmd.Run(); !errors.As(err, &exit) || exit.ExitCode() == 1 {
+ 		return ""
+ 	}
+ 	return fmt.Sprintf("note: --base %s (%s) is not an ancestor of HEAD: what it holds and HEAD lacks reads as removed; for the merge base give --base=$(git merge-base %s HEAD)", g.ref, g.short, g.ref)

@@ -37,6 +37,7 @@ type document struct {
 		Args     []string `json:"args"`
 		ExitCode *int     `json:"exitCode"`
 		Packages []string `json:"packages"`
+		Failed   bool     `json:"failed"`
 	} `json:"run"`
 	Specs   []string `json:"specs"`
 	Summary struct {

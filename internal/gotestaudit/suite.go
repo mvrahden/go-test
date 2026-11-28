@@ -36,7 +36,7 @@ func readSuite(ts *gotestast.TestSuiteSpec, m module, external bool) Suite {
 			spec := ts.BehaviorsOf(meth)
 			b.Incomplete = !spec.Complete
 			b.Children, n.Children = r.behaviors(spec.Behaviors, m)
-			b.Hash, b.Assertions, b.AssertsBy = r.body([]ast.Node{decl.Body}, stmtsOf(spec.Behaviors))
+			b.Hash, b.Assertions, b.AssertsBy, b.Skips = r.body([]ast.Node{decl.Body}, stmtsOf(spec.Behaviors))
 		}
 		s.Methods = append(s.Methods, b)
 		nodes = append(nodes, n)
@@ -72,7 +72,7 @@ func (r *bodyReader) method(meth *gotestast.TestSuiteMethod, kind string, m modu
 	if decl := meth.Decl(); decl != nil {
 		b.Location = r.location(m, decl.Pos(), decl.End())
 		if kind != KindTest && decl.Body != nil {
-			b.Hash, b.Assertions, b.AssertsBy = r.body([]ast.Node{decl.Body}, nil)
+			b.Hash, b.Assertions, b.AssertsBy, b.Skips = r.body([]ast.Node{decl.Body}, nil)
 		}
 	}
 	if kind == KindFuzz {
@@ -109,7 +109,7 @@ func (r *bodyReader) behaviors(bs []*gotestast.Behavior, m module) ([]Behavior, 
 		if b.Body != nil {
 			parts = append(parts, b.Body)
 		}
-		rec.Hash, rec.Assertions, rec.AssertsBy = r.body(parts, stmtsOf(b.Children))
+		rec.Hash, rec.Assertions, rec.AssertsBy, rec.Skips = r.body(parts, stmtsOf(b.Children))
 		rec.Children, node.Children = r.behaviors(b.Children, m)
 		out = append(out, rec)
 		nodes = append(nodes, node)

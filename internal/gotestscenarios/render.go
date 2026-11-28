@@ -9,10 +9,13 @@ import (
 // countOrder is the order the closing line counts statuses in.
 var countOrder = []string{StatusBound, StatusVerified, StatusFailing, StatusNotRun, StatusVacuous, StatusUnbound, StatusAmbiguous}
 
-// RenderText writes the scenarios that are not bound or verified, each
-// with the clauses at fault, then the unstated Its, what could not be
-// read, and the closing line.
+// RenderText writes a failed run of its own, the scenarios that are not
+// bound or verified, each with the clauses at fault, then the unstated Its,
+// what could not be read, and the closing line.
 func RenderText(w io.Writer, d *Document, v Verdict) {
+	if d.RunFailed() {
+		fmt.Fprintf(w, "%-10s the run of the bound packages exited %d\n", StatusFailing, *d.Run.ExitCode)
+	}
 	for _, status := range Classes {
 		for i := range d.Scenarios {
 			sc := &d.Scenarios[i]
@@ -105,7 +108,11 @@ func ClosingLine(d *Document, v Verdict) string {
 	if n := len(d.Unreadable); n > 0 {
 		segments = append(segments, fmt.Sprintf("unreadable: %d", n))
 	}
-	segments = append(segments, "evidence: "+d.Evidence)
+	evidence := "evidence: " + d.Evidence
+	if d.RunFailed() {
+		evidence += fmt.Sprintf(", exited %d", *d.Run.ExitCode)
+	}
+	segments = append(segments, evidence)
 	if len(v.FailOn) > 0 {
 		segments = append(segments, "fail-on: "+strings.Join(v.FailOn, ","))
 	}

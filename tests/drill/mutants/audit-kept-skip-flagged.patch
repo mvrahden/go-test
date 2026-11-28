@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/audit AuditSkip / ASkipTheHeadAdds / when the head changes a body that wrote a skip call and still writes one / lists no skip finding for it \(
+Clause: when the head changes a body that wrote a skip call and still writes one → lists no skip finding for it
+--- a/internal/gotestaudit/compare.go
++++ b/internal/gotestaudit/compare.go
+@@ -211,7 +211,7 @@
+ 		c.find(ClassExcluded, h.pkg, subject(h), b.b.Name, h.b.Name, h.loc)
+ 		c.at(b, h)
+ 	}
+-	if c.skips && h.b.Skips > b.b.Skips {
++	if c.skips && h.b.Skips >= b.b.Skips {
+ 		c.find(ClassSkip, h.pkg, subject(h), skipText(b.b.Skips), skipText(h.b.Skips), h.loc)
+ 		c.at(b, h)
+ 	}

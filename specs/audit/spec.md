@@ -91,6 +91,17 @@ The audit SHALL exit 0 whatever it finds unless `--fail-on` names finding classe
 - **WHEN** audit --base names no commit of the checkout
 - **THEN** exits 2 naming --base-record and --head-record
 
+### Requirement: A base beside HEAD
+Where git knows the commit `--base` names to be no ancestor of `HEAD`, the audit SHALL say so in one note on stderr, naming the merge base, and compare the commit all the same; in a shallow checkout, where git cannot know, it SHALL print none.
+
+#### Scenario: A base that is no ancestor of HEAD
+- **WHEN** audit --base names a commit that is no ancestor of HEAD
+- **THEN** prints one note on stderr naming the ref, its commit and the merge base, and compares the commit the ref names
+
+#### Scenario: A base in a shallow checkout
+- **WHEN** audit --base names a commit a shallow checkout holds no path to
+- **THEN** prints no note on stderr
+
 ### Requirement: Evidence from runs
 `gotest audit --evidence=<stream>`, repeatable, SHALL state for each behavior the comparison lists as added, reworded, moved or changed and each finding's behavior its verdict, the assertions the run counted, whether it passed vacuous, its `AssertsBy` and the stream it was judged by, reading the stream's test names as the spec tree does. A behavior the stream does not report SHALL read as not run, skipped where X_ excludes it, and as no evidence where no stream holds its package.
 
@@ -140,12 +151,29 @@ With `--base-evidence=<stream>`, a stream of the base's run, a finding of class 
 - **THEN** the assertions finding carries the base's and the head's run-time counts
 
 ### Requirement: The audit's own run
-`gotest audit --run` SHALL run, through gotest's runner, the packages holding a behavior the comparison names and, when the changed lines are known, the changed production packages, measuring their coverage, and take that run as current evidence. Where no package holds one it SHALL run nothing and say so.
+`gotest audit --run` SHALL run, through gotest's runner, the packages holding a behavior the comparison names and, when the changed lines are known, the packages holding a changed test file and the changed production packages, measuring the coverage of the latter, and take that run as current evidence. Where no package holds one it SHALL run nothing and say so.
 
 #### Scenario: Running what changed
 - **WHEN** audit --run compares the working tree with a base
 - **THEN** runs the packages of the changed behaviors and states their verdicts as current evidence of that run
 - **AND** lists the changed production lines that run did not execute
+
+#### Scenario: A changed test file without a changed behavior
+- **WHEN** audit --run compares a head that changes only a suite's hook, which now fails
+- **THEN** runs the suite's package though no behavior changed, and lists the failing run
+
+#### Scenario: Nothing to run
+- **WHEN** audit --run compares a head that changes no Go file
+- **THEN** runs nothing and notes that no package holds a changed behavior, a changed test file or a changed production file
+
+### Requirement: A run of the audit that fails
+When the run `gotest audit --run` made exits non-zero and was not stopped, the audit SHALL list one finding of class `failing` about the run, its exit code as the head value, whatever the evidence rows read. It is no weakening: `--fail-on` naming `failing` or `proof` SHALL exit 1 on it, `all` SHALL not, and without `--fail-on` the audit SHALL exit 0. The text format SHALL name it under `run:` and in a `run:` segment of the closing line, Markdown under a `Run` heading.
+
+#### Scenario: A run that fails outside its rows
+- **WHEN** audit --run runs an added test whose suite's BeforeAll fails
+- **THEN** lists a failing finding about the run naming exit 1, beside the test read as not run, and exits 0 without --fail-on
+- **AND** --fail-on=failing exits 1 and the closing line names run: exited 1
+- **AND** names the run under run: in the text format and under a Run heading in Markdown
 
 ### Requirement: Unproven lines
 Given a coverage profile, `--coverage` or the one `--run` measured, and the changed lines, from `--diff` or from git between `--base` and the files on disk with untracked files whole, the audit SHALL list per changed non-test file of the packages audited the changed lines a block spans and none executed, as ranges with counts. A line no block spans SHALL not count; a file of a package no block covers SHALL read as without coverage data.
@@ -159,6 +187,17 @@ Given a coverage profile, `--coverage` or the one `--run` measured, and the chan
 #### Scenario: Lines from git
 - **WHEN** audit --base with --coverage runs in a checkout with uncommitted and untracked production files
 - **THEN** takes the changed lines from the commit to the files on disk, every line of an untracked file included
+
+### Requirement: A change the run tested nothing of
+Where the run `--run` made executed no test and so wrote no profile, a changed non-test file with a changed line inside a function's body SHALL read as without coverage data, and one with none SHALL not be listed.
+
+#### Scenario: A changed package the run executed no test for
+- **WHEN** audit --run compares a head that adds a package with a function and no test
+- **THEN** lists the package's file as without coverage data and --fail-on=unproven exits 1
+
+#### Scenario: A changed file without a function
+- **WHEN** audit --run compares a head that adds a package declaring only a type
+- **THEN** lists no unproven file and --fail-on=unproven exits 0
 
 ### Requirement: Coverage of the binaries a test starts
 When `gotest audit --run` measures coverage it SHALL give the run a `GOCOVERDIR` under its own directory and count, beside the test binaries' profiles, what each binary built with `go build -cover` that a test starts wrote there. A file only binaries built without it execute SHALL read as without coverage data, and where no binary wrote any a note SHALL say how one counts. Nothing SHALL be written into the module, and the directory SHALL go with the run's.
@@ -185,6 +224,41 @@ When `gotest audit --run` measures coverage it SHALL give the run a `GOCOVERDIR`
 - **WHEN** --fail-on names a proof class and no stream or profile is given
 - **THEN** audit refuses it with exit 2, naming the flags that give it
 
+### Requirement: A skip the head adds
+The audit SHALL list, as a finding of class `skip`, each behavior whose own body writes more calls that skip the test than the base's did, and each added behavior whose body writes one, naming both counts: `Skip`, `Skipf` and `SkipNow` of `testing`'s T, B, F and TB and `Skipf` of gotest's T, B and F, counted from source into the record, a helper's calls not followed. A body that writes no more of them than before SHALL be no such finding.
+
+#### Scenario: Skip calls added
+- **WHEN** the head adds calls that skip the test to two bodies and adds a test whose body writes one
+- **THEN** lists each as a finding of class skip naming the calls its body wrote before and writes now
+- **AND** --fail-on=all exits 1 and the closing line counts the three skip findings
+
+#### Scenario: A body that keeps its skip call
+- **WHEN** the head changes a body that wrote a skip call and still writes one
+- **THEN** lists no skip finding for it
+
+### Requirement: A record without skip counts
+Where a record was written without the counts of the calls that skip the test, the audit SHALL list no `skip` finding and say so in a note.
+
+#### Scenario: A record without skip counts
+- **WHEN** the base record was written without skip counts
+- **THEN** lists no skip finding and notes that a skip the head adds is not listed
+
+### Requirement: A behavior the run skipped
+An evidence row whose behavior the run skipped, by a call in the test, by its suite's guard or by a focus elsewhere, SHALL read `skip`, give the reason, and count as not run: under `not-run`, in the closing line and as a row that needs a decision. A row `X_` excludes SHALL not count: its `excluded` finding names it. A skip SHALL be no weakening by itself, so a changed test under a guard the base already has leaves `all` unbroken.
+
+#### Scenario: A changed test under a guard that holds
+- **WHEN** audit --run runs a changed test whose suite's guard, as the base has it, keeps it from running
+- **THEN** reads the test as skip with the guard's reason, counts it as not run and lists no weakening
+- **AND** --fail-on=all exits 0 and --fail-on=not-run exits 1
+
+#### Scenario: A test the head makes skip
+- **WHEN** audit --run runs tests the head added skip calls to
+- **THEN** reads each as skip and counts it as not run, beside its skip finding
+
+#### Scenario: A behavior X_ excludes
+- **WHEN** a stream's run left out a behavior X_ excludes
+- **THEN** reads it as skip and does not count it as not run
+
 ### Requirement: Evidence in the renderings
 Text and Markdown SHALL mark each behavior and weakening with its verdict, a passing leaf's run-time assertions and `*` for a stale stream, name the streams read, list removed, weakened, failing, vacuous, not run and stale behaviors first, and list the unproven lines. Text SHALL fold five or more rows alike of one package and suite into one line, a failing row never, unless `-v` is given; JSON SHALL keep every row.
 
@@ -202,12 +276,16 @@ Text and Markdown SHALL mark each behavior and weakening with its verdict, a pas
 - **THEN** writes the evidence as a column of the behaviors table and the unproven lines as a table
 
 ### Requirement: Where a base is exported
-`--base` SHALL export the commit into a directory under gotest's cache fixed per checkout, never inside the checkout, under a lock one audit of the checkout holds at a time, exporting again only when the directory holds another commit; `gotest clean --cache` SHALL remove the directories no audit holds.
+`--base` SHALL export the commit into a directory under gotest's cache fixed per checkout, never inside the checkout, under a lock one audit of the checkout holds at a time, exporting again only when the directory holds another commit; `gotest clean --cache` SHALL remove the directories no audit holds. On Unix, a workspace file the commit holds as a symbolic link SHALL be left as the link it is, so that nothing is written outside the checkout and that directory.
 
 #### Scenario: Two audits of one commit
 - **WHEN** audit --base records one commit twice
 - **THEN** exports it once into one directory under gotest's cache, outside the checkout
 - **AND** gotest clean --cache removes that directory
+
+#### Scenario: A commit whose go.work is a dangling link
+- **WHEN** audit --base names a commit whose go.work is a symbolic link to a file that does not exist, on Unix
+- **THEN** writes no file where the link points and exits 0
 
 ### Requirement: What a tool reads from the document
 In the JSON document each finding and evidence row SHALL carry an `id` made from what it is about, never its order or lines; a finding SHALL carry each side's location where it has one, and its module; a finding, behavior or evidence row about a test SHALL name the go test name and `-run` pattern that select it; the document SHALL give each module's directory and each side's branch; an evidence row SHALL say whether it needs a decision, and its stream and commit.

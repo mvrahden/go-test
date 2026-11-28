@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/audit AuditSkip / ASkipTheHeadAdds / when the head adds calls that skip the test to two bodies and adds a test whose body writes one / lists each as a finding of class skip naming the calls its body wrote before and writes now \(
+Expect: ^FAIL .*conformance/audit AuditSkip / ASkipTheHeadAdds / when the head adds calls that skip the test to two bodies and adds a test whose body writes one / --fail-on=all exits 1 and the closing line counts the three skip findings \(
+Clause: when the head adds calls that skip the test to two bodies and adds a test whose body writes one → lists each as a finding of class skip naming the calls its body wrote before and writes now
+Clause: when the head adds calls that skip the test to two bodies and adds a test whose body writes one → --fail-on=all exits 1 and the closing line counts the three skip findings
+--- a/internal/gotestaudit/compare.go
++++ b/internal/gotestaudit/compare.go
+@@ -211,7 +211,7 @@
+ 		c.find(ClassExcluded, h.pkg, subject(h), b.b.Name, h.b.Name, h.loc)
+ 		c.at(b, h)
+ 	}
+-	if c.skips && h.b.Skips > b.b.Skips {
++	if c.skips && false {
+ 		c.find(ClassSkip, h.pkg, subject(h), skipText(b.b.Skips), skipText(h.b.Skips), h.loc)
+ 		c.at(b, h)
+ 	}

@@ -42,7 +42,7 @@ func Read(ctx context.Context, opts *Options) (rec Record, unmatched []string, e
 		Schema:     Schema,
 		Provenance: opts.Provenance,
 		Patterns:   slices.Clone(opts.Patterns),
-		Notes:      []string{FloorNote},
+		Notes:      []string{FloorNote, SkipNote},
 	}
 	var loaded []string
 	var mods []module
