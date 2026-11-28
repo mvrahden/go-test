@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"go/token"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -108,4 +109,18 @@ func CheckFocusViolations(suites gotestast.TestSuiteSpecSet) []FocusViolation {
 		}
 	}
 	return violations
+}
+
+// noteGenerateFocus says on w that generate ignored the F_ prefixes among
+// loaded. A collection error is left to generation.
+func noteGenerateFocus(w io.Writer, loaded []*gotestgen.LoadResult) {
+	suites, err := gotestgen.CollectFromLoaded(loaded)
+	if err != nil {
+		return
+	}
+	violations := CheckFocusViolations(suites)
+	if len(violations) == 0 {
+		return
+	}
+	fmt.Fprintf(w, "note: generate ignores F_: each harness holds every suite and method its package declares (%d focused, first %s) — go test runs them all, and a gotest run narrows to the focus\n", len(violations), strings.Join(strings.Fields(violations[0].String()), " "))
 }

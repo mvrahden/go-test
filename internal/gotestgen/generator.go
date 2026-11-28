@@ -535,17 +535,24 @@ func reportOrder(matched, listed []string) []string {
 }
 
 func GenerateFromLoaded(loadResults []*LoadResult) (GenerateResults, []SharedFixtureInfo, error) {
-	return generateFromLoaded(loadResults, true)
+	return generateFromLoaded(loadResults, true, false)
 }
 
 // GenerateFromLoadedOpts is GenerateFromLoaded with an explicit harvestSeeds
 // switch — when false, no gotest.Each/literal-call scanning happens and
 // generated fuzz wrappers get no harvested f.Add(...) seed lines.
 func GenerateFromLoadedOpts(loadResults []*LoadResult, harvestSeeds bool) (GenerateResults, []SharedFixtureInfo, error) {
-	return generateFromLoaded(loadResults, harvestSeeds)
+	return generateFromLoaded(loadResults, harvestSeeds, false)
 }
 
-func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateResults, []SharedFixtureInfo, error) {
+// GenerateHarness is GenerateFromLoaded for files that are kept: each
+// package's harness holds every suite and method it declares, a focused
+// one beside the others. Only a run narrows by focus.
+func GenerateHarness(loadResults []*LoadResult) (GenerateResults, []SharedFixtureInfo, error) {
+	return generateFromLoaded(loadResults, true, true)
+}
+
+func generateFromLoaded(loadResults []*LoadResult, harvestSeeds, whole bool) (GenerateResults, []SharedFixtureInfo, error) {
 	if err := CheckRuntimeVersion(loadResults); err != nil {
 		return nil, nil, err
 	}
@@ -565,6 +572,10 @@ func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateR
 		all[i].pxtest = c.CollectSuiteSpecs(lr.Pxtest)
 		if err := collectorError(lr.Pxtest, all[i].pxtest.Errs); err != nil {
 			return nil, nil, err
+		}
+		if whole {
+			all[i].ptest.Suites.IgnoreFocus()
+			all[i].pxtest.Suites.IgnoreFocus()
 		}
 		if err := orphanError(lr); err != nil {
 			return nil, nil, err

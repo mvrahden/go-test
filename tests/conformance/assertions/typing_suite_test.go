@@ -628,6 +628,41 @@ func (s *AssertionTypingTestSuite) TestOrderingNaN(t *gotest.T) {
 	})
 }
 
+func (s *AssertionTypingTestSuite) TestElementsOfNaN(t *gotest.T) {
+	type pt struct{ X, Y float64 }
+	nan := math.NaN()
+	nan32 := float32(nan)
+	const inA = "in listA is not equal to itself: a NaN matches nothing, itself included"
+	const inB = "in listB is not equal to itself: a NaN matches nothing, itself included"
+	t.When("ElementsMatch is given a list holding a NaN", func(w *gotest.T) {
+		w.It("fails naming the element and its list, whichever list holds it and also when both hold one", func(it *gotest.T) {
+			for _, c := range []struct {
+				m    *gotest.R
+				want string
+			}{
+				{gotest.Record(func(r *gotest.R) { gotest.ElementsMatch(r, []float64{1, 2}, []float64{nan, nan}) }), "element NaN " + inB},
+				{gotest.Record(func(r *gotest.R) { gotest.ElementsMatch(r, []float64{nan, nan}, []float64{1, 2}) }), "element NaN " + inA},
+				{gotest.Record(func(r *gotest.R) { gotest.ElementsMatch(r, []float64{nan}, []float64{nan}) }), "element NaN " + inA},
+				{gotest.Record(func(r *gotest.R) { gotest.ElementsMatch(r, []float32{1, 2}, []float32{nan32, nan32}) }), "element NaN " + inB},
+				{gotest.Record(func(r *gotest.R) { gotest.ElementsMatch(r, []pt{{1, 2}}, []pt{{nan, 7}}) }), "pt{X:NaN, Y:7} " + inB},
+				{gotest.Record(func(r *gotest.R) { gotest.ElementsMatch(r, [][2]float64{{1, 2}}, [][2]float64{{nan, 7}}) }), "element [2]float64{NaN, 7} " + inB},
+				{gotest.Record(func(r *gotest.R) { gotest.ElementsMatch(r, []any{1.0}, []any{nan}) }), "element NaN " + inB},
+			} {
+				gotest.True(it, c.m.Failed(), c.want)
+				gotest.Contains(it, c.m.Message(), "ElementsMatch failed:\n  ")
+				gotest.Contains(it, c.m.Message(), c.want)
+			}
+			for _, ok := range []*gotest.R{
+				gotest.Record(func(r *gotest.R) { gotest.ElementsMatch(r, []float64{1, 2, 2}, []float64{2, 1, 2}) }),
+				gotest.Record(func(r *gotest.R) { gotest.ElementsMatch(r, []float64{math.Inf(1), 0}, []float64{0, math.Inf(1)}) }),
+				gotest.Record(func(r *gotest.R) { gotest.ElementsMatch(r, []pt{{1, 2}, {3, 4}}, []pt{{3, 4}, {1, 2}}) }),
+			} {
+				gotest.False(it, ok.Failed(), ok.Message())
+			}
+		})
+	})
+}
+
 func (s *AssertionTypingTestSuite) TestEmptyOnPointers(t *gotest.T) {
 	type user struct{ Name string }
 	n := 0

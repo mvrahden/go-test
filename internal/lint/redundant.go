@@ -108,12 +108,15 @@ func sameExprText(pass *analysis.Pass, a, b ast.Expr) bool {
 }
 
 // isRedundantBefore says why first may go: the second fails on every input
-// the first fails. NotNil fails its type guard on what cannot be nil, and
-// Contains finds an empty string in an empty one.
+// the first fails. NotNil fails its type guard on what an interface or a type
+// parameter may hold, and Contains finds an empty string in an empty one.
 func isRedundantBefore(pass *analysis.Pass, first, second *parsedAssertion) string {
 	weaker, stronger, strongerCall := first.name, second.name, second.call
-	if weaker == "NotNil" && nilKindOf(pass, first.guardedArg) == notNilable {
-		return ""
+	if weaker == "NotNil" {
+		// Only a pointer, channel, slice, map or func fails NotNil exactly when nil.
+		if k := nilKindOf(pass, first.guardedArg); k != comparableNil && k != uncomparableNil {
+			return ""
+		}
 	}
 	if weaker == "NotEmpty" && stronger == "Contains" && mayBeEmptyString(pass, strongerCall.Args[2]) {
 		return ""

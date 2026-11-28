@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/assertions SnapshotKeys .* / the run ends with exit 2 before any test runs, naming the variable and the value( / .*)? \(
+Clause: when GOTEST_UPDATE_SNAPSHOTS or GOTEST_CI is set to a value that is no boolean → the run ends with exit 2 before any test runs, naming the variable and the value
+--- a/cmd/gotest/cli.go
++++ b/cmd/gotest/cli.go
+@@ -364,9 +364,6 @@
+ }
+ 
+ func parseExecFlags(own OwnFlags, goTestArgs []string, projCfg *config.ProjectConfig) (ExecConfig, error) {
+-	if err := protocol.CheckSwitches(os.Getenv); err != nil {
+-		return ExecConfig{}, err
+-	}
+ 	control, err := parseControlFlag(own)
+ 	if err != nil {
+ 		return ExecConfig{}, err

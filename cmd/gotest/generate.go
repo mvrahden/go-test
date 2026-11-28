@@ -42,11 +42,12 @@ func runGenerate(inv Invocation) int { //nolint:gocritic // hugeParam: stable AP
 	if reportBrokenPackages(broken) {
 		return 2
 	}
-	results, _, err := gotestgen.GenerateFromLoaded(loaded)
+	results, _, err := gotestgen.GenerateHarness(loaded)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
+	noteGenerateFocus(os.Stderr, loaded)
 
 	outside := map[string]bool{}
 	for _, lr := range loaded {

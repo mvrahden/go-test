@@ -166,6 +166,15 @@ The generated harness SHALL compile beside whatever names the package declares, 
 - **THEN** a renamed suite leaves no reference to its old name, a variant without suites loses its file, and the run passes
 - **AND** an unchanged generated file is not written again
 
+### Requirement: Generating under a focus
+gotest generate SHALL write, for every package it is given, a harness that holds every suite and method the package declares, a focused one beside the others under its declared name; only the X_ prefix SHALL leave one out, and narrowing by focus belongs to a run. When a suite or method it generates for carries the F_ prefix, generate SHALL say so on stderr, with how many carry it and where the first is declared, and SHALL exit 0.
+
+#### Scenario: A focused method among the packages
+- **WHEN** gotest generate is given two packages of which one holds a focused method
+- **THEN** each package keeps a harness holding every method it declares, and go test on them runs the unfocused methods too
+- **AND** generate notes on stderr that it ignores F_, naming the method where it is declared, and exits 0
+- **AND** a run of the same packages still runs the focused method alone
+
 ### Requirement: Stale generated files and build constraints
 A generated file left on disk by an earlier generate SHALL neither break nor be compiled into a run and SHALL be read past by discover and spec; --tags SHALL select the suite files built with that tag.
 

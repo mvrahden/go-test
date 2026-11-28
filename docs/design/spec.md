@@ -1620,13 +1620,13 @@ User-facing:
 
 | Variable | Effect |
 |---|---|
-| `GOTEST_CI` | CI mode on for any value but `0`, `f`, `F`, `false`, `FALSE` and `False`, which turn it off; unset, the standard `CI` variable turns it on |
+| `GOTEST_CI` | CI mode: on for `1`, `t`, `T`, `true`, `TRUE` and `True`, off for `0`, `f`, `F`, `false`, `FALSE` and `False`; any other value is refused with exit 2 ([Switch values that are no boolean](../../specs/assertions/spec.md#requirement-switch-values-that-are-no-boolean)); unset, the standard `CI` variable turns it on |
 | `GOTEST_AGENT` | A text run's agent output, off for the same values as `GOTEST_CI` and on for any other; unset, a detected agent (`AI_AGENT`, `CLAUDECODE=1`) turns it on, and `--agent` wins over it |
 | `GOTEST_LIVE` | A `-json` run's live event stream, on for any value but those that turn `GOTEST_CI` off; unset, off; `--live` wins over it, and no other run reads it ([A live event stream](../../specs/cli/spec.md#requirement-a-live-event-stream)) |
 | `GOTEST_CACHE_DIR` | Cache location for test binaries and each working directory's last run record (default `os.UserCacheDir()/gotest`; a run evicts the binaries of a gone checkout, those unused for 7 days, then the least recently used above 5 GiB) |
 | `GOTEST_EXCLUSIVE_LOCK` | `0` lets the run's exclusive scopes overlap another run's; any other value or unset, runs of one module take turns at them through lock files under the cache's `exclusive/` directory ([Exclusive across runs](../../specs/lifecycle/spec.md#requirement-exclusive-across-runs)) |
 | `GOTEST_SLOW_BUILD_THRESHOLD` | How long a build runs, as a Go duration, before the CLI says it is still building (default `15s`; unparsable or not positive → the default) |
-| `GOTEST_UPDATE_SNAPSHOTS` | Regenerate snapshot baselines, off for the same values as `GOTEST_CI` (what `--update-snapshots` sets; the only mechanism under plain `go test`) |
+| `GOTEST_UPDATE_SNAPSHOTS` | Regenerate snapshot baselines: on, off and refused for the same values as `GOTEST_CI` (what `--update-snapshots` sets; the only mechanism under plain `go test`, where a refused value fails each `MatchSnapshot`) |
 | `GOTEST_TIMEOUT_SCALE` | Multiply every suite and fixture budget, declared or default, deadline and verdict alike, for a machine slower than the one the budgets were written on (`2` doubles them); the processes the tests start do not inherit it |
 
 Internal protocol between the CLI and test/subprocess boundaries (may change without notice): `GOTEST_SHARED_STATE_FILE` (shared-fixture state file for the test process), `GOTEST_CONTROL` (the suite process's control channel: the stop, the forced stop and the teardown budget travel on it as lines), `GOTEST_EXCLUSIVE_HELD` (the exclusive-scope lock files the suite's run holds, which a gotest run the suite starts takes as its own: [Runs that do not wait](../../specs/lifecycle/spec.md#requirement-runs-that-do-not-wait)).

@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/assertions SnapshotKeys .* / a stale baseline passes and is rewritten \(
+Clause: when GOTEST_UPDATE_SNAPSHOTS is spelled true or T → a stale baseline passes and is rewritten
+--- a/cmd/gotest/cli.go
++++ b/cmd/gotest/cli.go
+@@ -367,6 +367,9 @@
+ 	if err := protocol.CheckSwitches(os.Getenv); err != nil {
+ 		return ExecConfig{}, err
+ 	}
++	if v := os.Getenv(protocol.EnvUpdateSnapshots); v == "true" || v == "T" {
++		return ExecConfig{}, fmt.Errorf("%s=%q", protocol.EnvUpdateSnapshots, v)
++	}
+ 	control, err := parseControlFlag(own)
+ 	if err != nil {
+ 		return ExecConfig{}, err

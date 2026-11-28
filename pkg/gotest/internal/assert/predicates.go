@@ -432,7 +432,7 @@ func ErrorText(err error) (text string) {
 
 // CheckElementsMatch returns "" if listA and listB hold the same elements
 // the same number of times, in any order. Otherwise it returns a formatted
-// error string.
+// error string. An element that is not equal to itself, a NaN, matches nothing.
 func CheckElementsMatch[V comparable](listA, listB []V) (msg string) {
 	if len(listA) != len(listB) {
 		return fmt.Sprintf("ElementsMatch failed:\n  lists have different lengths: %d vs %d", len(listA), len(listB))
@@ -443,6 +443,9 @@ func CheckElementsMatch[V comparable](listA, listB []V) (msg string) {
 		}
 	}()
 	counts := make(map[V]int, len(listA))
+	if v, list, found := notSelfEqual(listA, listB); found {
+		return fmt.Sprintf("ElementsMatch failed:\n  element %#v in %s is not equal to itself: a NaN matches nothing, itself included", v, list)
+	}
 	for _, v := range listA {
 		counts[v]++
 	}
@@ -487,3 +490,24 @@ func unhashable[V comparable](name string, r any, lists ...[]V) string {
 	}
 	panic(r)
 }
+
+// notSelfEqual finds the first element, of listA then of listB, that is
+// not equal to itself: a NaN, or a value holding one. It panics as a map
+// does on an element == cannot compare.
+func notSelfEqual[V comparable](listA, listB []V) (v V, list string, found bool) {
+	for _, l := range []struct {
+		name  string
+		elems []V
+	}{{"listA", listA}, {"listB", listB}} {
+		for _, v := range l.elems {
+			if !same(v, v) {
+				return v, l.name, true
+			}
+		}
+	}
+	return v, "", false
+}
+
+// same reports a == b. Called with one value twice, it is false only for
+// a NaN or a value holding one.
+func same[V comparable](a, b V) bool { return a == b }

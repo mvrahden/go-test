@@ -288,6 +288,7 @@ shards of one run do not add up to every mutant exactly once.
 | `notempty-pointer-to-a-number-passes` | `IsEmptyable` takes every pointer as one that can be empty, so `NotEmpty` on a pointer to a number is a nil check | ring-0 predicates suite |
 | `noerror-error-method-panics` | `ErrorText` reads `<nil>` for an error whose `Error` method panicked, naming neither its type nor the panic | ring-0 predicates suite |
 | `elementsmatch-unhashable-panics` | `CheckElementsMatch` passes lists whose elements `==` cannot compare | ring-0 predicates suite |
+| `elementsmatch-matches-nan` | `CheckElementsMatch` passes lists holding a NaN, which matches nothing | ring-0 predicates suite |
 | `fail-is-noop` | `fail()` in `pkg/gotest` records nothing | canary: the fixtures that must fail stay green |
 | `failfast-drops-the-skipped` | a FailFast suite drops the methods it did not run instead of reporting them | canary: the FailFast fixture's later methods have no skip verdict |
 | `failfast-reads-before-cleanup` | a parallel FailFast method's verdict is read before its cleanups ran | canary: both methods of the cleanup-failing FailFast fixture run under `-parallel=1` |
@@ -554,6 +555,10 @@ shards of one run do not add up to every mutant exactly once.
 | `snapshot-name-unchecked` | a snapshot name that spans lines is written as it is | canary: the failing fixture's bad name passes |
 | `snapshot-update-switch-any-value` | `GOTEST_UPDATE_SNAPSHOTS=0` rewrites baselines | canary: the stale baseline passes and the file changes |
 | `switch-false-spellings-on` | `FALSE` and `f` switch `GOTEST_CI` and `GOTEST_UPDATE_SNAPSHOTS` on | canary: a stale baseline is rewritten and a missing one refused |
+| `switch-unknown-value-runs` | a run given a `GOTEST_CI` or `GOTEST_UPDATE_SNAPSHOTS` value that is no boolean goes on | assertions conformance: the run exits 1 instead of 2 and its tests run |
+| `snapshot-unknown-switch-value-read` | `MatchSnapshot` reads and writes baselines under a switch value that is no boolean | ring-0 snapshot internals suite: the snapshot passes and a file is written |
+| `switch-true-spellings-refused` | `GOTEST_UPDATE_SNAPSHOTS` spelled `true` or `T` is refused | assertions conformance: the stale baseline is not rewritten |
+| `switch-empty-value-refused` | `GOTEST_UPDATE_SNAPSHOTS` set to the empty string is refused | assertions conformance: the missing baseline is not written |
 | `snapshot-legacy-ignored` | a baseline under the key the release before exact names used is not looked up | canary: the `snapshotlegacy` sections fail under `GOTEST_CI=1` |
 | `snapshot-legacy-renamed-under-ci` | an old-keyed section is renamed under `GOTEST_CI` | canary: the `snapshotlegacy` baseline changes in a CI run |
 | `snapshot-legacy-not-renamed` | an old-keyed section that matches keeps its old key | canary: the `snapshotlegacy` baseline is not migrated |
@@ -831,6 +836,9 @@ shards of one run do not add up to every mutant exactly once.
 | `external-generic-alias-dropped` | an alias of a generic suite in the external test package is read as a suite without cases | canary: none of the `shapes/pxgenericalias` aliases' methods passes |
 | `focus-method-not-run-wide` | only a focused suite, never a focused method, focuses the whole run | canary: the `shapes/focusmethod` unfocused suite in the other package is not skipped |
 | `focus-fuzz-method-not-run-wide` | a focused fuzz method does not focus the whole run | conformance: the discovery It for a focused fuzz method sees the unfocused suite in the other package run |
+| `generate-narrows-under-focus` | `generate` narrows each harness to the run's focus, so a package without a focused item loses its harness | discovery conformance: the unfocused method and the other package's harness are missing, and go test does not run them |
+| `generate-focus-unannounced` | `generate` writes every harness whole under a focus but says nothing | discovery conformance: stderr holds no note |
+| `focus-ignored-by-a-run` | a run generates the whole harness, ignoring the focus | discovery conformance: the run of the focused packages runs the unfocused method and the other suite |
 | `hooks-calling-t-alias-unseen` | the hooks of a generic suite another package declares are read with the alias's package's types | cli conformance: the cross-package alias row runs instead of failing with exit 2 |
 | `fuzz-alias-methods-read-in-alias-package` | a fuzz method of a generic suite another package declares is read with the alias's package's types | conformance: the fuzz It for a cross-package alias sees the method refused as never calling `f.Fuzz` |
 | `fuzz-alias-type-parameter-unread` | a fuzz callback's type parameter is not read as the type the alias instantiates | conformance: the fuzz It for a type-parameter callback sees the target refused as not fuzzable |
@@ -851,6 +859,7 @@ shards of one run do not add up to every mutant exactly once.
 | `lint-errors-is-fixed` | `True(errors.Is(err, target))` gets an `ErrorIs` fix | conformance: the lint It for `errors.Is` finds the nil-target row's verdict changed |
 | `lint-guard-fixed` | `ErrorIs` with a nil target is rewritten into `NoError` | conformance: the lint It for guards finds the row's verdict changed |
 | `lint-redundant-notnil-unguarded` | a `NotNil` that fails its type guard is removed as redundant | conformance: the lint It for redundant assertions finds the string row's verdict changed |
+| `lint-redundant-notnil-of-an-interface` | a `NotNil` of an interface or of a type parameter with no core type is removed as redundant | conformance: the lint It for such operands finds the `NotNil` removed and the verdict changed |
 | `lint-redundant-impure-operand` | an assertion before one on the same call or receive is removed as redundant | conformance: the lint It for impure operands finds the call rows' verdicts changed |
 | `lint-redundant-impure-argument` | only the checked operand must be pure; a call among the other arguments may write it | conformance: the lint It for impure operands finds the target-call row's verdict changed |
 | `lint-bool-rewrite-any-operand` | `Equal(t, true, v)` becomes `True(t, v)` whatever `v`'s type | conformance: the lint It for bool literals sees the fix for a named bool and an `any` fail to compile |

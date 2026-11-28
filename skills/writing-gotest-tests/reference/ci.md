@@ -96,7 +96,7 @@ jobs:
   in-toto test-result predicate through `actions/attest`; the job must grant
   `id-token: write` and `attestations: write`, or the attestation is
   skipped with a summary line. Do not add a separate audit or attest step.
-- CI environments auto-arm `--ci` (any non-falsy `CI`/`GOTEST_CI` value):
+- CI environments auto-arm `--ci` (`CI` set to anything but a false spelling, or `GOTEST_CI` set to a true one; v1.42+ refuses a `GOTEST_CI` that is neither with exit 2):
   committed `F_` focus prefixes FAIL the run, a test that passed without
   an assertion fails it (v1.42+, in every output mode), and a missing
   snapshot baseline fails

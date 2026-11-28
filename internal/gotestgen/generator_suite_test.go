@@ -3,6 +3,7 @@ package gotestgen_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
@@ -187,5 +188,50 @@ func (s *GeneratorTestSuite) TestE2ENoTestSuites(t *gotest.T) {
 				gotest.Empty(sub, r.PXTest)
 			}
 		}
+	})
+}
+
+func (s *GeneratorTestSuite) TestGenerateHarness_IgnoresFocus(t *gotest.T) {
+	cwd, err := os.Getwd()
+	gotest.NoError(t, err)
+	shapes := filepath.Join(cwd, "..", "..", "tests", "conformance", "testdata", "shapes", "focusmethod")
+	// load anew for each It: the reduction trims the collected suites in place.
+	load := func(it *gotest.T) []*gotestgen.LoadResult {
+		loaded, broken, err := gotestgen.LoadPackages([]string{filepath.Join(shapes, "a"), filepath.Join(shapes, "b")}, nil)
+		gotest.NoError(it, err)
+		gotest.Empty(it, broken)
+		return loaded
+	}
+	pick := func(it *gotest.T, results gotestgen.GenerateResults) (a, b *gotestgen.GenerateResult) {
+		for _, r := range results {
+			switch {
+			case strings.HasSuffix(r.PkgPath, "/focusmethod/a"):
+				a = r
+			case strings.HasSuffix(r.PkgPath, "/focusmethod/b"):
+				b = r
+			}
+		}
+		gotest.NotZero(it, a)
+		gotest.NotZero(it, b)
+		return a, b
+	}
+
+	t.It("holds every method of every package, the focused one beside the others", func(it *gotest.T) {
+		results, _, err := gotestgen.GenerateHarness(load(it))
+		gotest.NoError(it, err)
+		a, b := pick(it, results)
+		gotest.ElementsMatch(it, []string{"TestMethodTestSuite/F_TestFocused", "TestMethodTestSuite/TestPlain"}, a.TestCases)
+		gotest.Equal(it, []string{"TestOtherTestSuite/TestRuns"}, b.TestCases)
+		gotest.NotEmpty(it, b.PTest)
+		gotest.Empty(it, b.SkippedSuiteNames)
+	})
+
+	t.It("leaves the generation of a run narrowed to the focus", func(it *gotest.T) {
+		results, _, err := gotestgen.GenerateFromLoaded(load(it))
+		gotest.NoError(it, err)
+		a, b := pick(it, results)
+		gotest.Equal(it, []string{"TestMethodTestSuite/F_TestFocused"}, a.TestCases)
+		gotest.Empty(it, b.PTest)
+		gotest.Equal(it, []string{"OtherTestSuite"}, b.SkippedSuiteNames)
 	})
 }

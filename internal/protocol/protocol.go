@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -15,10 +16,10 @@ const (
 	EnvUpdateSnapshots  = "GOTEST_UPDATE_SNAPSHOTS"
 	EnvCI               = "GOTEST_CI"
 	// EnvAgentOutput switches a text run's agent output on or off, read as
-	// EnvCI is; unset, a detected agent turns it on.
+	// SwitchOn reads it; unset, a detected agent turns it on.
 	EnvAgentOutput = "GOTEST_AGENT"
 	// EnvLive switches a -json run's live event stream on or off, read as
-	// EnvCI is; unset, it is off.
+	// SwitchOn reads it; unset, it is off.
 	EnvLive     = "GOTEST_LIVE"
 	EnvCacheDir = "GOTEST_CACHE_DIR"
 	// EnvExclusiveLock at 0 lets a run's exclusive scopes overlap another
@@ -136,9 +137,34 @@ func SplitFuzzWrapper(name string) (suite, method string, ok bool) {
 	return m[1], m[2], true
 }
 
-// SwitchOn reads the value of an on/off variable such as GOTEST_CI: empty is
-// off, and so are the false spellings of strconv.ParseBool (0, f, F, false,
-// FALSE, False). Any other value is on, so a mistyped opt-in stays on.
+// ParseSwitch reads an on/off variable that takes no other value: empty is
+// off, a spelling of strconv.ParseBool is on or off, anything else an error
+// naming the variable and the value.
+func ParseSwitch(name, value string) (on bool, err error) {
+	if value == "" {
+		return false, nil
+	}
+	on, err = strconv.ParseBool(value)
+	if err != nil {
+		return false, fmt.Errorf("%s=%q is neither on nor off: set it to 1 or true to switch it on, to 0 or false to switch it off, or unset it", name, value)
+	}
+	return on, nil
+}
+
+// CheckSwitches refuses a GOTEST_CI or GOTEST_UPDATE_SNAPSHOTS value
+// ParseSwitch refuses, GOTEST_CI first.
+func CheckSwitches(getenv func(string) string) error {
+	for _, name := range []string{EnvCI, EnvUpdateSnapshots} {
+		if _, err := ParseSwitch(name, getenv(name)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// SwitchOn reads the value of an on/off variable such as GOTEST_AGENT: empty
+// is off, and so are the false spellings of strconv.ParseBool (0, f, F, false,
+// FALSE, False). Any other value is on.
 func SwitchOn(v string) bool {
 	if v == "" {
 		return false

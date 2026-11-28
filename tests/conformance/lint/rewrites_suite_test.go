@@ -56,19 +56,20 @@ type rewriteRow struct {
 }
 
 const (
-	groupConcrete  = "concrete"
-	groupInterface = "interface"
-	groupCore      = "core"
-	groupBool      = "bool"
-	groupErrorMsg  = "errormsg"
-	groupOrdering  = "ordering"
-	groupLen       = "len"
-	groupEquality  = "equality"
-	groupTypeArgs  = "typeargs"
-	groupErrorsIs  = "errorsis"
-	groupGuards    = "guards"
-	groupRedundant = "redundant"
-	groupImpure    = "impure"
+	groupConcrete       = "concrete"
+	groupInterface      = "interface"
+	groupCore           = "core"
+	groupBool           = "bool"
+	groupErrorMsg       = "errormsg"
+	groupOrdering       = "ordering"
+	groupLen            = "len"
+	groupEquality       = "equality"
+	groupTypeArgs       = "typeargs"
+	groupErrorsIs       = "errorsis"
+	groupGuards         = "guards"
+	groupRedundant      = "redundant"
+	groupRedundantIface = "redundantiface"
+	groupImpure         = "impure"
 )
 
 const (
@@ -182,6 +183,18 @@ var rewriteRows = []rewriteRow{
 		body: "var s []int\n\tgotest.Equal[any](t, nil, s)", verdict: "fail"},
 	{Desc: "Equal of nil and a nil slice", group: groupTypeArgs,
 		body: "var s []int\n\tgotest.Equal(t, nil, s)", rules: []string{simplify}, want: "gotest.Nil(t, s)", verdict: "pass"},
+	{Desc: "Equal[any] of \"\" and an empty named string", group: groupTypeArgs, decls: "type S string\n",
+		body: "v := S(\"\")\n\tgotest.Equal[any](t, \"\", v)", verdict: "fail"},
+	{Desc: "Equal[any] of a length and a float constant", group: groupTypeArgs,
+		body: "xs := []int{1, 2, 3}\n\tgotest.Equal[any](t, len(xs), 3.0)", verdict: "fail"},
+	{Desc: "Equal[any] of true and a bool", group: groupTypeArgs,
+		body: "ok := true\n\tgotest.Equal[any](t, true, ok)", verdict: "pass"},
+	{Desc: "Equal[string] of \"\" and an empty string", group: groupTypeArgs,
+		body: "s := \"\"\n\tgotest.Equal[string](t, \"\", s)", verdict: "pass"},
+	{Desc: "Equal of \"\" and an empty string", group: groupTypeArgs,
+		body: "s := \"\"\n\tgotest.Equal(t, \"\", s)", rules: []string{simplify}, want: "gotest.Empty(t, s)", verdict: "pass"},
+	{Desc: "Equal of a length and a float constant", group: groupTypeArgs,
+		body: "xs := []int{1, 2, 3}\n\tgotest.Equal(t, len(xs), 3.0)", rules: []string{simplify}, want: "gotest.Len(t, xs, 3.0)", verdict: "pass"},
 
 	// errors.Is matches a nil target to a nil error; ErrorIs fails it.
 	{Desc: "True of errors.Is with a target holding nil", group: groupErrorsIs, imports: []string{"errors"},
@@ -210,6 +223,23 @@ var rewriteRows = []rewriteRow{
 		body: "b := box{items: []int{1}}\n\tgotest.NotNil(t, b.items)\n\tgotest.Contains(t, b.items, 1)", rules: []string{redundant}, gone: "gotest.NotNil(t, b.items)", verdict: "pass"},
 	{Desc: "NotEmpty of a map element before Len", group: groupRedundant,
 		body: "m := map[string][]int{\"k\": {1}}\n\tgotest.NotEmpty(t, m[\"k\"])\n\tgotest.Len(t, m[\"k\"], 1)", rules: []string{redundant}, gone: "gotest.NotEmpty(t, m[\"k\"])", verdict: "pass"},
+	{Desc: "NotNil of a slice before Len", group: groupRedundant,
+		body: "s := []int{1}\n\tgotest.NotNil(t, s)\n\tgotest.Len(t, s, 1)", rules: []string{redundant}, gone: "gotest.NotNil(t, s)", verdict: "pass"},
+	{Desc: "NotNil of a slice before NotEmpty", group: groupRedundant,
+		body: "s := []int{1}\n\tgotest.NotNil(t, s)\n\tgotest.NotEmpty(t, s)", rules: []string{redundant}, gone: "gotest.NotNil(t, s)", verdict: "pass"},
+	{Desc: "NotNil of a type parameter over []int before Contains", group: groupRedundant, decls: "func check[P ~[]int](t *testing.T, p P) {\n\tgotest.NotNil(t, p)\n\tgotest.Contains(t, p, 1)\n}\n",
+		body: "check(t, []int{1})", rules: []string{redundant}, gone: "gotest.NotNil(t, p)", verdict: "pass"},
+
+	// NotNil fails its type guard on what an interface or a type parameter
+	// holds; the assertion after it accepts the value.
+	{Desc: "NotNil of an any holding a string before Len", group: groupRedundantIface,
+		body: "m := map[string]any{\"name\": \"abc\"}\n\tgotest.NotNil(t, m[\"name\"])\n\tgotest.Len(t, m[\"name\"], 3)", rules: []string{simplify}, verdict: "fail"},
+	{Desc: "NotNil of an any holding a string before NotEmpty", group: groupRedundantIface,
+		body: "var v any = \"abc\"\n\tgotest.NotNil(t, v)\n\tgotest.NotEmpty(t, v)", rules: []string{simplify}, verdict: "fail"},
+	{Desc: "NotNil of an any holding a string before Contains", group: groupRedundantIface,
+		body: "var v any = \"abc\"\n\tgotest.NotNil(t, v)\n\tgotest.Contains(t, v, \"b\")", rules: []string{simplify}, verdict: "fail"},
+	{Desc: "NotNil of a type parameter holding a string before NotEmpty", group: groupRedundantIface, decls: "func check[P any](t *testing.T, p P) {\n\tgotest.NotNil(t, p)\n\tgotest.NotEmpty(t, p)\n}\n",
+		body: "check(t, \"abc\")", verdict: "fail"},
 
 	// Each assertion evaluates its own operand: a call or a receive is no repeat.
 	{Desc: "NotEmpty of a call before Len of the same call", group: groupImpure,
@@ -348,7 +378,7 @@ func (s *LinterRewritesTestSuite) TestEqualities(t *gotest.T) {
 }
 
 func (s *LinterRewritesTestSuite) TestTypeArguments(t *gotest.T) {
-	t.When("Equal compares an operand with nil under an explicit type argument", func(w *gotest.T) {
+	t.When("Equal is called with an explicit type argument", func(w *gotest.T) {
 		w.It("Equal is not rewritten, since the type argument decides what it compares", func(it *gotest.T) {
 			s.checkRows(it, groupTypeArgs)
 		})
@@ -378,6 +408,9 @@ func (s *LinterRewritesTestSuite) TestRedundancies(t *gotest.T) {
 		})
 		w.It("operands that call a function or receive from a channel are left unreported, since each assertion evaluates its own", func(it *gotest.T) {
 			s.checkRows(it, groupImpure)
+		})
+		w.It("a NotNil of an interface, or of a type parameter with no core type, is left unreported, since it fails values the second accepts", func(it *gotest.T) {
+			s.checkRows(it, groupRedundantIface)
 		})
 	})
 }

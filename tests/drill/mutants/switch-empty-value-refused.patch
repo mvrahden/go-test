@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/assertions SnapshotKeys .* / both are off: a missing baseline is written and a stale one still fails \(
+Clause: when GOTEST_CI and GOTEST_UPDATE_SNAPSHOTS are set to the empty string → both are off: a missing baseline is written and a stale one still fails
+--- a/cmd/gotest/cli.go
++++ b/cmd/gotest/cli.go
+@@ -367,6 +367,9 @@
+ 	if err := protocol.CheckSwitches(os.Getenv); err != nil {
+ 		return ExecConfig{}, err
+ 	}
++	if v, set := os.LookupEnv(protocol.EnvUpdateSnapshots); set && v == "" {
++		return ExecConfig{}, fmt.Errorf("%s is empty", protocol.EnvUpdateSnapshots)
++	}
+ 	control, err := parseControlFlag(own)
+ 	if err != nil {
+ 		return ExecConfig{}, err

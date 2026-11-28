@@ -132,7 +132,7 @@ A baseline saved under the older key, without such a suffix, is still compared, 
 `B` and `F` carry `Name()`, so benchmark and fuzz snapshots are keyed by name too.
 Under `-trimpath` the baselines are looked up in the package directory go test runs in, so a snapshot taken in a helper of another package lands beside the package under test.
 A name that spans lines or spells a section header is refused ([Snapshot names](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-snapshot-names)).
-`GOTEST_UPDATE_SNAPSHOTS` and `GOTEST_CI` are off when unset or set to `0`, `f`, `F`, `false`, `FALSE` or `False`, and on for any other value; with updates off a stale baseline fails and stays untouched ([Snapshot updates switched off](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-snapshot-updates-switched-off)).
+`GOTEST_UPDATE_SNAPSHOTS` and `GOTEST_CI` are off when unset or set to `0`, `f`, `F`, `false`, `FALSE` or `False`, on for `1`, `t`, `T`, `true`, `TRUE` or `True`, and refused for any other value (v1.42+; below, any other value was on; [Switch values that are no boolean](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-switch-values-that-are-no-boolean)); with updates off a stale baseline fails and stays untouched ([Snapshot updates switched off](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-snapshot-updates-switched-off)).
 Under `--ci` or `--update-snapshots` a whole suite that passed names the sections of its snapshot files no test read (v1.38+, [Sections no test read](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-sections-no-test-read)).
 
 ### Typing

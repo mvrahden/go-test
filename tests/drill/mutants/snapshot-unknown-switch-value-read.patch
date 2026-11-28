@@ -1,0 +1,14 @@
+Expect: MatchSnapshot read a baseline under GOTEST_UPDATE_SNAPSHOTS="off"
+Judge: ./pkg/gotest SnapshotInternalsTestSuite/TestMatchSnapshot_RefusesAValueThatIsNoSwitch
+Clause: when GOTEST_UPDATE_SNAPSHOTS or GOTEST_CI is set to a value that is no boolean → MatchSnapshot under plain go test fails naming the variable and the value, and leaves the baseline as it was
+--- a/pkg/gotest/snapshot.go
++++ b/pkg/gotest/snapshot.go
+@@ -412,7 +412,7 @@
+ // that is no boolean fails it.
+ func MatchSnapshot(t testingT, value any, name ...string) {
+ 	countAssertion(t)
+-	if err := protocol.CheckSwitches(os.Getenv); err != nil {
++	if err := protocol.CheckSwitches(os.Getenv); err != nil && false {
+ 		failf(t, "MatchSnapshot: %v", err)
+ 		return
+ 	}
