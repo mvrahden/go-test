@@ -21,7 +21,7 @@ func (s *CLIReplayExitTestSuite) SuiteConfig() gotest.SuiteConfig {
 
 // Streams written by hand: the green tests of passedRun under another close.
 const (
-	calcPasses = `
+	calcGreen = `
 {"Action":"run","Package":"example.com/m/calc","Test":"TestCalcTestSuite"}
 {"Action":"run","Package":"example.com/m/calc","Test":"TestCalcTestSuite/TestAdds"}
 {"Action":"attr","Package":"example.com/m/calc","Test":"TestCalcTestSuite/TestAdds","Key":"gotest.assertions","Value":"2"}
@@ -29,11 +29,11 @@ const (
 {"Action":"pass","Package":"example.com/m/calc","Test":"TestCalcTestSuite"}
 {"Action":"pass","Package":"example.com/m/calc"}
 `
-	closedByPolicy = runOpens + calcPasses + `{"Action":"fail","Package":"gotest run","RunLevel":true,"Result":{"ExitCode":1,"Packages":{"Passed":1,"Failed":0,"Skipped":0},"Tests":{"Passed":2,"Failed":0,"Skipped":0}}}
+	closedByPolicy = runOpens + calcGreen + `{"Action":"fail","Package":"gotest run","RunLevel":true,"Result":{"ExitCode":1,"Packages":{"Passed":1,"Failed":0,"Skipped":0},"Tests":{"Passed":2,"Failed":0,"Skipped":0}}}
 `
-	closedWithTwo = runOpens + calcPasses + `{"Action":"fail","Package":"gotest run","RunLevel":true,"Result":{"ExitCode":2,"Packages":{"Passed":1,"Failed":0,"Skipped":0},"Tests":{"Passed":2,"Failed":0,"Skipped":0}}}
+	closedWithTwo = runOpens + calcGreen + `{"Action":"fail","Package":"gotest run","RunLevel":true,"Result":{"ExitCode":2,"Packages":{"Passed":1,"Failed":0,"Skipped":0},"Tests":{"Passed":2,"Failed":0,"Skipped":0}}}
 `
-	closedStopped = runOpens + calcPasses + `{"Action":"start","Package":"interrupted","RunLevel":true}
+	closedStopped = runOpens + calcGreen + `{"Action":"start","Package":"interrupted","RunLevel":true}
 {"Action":"output","Package":"interrupted","RunLevel":true,"Output":"FAIL: run interrupted while running: example.com/m/slow TestSlowTestSuite\n"}
 {"Action":"fail","Package":"interrupted","RunLevel":true}
 {"Action":"fail","Package":"gotest run","RunLevel":true,"Result":{"ExitCode":130,"Packages":{"Passed":1,"Failed":1,"Skipped":0},"Tests":{"Passed":2,"Failed":0,"Skipped":0}}}

@@ -943,7 +943,7 @@ func (s *TreeTestSuite) TestSkipReasons(t *gotest.T, _ *treeCtx) {
 // One run each of a package: failed, passed, and failed on its own with every
 // test passing.
 const (
-	ledgerFailed = `{"Action":"start","Package":"example.com/again"}
+	ledgerRed = `{"Action":"start","Package":"example.com/again"}
 {"Action":"run","Package":"example.com/again","Test":"TestLedgerTestSuite","Gotest":{"Subtest":"TestLedgerTestSuite"}}
 {"Action":"run","Package":"example.com/again","Test":"TestLedgerTestSuite/TestPosts","Gotest":{"Subtest":"TestPosts"}}
 {"Action":"output","Package":"example.com/again","Test":"TestLedgerTestSuite/TestPosts","Output":"    ledger_test.go:14: posted twice\n"}
@@ -953,7 +953,7 @@ const (
 {"Action":"fail","Package":"example.com/again","Test":"TestLedgerTestSuite","Elapsed":0.02}
 {"Action":"fail","Package":"example.com/again","Elapsed":0.03}
 `
-	ledgerPassedTests = `{"Action":"start","Package":"example.com/again"}
+	ledgerGreenTests = `{"Action":"start","Package":"example.com/again"}
 {"Action":"run","Package":"example.com/again","Test":"TestLedgerTestSuite","Gotest":{"Subtest":"TestLedgerTestSuite"}}
 {"Action":"run","Package":"example.com/again","Test":"TestLedgerTestSuite/TestPosts","Gotest":{"Subtest":"TestPosts"}}
 {"Action":"pass","Package":"example.com/again","Test":"TestLedgerTestSuite/TestPosts","Elapsed":0.01}
@@ -961,9 +961,9 @@ const (
 {"Action":"pass","Package":"example.com/again","Test":"TestLedgerTestSuite/TestBalances","Elapsed":0.01}
 {"Action":"pass","Package":"example.com/again","Test":"TestLedgerTestSuite","Elapsed":0.02}
 `
-	ledgerPassed = ledgerPassedTests + `{"Action":"pass","Package":"example.com/again","Elapsed":0.03}
+	ledgerGreen = ledgerGreenTests + `{"Action":"pass","Package":"example.com/again","Elapsed":0.03}
 `
-	ledgerCrashed = ledgerPassedTests + `{"Action":"output","Package":"example.com/again","Output":"panic: the ledger is closed\n"}
+	ledgerCrashed = ledgerGreenTests + `{"Action":"output","Package":"example.com/again","Output":"panic: the ledger is closed\n"}
 {"Action":"fail","Package":"example.com/again","Elapsed":0.03}
 `
 )
@@ -988,15 +988,15 @@ func ledgerReadsFailed(t *gotest.T, tree []*gotestspec.Package) {
 }
 
 func (s *TreeTestSuite) TestAFailedVerdictStandsAgainstALaterPass(t *gotest.T, _ *treeCtx) {
-	ledgerReadsFailed(t, treeOf(t, ledgerFailed+ledgerPassed))
+	ledgerReadsFailed(t, treeOf(t, ledgerRed+ledgerGreen))
 }
 
 func (s *TreeTestSuite) TestALaterFailReplacesAPass(t *gotest.T, _ *treeCtx) {
-	ledgerReadsFailed(t, treeOf(t, ledgerPassed+ledgerFailed))
+	ledgerReadsFailed(t, treeOf(t, ledgerGreen+ledgerRed))
 }
 
 func (s *TreeTestSuite) TestAPackageThatFailedOnItsOwnStaysFailed(t *gotest.T, _ *treeCtx) {
-	tree := treeOf(t, ledgerCrashed+ledgerPassed)
+	tree := treeOf(t, ledgerCrashed+ledgerGreen)
 	mustLen(t, "packages", tree, 1)
 	mustEq(t, "package status", tree[0].Status, gotestspec.StatusFail)
 	mustLen(t, "suites", tree[0].Nodes, 1)
