@@ -6,8 +6,8 @@ Clause: when spec or summary runs, outside CI mode, a package holding a focused 
  	if !ok {
  		return 2
  	}
--	if code, err := focusGate(pkgs.Loaded, cfg.CI); err != nil {
-+	if code, err := focusGate(nil, cfg.CI); err != nil {
+-	if code, err := focusGate(pkgs.Loaded, &cfg); err != nil {
++	if code, err := focusGate(nil, &cfg); err != nil {
  		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
  		return 2
  	} else if code != 0 {

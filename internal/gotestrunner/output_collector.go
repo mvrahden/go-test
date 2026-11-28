@@ -76,6 +76,8 @@ type OutputCollector struct {
 	// their count, nil when the census did not judge the run.
 	missing []CensusCase
 	notRun  *int
+	// uncounted are the packages of a run the census did not judge that hold a declared test without a verdict.
+	uncounted map[string]bool
 	// vacuous counts the tests that passed without an assertion, nil when
 	// none reported a count; vacuousFailed are those --ci failed the run on.
 	vacuous       *int

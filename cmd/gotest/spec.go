@@ -116,7 +116,7 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	if !ok {
 		return 2
 	}
-	if code, err := focusGate(pkgs.Loaded, cfg.CI); err != nil {
+	if code, err := focusGate(pkgs.Loaded, &cfg); err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	} else if code != 0 {
@@ -167,7 +167,7 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		return 2
 	}
 
-	code, coverageFailure := coverageVerdict(coverProfile, minCoverage, result.ExitCode)
+	code, coverageFailure := coverageVerdict(plan, coverProfile, minCoverage, result.ExitCode)
 	saveRun(&result, code, manifest, recordOptions{plan: plan, eventsFile: own.Value("--events-file"), narrowed: narrowedBy(&cfg, plan)})
 	events, err := gotestspec.ParseEvents(bytes.NewReader(result.CapturedJSON))
 	if err != nil {

@@ -3,10 +3,10 @@ Clause: when a run outside CI mode holds a focused method → notes on stderr th
 --- a/cmd/gotest/focusguard.go
 +++ b/cmd/gotest/focusguard.go
 @@ -80,6 +80,9 @@
- 	if ci {
+ 	if cfg.CI {
  		return enforceFocusGuard(loaded)
  	}
-+	if !ci {
++	if !cfg.CI {
 +		return 0, nil
 +	}
  	suites, err := gotestgen.CollectFromLoaded(loaded)

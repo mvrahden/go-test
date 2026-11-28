@@ -34,7 +34,8 @@ func historyDir(root, dir string) string {
 
 // SaveRun records rec as the last run made in rec.Dir and keeps it in the
 // checkout's history. With merge, last.json keeps the packages rec did not
-// run, and their failed units, from the record before it. now dates it.
+// run, and their failed units, from the record before it. A merging run
+// that ran no package leaves last.json as it is. now dates it.
 func SaveRun(rec protocol.RunRecord, merge bool, now time.Time) error { //nolint:gocritic // hugeParam: once per run
 	root, err := cacheRoot()
 	if err != nil {
@@ -53,6 +54,9 @@ func saveRunIn(root string, rec protocol.RunRecord, merge bool, now time.Time) e
 	last := rec
 	if merge {
 		if before, err := readRecordIn(root, rec.Dir); err == nil {
+			if len(rec.Packages) == 0 && len(rec.Failed) == 0 {
+				return keep(root, rec, now)
+			}
 			last = mergeRecords(before, rec)
 		}
 	}

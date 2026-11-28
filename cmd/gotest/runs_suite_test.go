@@ -31,6 +31,25 @@ func (s *RunsListingTestSuite) TestANarrowedRun(t *gotest.T) {
 	gotest.NotContains(t, main.ExportRunsEntryJSON(&k), `"changed"`)
 }
 
+func (s *RunsListingTestSuite) TestTheWordOfARun(t *gotest.T) {
+	for sub, r := range gotest.Each(t, []struct {
+		Desc   string
+		exit   int
+		passed int
+		tests  *protocol.Tally
+		want   string
+	}{
+		{"a package passed", 0, 1, nil, "PASS"},
+		{"no package passed", 0, 0, nil, "EMPTY"},
+		{"a package passed, no test", 0, 1, &protocol.Tally{}, "EMPTY"},
+		{"tests passed, no package counted", 0, 0, &protocol.Tally{Passed: 2}, "PASS"},
+		{"exit 1", 1, 3, nil, "FAIL"},
+		{"exit 2 beside a passed test", 2, 0, &protocol.Tally{Passed: 1}, "FAIL"},
+	}) {
+		gotest.Equal(sub, r.want, main.ExportRunWord(r.exit, r.passed, r.tests))
+	}
+}
+
 func (s *RunsListingTestSuite) TestTheNarrowingOfARun(t *gotest.T) {
 	c := main.ExportNarrowedTo([]string{"m/c", "m/a", "m/b"}, 2)
 	gotest.Equal(t, protocol.Changed{Ran: 3, Unchanged: 2, Packages: []string{"m/a", "m/b", "m/c"}}, *c)

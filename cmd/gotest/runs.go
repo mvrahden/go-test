@@ -257,6 +257,23 @@ func freshnessOf(ctx context.Context, kept []gotestrunner.KeptRun) map[string]ma
 	return out
 }
 
+// runWord is the closing line's word for a run: FAIL for a non-zero exit
+// code, EMPTY when nothing passed, counting tests where the record holds
+// them and packages otherwise, else PASS.
+func runWord(r *runsResult) string {
+	passed := r.Packages.Passed
+	if r.Tests != nil {
+		passed = r.Tests.Passed
+	}
+	switch {
+	case r.ExitCode != 0:
+		return "FAIL"
+	case passed == 0:
+		return "EMPTY"
+	}
+	return "PASS"
+}
+
 // writeRuns lists the records as text, one line each, newest first.
 func writeRuns(w io.Writer, doc *runsDocument) {
 	if len(doc.Runs) == 0 {
@@ -265,10 +282,7 @@ func writeRuns(w io.Writer, doc *runsDocument) {
 	}
 	for i := range doc.Runs {
 		e := &doc.Runs[i]
-		verdict := "PASS"
-		if e.Result.ExitCode != 0 {
-			verdict = "FAIL"
-		}
+		verdict := runWord(&e.Result)
 		parts := []string{
 			e.Recorded.Local().Format("2006-01-02 15:04:05"),
 			fmt.Sprintf("%s exit %d", verdict, e.Result.ExitCode),

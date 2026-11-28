@@ -1,13 +1,17 @@
 Expect: ^FAIL .*conformance/cli CLIChanged .* / its record lists the package with its verdict, its InputHash and its time, marked narrowed \(
 Clause: when a -run narrowed run of a package ends → its record lists the package with its verdict, its InputHash and its time, marked narrowed
+Expect: ^FAIL .*conformance/cli CLIRecordTrust .* / each such run's record marks the package's verdict as of a part / -count=0 \(
+Clause: when --changed follows a passing run of a package with a failing test given -count=0, or -test.run, -test.count=0 or -h after -args → each such run's record marks the package's verdict as of a part
+Expect: ^FAIL .*conformance/cli CLIRecordTrust .* / --changed after the -count=0 run runs the package again and exits 1 \(
+Clause: when --changed follows a passing run of a package with a failing test given -count=0, or -test.run, -test.count=0 or -h after -args → --changed after the -count=0 run runs the package again and exits 1
 --- a/cmd/gotest/changed.go
 +++ b/cmd/gotest/changed.go
-@@ -173,7 +173,7 @@
- // -skip, --group and --skip-group narrow all, --failed's selection the
- // packages it narrows.
+@@ -203,7 +203,7 @@
+ // a focused suite or method every package declaring a test it can leave
+ // out; --failed every package it does not rerun whole.
  func narrowedBy(cfg *ExecConfig, plan *runPlan) func(string) bool {
--	all := hasFlag(cfg.GoTestArgs, "-run") || hasFlag(cfg.GoTestArgs, "-skip") || len(cfg.Groups)+len(cfg.SkipGroups) > 0
-+	all := hasFlag(cfg.GoTestArgs, "-skip") || len(cfg.Groups)+len(cfg.SkipGroups) > 0
- 	only := cfg.Only
- 	if plan != nil && plan.only != nil {
- 		only = plan.only
+-	all := gotestrunner.SelectsTests(cfg.GoTestArgs) || len(cfg.Groups)+len(cfg.SkipGroups) > 0
++	all := len(cfg.Groups)+len(cfg.SkipGroups) > 0
+ 	focused := func(pkg string) bool {
+ 		return plan != nil && plan.focused && (plan.declares == nil || plan.declares[pkg])
+ 	}

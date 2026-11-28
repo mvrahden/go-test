@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLIRecordTrust .* / that package's verdict stays current and a later --changed run leaves it out \(
+Clause: when a run is narrowed by a focus and one of its packages declares no test → that package's verdict stays current and a later --changed run leaves it out
+--- a/cmd/gotest/changed.go
++++ b/cmd/gotest/changed.go
+@@ -205,7 +205,7 @@
+ func narrowedBy(cfg *ExecConfig, plan *runPlan) func(string) bool {
+ 	all := gotestrunner.SelectsTests(cfg.GoTestArgs) || len(cfg.Groups)+len(cfg.SkipGroups) > 0
+ 	focused := func(pkg string) bool {
+-		return plan != nil && plan.focused && (plan.declares == nil || plan.declares[pkg])
++		return plan != nil && plan.focused
+ 	}
+ 	only := cfg.Only
+ 	if plan != nil && plan.only != nil {

@@ -2,12 +2,12 @@ Expect: ^FAIL .*conformance/cli CLIRunRecords .* / the history holds a record of
 Clause: when three runs are made in one working directory, one with --events-file → the history holds a record of each, the third naming its events file
 --- a/cmd/gotest/changed.go
 +++ b/cmd/gotest/changed.go
-@@ -199,7 +199,7 @@
+@@ -223,7 +223,7 @@
  	}
  	res := *result.Judged
  	res.ExitCode = code
 -	rec := protocol.RunRecord{Dir: dir, Manifest: *manifest, Result: res, Failed: result.Failed, Packages: slices.Clone(result.Packages), EventsFile: absPath(opts.eventsFile), Started: processStart.UTC()}
 +	rec := protocol.RunRecord{Dir: dir, Manifest: *manifest, Result: res, Failed: result.Failed, Packages: slices.Clone(result.Packages), Started: processStart.UTC()}
- 	for i := range rec.Packages {
- 		if opts.narrowed != nil && opts.narrowed(rec.Packages[i].Package) {
- 			rec.Packages[i].Narrowed = true
+ 	var mode protocol.VerdictMode
+ 	if opts.plan != nil {
+ 		mode = opts.plan.mode

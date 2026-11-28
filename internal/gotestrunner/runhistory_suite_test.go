@@ -64,6 +64,25 @@ func (s *RunHistoryTestSuite) TestMergingRuns(t *gotest.T) {
 			gotest.Len(it, last.Packages, 2)
 		})
 	})
+	t.When("a --changed run that ran no package follows a failed run", func(w *gotest.T) {
+		w.It("leaves last.json as it was and keeps its own record in the history", func(it *gotest.T) {
+			cache := it.TempDir()
+			now := time.Now()
+			failed := runOf("/work", "a", "fail")
+			failed.Result.ExitCode = 1
+			failed.Manifest.Args = []string{"./..."}
+			gotest.NoError(it, gotestrunner.ExportSaveRunIn(cache, failed, false, now))
+			empty := protocol.RunRecord{Dir: "/work", Manifest: protocol.Manifest{Args: []string{"--changed", "./b"}}}
+			gotest.NoError(it, gotestrunner.ExportSaveRunIn(cache, empty, true, now.Add(time.Second)))
+			last, err := gotestrunner.ExportReadRecordIn(cache, "/work")
+			gotest.NoError(it, err)
+			gotest.Equal(it, 1, last.Result.ExitCode)
+			gotest.Equal(it, []string{"./..."}, last.Manifest.Args)
+			gotest.Len(it, last.Failed, 1)
+			gotest.Len(it, last.Packages, 1)
+			gotest.Len(it, gotestrunner.ExportKeptRunsIn(cache, "/work"), 2)
+		})
+	})
 	t.When("a run without --changed follows", func(w *gotest.T) {
 		w.It("replaces last.json and lists the newest kept run first", func(it *gotest.T) {
 			cache := it.TempDir()

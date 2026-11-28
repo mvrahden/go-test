@@ -61,14 +61,16 @@ func (s *FocusGuardTestSuite) TestFocusGate(t *gotest.T) {
 	gotest.NoError(t, err)
 	t.When("a load holds a focused method", func(w *gotest.T) {
 		w.It("fails the run in CI mode", func(it *gotest.T) {
-			code, err := ExportFocusGate(loaded, true)
+			code, err := ExportFocusGate(loaded, &ExecConfig{CI: true})
 			gotest.NoError(it, err)
 			gotest.Equal(it, 1, code)
 		})
 		w.It("lets it run outside CI mode", func(it *gotest.T) {
-			code, err := ExportFocusGate(loaded, false)
+			cfg := &ExecConfig{}
+			code, err := ExportFocusGate(loaded, cfg)
 			gotest.NoError(it, err)
 			gotest.Equal(it, 0, code)
+			gotest.True(it, cfg.Focused)
 		})
 	})
 }

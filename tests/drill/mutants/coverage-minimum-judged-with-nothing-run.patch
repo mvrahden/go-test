@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/cli CLIRecordTrust .* / runs nothing and exits 0, noting on stderr that the coverage minimum was skipped, for --min and for min-coverage in the configuration \(
+Clause: when --changed with a coverage minimum follows a passing run with the same minimum, nothing changed since → runs nothing and exits 0, noting on stderr that the coverage minimum was skipped, for --min and for min-coverage in the configuration
+Expect: ^FAIL .*conformance/cli CLIRecordTrust .* / spec and summary note so too and exit 0 \(
+Clause: when --changed with a coverage minimum follows a passing run with the same minimum, nothing changed since → spec and summary note so too and exit 0
+--- a/cmd/gotest/cli.go
++++ b/cmd/gotest/cli.go
+@@ -500,7 +500,7 @@
+ 
+ // coverageVerdict is the exit code a --min limit leaves code at, and what stderr says of it: why the limit fails the run, or that a --changed run that ran no package was not judged; "" for neither.
+ func coverageVerdict(plan *runPlan, coverProfile string, minCoverage, code int) (int, string) {
+-	if minCoverage > 0 && plan != nil && plan.changed != nil && plan.changed.Ran == 0 {
++	if false {
+ 		return code, "note: coverage minimum skipped under --changed: no package ran\n"
+ 	}
+ 	if code != 0 || minCoverage <= 0 || coverProfile == "" {

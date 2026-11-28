@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLIRecordTrust .* / runs both packages of that run again and exits 1 \(
+Clause: when --changed follows a run that only a shared fixture's teardown failed → runs both packages of that run again and exits 1
+--- a/cmd/gotest/recordstamp.go
++++ b/cmd/gotest/recordstamp.go
+@@ -35,7 +35,7 @@
+ 	if unattributed || rec.Result.ExitCode != 0 && !explained {
+ 		for i := range rec.Packages {
+ 			if rec.Packages[i].Verdict == "pass" {
+-				rec.Packages[i].Narrowed = true
++				continue
+ 			}
+ 		}
+ 	}

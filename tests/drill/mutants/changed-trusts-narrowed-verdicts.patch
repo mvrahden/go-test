@@ -1,13 +1,13 @@
 Expect: ^FAIL .*conformance/cli CLIChanged .* / runs again the packages the narrowed run ran, and none it left out \(
 Clause: when --changed follows a --changed run that -run narrowed → runs again the packages the narrowed run ran, and none it left out
---- a/cmd/gotest/changed.go
-+++ b/cmd/gotest/changed.go
-@@ -112,7 +112,7 @@
- 	keep := map[string]bool{}
- 	for _, pkg := range pkgs.Order {
- 		r, ok := recorded[pkg]
--		current := ok && r.InputHash != "" && r.InputHash == hashes[pkg] && !r.Narrowed
-+		current := ok && r.InputHash != "" && r.InputHash == hashes[pkg]
- 		switch {
- 		case !current:
- 			keep[pkg] = true
+--- a/cmd/gotest/recordstamp.go
++++ b/cmd/gotest/recordstamp.go
+@@ -27,7 +27,7 @@
+ // whose hash is hash under a run of mode, and whether only the mode keeps
+ // it from being so. An entry the record lacks is the zero value: never held.
+ func heldCurrent(r protocol.PackageVerdict, hash string, mode protocol.VerdictMode) (held, otherMode bool) {
+-	unchanged := r.InputHash != "" && r.InputHash == hash && !r.Narrowed
++	unchanged := r.InputHash != "" && r.InputHash == hash
+ 	held = unchanged && r.Mode.Covers(mode)
+ 	return held, unchanged && !held
+ }

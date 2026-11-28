@@ -205,6 +205,17 @@ func ExportCensus(mode RunMode, stream string, declared DeclaredUnits, goTestArg
 	return exit, errw.String(), target.String()[before:]
 }
 
+// ExportUncounted writes stream through a capturing collector's JSON
+// writer, notes the packages a run exiting code did not count and returns
+// them sorted.
+func ExportUncounted(stream string, declared DeclaredUnits, code int) []string {
+	var stdout, errw bytes.Buffer
+	c := NewOutputCollector(RunCaptureJSON, false, WithWriters(&stdout, &errw))
+	_, _ = io.WriteString(c.jsonWriter(), stream)
+	c.noteUncounted(PipelineConfig{}, declared, code, nil)
+	return slices.Sorted(maps.Keys(c.uncounted))
+}
+
 // ExportNewStateProcess builds a shared fixture process handle that holds
 // state without a subprocess behind it, for the state-file tests.
 func ExportNewStateProcess(sharedDir string, state map[string]json.RawMessage) *SharedFixtureProcess {

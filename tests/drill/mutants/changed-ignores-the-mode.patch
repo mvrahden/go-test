@@ -1,0 +1,16 @@
+Expect: ^FAIL .*conformance/cli CLIRecordTrust .* / a plain --changed run runs the package again, saying on stderr that the record does not hold its verdict under this run's -short and --ci \(
+Clause: when --changed follows a -short run of a package unchanged since → a plain --changed run runs the package again, saying on stderr that the record does not hold its verdict under this run's -short and --ci
+Expect: ^FAIL .*conformance/cli CLIRecordTrust .* / after a plain run, --ci --changed runs the package again and fails on its test that passed without an assertion \(
+Clause: when --changed follows a run of a package unchanged since, one of the two under --ci → after a plain run, --ci --changed runs the package again and fails on its test that passed without an assertion
+Expect: ^FAIL .*conformance/cli CLIRecordTrust .* / runs every package given once, saying so on stderr \(
+Clause: when --changed reads a record whose packages carry no mode → runs every package given once, saying so on stderr
+--- a/cmd/gotest/recordstamp.go
++++ b/cmd/gotest/recordstamp.go
+@@ -28,6 +28,6 @@
+ // it from being so. An entry the record lacks is the zero value: never held.
+ func heldCurrent(r protocol.PackageVerdict, hash string, mode protocol.VerdictMode) (held, otherMode bool) {
+ 	unchanged := r.InputHash != "" && r.InputHash == hash && !r.Narrowed
+-	held = unchanged && r.Mode.Covers(mode)
++	held = unchanged
+ 	return held, unchanged && !held
+ }

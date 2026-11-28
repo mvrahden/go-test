@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLIRunRecords .* / the text format prints EMPTY exit 0 for it and PASS exit 0 for the run before it \(
+Clause: when gotest runs follows a --changed run that left every package out → the text format prints EMPTY exit 0 for it and PASS exit 0 for the run before it
+--- a/cmd/gotest/runs.go
++++ b/cmd/gotest/runs.go
+@@ -268,7 +268,7 @@
+ 	switch {
+ 	case r.ExitCode != 0:
+ 		return "FAIL"
+-	case passed == 0:
++	case passed < 0:
+ 		return "EMPTY"
+ 	}
+ 	return "PASS"

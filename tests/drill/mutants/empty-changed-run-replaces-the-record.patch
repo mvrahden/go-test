@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/cli CLIRecordTrust .* / the record keeps the failed run's exit code, arguments and failures, and the history holds both runs \(
+Clause: when a --changed run given only an unchanged package follows a run that failed another package → the record keeps the failed run's exit code, arguments and failures, and the history holds both runs
+--- a/internal/gotestrunner/runhistory.go
++++ b/internal/gotestrunner/runhistory.go
+@@ -54,9 +54,6 @@
+ 	last := rec
+ 	if merge {
+ 		if before, err := readRecordIn(root, rec.Dir); err == nil {
+-			if len(rec.Packages) == 0 && len(rec.Failed) == 0 {
+-				return keep(root, rec, now)
+-			}
+ 			last = mergeRecords(before, rec)
+ 		}
+ 	}

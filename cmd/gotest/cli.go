@@ -249,7 +249,7 @@ func runText(inv Invocation, own OwnFlags, goTestArgs []string, jsonMode bool, a
 	}
 
 	code, result, plan, phases := execRun(cfg)
-	code = enforceCoverage(coverProfile, minCoverage, code)
+	code = enforceCoverage(plan, coverProfile, minCoverage, code)
 	m := <-manifest
 	if m != nil && plan != nil && m != cfg.Manifest {
 		m.Build, m.Changed = plan.inputs.flags, plan.changed
@@ -492,15 +492,17 @@ func ensureCoverProfile(goTestArgs []string, needed bool) ([]string, string, fun
 	return gotestrunner.InsertBeforeArgs(goTestArgs, "-coverprofile="+profile), profile, func() { _ = os.RemoveAll(dir) }, nil
 }
 
-func enforceCoverage(coverProfile string, minCoverage, code int) int {
-	code, failure := coverageVerdict(coverProfile, minCoverage, code)
+func enforceCoverage(plan *runPlan, coverProfile string, minCoverage, code int) int {
+	code, failure := coverageVerdict(plan, coverProfile, minCoverage, code)
 	fmt.Fprint(os.Stderr, failure)
 	return code
 }
 
-// coverageVerdict is the exit code a --min limit leaves code at, and what
-// stderr says when the limit fails the run; "" when it does not.
-func coverageVerdict(coverProfile string, minCoverage, code int) (int, string) {
+// coverageVerdict is the exit code a --min limit leaves code at, and what stderr says of it: why the limit fails the run, or that a --changed run that ran no package was not judged; "" for neither.
+func coverageVerdict(plan *runPlan, coverProfile string, minCoverage, code int) (int, string) {
+	if minCoverage > 0 && plan != nil && plan.changed != nil && plan.changed.Ran == 0 {
+		return code, "note: coverage minimum skipped under --changed: no package ran\n"
+	}
 	if code != 0 || minCoverage <= 0 || coverProfile == "" {
 		return code, ""
 	}

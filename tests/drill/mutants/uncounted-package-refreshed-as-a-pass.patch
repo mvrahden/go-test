@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/cli CLIRecordTrust .* / runs both again, leaves out the third that passed, and exits 2, naming the test that never ran \(
+Clause: when --changed follows a run that a test failed, beside a package whose binary ran none of its tests, the failing test fixed since → runs both again, leaves out the third that passed, and exits 2, naming the test that never ran
+Expect: ^FAIL .*conformance/cli CLIRecordTrust .* / a further --changed run runs that package alone and exits 2 \(
+Clause: when --changed follows a run that a test failed, beside a package whose binary ran none of its tests, the failing test fixed since → a further --changed run runs that package alone and exits 2
+--- a/internal/gotestrunner/dispatch.go
++++ b/internal/gotestrunner/dispatch.go
+@@ -524,7 +524,6 @@
+ 		if r.fixtures.failedSetup() && exitCode == 0 {
+ 			exitCode = 1
+ 		}
+-		c.noteUncounted(r.cfg, r.overlay.Declared, exitCode, dispatchErr)
+ 		exitCode = c.takeCensus(r.cfg, r.overlay.Declared, exitCode, dispatchErr)
+ 		exitCode = c.judgeVacuous(r.cfg.CI, exitCode)
+ 		running := c.bookDeadline(dispatchErr)

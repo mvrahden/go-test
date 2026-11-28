@@ -822,6 +822,14 @@ A test run, a -json run, spec and summary SHALL record, when they run their pack
 - **WHEN** --failed is given without a record, after a run that failed nothing, or with a package that did not fail
 - **THEN** runs nothing and exits 2, saying why on stderr
 
+### Requirement: A failure whose test is gone
+--failed SHALL run nothing and exit 1, naming the failures on stderr, when a failure it would rerun in a package given names no test that package declares any more: rerunning it would run nothing and pass.
+
+#### Scenario: A failure whose test is gone
+- **WHEN** --failed follows a run of which a failed method was renamed since
+- **THEN** runs nothing and exits 1, naming on stderr the failure that names no test any more
+- **AND** spec --failed and summary --failed exit 1 with the same line
+
 ### Requirement: A package's input hash
 A run SHALL stamp each package's verdict event in the -json stream with `InputHash`, a digest of the source the verdict judged: the files of the package and of each package it reaches in a main module, generated files aside, with what they embed; the testdata trees of its directory and of those above it in its module; every other module's version; the go, toolchain and godebug lines of go.mod and go.work; the build flags, Go version, platform and CLI version.
 
@@ -861,7 +869,7 @@ spec and summary given --input and --check-fresh SHALL hash the stream's package
 - **THEN** refuses with exit 2, naming --input
 
 ### Requirement: Running what changed
---changed SHALL run, of the packages given, those whose verdict the working directory's record does not hold as current: their input hash differs, or the record holds no verdict of them, a failed one or one narrowed by -run, -skip, --group or --failed. Without a record it SHALL run every package and say so on stderr. Beside --failed a package chosen only for its failure SHALL rerun only what failed. It SHALL work in a text or -json run, spec and summary.
+--changed SHALL run, of the packages given, those whose verdict the working directory's record does not hold as current: their input hash differs, or the record holds no verdict of them, a failed one, one of a part of their tests, or one taken under a mode that does not cover this run's. Without a record it SHALL run every package and say so on stderr. Beside --failed a package chosen only for its failure SHALL rerun only what failed. It SHALL work in a text or -json run, spec and summary.
 
 #### Scenario: A run after a change
 - **WHEN** --changed follows a run, after a file two of its packages read changed
@@ -892,7 +900,7 @@ A --changed run SHALL say how far it was narrowed: its manifest's `Changed` coun
 - **AND** closes the stream with 0 units not run
 
 ### Requirement: The packages of a record
-A run's record SHALL list each package it judged with its verdict, its InputHash, its time and whether -run, -skip, --group or --failed narrowed it. A --changed run SHALL keep from the record before it the packages it did not run and their failed units, so the record holds the last verdict of every package. Writers SHALL take the checkout's lock, so runs side by side lose no package.
+A run's record SHALL list each package it judged with its verdict, its InputHash, its time, the mode the verdict was taken under and whether the verdict is of a part of the package's tests. A --changed run SHALL keep from the record before it the packages it did not run and their failed units, so the record holds the last verdict of every package. Writers SHALL take the checkout's lock, so runs side by side lose no package.
 
 #### Scenario: The packages of a narrowed run
 - **WHEN** a -run narrowed run of a package ends
@@ -901,6 +909,102 @@ A run's record SHALL list each package it judged with its verdict, its InputHash
 #### Scenario: The record after a --changed run
 - **WHEN** a --changed run leaves out packages the record before it held
 - **THEN** the record keeps their verdicts and hashes beside those of the packages it ran
+
+#### Scenario: The mode in a record
+- **WHEN** a --ci -short run of a package ends
+- **THEN** its record lists the package with a Mode whose Policy and Short are on
+- **AND** the record of a plain run lists it with both off
+
+### Requirement: The mode a verdict was taken under
+A run's record SHALL stamp each package's verdict with its mode, `Mode`: `Policy`, whether CI mode's gates judged it, by --ci or the environment, and `Short`, whether its tests ran under -short, or -test.short after -args. --changed SHALL hold a recorded verdict as current only when its mode covers the run's: the same `Short`, and `Policy` on or the run's off, since a verdict CI mode took stands for a plain run and never the reverse.
+
+#### Scenario: After a -short run
+- **WHEN** --changed follows a -short run of a package unchanged since
+- **THEN** a plain --changed run runs the package again, saying on stderr that the record does not hold its verdict under this run's -short and --ci
+- **AND** a -short --changed run leaves it out
+
+#### Scenario: CI mode and a plain run
+- **WHEN** --changed follows a run of a package unchanged since, one of the two under --ci
+- **THEN** after a plain run, --ci --changed runs the package again and fails on its test that passed without an assertion
+- **AND** after a --ci run, a plain --changed run leaves the package out
+
+### Requirement: A verdict without a mode
+A verdict without a mode, as a record written before modes were stamped holds, SHALL cover no run. When packages unchanged since their verdict run again for their mode alone, --changed SHALL say so on stderr with their number.
+
+#### Scenario: A record without modes
+- **WHEN** --changed reads a record whose packages carry no mode
+- **THEN** runs every package given once, saying so on stderr
+- **AND** leaves them out on the next --changed run
+
+### Requirement: A verdict of a part of a package's tests
+A record SHALL mark a package's verdict as of a part of its tests, `Narrowed`, when the run selected among the tests by anything outside the package's own source: -run, -skip, --group or --skip-group; --failed, for every package it did not rerun whole; -count=0; -test.run, -test.skip, -test.list, -test.bench or -test.count=0 after -args, or a flag there asking the binary for its usage; and a focused suite or method anywhere among the packages given, for every package of the run.
+
+#### Scenario: A run narrowed by focus
+- **WHEN** --changed follows a run that a focused method in one package narrowed, the focus removed since
+- **THEN** runs again the other package, whose failing test the focus kept from running, and exits 1
+
+#### Scenario: A --failed run given packages
+- **WHEN** --changed follows a --failed run given two packages, the one that had not failed broken since
+- **THEN** runs that package again and exits 1
+
+#### Scenario: Flags that leave nothing to run
+- **WHEN** --changed follows a passing run of a package with a failing test given -count=0, or -test.run, -test.count=0 or -h after -args
+- **THEN** each such run's record marks the package's verdict as of a part
+- **AND** --changed after the -count=0 run runs the package again and exits 1
+
+### Requirement: A verdict of a part is never current
+A verdict of a part of a package's tests SHALL never be held as current. A package in which nothing ran for a reason in its own source, having no test files, every method excluded or benchmarks only, SHALL not be marked so: its input hash covers the reason. A focus SHALL mark so only the packages declaring a test or fuzz target an unfocused run runs: from a package declaring none it takes nothing.
+
+#### Scenario: Packages that run nothing by their own source
+- **WHEN** --changed follows a run of a package whose methods are all excluded, one holding only benchmarks, one without test files and one that passed
+- **THEN** leaves all four out as unchanged
+
+#### Scenario: A focused run beside a package that declares no test
+- **WHEN** a run is narrowed by a focus and one of its packages declares no test
+- **THEN** that package's verdict stays current and a later --changed run leaves it out
+
+### Requirement: What a failed run leaves in its record
+A record SHALL list as failed each package a failure of the run names, a test that passed without an assertion and failed a --ci run and a declared test the census found without a verdict among them. A run that failed without a failed package, as on a shared fixture's teardown or the coverage minimum, and a run in which a shared fixture's teardown failed beside other failures SHALL mark every passing verdict it records as of a part: no pass of that run is held as current.
+
+#### Scenario: A pass without an assertion that failed a --ci run
+- **WHEN** --ci --changed follows a --ci run that failed only on a test that passed without an assertion
+- **THEN** the first run's record lists that test's package as failed
+- **AND** --changed runs that package again, leaves the other out and exits 1
+
+#### Scenario: A teardown failure alone
+- **WHEN** --changed follows a run that only a shared fixture's teardown failed
+- **THEN** runs both packages of that run again and exits 1
+
+#### Scenario: A teardown failure beside a failed test
+- **WHEN** --changed follows a run that a shared fixture's teardown and a test failed, the test fixed since
+- **THEN** runs all three packages of that run again and exits 1 on the teardown
+
+#### Scenario: A coverage minimum that failed
+- **WHEN** --min --changed follows a run that only its coverage minimum failed
+- **THEN** runs the package again and exits 1 on the minimum
+
+### Requirement: Packages a failed run did not count
+A run the census did not judge, as one that failed, SHALL mark as of a part each package holding a declared test without a verdict.
+
+#### Scenario: A package a failed run did not count
+- **WHEN** --changed follows a run that a test failed, beside a package whose binary ran none of its tests, the failing test fixed since
+- **THEN** runs both again, leaves out the third that passed, and exits 2, naming the test that never ran
+- **AND** a further --changed run runs that package alone and exits 2
+
+### Requirement: What a --changed run that ran nothing leaves
+A --changed run that ran no package SHALL leave the record as it found it, and keep its own record in the history.
+
+#### Scenario: A --changed run that ran nothing
+- **WHEN** a --changed run given only an unchanged package follows a run that failed another package
+- **THEN** the record keeps the failed run's exit code, arguments and failures, and the history holds both runs
+
+### Requirement: A coverage minimum when nothing ran
+A --changed run that ran no package SHALL not judge the coverage minimum, --min or the configuration's min-coverage, and SHALL say on stderr that it was skipped, in a text or -json run, spec and summary: no profile holds anything to measure.
+
+#### Scenario: Nothing ran under a minimum
+- **WHEN** --changed with a coverage minimum follows a passing run with the same minimum, nothing changed since
+- **THEN** runs nothing and exits 0, noting on stderr that the coverage minimum was skipped, for --min and for min-coverage in the configuration
+- **AND** spec and summary note so too and exit 0
 
 ### Requirement: Run records kept
 Each run that records itself SHALL also keep its record alone, with the path of its --events-file, as a file of its own in the checkout's history under the gotest cache, written by a rename; each write SHALL remove all but the newest 50 and those kept over 30 days. gotest clean --cache SHALL remove the records of every checkout no run is writing.
@@ -934,6 +1038,13 @@ Each run that records itself SHALL also keep its record alone, with the path of 
 - **WHEN** gotest runs --import names a saved stream of a run
 - **THEN** lists it among the records as imported, with its packages and the file's path
 - **AND** refuses with exit 2 a file that holds no package verdict
+
+### Requirement: The word of a listed run
+The text format of `gotest runs` SHALL print for each run the closing line's word: FAIL for a non-zero exit code, EMPTY for exit 0 with nothing passed, tests where the run counted them and packages otherwise, and PASS for any other.
+
+#### Scenario: A run that ran nothing
+- **WHEN** gotest runs follows a --changed run that left every package out
+- **THEN** the text format prints EMPTY exit 0 for it and PASS exit 0 for the run before it
 
 ### Requirement: An agent's hook events
 `gotest hook <event>` SHALL read a coding agent's hook event as JSON on stdin and never deny the agent a tool: it SHALL exit 0, writing nothing or one JSON object, for post-edit and pre-shell one whose hookSpecificOutput carries additionalContext and no permission decision, and SHALL exit 1, never 2, on an event it does not know.

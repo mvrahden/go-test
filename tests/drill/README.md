@@ -1215,7 +1215,7 @@ shards of one run do not add up to every mutant exactly once.
 | `changed-lists-the-packages-left-out` | a `--changed` run's manifest lists in `Changed` every loaded package, those it left out too | cli conformance: `Changed.Packages` names the unchanged package |
 | `changed-without-a-record-lists-nothing` | a `--changed` run without a record lists no package in `Changed` | cli conformance: `Changed.Packages` is empty |
 | `changed-run-narrows-with-run` | a `--changed` run narrows itself with `-run`, which stands the census down | cli conformance: the closing event has no count of units not run |
-| `record-ignores-run-narrowing` | a `-run` narrowed run's packages are recorded as whole | cli conformance: the recorded package is not marked narrowed |
+| `record-ignores-run-narrowing` | a run whose flags select its tests records its packages as whole | cli conformance: the recorded package is not marked narrowed |
 | `changed-run-replaces-the-record` | a `--changed` run replaces the record instead of keeping the packages it left out | cli conformance: the record holds only the packages the run ran |
 | `record-forgets-the-events-file` | a run's kept record never names its `--events-file` | cli conformance: the third record names no events file |
 | `clean-keeps-run-records` | `gotest clean --cache` leaves the run records | cli conformance: the history and last.json are still there |
@@ -1273,6 +1273,20 @@ shards of one run do not add up to every mutant exactly once.
 | `mutate-ignore-without-a-reason-keeps` | a comment without a reason keeps its function | audit conformance: the reasonless It finds Half's mutant ignored |
 | `mutate-ignores-unrecorded` | a record lists no mutate-ignore comment | audit conformance: the record It finds none |
 | `mutate-ignores-not-compared` | mutate-ignore comments are left out of the comparison | audit conformance: the suppression It finds no finding |
+| `changed-ignores-the-mode` | `--changed` holds a verdict as current whatever mode it was taken under | cli conformance: the package judged under -short does not run again |
+| `record-forgets-the-mode` | a run's record stamps no package with its mode | cli conformance: the record's package has no Mode, and an unchanged package runs again |
+| `focus-leaves-the-record-whole` | a run narrowed by `F_` records its packages as whole | cli conformance: the package the focus kept from running is left out |
+| `failed-refreshes-packages-it-skipped` | `--failed` records as whole a package given that it ran nothing of | cli conformance: the package broken since is left out |
+| `changed-keeps-a-policy-failure` | a package whose test failed a `--ci` run for passing without an assertion is recorded as passed | cli conformance: the record lists the package as pass, and --changed leaves it out |
+| `uncounted-package-refreshed-as-a-pass` | a failed run records as a whole pass a package whose binary ran none of its tests | cli conformance: --changed leaves that package out and exits 0 |
+| `unattributed-failure-refreshes-passes` | a run that failed outside its packages records their passes as whole | cli conformance: --changed after the teardown failure runs nothing |
+| `teardown-failure-kept-from-the-record` | a teardown failure beside a failed test is not told to the record | cli conformance: --changed runs only the package that had failed |
+| `unexplained-exit-refreshes-passes` | a run that exits non-zero with no failed package records its passes as whole | cli conformance: --changed under the minimum runs nothing |
+| `empty-changed-run-replaces-the-record` | a `--changed` run that ran no package overwrites the record's run | cli conformance: the record holds exit code 0 and the --changed arguments |
+| `failed-with-nothing-left-passes` | `--failed` reruns a failure whose test is gone, runs nothing and passes | cli conformance: the rerun after the rename exits 0 |
+| `coverage-minimum-judged-with-nothing-run` | a `--changed` run that ran no package still reads a coverage profile for the minimum | cli conformance: the run exits 2 on the profile |
+| `runs-call-an-empty-run-a-pass` | `gotest runs` prints PASS for a run in which nothing passed | cli conformance: the --changed run's line reads PASS exit 0 |
+| `focus-narrows-a-package-without-tests` | a focused run records a package that declares no test as of a part | cli conformance: the package without tests is marked narrowed |
 
 ## Adding a mutant
 

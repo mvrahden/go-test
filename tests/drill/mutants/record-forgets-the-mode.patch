@@ -1,0 +1,23 @@
+Expect: ^FAIL .*conformance/cli CLIRecordTrust .* / its record lists the package with a Mode whose Policy and Short are on \(
+Clause: when a --ci -short run of a package ends → its record lists the package with a Mode whose Policy and Short are on
+Expect: ^FAIL .*conformance/cli CLIRecordTrust .* / the record of a plain run lists it with both off \(
+Clause: when a --ci -short run of a package ends → the record of a plain run lists it with both off
+Expect: ^FAIL .*conformance/cli CLIRecordTrust .* / a -short --changed run leaves it out \(
+Clause: when --changed follows a -short run of a package unchanged since → a -short --changed run leaves it out
+Expect: ^FAIL .*conformance/cli CLIRecordTrust .* / after a --ci run, a plain --changed run leaves the package out \(
+Clause: when --changed follows a run of a package unchanged since, one of the two under --ci → after a --ci run, a plain --changed run leaves the package out
+Expect: ^FAIL .*conformance/cli CLIRecordTrust .* / leaves them out on the next --changed run \(
+Clause: when --changed reads a record whose packages carry no mode → leaves them out on the next --changed run
+Expect: ^FAIL .*conformance/cli CLIRecordTrust .* / leaves all four out as unchanged \(
+Clause: when --changed follows a run of a package whose methods are all excluded, one holding only benchmarks, one without test files and one that passed → leaves all four out as unchanged
+--- a/cmd/gotest/recordstamp.go
++++ b/cmd/gotest/recordstamp.go
+@@ -26,8 +26,6 @@
+ 			p.Verdict = "fail"
+ 		}
+ 		explained = explained || p.Verdict == "fail"
+-		m := mode
+-		p.Mode = &m
+ 		if narrowed != nil && narrowed(p.Package) {
+ 			p.Narrowed = true
+ 		}

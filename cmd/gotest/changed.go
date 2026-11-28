@@ -70,6 +70,13 @@ type runPlan struct {
 	merge bool
 	// only is the selection of a --changed --failed run; nil for none.
 	only map[string]string
+	// mode is the mode the run's verdicts are taken under.
+	mode protocol.VerdictMode
+	// focused marks a run some focused suite or method narrows.
+	focused bool
+	// declares are, under a focus, the packages declaring a test or fuzz
+	// target an unfocused run runs; nil when unknown, which narrows all.
+	declares map[string]bool
 }
 
 // planRun hashes the loaded packages and, under --changed, keeps only
@@ -79,7 +86,10 @@ type runPlan struct {
 // the run cannot go on.
 func planRun(cfg *ExecConfig, pkgs *gotestgen.RunPackages) (*runPlan, bool) {
 	classified := gotestrunner.ClassifyGoTestArgs(cfg.GoTestArgs)
-	plan := &runPlan{inputs: startInputs(pkgs, classified.BuildFlags)}
+	plan := &runPlan{inputs: startInputs(pkgs, classified.BuildFlags), mode: runMode(cfg), focused: cfg.Focused}
+	if plan.focused {
+		plan.declares = declaringPackages(pkgs.Loaded)
+	}
 	if cfg.Manifest != nil {
 		cfg.Manifest.Build = plan.inputs.flags
 	}
@@ -111,15 +121,22 @@ func planRun(cfg *ExecConfig, pkgs *gotestgen.RunPackages) (*runPlan, bool) {
 	}
 	failedOnly := map[string]bool{}
 	keep := map[string]bool{}
+	otherMode := 0
 	for _, pkg := range pkgs.Order {
-		r, ok := recorded[pkg]
-		current := ok && r.InputHash != "" && r.InputHash == hashes[pkg] && !r.Narrowed
+		r := recorded[pkg]
+		current, other := heldCurrent(r, hashes[pkg], plan.mode)
+		if other {
+			otherMode++
+		}
 		switch {
 		case !current:
 			keep[pkg] = true
 		case r.Verdict == "fail":
 			keep[pkg], failedOnly[pkg] = true, true
 		}
+	}
+	if otherMode > 0 {
+		fmt.Fprintf(os.Stderr, "gotest: --changed: %d unchanged package(s) run again: the record does not hold their verdict under this run's -short and --ci\n", otherMode)
 	}
 	if cfg.ChangedFailed {
 		only := gotestrunner.RerunSelection(rec.Failed)
@@ -181,21 +198,28 @@ type recordOptions struct {
 	narrowed func(pkg string) bool
 }
 
-// narrowedBy is the narrowing a run's flags make of each package: -run,
-// -skip, --group and --skip-group narrow all, --failed's selection the
-// packages it narrows.
+// narrowedBy is the narrowing a run makes of each package: flags that
+// select tests or leave none to run, --group and --skip-group narrow all,
+// a focused suite or method every package declaring a test it can leave
+// out; --failed every package it does not rerun whole.
 func narrowedBy(cfg *ExecConfig, plan *runPlan) func(string) bool {
-	all := hasFlag(cfg.GoTestArgs, "-run") || hasFlag(cfg.GoTestArgs, "-skip") || len(cfg.Groups)+len(cfg.SkipGroups) > 0
+	all := gotestrunner.SelectsTests(cfg.GoTestArgs) || len(cfg.Groups)+len(cfg.SkipGroups) > 0
+	focused := func(pkg string) bool {
+		return plan != nil && plan.focused && (plan.declares == nil || plan.declares[pkg])
+	}
 	only := cfg.Only
 	if plan != nil && plan.only != nil {
 		only = plan.only
 	}
 	return func(pkg string) bool {
-		if all {
+		if all || focused(pkg) {
 			return true
 		}
+		if only == nil {
+			return false
+		}
 		sel, ok := only[pkg]
-		return ok && sel != ""
+		return !ok || sel != ""
 	}
 }
 
@@ -215,11 +239,11 @@ func saveRun(result *gotestrunner.PipelineResult, code int, manifest *protocol.M
 	res := *result.Judged
 	res.ExitCode = code
 	rec := protocol.RunRecord{Dir: dir, Manifest: *manifest, Result: res, Failed: result.Failed, Packages: slices.Clone(result.Packages), EventsFile: absPath(opts.eventsFile), Started: processStart.UTC()}
-	for i := range rec.Packages {
-		if opts.narrowed != nil && opts.narrowed(rec.Packages[i].Package) {
-			rec.Packages[i].Narrowed = true
-		}
+	var mode protocol.VerdictMode
+	if opts.plan != nil {
+		mode = opts.plan.mode
 	}
+	stampRecord(&rec, mode, opts.narrowed, result.Unattributed)
 	merge := opts.plan != nil && opts.plan.merge
 	if err := gotestrunner.SaveRun(rec, merge, time.Now()); err != nil {
 		fmt.Fprintf(os.Stderr, "gotest: the run is not recorded for --failed: %s\n", err)
