@@ -453,11 +453,11 @@
     "package": "vsce package"
   },
   "devDependencies": {
-    "@types/node": "^24.19.2",
+    "@types/node": "^24.19.4",
     "@types/vscode": "1.120.0",
     "esbuild": "^0.28.0",
     "prettier": "^3.10.1",
     "typescript": "^7.0.2",
-    "vitest": "^5.1.1"
+    "vitest": "^5.1.2"
   }
 }
