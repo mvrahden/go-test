@@ -346,6 +346,14 @@ shards of one run do not add up to every mutant exactly once.
 | `tree-fail-is-pass` | `BuildTree` classifies `fail` events as `pass` | ring-0 tree suite (the canary reads raw events, not the tree) |
 | `branch-keeps-a-pass-over-a-failure` | a suite whose own line says pass stays passed above a failed method | spec conformance: the composed stream's suite renders unlike the one go test failed |
 | `failed-branch-counted-as-its-own` | a branch failed by a failure beneath it counts as a failure of its own | spec conformance: the composed stream counts two failures |
+| `first-verdict-of-a-test-stands` | a test keeps the first verdict a stream holds for it | spec conformance: the method that failed in the later run reads passed |
+| `package-keeps-only-its-later-verdict` | a package that failed on its own reads passed once a later run of it passed | spec conformance: the crashed package's stream counts no failed package |
+| `replay-exit-ignores-the-result` | a replay exits by the verdicts alone, whatever code the run closed its stream with | cli conformance: the vacuous-only run's stream replays 0, the stopped run's 1 |
+| `replay-exit-trusts-the-result-alone` | a replay of a stream without a closing result exits 0 over a failed test | cli conformance: go test's failed stream replays 0 |
+| `replay-keeps-only-the-later-run` | a test that failed reads passed once a later run of it passed | spec conformance: the failed run's method, suite and package read passed |
+| `stream-ends-as-its-last-run` | a stream of several closed runs reads by the last one's exit code | cli conformance: a failed run followed by a passed one replays 0 and names exit code 0 |
+| `testresult-exits-as-the-run` | `--format=intoto-test-result` exits with the run's code | cli conformance: the predicate of a failed run exits 1 |
+| `unclosed-run-replays-by-its-tree` | a run that never closed its stream replays as a whole one | cli conformance: the unclosed stream exits 0 |
 | `declared-node-shown-as-passed` | `--declared` gives a declared node the stream did not report a pass | spec conformance: the left-out method's rows carry a verdict |
 | `not-run-uncounted` | the behaviors without a verdict are not counted as not run | spec conformance: the declared package counts 0 not run, and a behavior that started without a verdict counts nowhere |
 | `no-verdict-row-timed` | the terminal spec times a behavior that started and reported no verdict | spec conformance: the row reads `○ DeleteUser` instead of NOT RUN |
@@ -1062,6 +1070,9 @@ shards of one run do not add up to every mutant exactly once.
 | `annotation-test-path-unprefixed` | a failed test is annotated at its file's base name, without its package directory | cli conformance: a failed test's annotation names the file in its package's directory |
 | `summary-markdown-all-dropped` | the Markdown headline of a run in which every test passed does not say All | cli conformance: the Markdown headline of an all-pass run says All |
 | `summary-headline-no-pass-unsaid` | the headline of a run in which nothing passed does not say so | cli conformance: an all-skipped run's headline says no tests passed |
+| `run-failure-annotation-with-an-empty-file` | the annotation of a run that failed with no failed test is written with an empty `file=` | cli conformance: no `::error title=gotest run failed::` line |
+| `summary-heading-passes-a-policy-failure` | the summary of a run that failed with no failed test opens with the passed count | cli conformance: the vacuous-only and the coverage-limit run's headline says tests passed |
+| `summary-policy-failure-unannotated` | a run that failed with no failed test gets no annotation | cli conformance: the vacuous-only run's `--github` summary holds no `::error` line |
 | `summary-failed-headline-drops-passes` | the headline of a run with failures leaves out the passed count | cli conformance: a failed run's headline names the failed, passed and skipped counts |
 | `summary-markdown-all-beside-skips` | the Markdown headline says All beside skipped tests | cli conformance: the Markdown headline of a run with skips does not say All |
 | `summary-markdown-all-beside-a-note` | the Markdown headline says All above a note of stdlib tests not run | cli conformance: the Markdown summary with the stdlib note does not say All |

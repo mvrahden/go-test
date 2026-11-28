@@ -478,3 +478,67 @@ func (s *SummaryRenderTestSuite) TestRenderMarkdownSummary_Notes(t *gotest.T, _ 
 		gotest.Regexp(it, "^### 1 test failed, 1 passed\n\n> \\*\\*Note:\\*\\* 1 stdlib test", out)
 	})
 }
+
+// exitOf names a run that closed with code n.
+func exitOf(n int) gotestspec.RenderOption {
+	return gotestspec.WithRun(&gotestspec.RunInfo{ExitCode: &n})
+}
+
+// twoPassed is a package of two passing tests.
+func twoPassed() []*gotestspec.Package {
+	return []*gotestspec.Package{{
+		Path:     "example.com/pkg",
+		Duration: 2300 * time.Millisecond,
+		Nodes: []*gotestspec.Node{
+			{Kind: gotestspec.KindTest, Display: "Foo", Status: gotestspec.StatusPass, Duration: time.Second},
+			{Kind: gotestspec.KindTest, Display: "Bar", Status: gotestspec.StatusPass, Duration: time.Second},
+		},
+	}}
+}
+
+func (s *SummaryRenderTestSuite) TestRenderSummary_RunFailedWithoutAFailedTest(t *gotest.T, _ *summaryRenderCtx) {
+	var buf bytes.Buffer
+	gotestspec.RenderSummary(&buf, twoPassed(), gotestspec.WithNoColor(), exitOf(1))
+	gotest.Regexp(t, `^Run failed with exit 1, no test failed: 2 passed \(`, buf.String())
+
+	buf.Reset()
+	gotestspec.RenderSummary(&buf, nil, gotestspec.WithNoColor(), exitOf(2))
+	gotest.Regexp(t, `^Run failed with exit 2, no test failed \(`, buf.String())
+}
+
+func (s *SummaryRenderTestSuite) TestRenderMarkdownSummary_RunFailedWithoutAFailedTest(t *gotest.T, _ *summaryRenderCtx) {
+	var buf bytes.Buffer
+	gotestspec.RenderMarkdownSummary(&buf, twoPassed(), exitOf(1))
+	out := buf.String()
+	gotest.Regexp(t, `^### Run failed with exit 1, no test failed: 2 passed \(`, out)
+	gotest.NotContains(t, out, "All")
+}
+
+func (s *SummaryRenderTestSuite) TestRenderSummary_RunExitLeavesOtherHeadlines(t *gotest.T, _ *summaryRenderCtx) {
+	withFailure := twoPassed()
+	withFailure[0].Nodes = append(withFailure[0].Nodes, failingTest("Baz", "boom\n"))
+	packageFailed := twoPassed()
+	packageFailed[0].Status = gotestspec.StatusFail
+	packageFailed[0].Output = []string{"panic: boom\n"}
+	for sub, r := range gotest.Each(t, []struct {
+		Desc     string
+		packages []*gotestspec.Package
+		run      gotestspec.RenderOption
+		markdown bool
+		want     string
+	}{
+		{Desc: "exit code 0", packages: twoPassed(), run: exitOf(0), want: `^2 tests passed \(`},
+		{Desc: "no exit code", packages: twoPassed(), run: gotestspec.WithRun(&gotestspec.RunInfo{}), want: `^2 tests passed \(`},
+		{Desc: "a failed test", packages: withFailure, run: exitOf(1), want: `^1 test failed`},
+		{Desc: "a package failure", packages: packageFailed, run: exitOf(1), want: `— package failure detected`},
+		{Desc: "Markdown, exit code 0", packages: twoPassed(), run: exitOf(0), markdown: true, want: `^### All 2 tests passed \(`},
+	}) {
+		var buf bytes.Buffer
+		if r.markdown {
+			gotestspec.RenderMarkdownSummary(&buf, r.packages, r.run)
+		} else {
+			gotestspec.RenderSummary(&buf, r.packages, gotestspec.WithNoColor(), r.run)
+		}
+		gotest.Regexp(sub, r.want, buf.String())
+	}
+}

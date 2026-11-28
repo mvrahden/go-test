@@ -103,6 +103,20 @@ func diagnosticTitle(output []string) string {
 	return "package-level failure"
 }
 
+// RunFailureAnnotation is the annotation of a run that ended with another
+// exit code than 0 while packages hold no failure; it names no file.
+func RunFailureAnnotation(packages []*Package, run *RunInfo) (Annotation, bool) {
+	code, ok := run.failed()
+	if !ok || HasFailures(packages) {
+		return Annotation{}, false
+	}
+	cause := "the run's own output names what failed it"
+	if n := CollectStats(packages).Vacuous; code == 1 && n > 0 {
+		cause = countNoun(n, "test passed without an assertion", "tests passed without an assertion") + ", which fails a run in CI mode"
+	}
+	return Annotation{Title: "gotest run failed", Message: fmt.Sprintf("exit %d and no test failed: %s", code, cause)}, true
+}
+
 // annotationCap bounds an annotation's message, in bytes.
 const annotationCap = 1024
 
@@ -111,6 +125,10 @@ const annotationCap = 1024
 func WriteGitHubAnnotations(w io.Writer, annotations []Annotation) {
 	for _, a := range annotations {
 		msg := escapeData(truncateRunes(a.Message, annotationCap))
+		if a.File == "" {
+			fmt.Fprintf(w, "::error title=%s::%s\n", escapeProperty(a.Title), msg)
+			continue
+		}
 		props := "file=" + escapeProperty(a.File)
 		if a.Line > 0 {
 			props += ",line=" + strconv.Itoa(a.Line)

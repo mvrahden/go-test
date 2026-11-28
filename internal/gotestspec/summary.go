@@ -150,6 +150,27 @@ func otherCounts(s Stats, withPassed bool) []string { //nolint:gocritic // hugeP
 	return parts
 }
 
+// runFailedPhrase is the headline of a run that failed with no failed test
+// or package: its exit code, then the counts that are not zero.
+func runFailedPhrase(code int, s Stats) string { //nolint:gocritic // hugeParam: as renderSummary
+	phrase := fmt.Sprintf("Run failed with exit %d, no test failed", code)
+	if counts := otherCounts(s, true); len(counts) > 0 {
+		phrase += ": " + strings.Join(counts, ", ")
+	}
+	return phrase
+}
+
+// greenPhrase is the headline of a run in which no test and no package
+// failed: passedPhrase, or runFailedPhrase when the run still ended with
+// another exit code than 0, which runFailed reports.
+func greenPhrase(run *RunInfo, s Stats) (phrase string, clean, runFailed bool) { //nolint:gocritic // hugeParam: as renderSummary
+	if code, ok := run.failed(); ok {
+		return runFailedPhrase(code, s), false, true
+	}
+	phrase, clean = passedPhrase(s)
+	return phrase, clean, false
+}
+
 func RenderSummary(w io.Writer, packages []*Package, opts ...RenderOption) {
 	cfg := renderConfig{color: true}
 	for _, o := range opts {
@@ -172,8 +193,12 @@ func RenderSummary(w io.Writer, packages []*Package, opts ...RenderOption) {
 		passedColor = c.yellow
 	}
 	if len(failures) == 0 && len(diags) == 0 && stats.FailedPackages == 0 {
+		headline, _, runFailed := greenPhrase(cfg.run, stats)
+		if runFailed {
+			passedColor = c.red
+		}
 		fmt.Fprintf(w, "%s%s%s (%s)\n",
-			passedColor, passed, c.reset,
+			passedColor, headline, c.reset,
 			formatDuration(effectiveDuration(&cfg, packages)))
 		renderVacuous(w, collectVacuous(packages), c)
 		renderStale(w, packages, c)
@@ -274,14 +299,15 @@ func RenderMarkdownSummary(w io.Writer, packages []*Package, opts ...RenderOptio
 	failures := collectFailures(packages)
 	diags := collectPackageDiagnostics(packages)
 
-	passed, clean := passedPhrase(stats)
+	passed, _ := passedPhrase(stats)
 	if len(failures) == 0 && len(diags) == 0 && stats.FailedPackages == 0 {
+		headline, clean, _ := greenPhrase(cfg.run, stats)
 		all := ""
 		if clean && len(cfg.notes) == 0 {
 			all = "All "
 		}
 		fmt.Fprintf(w, "### %s%s (%s)\n",
-			all, passed, formatDuration(effectiveDuration(&cfg, packages)))
+			all, headline, formatDuration(effectiveDuration(&cfg, packages)))
 		renderMarkdownNotes(w, cfg.notes)
 		renderMarkdownVacuous(w, collectVacuous(packages))
 		renderMarkdownStale(w, packages)

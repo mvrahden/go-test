@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/spec .* / renders the failed method, its suite and its package as failed, with the failure's message, in the terminal, Markdown and JSON formats \(
+Expect: ^FAIL .*conformance/spec .* / counts one failure and exits 1, or 0 with --render-only \(
+Clause: when a stream holds a package's failed run and, after it, a run in which the same tests passed → renders the failed method, its suite and its package as failed, with the failure's message, in the terminal, Markdown and JSON formats
+Clause: when a stream holds a package's failed run and, after it, a run in which the same tests passed → counts one failure and exits 1, or 0 with --render-only
+--- a/internal/gotestspec/tree.go
++++ b/internal/gotestspec/tree.go
+@@ -384,7 +384,7 @@
+ 				node.Status = StatusPass
+ 			}
+ 		case ActionPass, ActionFail, ActionSkip:
+-			node.Status = verdictOver(node.Status, statusFrom(ev.Action))
++			node.Status = statusFrom(ev.Action)
+ 			node.Duration = elapsed(ev.Elapsed)
+ 			node.End = ev.Time
+ 		case ActionAttr:

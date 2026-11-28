@@ -59,8 +59,10 @@ invocation runs tests — there is NO `test` subcommand:
   the declared labels and `When` vocabulary from the source it can reach
   from the working directory, so a replay renders exactly like the run;
   packages it cannot load render from the names alone). `--input` exits
-  non-zero when the stream contains failures (same rule as
-  `summary --input`), so replaying a saved stream in CI needs no pipefail
+  as the run that wrote the stream did, and by the stream's own verdicts
+  when the run left no result in it (same rule as `summary --input`:
+  [A replayed stream's exit code](https://github.com/mvrahden/go-test/blob/main/specs/cli/spec.md#requirement-a-replayed-streams-exit-code)),
+  so replaying a saved stream in CI needs no pipefail
   gymnastics — the render step itself is the verdict; `--render-only`
   lifts that rule for pure renderers (exit 0 on a failing stream, 2 on an
   unreadable one). From v1.33 a stream with no test events, or one cut

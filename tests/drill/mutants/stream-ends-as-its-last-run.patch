@@ -1,0 +1,17 @@
+Expect: ^FAIL .*conformance/cli .* / summary --input and spec --input exit 1 \(
+Expect: ^FAIL .*conformance/cli .* / summary --format=json names exit code 1 as the run's \(
+Expect: ^FAIL .*conformance/cli .* / the test-result predicate of the stream says FAILED \(
+Clause: when a stream holds a run that failed only on its policy and a later run that passed → summary --input and spec --input exit 1
+Clause: when a stream holds a run that failed only on its policy and a later run that passed → summary --format=json names exit code 1 as the run's
+Clause: when a stream holds a run that failed only on its policy and a later run that passed → the test-result predicate of the stream says FAILED
+--- a/internal/gotestspec/run.go
++++ b/internal/gotestspec/run.go
+@@ -32,7 +32,7 @@
+ 		if ev.Manifest != nil && !ok {
+ 			r.Manifest, ok = *ev.Manifest, true
+ 		}
+-		if ev.Result != nil && (r.ExitCode == nil || ev.Result.ExitCode > *r.ExitCode) {
++		if ev.Result != nil {
+ 			code := ev.Result.ExitCode
+ 			r.ExitCode = &code
+ 		}

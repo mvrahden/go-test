@@ -45,6 +45,15 @@ const (
 {"Action":"pass","Package":"example.com/m/calc"}
 {"Action":"pass","Package":"gotest run","RunLevel":true,"Result":{"ExitCode":0,"Packages":{"Passed":1,"Failed":0,"Skipped":0},"Tests":{"Passed":2,"Failed":0,"Skipped":0}}}
 `
+	vacuousOnlyRun = runOpens + `
+{"Action":"run","Package":"example.com/m/calc","Test":"TestCalcTestSuite"}
+{"Action":"run","Package":"example.com/m/calc","Test":"TestCalcTestSuite/TestPrints"}
+{"Action":"attr","Package":"example.com/m/calc","Test":"TestCalcTestSuite/TestPrints","Key":"gotest.assertions","Value":"0"}
+{"Action":"pass","Package":"example.com/m/calc","Test":"TestCalcTestSuite/TestPrints"}
+{"Action":"pass","Package":"example.com/m/calc","Test":"TestCalcTestSuite"}
+{"Action":"pass","Package":"example.com/m/calc"}
+{"Action":"fail","Package":"gotest run","RunLevel":true,"Result":{"ExitCode":1,"Packages":{"Passed":1,"Failed":0,"Skipped":0},"Tests":{"Passed":2,"Failed":0,"Skipped":0},"NotRun":0,"Vacuous":1}}
+`
 	plainStream = `{"Action":"run","Package":"example.com/m/calc","Test":"TestAdds"}
 {"Action":"pass","Package":"example.com/m/calc","Test":"TestAdds"}
 {"Action":"pass","Package":"example.com/m/calc"}
@@ -126,6 +135,19 @@ func (s *CLITestResultTestSuite) TestThePredicate(t *gotest.T) {
 			gotest.Empty(it, run.Stdout)
 			gotest.Regexp(it, "^FAIL: ", run.Stderr)
 			gotest.Contains(it, run.Stderr, "--events-file")
+		})
+	})
+}
+
+func (s *CLITestResultTestSuite) TestThePredicateOfAPolicyFailure(t *gotest.T) {
+	t.When("summary writes the test-result predicate of a stream whose run failed only on tests that passed without an assertion", func(w *gotest.T) {
+		run := testResult(w, vacuousOnlyRun)
+		w.It("exits 0 and prints result FAILED with those tests in warnedTests", func(it *gotest.T) {
+			p := readPredicate(it, &run)
+			gotest.Equal(it, "FAILED", p.Result)
+			gotest.Equal(it, []string{"example.com/m/calc.TestCalcTestSuite/TestPrints"}, p.WarnedTests)
+			gotest.Empty(it, p.FailedTests)
+			gotest.Empty(it, p.PassedTests)
 		})
 	})
 }

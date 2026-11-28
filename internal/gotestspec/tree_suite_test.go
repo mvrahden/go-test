@@ -939,3 +939,93 @@ func (s *TreeTestSuite) TestSkipReasons(t *gotest.T, _ *treeCtx) {
 	mustEq(t, "no reason when the source cannot say", without["TestLogThenSkip"], "")
 	mustEq(t, "the harness's own skip without the source", without["TestGuardedTestSuite"], "suite guard: DATABASE_URL not set")
 }
+
+// One run each of a package: failed, passed, and failed on its own with every
+// test passing.
+const (
+	ledgerRed = `{"Action":"start","Package":"example.com/again"}
+{"Action":"run","Package":"example.com/again","Test":"TestLedgerTestSuite","Gotest":{"Subtest":"TestLedgerTestSuite"}}
+{"Action":"run","Package":"example.com/again","Test":"TestLedgerTestSuite/TestPosts","Gotest":{"Subtest":"TestPosts"}}
+{"Action":"output","Package":"example.com/again","Test":"TestLedgerTestSuite/TestPosts","Output":"    ledger_test.go:14: posted twice\n"}
+{"Action":"fail","Package":"example.com/again","Test":"TestLedgerTestSuite/TestPosts","Elapsed":0.01}
+{"Action":"run","Package":"example.com/again","Test":"TestLedgerTestSuite/TestBalances","Gotest":{"Subtest":"TestBalances"}}
+{"Action":"pass","Package":"example.com/again","Test":"TestLedgerTestSuite/TestBalances","Elapsed":0.01}
+{"Action":"fail","Package":"example.com/again","Test":"TestLedgerTestSuite","Elapsed":0.02}
+{"Action":"fail","Package":"example.com/again","Elapsed":0.03}
+`
+	ledgerGreenTests = `{"Action":"start","Package":"example.com/again"}
+{"Action":"run","Package":"example.com/again","Test":"TestLedgerTestSuite","Gotest":{"Subtest":"TestLedgerTestSuite"}}
+{"Action":"run","Package":"example.com/again","Test":"TestLedgerTestSuite/TestPosts","Gotest":{"Subtest":"TestPosts"}}
+{"Action":"pass","Package":"example.com/again","Test":"TestLedgerTestSuite/TestPosts","Elapsed":0.01}
+{"Action":"run","Package":"example.com/again","Test":"TestLedgerTestSuite/TestBalances","Gotest":{"Subtest":"TestBalances"}}
+{"Action":"pass","Package":"example.com/again","Test":"TestLedgerTestSuite/TestBalances","Elapsed":0.01}
+{"Action":"pass","Package":"example.com/again","Test":"TestLedgerTestSuite","Elapsed":0.02}
+`
+	ledgerGreen = ledgerGreenTests + `{"Action":"pass","Package":"example.com/again","Elapsed":0.03}
+`
+	ledgerCrashed = ledgerGreenTests + `{"Action":"output","Package":"example.com/again","Output":"panic: the ledger is closed\n"}
+{"Action":"fail","Package":"example.com/again","Elapsed":0.03}
+`
+)
+
+// ledgerReadsFailed checks a tree of the ledger package whose TestPosts
+// failed in one of the runs its stream holds.
+func ledgerReadsFailed(t *gotest.T, tree []*gotestspec.Package) {
+	mustLen(t, "packages", tree, 1)
+	mustEq(t, "package status", tree[0].Status, gotestspec.StatusFail)
+	mustLen(t, "suites", tree[0].Nodes, 1)
+	suite := tree[0].Nodes[0]
+	mustEq(t, "suite status", suite.Status, gotestspec.StatusFail)
+	mustLen(t, "methods", suite.Children, 2)
+	posts, balances := suite.Children[0], suite.Children[1]
+	mustEq(t, "TestPosts", posts.Status, gotestspec.StatusFail)
+	mustEq(t, "TestBalances", balances.Status, gotestspec.StatusPass)
+	mustContain(t, strings.Join(posts.Output, ""), "posted twice", "the failed method keeps its output")
+	stats := gotestspec.CollectStats(tree)
+	mustEq(t, "failed", stats.Failed, 1)
+	mustEq(t, "passed", stats.Passed, 1)
+	mustEq(t, "HasFailures", gotestspec.HasFailures(tree), true)
+}
+
+func (s *TreeTestSuite) TestAFailedVerdictStandsAgainstALaterPass(t *gotest.T, _ *treeCtx) {
+	ledgerReadsFailed(t, treeOf(t, ledgerRed+ledgerGreen))
+}
+
+func (s *TreeTestSuite) TestALaterFailReplacesAPass(t *gotest.T, _ *treeCtx) {
+	ledgerReadsFailed(t, treeOf(t, ledgerGreen+ledgerRed))
+}
+
+func (s *TreeTestSuite) TestAPackageThatFailedOnItsOwnStaysFailed(t *gotest.T, _ *treeCtx) {
+	tree := treeOf(t, ledgerCrashed+ledgerGreen)
+	mustLen(t, "packages", tree, 1)
+	mustEq(t, "package status", tree[0].Status, gotestspec.StatusFail)
+	mustLen(t, "suites", tree[0].Nodes, 1)
+	mustLen(t, "methods", tree[0].Nodes[0].Children, 2)
+	for _, m := range tree[0].Nodes[0].Children {
+		mustEq(t, m.Name, m.Status, gotestspec.StatusPass)
+	}
+	mustEq(t, "failed packages", gotestspec.CollectStats(tree).FailedPackages, 1)
+	mustEq(t, "HasFailures", gotestspec.HasFailures(tree), true)
+}
+
+// The editor composes a rerun as each key's newest lines, the package's last.
+func (s *TreeTestSuite) TestAStreamOfNewestLinesReadsByThem(t *gotest.T, _ *treeCtx) {
+	tree := treeOf(t, `{"Action":"run","Package":"example.com/again","Test":"TestLedgerTestSuite/TestBalances","Gotest":{"Subtest":"TestBalances"}}
+{"Action":"pass","Package":"example.com/again","Test":"TestLedgerTestSuite/TestBalances","Elapsed":0.01}
+{"Action":"run","Package":"example.com/again","Test":"TestLedgerTestSuite","Gotest":{"Subtest":"TestLedgerTestSuite"}}
+{"Action":"pass","Package":"example.com/again","Test":"TestLedgerTestSuite","Elapsed":0.02}
+{"Action":"run","Package":"example.com/again","Test":"TestLedgerTestSuite/TestPosts","Gotest":{"Subtest":"TestPosts"}}
+{"Action":"pass","Package":"example.com/again","Test":"TestLedgerTestSuite/TestPosts","Elapsed":0.01}
+{"Action":"start","Package":"example.com/again"}
+{"Action":"pass","Package":"example.com/again","Elapsed":0.03}
+`)
+	mustLen(t, "packages", tree, 1)
+	mustEq(t, "package status", tree[0].Status, gotestspec.StatusPass)
+	mustLen(t, "suites", tree[0].Nodes, 1)
+	mustEq(t, "suite status", tree[0].Nodes[0].Status, gotestspec.StatusPass)
+	mustLen(t, "methods", tree[0].Nodes[0].Children, 2)
+	for _, m := range tree[0].Nodes[0].Children {
+		mustEq(t, m.Name, m.Status, gotestspec.StatusPass)
+	}
+	mustEq(t, "HasFailures", gotestspec.HasFailures(tree), false)
+}

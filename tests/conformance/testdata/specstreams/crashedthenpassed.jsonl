@@ -1,0 +1,17 @@
+{"Time":"2026-11-02T10:00:00.000Z","Action":"start","Package":"example.com/again"}
+{"Time":"2026-11-02T10:00:00.001Z","Action":"run","Package":"example.com/again","Test":"TestLedgerTestSuite","Gotest":{"Subtest":"TestLedgerTestSuite"}}
+{"Time":"2026-11-02T10:00:00.002Z","Action":"run","Package":"example.com/again","Test":"TestLedgerTestSuite/TestPosts","Gotest":{"Subtest":"TestPosts"}}
+{"Time":"2026-11-02T10:00:00.004Z","Action":"pass","Package":"example.com/again","Test":"TestLedgerTestSuite/TestPosts","Elapsed":0.01}
+{"Time":"2026-11-02T10:00:00.005Z","Action":"run","Package":"example.com/again","Test":"TestLedgerTestSuite/TestBalances","Gotest":{"Subtest":"TestBalances"}}
+{"Time":"2026-11-02T10:00:00.006Z","Action":"pass","Package":"example.com/again","Test":"TestLedgerTestSuite/TestBalances","Elapsed":0.01}
+{"Time":"2026-11-02T10:00:00.007Z","Action":"pass","Package":"example.com/again","Test":"TestLedgerTestSuite","Elapsed":0.02}
+{"Time":"2026-11-02T10:00:00.008Z","Action":"output","Package":"example.com/again","Output":"panic: the ledger is closed\n"}
+{"Time":"2026-11-02T10:00:00.009Z","Action":"fail","Package":"example.com/again","Elapsed":0.03}
+{"Time":"2026-11-02T10:01:00.000Z","Action":"start","Package":"example.com/again"}
+{"Time":"2026-11-02T10:01:00.001Z","Action":"run","Package":"example.com/again","Test":"TestLedgerTestSuite","Gotest":{"Subtest":"TestLedgerTestSuite"}}
+{"Time":"2026-11-02T10:01:00.002Z","Action":"run","Package":"example.com/again","Test":"TestLedgerTestSuite/TestPosts","Gotest":{"Subtest":"TestPosts"}}
+{"Time":"2026-11-02T10:01:00.004Z","Action":"pass","Package":"example.com/again","Test":"TestLedgerTestSuite/TestPosts","Elapsed":0.01}
+{"Time":"2026-11-02T10:01:00.005Z","Action":"run","Package":"example.com/again","Test":"TestLedgerTestSuite/TestBalances","Gotest":{"Subtest":"TestBalances"}}
+{"Time":"2026-11-02T10:01:00.006Z","Action":"pass","Package":"example.com/again","Test":"TestLedgerTestSuite/TestBalances","Elapsed":0.01}
+{"Time":"2026-11-02T10:01:00.007Z","Action":"pass","Package":"example.com/again","Test":"TestLedgerTestSuite","Elapsed":0.02}
+{"Time":"2026-11-02T10:01:00.009Z","Action":"pass","Package":"example.com/again","Elapsed":0.03}

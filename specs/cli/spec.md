@@ -441,6 +441,20 @@ gotest summary's first line SHALL count as passed only the tests that passed and
 - **WHEN** gotest summary runs a package with failed, passed and skipped tests
 - **THEN** the headline opens with the failed count, then the passed and the skipped
 
+### Requirement: The headline of a run that failed with no failed test
+gotest summary's first line, in its terminal and Markdown summaries and the GitHub step summary, of a run that ended with another exit code than 0 while no test and no package failed SHALL open with Run failed, that exit code and that no test failed, then the passed, skipped, not-run and vacuous counts that are not zero, and SHALL NOT say All.
+
+#### Scenario: A run that failed with no failed test
+- **WHEN** gotest summary --ci runs a package whose only problem is tests that passed without an assertion
+- **THEN** the headline opens with Run failed with exit 1, says no test failed and counts the passed, skipped and vacuous tests
+- **AND** the Markdown headline and the GitHub step summary open so too
+- **AND** the summary of the run's saved stream opens so too
+
+#### Scenario: A run that failed on its coverage limit
+- **WHEN** gotest summary --min=100 runs a package whose tests pass and cover nothing
+- **THEN** the headline opens with Run failed with exit 1, says no test failed and counts the passed test
+- **AND** the Markdown headline does not say All
+
 ### Requirement: Annotations of a summary
 gotest summary --github SHALL annotate a failed test at its file in its package's directory, and a package that failed to build at the path the compiler printed, which already names the file from the working directory.
 
@@ -451,6 +465,17 @@ gotest summary --github SHALL annotate a failed test at its file in its package'
 #### Scenario: A failed test
 - **WHEN** gotest summary --github runs a package with a failed test
 - **THEN** annotates the failure at the test file in its package's directory
+
+### Requirement: The annotation of a run that failed with no failed test
+gotest summary --github SHALL give a run that ended with another exit code than 0 while no test and no package failed one error annotation without a file, titled gotest run failed, naming the exit code and, for exit code 1 with tests that passed without an assertion, how many did; any other such run's annotation points to the run's own output.
+
+#### Scenario: A run that failed with no failed test
+- **WHEN** gotest summary --github --ci runs a package whose only problem is tests that passed without an assertion
+- **THEN** writes one error annotation without a file, naming exit 1 and the 5 tests that passed without an assertion
+
+#### Scenario: A run that failed on its coverage limit
+- **WHEN** gotest summary --github --min=100 runs a package whose tests pass and cover nothing
+- **THEN** writes one error annotation without a file, naming exit 1 and the run's own output
 
 ### Requirement: A run's result as an in-toto predicate
 `gotest summary --input=<stream> --format=intoto-test-result` SHALL print the in-toto test-result predicate, v0.1, of the run the stream records: FAILED when a test or package failed or the run did not exit 0, WARNED when a test passed without an assertion, else PASSED; each leaf test as `<package>.<test>` in its list; the CLI and Go versions and the arguments from the manifest; the Actions run's url under GitHub Actions. A stream without a manifest SHALL exit 2.
@@ -467,6 +492,13 @@ gotest summary --github SHALL annotate a failed test at its file in its package'
 #### Scenario: A stream gotest did not write
 - **WHEN** summary writes the test-result predicate of a stream without a run manifest
 - **THEN** exits 2 naming --events-file on stderr, with nothing on stdout
+
+### Requirement: The predicate of a failed run exits 0
+`gotest summary --format=intoto-test-result` SHALL exit 0 for a run that failed: the result is the document's.
+
+#### Scenario: The predicate of a run that failed only on its policy
+- **WHEN** summary writes the test-result predicate of a stream whose run failed only on tests that passed without an assertion
+- **THEN** exits 0 and prints result FAILED with those tests in warnedTests
 
 ### Requirement: Hooks that call t.T() where it is nil
 gotest SHALL refuse with exit 2 a suite whose hook calls t.T() where its wrapper makes it nil: every hook under a benchmark method, BeforeAll and AfterAll under a fuzz method. One error names every such hook in source order, at the first. It reads the hook's own body, closures and aliases of t included, not the helpers it calls, and accepts a call whose result is checked for nil. The cases are the table in `tests/conformance/cli/rejections_suite_test.go`.
@@ -636,7 +668,7 @@ gotest clean --cache SHALL remove every cached binary no run is linking or copyi
 - **AND** refuses a package beside the flag with exit 2
 
 ### Requirement: Saving the event stream
-A run given --events-file SHALL write to that file byte for byte the go test -json stream it prints, and SHALL change none of its other output, coverage or exit code. Each event SHALL reach the file when it reaches stdout, a suite's events when its process ends or, under --live, as written, so a run stopped or killed leaves every event written before, each line whole. summary --input SHALL render the file as the run's summary and exit code, a --min limit excepted: the live run judges it.
+A run given --events-file SHALL write to that file byte for byte the go test -json stream it prints, and SHALL change none of its other output, coverage or exit code. Each event SHALL reach the file when it reaches stdout, a suite's events when its process ends or, under --live, as written, so a run stopped or killed leaves every event written before, each line whole. summary --input SHALL render the file as the run's summary and exit as the run did.
 
 #### Scenario: A -json run with --events-file
 - **WHEN** a -json run is given --events-file
@@ -738,6 +770,34 @@ spec and summary --format=json SHALL name the run they render in `run`, right af
 #### Scenario: A document of go test's own stream
 - **WHEN** spec --format=json renders a stream go test wrote
 - **THEN** holds no run
+
+### Requirement: A replayed stream's exit code
+spec and summary given --input SHALL exit as the run the stream records ended: with the `ExitCode` of the `Result` that closes it when that is not 0, the greatest of them when the stream holds several closed runs, and --format=json SHALL name that code as the run's `exitCode`. --render-only SHALL exit 0 whatever the run did.
+
+#### Scenario: A run that failed only on its policy
+- **WHEN** the saved stream of a --ci run that failed only on tests that passed without an assertion is replayed
+- **THEN** summary --input and spec --input exit 1, as the run did, and 0 with --render-only
+
+#### Scenario: A run that ended with another code
+- **WHEN** the saved stream of a run that ended with exit code 2 or 130 is replayed
+- **THEN** summary --input and spec --input exit with that code
+
+#### Scenario: A stream of several closed runs
+- **WHEN** a stream holds a run that failed only on its policy and a later run that passed
+- **THEN** summary --input and spec --input exit 1
+- **AND** summary --format=json names exit code 1 as the run's
+- **AND** the test-result predicate of the stream says FAILED
+
+### Requirement: A replayed stream without a closing result
+When no closed run ended with another code than 0, or the stream holds no closing Result, as one an older gotest or go test wrote and one filtered of its RunLevel events do, spec and summary given --input SHALL exit by the verdicts the stream holds: 2 when a package failed to build or the stream holds no verdict to report (no test events, or a package it opened never reported), 1 when a test or a package failed, else 0.
+
+#### Scenario: A stream without a closing result
+- **WHEN** a stream that go test wrote, or gotest wrote and a filter stripped of its RunLevel events, is replayed
+- **THEN** exits 1 when it holds a failed test and 0 when it holds none
+
+#### Scenario: A run that did not close its stream
+- **WHEN** the saved stream of a run that never closed it is replayed
+- **THEN** exits 2, naming gotest run as the package without a verdict
 
 ### Requirement: A suite cut short by --timeout
 A suite process an expired --timeout stopped SHALL fail its package on the text, -json and spec pipelines, whatever its tests reported: a method that returned when its context ended did not finish. The FAIL line of the run SHALL name the suite when no method was still running. An interrupt SHALL keep the tests' own verdicts, as the lifecycle spec states. A method running when the stop came SHALL be booked failed in the stream with the line that names the deadline.

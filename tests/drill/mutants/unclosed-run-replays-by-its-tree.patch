@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / exits 2, naming gotest run as the package without a verdict \(
+Clause: when the saved stream of a run that never closed it is replayed → exits 2, naming gotest run as the package without a verdict
+--- a/cmd/gotest/spec.go
++++ b/cmd/gotest/spec.go
+@@ -421,7 +421,7 @@
+ 			continue
+ 		}
+ 		seen = true
+-		if ev.Package == "" {
++		if ev.Package == "" || ev.Package == "gotest run" {
+ 			continue
+ 		}
+ 		if ev.Test == "" && (ev.Action == gotestspec.ActionPass || ev.Action == gotestspec.ActionFail || ev.Action == gotestspec.ActionSkip) {

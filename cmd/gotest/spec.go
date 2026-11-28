@@ -200,9 +200,9 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	return code
 }
 
-// runOptions name the run events record, with code as its exit code when
-// not nil; none for a stream with no manifest.
-func runOptions(events []gotestspec.TestEvent, code *int) []gotestspec.RenderOption {
+// runInfo is the run events record, with code as its exit code when not
+// nil; nil for a stream with no manifest.
+func runInfo(events []gotestspec.TestEvent, code *int) *gotestspec.RunInfo {
 	run, ok := gotestspec.RunOf(events)
 	if !ok {
 		return nil
@@ -211,7 +211,17 @@ func runOptions(events []gotestspec.TestEvent, code *int) []gotestspec.RenderOpt
 		c := *code
 		run.ExitCode = &c
 	}
-	return []gotestspec.RenderOption{gotestspec.WithRun(&run)}
+	return &run
+}
+
+// runOptions name the run events record, with code as its exit code when
+// not nil; none for a stream with no manifest.
+func runOptions(events []gotestspec.TestEvent, code *int) []gotestspec.RenderOption {
+	run := runInfo(events, code)
+	if run == nil {
+		return nil
+	}
+	return []gotestspec.RenderOption{gotestspec.WithRun(run)}
 }
 
 // renderSpec renders tree in format, under the view's options; live says
@@ -354,8 +364,9 @@ func runSpecFromInput(input, format, output string, noColor, renderOnly, checkFr
 }
 
 // replayExitCode is the verdict of a replayed stream: 2 when it holds no
-// verdict to report (see replayVerdict) or a package failed to build, as the
-// live run exits; 1 on failures, else 0. renderOnly drops the verdict.
+// verdict to report (see replayVerdict); else the greatest of the code its
+// closed runs ended with and what its verdicts say, 2 for a failed build,
+// 1 on failures, else 0. renderOnly drops the verdict.
 func replayExitCode(events []gotestspec.TestEvent, tree []*gotestspec.Package, renderOnly bool) int {
 	if renderOnly {
 		return 0
@@ -365,13 +376,17 @@ func replayExitCode(events []gotestspec.TestEvent, tree []*gotestspec.Package, r
 		fmt.Fprintf(os.Stderr, "FAIL: %s", gap)
 		return 2
 	}
-	if buildFailed {
-		return 2
+	code := 0
+	switch {
+	case buildFailed:
+		code = 2
+	case gotestspec.HasFailures(tree):
+		code = 1
 	}
-	if gotestspec.HasFailures(tree) {
-		return 1
+	if run := runInfo(events, nil); run != nil && run.ExitCode != nil {
+		code = max(code, *run.ExitCode)
 	}
-	return 0
+	return code
 }
 
 // replayVerdict says why a replayed stream carries no verdict: it holds no
