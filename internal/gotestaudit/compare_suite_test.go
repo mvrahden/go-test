@@ -125,7 +125,8 @@ func (s *AuditCompareTestSuite) TestTheCountedFunctions(t *gotest.T) {
 // classFindings are a document's findings as {Class, Subject, Base, Head}.
 func classFindings(doc *gotestaudit.Document) [][4]string {
 	var out [][4]string
-	for _, f := range doc.Findings {
+	for i := range doc.Findings {
+		f := &doc.Findings[i]
 		out = append(out, [4]string{f.Class, f.Subject, f.Base, f.Head})
 	}
 	return out
