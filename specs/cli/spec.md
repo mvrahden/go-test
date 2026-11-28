@@ -198,7 +198,7 @@ Each suite process SHALL run only its own suite under a -run pattern: for every 
 - **THEN** runs the test methods and replays no fuzz seed, as go test does
 
 ### Requirement: Go test flags gotest implements
-A go test flag gotest implements itself SHALL keep the meaning go test gives it, or SHALL be refused with a reason. The cases are the table in `tests/conformance/cli/goflags_suite_test.go`.
+A go test flag gotest implements itself SHALL keep the meaning go test gives it, or SHALL be refused with a reason. The cases are the table in `tests/conformance/cli/goflags_suite_test.go`. A -n the go command reads from GOFLAGS, set in the environment or in go's env file, SHALL be refused with exit 2 as the argument is, by every command that builds test binaries; -n=false is no dry run and is accepted.
 
 #### Scenario: A go test flag gotest takes over
 - **WHEN** a go test flag gotest implements itself is given
@@ -212,6 +212,11 @@ A go test flag gotest implements itself SHALL keep the meaning go test gives it,
 #### Scenario: A build-only mode or the fuzz engine
 - **WHEN** -c, -n or -fuzz is given to a run
 - **THEN** refuses each with exit 2, naming what does that job instead
+
+#### Scenario: A dry run asked for through GOFLAGS
+- **WHEN** GOFLAGS carries -n for a run after a test file changed since a passing run
+- **THEN** refuses the run with exit 2 before anything is built, naming GOFLAGS, and prints nothing on stdout
+- **AND** refuses it the same when go's env file sets GOFLAGS
 
 #### Scenario: A profile flag over several suite processes
 - **WHEN** -cpuprofile, -memprofile, -blockprofile, -mutexprofile or -trace is given to a run that starts two suite processes
@@ -593,7 +598,7 @@ A run SHALL link its test binaries without the symbol table and debug informatio
 - **THEN** the test prints the value and the binary carries debug information
 
 ### Requirement: A run never executes a stale binary
-A run SHALL execute a test binary built from the sources, build tags and link flags it was given, whatever an earlier run left in the cache.
+A run SHALL execute a test binary built from the sources, build tags and link flags it was given, whatever an earlier run left in the cache. A cached binary the go command neither rebuilt nor found up to date in this run SHALL NOT be executed: its package is built again without the cache.
 
 #### Scenario: A dependency changes and changes back
 - **WHEN** a dependency's source is changed, run, and restored
@@ -626,6 +631,14 @@ A run SHALL execute a test binary built from the sources, build tags and link fl
 #### Scenario: A filtered run before a full one
 - **WHEN** a run that -run narrows to one package is followed by an unfiltered run
 - **THEN** the second run builds and runs the other package
+
+### Requirement: A run builds for the go command's target platform
+A run SHALL execute a test binary built for the target platform it was given, the go command's GOOS and GOARCH from the environment or go's env file: test binaries are named, built and cached for it, apart from every other platform's. gotest starts each binary on the host, or under -exec; a binary the host cannot start fails its suites with exit 2, naming the platform it was built for. The scenario below gives GOOS=linux on a Windows host and GOOS=windows on any other.
+
+#### Scenario: A target platform the host cannot execute
+- **WHEN** a test file is changed after a passing run and the next run is given another operating system as GOOS
+- **THEN** exits 2 with each suite reported as not started and the platform its binary is built for named on stderr, and prints nothing the cached binary would
+- **AND** leaves the cached binary of the host's platform as the passing run left it
 
 ### Requirement: Clearing the test binary cache
 gotest clean --cache SHALL remove every cached binary no run is linking or copying, with its lock and record, and say how many.

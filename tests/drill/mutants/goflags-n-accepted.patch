@@ -1,0 +1,14 @@
+Clause: when GOFLAGS carries -n for a run after a test file changed since a passing run → refuses the run with exit 2 before anything is built, naming GOFLAGS, and prints nothing on stdout
+Expect: ^FAIL .*conformance/cli CLIUnbuiltBinary .* / refuses the run with exit 2 before anything is built, naming GOFLAGS, and prints nothing on stdout \(
+--- a/cmd/gotest/cli.go
++++ b/cmd/gotest/cli.go
+@@ -391,9 +391,6 @@
+ 	if compileParallel == 0 {
+ 		compileParallel = projCfg.CompileParallel
+ 	}
+-	if err := refuseDryRun(gotestrunner.ReadGoSettings().GOFLAGS); err != nil {
+-		return ExecConfig{}, err
+-	}
+ 	if hasFlag(goTestArgs, "-o") {
+ 		return ExecConfig{}, fmt.Errorf("-o is not supported: gotest builds each suite's binary itself; use `gotest generate` to see the sources, or -exec to run the binaries under a command")
+ 	}

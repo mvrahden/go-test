@@ -97,6 +97,8 @@ func ExportParseExecFlags(ownArgs, goTestArgs []string, projCfg *config.ProjectC
 	return parseExecFlags(own, goTestArgs, projCfg)
 }
 
+var ExportRefuseDryRun = refuseDryRun
+
 // color.go
 var (
 	ExportColorDisabled = colorDisabled

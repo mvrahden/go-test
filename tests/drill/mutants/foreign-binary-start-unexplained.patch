@@ -1,0 +1,21 @@
+Clause: when a test file is changed after a passing run and the next run is given another operating system as GOOS → exits 2 with each suite reported as not started and the platform its binary is built for named on stderr, and prints nothing the cached binary would
+Expect: ^FAIL .*conformance/cli CLIUnbuiltBinary .* / exits 2 with each suite reported as not started and the platform its binary is built for named on stderr, and prints nothing the cached binary would \(
+--- a/internal/gotestrunner/suiterun.go
++++ b/internal/gotestrunner/suiterun.go
+@@ -8,7 +8,6 @@
+ 	"os"
+ 	"os/exec"
+ 	"regexp"
+-	"runtime"
+ 	"slices"
+ 	"sort"
+ 	"strings"
+@@ -324,7 +323,7 @@
+ 	if err != nil {
+ 		return SuiteResult{
+ 			Target:   target,
+-			Stderr:   fmt.Appendf(nil, "gotest: %s did not start: %v\n%s", target.SuiteName, err, foreignTargetNote(goSettings(), runtime.GOOS, runtime.GOARCH, target.Exec)),
++			Stderr:   fmt.Appendf(nil, "gotest: %s did not start: %v\n", target.SuiteName, err),
+ 			ExitCode: 2,
+ 			Started:  start,
+ 			Duration: time.Since(start),

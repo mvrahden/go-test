@@ -62,7 +62,7 @@ func (s *CompileStageTestSuite) TestReadiness(t *gotest.T, ctx *stageCtx) {
 		{Desc: "same file, newer, exit 0", Placed: placed, Now: touched, Exited: 0, Want: gotestrunner.ExportConfirmed},
 		{Desc: "same file, not newer, go running", Placed: placed, Now: placed, Exited: running, Want: gotestrunner.ExportNotReady},
 		{Desc: "same file, not newer, exit 1", Placed: placed, Now: placed, Exited: 1, Want: gotestrunner.ExportNotReady},
-		{Desc: "same file, not newer, exit 0", Placed: placed, Now: placed, Exited: 0, Want: gotestrunner.ExportConfirmed},
+		{Desc: "same file, not newer, exit 0", Placed: placed, Now: placed, Exited: 0, Want: gotestrunner.ExportUnseen},
 		{Desc: "a new file where go renames", Placed: placed, Now: other, RenameSafe: true, Exited: running, Want: gotestrunner.ExportRebuilt},
 		{Desc: "a new file in an empty slot where go renames", Now: other, RenameSafe: true, Exited: running, Want: gotestrunner.ExportRebuilt},
 		{Desc: "a new file where go copies, go running", Placed: placed, Now: other, Exited: running, Want: gotestrunner.ExportNotReady},

@@ -391,6 +391,9 @@ func parseExecFlags(own OwnFlags, goTestArgs []string, projCfg *config.ProjectCo
 	if compileParallel == 0 {
 		compileParallel = projCfg.CompileParallel
 	}
+	if err := refuseDryRun(gotestrunner.ReadGoSettings().GOFLAGS); err != nil {
+		return ExecConfig{}, err
+	}
 	if hasFlag(goTestArgs, "-o") {
 		return ExecConfig{}, fmt.Errorf("-o is not supported: gotest builds each suite's binary itself; use `gotest generate` to see the sources, or -exec to run the binaries under a command")
 	}
@@ -471,6 +474,50 @@ func refuseSelection(goTestArgs []string) error {
 		}
 	}
 	return nil
+}
+
+// refuseDryRun refuses a -n the go command reads from GOFLAGS: go would build nothing, and a cached binary would stand in for the run's.
+func refuseDryRun(goflags string) error {
+	for _, field := range goflagsFields(goflags) {
+		name, value, hasValue := strings.Cut(field, "=")
+		if name != "-n" && name != "--n" {
+			continue
+		}
+		if off, err := strconv.ParseBool(value); hasValue && err == nil && !off {
+			continue
+		}
+		return fmt.Errorf("-n in GOFLAGS is not supported: gotest has no dry run; drop it from GOFLAGS (the environment, or go env -w), and use --debug to keep the generated sources and the work dir of a real run")
+	}
+	return nil
+}
+
+// goflagsFields splits GOFLAGS as the go command does: white space separates
+// fields, and a field that starts with a quote runs to the next same quote,
+// which it loses. An unterminated quote runs to the end.
+func goflagsFields(goflags string) []string {
+	const space = " \t\n\r"
+	var fields []string
+	for {
+		goflags = strings.TrimLeft(goflags, space)
+		if goflags == "" {
+			return fields
+		}
+		if q := goflags[0]; q == '\'' || q == '"' {
+			end := strings.IndexByte(goflags[1:], q)
+			if end < 0 {
+				return append(fields, goflags[1:])
+			}
+			fields = append(fields, goflags[1:end+1])
+			goflags = goflags[end+2:]
+			continue
+		}
+		end := strings.IndexAny(goflags, space)
+		if end < 0 {
+			end = len(goflags)
+		}
+		fields = append(fields, goflags[:end])
+		goflags = goflags[end:]
+	}
 }
 
 // ensureCoverProfile makes sure a -coverprofile is in play when a coverage

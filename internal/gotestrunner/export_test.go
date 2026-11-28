@@ -886,6 +886,7 @@ const (
 	ExportNotReady  = notReady
 	ExportConfirmed = confirmed
 	ExportRebuilt   = rebuilt
+	ExportUnseen    = unseen
 )
 
 var (
@@ -913,6 +914,19 @@ func ExportSetGoCacheDir(dir string) (restore func()) {
 	prev := goCacheDir
 	goCacheDir = func() string { return dir }
 	return func() { goCacheDir = prev }
+}
+
+var (
+	ExportReadGoSettings    = readGoSettings
+	ExportForeignTargetNote = foreignTargetNote
+)
+
+// ExportSetGoSettings makes s what the go command builds for and with until
+// restore.
+func ExportSetGoSettings(s GoSettings) (restore func()) {
+	prev := goSettings
+	goSettings = func() GoSettings { return s }
+	return func() { goSettings = prev }
 }
 
 var ExportLinkFlags = linkFlags

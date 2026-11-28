@@ -27,7 +27,8 @@ const pollInterval = 25 * time.Millisecond
 // its binary as soon as it is ready, or its failure as go attributed it.
 // It returns the packages of a group of several that go left without a
 // verdict of their own (a dependency failed), for the caller to build
-// alone, where whatever go says is theirs.
+// alone, where whatever go says is theirs. A placed binary go exited 0
+// without touching is built again in a call of its own, without the cache.
 func compileGroup(ctx context.Context, group []string, overlayFlag string, buildFlags []string, stageDir, goTmp, cacheDir string, emit func(CompileOutcome)) []string {
 	staged, err := stageGroup(group, stageDir, cacheDir)
 	if err == nil {
@@ -73,8 +74,10 @@ func compileGroup(ctx context.Context, group []string, overlayFlag string, build
 				continue
 			}
 			now, _ := os.Stat(b.Path)
-			if r := binaryReady(b.placed, now, safe, exited); r != notReady {
-				reported[i], ready[i] = true, r
+			r := binaryReady(b.placed, now, safe, exited)
+			ready[i] = r
+			if r == confirmed || r == rebuilt {
+				reported[i] = true
 				found = append(found, i)
 			}
 		}
@@ -97,7 +100,18 @@ wait:
 	pass(exitCode(runErr))
 	forwardBuildOutput(staged, reported, log, &stderr)
 
-	var left []string
+	left, again := settleGroup(ctx, staged, reported, ready, runErr, log, stderr.Bytes(), emit)
+	if len(again) > 0 {
+		left = append(left, compileGroup(ctx, again, overlayFlag, buildFlags, filepath.Join(stageDir, "again"), goTmp, "", emit)...)
+	}
+	return left
+}
+
+// settleGroup closes a group once go exited: it publishes what was reported
+// and sorts the rest. left are the packages of a group of several that go
+// gave no verdict, again those whose placed binary go left unseen. A package
+// alone in its group that go gave nothing gets its failure.
+func settleGroup(ctx context.Context, staged []stagedBinary, reported []bool, ready []readiness, runErr error, log *buildLog, stderr []byte, emit func(CompileOutcome)) (left, again []string) {
 	for i := range staged {
 		b := &staged[i]
 		switch {
@@ -106,17 +120,19 @@ wait:
 				publish(b, ready[i])
 			}
 		case ctx.Err() != nil:
-		case len(group) > 1:
+		case ready[i] == unseen:
+			again = append(again, b.Package)
+		case len(staged) > 1:
 			left = append(left, b.Package)
 		default:
-			diags := slices.Concat(log.diagnostics(b.Package), log.shared(), stderr.Bytes())
+			diags := slices.Concat(log.diagnostics(b.Package), log.shared(), stderr)
 			if runErr == nil {
 				runErr = errors.New("go test -c wrote no test binary")
 			}
 			emit(CompileOutcome{Package: b.Package, Err: compileError(b.Package, runErr, diags)})
 		}
 	}
-	return left
+	return left, again
 }
 
 // forwardBuildOutput writes to stderr what go said that no failure carries:
@@ -195,7 +211,7 @@ func stageGroup(group []string, stageDir, cacheDir string) ([]stagedBinary, erro
 	for i, pkg := range group {
 		b := &staged[i]
 		b.Package = pkg
-		b.Path = filepath.Join(stageDir, testBinaryName(pkg, runtime.GOOS))
+		b.Path = filepath.Join(stageDir, testBinaryName(pkg, goSettings().GOOS))
 		if cacheDir != "" {
 			b.Cached = filepath.Join(cacheDir, sanitizePkgName(pkg)+".test")
 			place(b)
@@ -239,14 +255,16 @@ type readiness int
 
 const (
 	notReady  readiness = iota
-	confirmed           // the placed file, left by go: up to date
+	confirmed           // the placed file, touched by go: up to date
 	rebuilt             // a file go wrote
+	unseen              // the placed file, which go exited 0 without touching
 )
 
 // binaryReady judges one slot. exited is go's exit: -1 while it runs. The
-// placed file is confirmed only once go exited 0 and left it there: its
-// mtime is no sign, since every run's slot links the same cache entry and
-// another run's go touches it. A new file is ready once go exited, or as
+// placed file is confirmed only once go exited 0 and its mtime moved: go
+// touches a target it finds up to date. A moved mtime alone is no sign,
+// since every run's slot links the same cache entry and another run's go
+// touches it. Left as placed, it is unseen. A new file is ready once go exited, or as
 // soon as it is there where go renames it into place.
 func binaryReady(placed, now os.FileInfo, renameSafe bool, exited int) readiness {
 	switch {
@@ -254,6 +272,9 @@ func binaryReady(placed, now os.FileInfo, renameSafe bool, exited int) readiness
 		return notReady
 	case placed != nil && os.SameFile(placed, now):
 		if exited == 0 {
+			if now.ModTime().Equal(placed.ModTime()) {
+				return unseen
+			}
 			return confirmed
 		}
 		return notReady

@@ -781,6 +781,35 @@ func (s *FlagParsingTestSuite) TestModesARunDoesNotHave(t *gotest.T) {
 	}
 }
 
+func (s *FlagParsingTestSuite) TestADryRunInGOFLAGS(t *gotest.T) {
+	const refusal = "-n in GOFLAGS is not supported: gotest has no dry run; drop it from GOFLAGS (the environment, or go env -w), and use --debug to keep the generated sources and the work dir of a real run"
+	for sub, tc := range gotest.Each(t, []struct {
+		Desc    string
+		goflags string
+		refused bool
+	}{
+		{Desc: "empty", goflags: ""},
+		{Desc: "-n", goflags: "-n", refused: true},
+		{Desc: "--n", goflags: "--n", refused: true},
+		{Desc: "-n=true", goflags: "-n=true", refused: true},
+		{Desc: "-n=1", goflags: "-n=1", refused: true},
+		{Desc: "-n behind another flag", goflags: "-tags=x  -n", refused: true},
+		{Desc: "-n quoted as a field", goflags: "'-n'", refused: true},
+		{Desc: "-n=false", goflags: "-n=false"},
+		{Desc: "-n=0", goflags: "-n=0"},
+		{Desc: "a value that ends in n", goflags: "-tags=n -x"},
+		{Desc: "-n inside a quoted field", goflags: "'-ldflags=-s -n -w'"},
+		{Desc: "-n as another flag's value", goflags: "-run=-n"},
+	}) {
+		err := ExportRefuseDryRun(tc.goflags)
+		if tc.refused {
+			gotest.ErrorContains(sub, err, refusal)
+		} else {
+			gotest.NoError(sub, err)
+		}
+	}
+}
+
 func (s *FlagParsingTestSuite) TestCommandHint(t *gotest.T) {
 	for sub, tc := range gotest.Each(t, []struct {
 		Desc string

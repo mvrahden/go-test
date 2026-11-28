@@ -1,0 +1,13 @@
+Clause: when a test file is changed after a passing run and the next run is given another operating system as GOOS → exits 2 with each suite reported as not started and the platform its binary is built for named on stderr, and prints nothing the cached binary would
+Expect: ^FAIL .*conformance/cli CLIUnbuiltBinary .* / exits 2 with each suite reported as not started and the platform its binary is built for named on stderr, and prints nothing the cached binary would \(
+--- a/internal/gotestrunner/compilestage.go
++++ b/internal/gotestrunner/compilestage.go
+@@ -195,7 +195,7 @@
+ 	for i, pkg := range group {
+ 		b := &staged[i]
+ 		b.Package = pkg
+-		b.Path = filepath.Join(stageDir, testBinaryName(pkg, goSettings().GOOS))
++		b.Path = filepath.Join(stageDir, testBinaryName(pkg, runtime.GOOS))
+ 		if cacheDir != "" {
+ 			b.Cached = filepath.Join(cacheDir, sanitizePkgName(pkg)+".test")
+ 			place(b)

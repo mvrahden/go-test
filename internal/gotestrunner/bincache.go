@@ -17,18 +17,19 @@ import (
 // A run links its test binaries into a cache keyed by what decides the
 // link's output: the working directory (two checkouts of one module share
 // import paths), the build flags, those in GOFLAGS among them, the platform
-// and the Go version. Each entry is then stable across runs. A run places
-// its cached binaries into its own stage dir, by link or copy, under each
-// binary's lock, and builds there: go leaves a binary that is up to date
-// and replaces one that is not. Nothing writes a cache entry in place: a
+// go builds for and the Go version. Each entry is then stable across runs.
+// A run places its cached binaries into its own stage dir, by link or copy,
+// under each binary's lock, and builds there: go leaves a binary that is up
+// to date and replaces one that is not. Nothing writes a cache entry in place: a
 // rebuilt binary replaces its entry by a rename, so a run executing the old
 // file keeps it.
 
 func binaryCacheKey(cwd string, buildFlags []string) string {
 	flags := slices.Clone(buildFlags)
 	slices.Sort(flags)
+	target := goSettings()
 	h := sha256.New()
-	for _, part := range append([]string{cwd, runtime.GOOS, runtime.GOARCH, runtime.Version()}, flags...) {
+	for _, part := range append([]string{cwd, target.GOOS, target.GOARCH, runtime.Version()}, flags...) {
 		h.Write([]byte(part))
 		h.Write([]byte{0})
 	}

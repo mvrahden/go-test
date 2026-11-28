@@ -1,0 +1,13 @@
+Clause: when GOFLAGS carries -n for a run after a test file changed since a passing run → refuses it the same when go's env file sets GOFLAGS
+Expect: ^FAIL .*conformance/cli CLIUnbuiltBinary .* / refuses it the same when go's env file sets GOFLAGS \(
+--- a/internal/gotestrunner/gosettings.go
++++ b/internal/gotestrunner/gosettings.go
+@@ -26,7 +26,7 @@
+ func readGoSettings() GoSettings {
+ 	out, err := exec.Command("go", "env", "-json", "GOOS", "GOARCH", "GOFLAGS").Output()
+ 	var env map[string]string
+-	if err != nil || json.Unmarshal(out, &env) != nil || env["GOOS"] == "" || env["GOARCH"] == "" {
++	if true || err != nil || json.Unmarshal(out, &env) != nil || env["GOOS"] == "" || env["GOARCH"] == "" {
+ 		return GoSettings{GOOS: runtime.GOOS, GOARCH: runtime.GOARCH, GOFLAGS: os.Getenv("GOFLAGS")}
+ 	}
+ 	return GoSettings{GOOS: env["GOOS"], GOARCH: env["GOARCH"], GOFLAGS: env["GOFLAGS"]}

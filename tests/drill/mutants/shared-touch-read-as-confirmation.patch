@@ -2,7 +2,7 @@ Clause: when two runs of one package start together over one cache, one with a b
 Expect: ^FAIL .*conformance/cli CLIStaleBinary .* / each executes the binary built for its own tags \(
 --- a/internal/gotestrunner/bincache.go
 +++ b/internal/gotestrunner/bincache.go
-@@ -69,7 +69,7 @@
+@@ -73,7 +73,7 @@
  	if err != nil {
  		return ""
  	}
@@ -13,12 +13,12 @@ Expect: ^FAIL .*conformance/cli CLIStaleBinary .* / each executes the binary bui
  	}
 --- a/internal/gotestrunner/compilestage.go
 +++ b/internal/gotestrunner/compilestage.go
-@@ -227,7 +227,7 @@
+@@ -271,7 +271,7 @@
  	case now == nil:
  		return notReady
  	case placed != nil && os.SameFile(placed, now):
 -		if exited == 0 {
 +		if now.ModTime().After(placed.ModTime()) || exited == 0 {
- 			return confirmed
- 		}
- 		return notReady
+ 			if now.ModTime().Equal(placed.ModTime()) {
+ 				return unseen
+ 			}
