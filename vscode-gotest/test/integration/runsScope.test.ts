@@ -171,6 +171,11 @@ beforeAll(async () => {
     goMod,
     readFileSync(goMod, "utf-8").replaceAll("REPO_ROOT", repoRoot),
   );
+  // A run under a focus refreshes no pass, so --changed would run the package again.
+  const cart = path.join(mod, "shop", "cart_suite_test.go");
+  const focused = readFileSync(cart, "utf-8");
+  expect(focused).toContain("F_TestTotal");
+  writeFileSync(cart, focused.replace("F_TestTotal", "TestTotal"));
   for (const k of ["GOWORK", "GOTEST_CACHE_DIR", "GOTEST_SLOW_BUILD_THRESHOLD"])
     saved[k] = process.env[k];
   process.env.GOWORK = "off";
